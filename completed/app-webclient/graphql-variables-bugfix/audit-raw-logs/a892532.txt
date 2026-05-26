@@ -1,0 +1,155 @@
+
+
+Vou investigar o bug pattern descrito: valores string de query params sendo passados diretamente para variáveis GraphQL que esperam Boolean.
+
+---
+
+Encontrei resultados relevantes. Agora preciso verificar o modelo Filter e examinar mais de perto os casos suspeitos em `plan.service.ts`.
+
+---
+
+Agora preciso verificar de onde vem `override` e `shared` no contexto de listagem. Eles estao tipados como `boolean` no Filter model (linhas 30, 43, 83, 96), mas preciso verificar se chegam como strings dos query params da URL. Vou verificar como o Filter e construido a partir dos query params.
+
+---
+
+Agora preciso examinar mais de perto o `plan.service.ts` para `override` e `shared`. No modelo Filter, `override` e `shared` sao tipados como `boolean` (linhas 30, 43, 83, 96), mas preciso verificar se vem dos query params da URL, onde seriam strings. Vou verificar como o `plan.component.ts` passa esses valores para o filtro.
+
+---
+
+Agora preciso entender o fluxo completo de `override` e `shared` no plan.service.ts. Quando vem dos query params, Angular os converte como strings. Vou verificar se ha outros campos boolean-like que podem ter o mesmo problema buscando por padroes mais amplos.
+
+---
+
+Agora preciso verificar os dois casos suspeitos encontrados no `plan.service.ts` - linhas 62 e 74 - onde `override` e `shared` sao passados diretamente. Preciso verificar a query GraphQL para confirmar que sao `Boolean`. Ja li o arquivo e vi que nas linhas 99 e 103, a query GraphQL declara `$override: Boolean` e `$shared: Boolean`. Agora preciso verificar se, quando vem de query params, esses campos chegam como string.
+
+Vou verificar se ha algum componente que defina `override` ou `shared` nos query params da URL.
+
+---
+
+Agora preciso verificar se `override` e `shared` sao usados nos query params da URL (navegacao com `queryParams`). Se o usuario navegar para a pagina com query params na URL (ex: `?shared=true`), esses chegam como strings do Angular Router.
+
+---
+
+Vou verificar como os filtros sao aplicados - se sao enviados para a URL como queryParams.
+
+---
+
+Agora vou ver como o componente envia os filtros para o service.
+
+---
+
+Agora entendo o fluxo completo. Quando `override` e `shared` sao definidos pelo `selectOverride` e `selectShared` no componente, eles sao atribuidos como `boolean` (`true`/`false`) ou `null`. Quando vem dos query params da URL (linha 86-87), eles chegam como `string` ("true"/"false"/"null") do Angular Router.
+
+Porem, o modelo Filter declara `override: boolean` e `shared: boolean` (linhas 83, 96), entao o TypeScript nao gera erro de tipo. Mas na pratica, query params do Angular Router sao SEMPRE strings.
+
+Vou verificar o plan.service.ts mais de perto para ver como eles tratam `override` e `shared`.
+
+---
+
+Agora preciso confirmar o cenario: quando `override` e `shared` vem dos query params, o Angular Router entrega `string`. A condicao `params.override !== undefined && params.override !== null` vai ser verdadeira para a string `"null"` (que e diferente de `null`). Mas a string `"true"` e truthy, entao quando o valor e `"true"` do query param, `variables.override = "true"` (string) sera passado para a variavel GraphQL `$override: Boolean`.
+
+Vou verificar se ha outros campos boolean em outros services que podem ter o mesmo problema. Vou buscar por padroes onde o GraphQL espera Boolean mas nao ha conversao.
+
+---
+
+`withoutStatus` e declarado como `$withoutStatus: String` na query (linha 107 do plan.service.ts), entao nao e problema. Agora vou fazer uma busca mais ampla para encontrar outros possiveis campos boolean em GraphQL que recebem valores do Filter sem conversao.
+
+---
+
+Agora vou verificar o `requirement.service.ts` para o campo `unresolved`.
+
+---
+
+O `requirement.service.ts` usa `unresolved: true` hardcoded (literal boolean), e o `plan-responsible.service.ts` usa `enabled: true` hardcoded. Ambos estao corretos.
+
+Agora vou verificar o `incentive.service.ts` que tem uma assinatura diferente.
+
+---
+
+Esse esta correto. Agora tenho toda a informacao necessaria para o relatorio. Resumindo as descobertas:
+
+---
+
+## Resultado da Auditoria: String `"true"` passada para variavel GraphQL Boolean
+
+### Modelo Filter (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/filter.model.ts`)
+
+Campos relevantes e seus tipos no modelo:
+- `enabled: string` (linha 71) - tipo string
+- `override: boolean` (linha 83) - tipo boolean
+- `shared: boolean` (linha 96) - tipo boolean
+- `orphan: string` (linha 82) - tipo string (no model), tipado como string
+- `primary: string` (linha 90) - tipo string
+
+### Campo `enabled` - TODOS CORRETOS
+
+Todas as 29 ocorrencias de `variables.enabled = params.enabled` utilizam a conversao correta `params.enabled === 'true'`. Nenhuma instancia passa a string diretamente.
+
+### Campo `orphan` - CORRETO
+
+`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/user.service.ts`, linha 60:
+```typescript
+variables.orphan = params.orphan === 'true';
+```
+
+### Campo `primary` - CORRETO
+
+`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-identifier/user-identifier.service.ts`, linha 52:
+```typescript
+variables.primary = params.primary === 'true';
+```
+
+### Campo `override` - BUG ENCONTRADO
+
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`
+**Linha:** 62
+
+```typescript
+if (params.override !== undefined && params.override !== null) {
+    variables.override = params.override;  // <-- BUG: sem conversao boolean
+}
+```
+
+A variavel GraphQL espera `$override: Boolean` (linha 99 do mesmo arquivo). Embora `override` esteja tipado como `boolean` no modelo Filter, quando o valor vem dos query params do Angular Router (URL), ele chega como `string`. O componente `plan.component.ts` (linha 86-87) recebe query params e cria `new Filter(params)` diretamente. Se um usuario acessar a pagina com `?override=true` na URL, o valor sera a string `"true"`, nao o boolean `true`.
+
+**Contexto atenuante:** O `selectOverride` no componente (linhas 366-374) converte corretamente para boolean antes de atribuir ao filter. Portanto, o bug so se manifesta quando o valor vem diretamente da URL (deep link / bookmark com query params), nao quando o usuario seleciona no dropdown.
+
+### Campo `shared` - BUG ENCONTRADO
+
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`
+**Linha:** 74
+
+```typescript
+if (params.shared !== undefined && params.shared !== null) {
+    variables.shared = params.shared;  // <-- BUG: sem conversao boolean
+}
+```
+
+A variavel GraphQL espera `$shared: Boolean` (linha 103 do mesmo arquivo). Mesmo cenario do `override`: quando vem via query params da URL, o valor e uma string.
+
+**Contexto atenuante:** Igual ao `override` - o `selectShared` no componente (linhas 355-363) converte corretamente. O bug ocorre apenas em deep links.
+
+### Resumo dos bugs
+
+| Arquivo | Linha | Campo | Tipo GraphQL | Conversao aplicada? |
+|---------|-------|-------|-------------|-------------------|
+| `plan.service.ts` | 62 | `override` | `Boolean` | NAO |
+| `plan.service.ts` | 74 | `shared` | `Boolean` | NAO |
+
+**Total de instancias com bug: 2**, ambas no arquivo `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`.
+
+A correcao para ambos seria:
+```typescript
+// Linha 62 - override
+variables.override = params.override === true || params.override === 'true';
+
+// Linha 74 - shared  
+variables.shared = params.shared === true || params.shared === 'true';
+```
+
+Ou, alternativamente, se o tipo do modelo fosse corrigido para `string` (consistente com a realidade dos query params), a conversao padrao `=== 'true'` usada em `enabled` funcionaria.
+
+Nota adicional: o fato de `override` e `shared` estarem tipados como `boolean` no modelo Filter (enquanto `enabled` esta tipado como `string`) cria uma inconsistencia que mascara o problema no TypeScript - o compilador nao alerta porque `boolean` e aceito sem conversao, mas na pratica o Angular Router entrega strings.
+
+---
+

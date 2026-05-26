@@ -1,0 +1,128 @@
+================================================================================
+CONTEXTO PARA REVISÃO
+================================================================================
+
+Este é o rascunho do email de novidades de janeiro de 2026 da plataforma 4Shark.
+
+OBJETIVO:
+Comunicar aos clientes as novidades e melhorias implementadas na plataforma
+desde dezembro de 2025, de forma clara e focada no valor para o usuário.
+
+VERSÕES:
+1. Geral - Para todos os clientes
+2. Atento - Versão especial para nosso maior cliente, incluindo
+   funcionalidades exclusivas de integração com folha de pagamento
+
+IMAGENS:
+Os marcadores [IMAGEM X] indicam onde inserir cada screenshot.
+Os arquivos estão no Desktop com nomes descritivos (news_*.png).
+
+TOM:
+- Profissional mas acolhedor
+- Foco no benefício para o cliente, não em detalhes técnicos
+- Storytelling: contextualiza o problema antes de apresentar a solução
+
+================================================================================
+EMAIL GERAL - RASCUNHO
+================================================================================
+
+Olá,
+
+Feliz Ano Novo! Desejamos que 2026 seja um ano de muito sucesso e conquistas para você e toda sua equipe.
+
+Iniciamos o ano com uma série de novidades que gostaríamos de compartilhar com vocês, fruto do trabalho contínuo de evolução da plataforma 4Shark.
+
+
+SEGURANÇA E ESTABILIDADE
+
+Realizamos melhorias internas que aumentam a estabilidade e reduzem riscos de segurança, garantindo uma plataforma mais robusta e confiável para o dia a dia de vocês.
+
+
+IDENTIFICAÇÃO COMPLETA NAS AUDITORIAS
+
+Sabemos que a conciliação de dados entre sistemas é uma necessidade frequente, e que muitas vezes o CPF ou documento de identificação é a chave para essa integração.
+
+Atendendo a essa solicitação, incluímos colunas de identificação (tipo do documento e valor, como CPF, RUT etc.) nas auditorias da plataforma, incluindo relatórios de usuários, extratos, metas e consumo mensal. Agora, ao exportar esses arquivos, vocês terão acesso direto à identificação de cada pessoa, facilitando a conciliação com folha de pagamento e outros sistemas internos.
+
+E podem ficar tranquilos quanto à segurança desses dados: os arquivos de auditoria ficam disponíveis por até 15 dias e são apagados automaticamente após esse período. O acesso é restrito a usuários autenticados na plataforma.
+
+
+NOVA AUDITORIA DE METAS DO PLANO
+
+Acompanhar as metas configuradas em cada plano era um processo que exigia navegar por diversas telas da plataforma, dificultando a identificação rápida de possíveis inconsistências.
+
+Entendendo essa necessidade, desenvolvemos uma nova funcionalidade de auditoria específica para metas. Com ela, vocês podem visualizar todas as metas associadas a um plano em um único relatório, identificando rapidamente quais usuários possuem metas configuradas, quais ainda precisam de atenção, e se os valores estão de acordo com o esperado.
+
+Para acessar, abra o Plano desejado e clique em "Auditoria de Metas". Na listagem, clique em "+ Gerar Nova Auditoria" para criar um novo relatório.
+
+[IMAGEM 1: Tela do plano com botão "Auditoria de Metas"]
+>>> news_plan_goal_audit_button.png
+
+[IMAGEM 2: Listagem de auditorias com botão "+ Gerar Nova Auditoria"]
+>>> news_plan_goal_audit_listing.png
+
+
+ATUALIZAÇÃO DE METAS
+
+Erros acontecem, e sabemos o quanto é frustrante perceber que uma meta foi cadastrada com o valor errado depois que o plano já foi vinculado.
+
+Antes, para corrigir esse tipo de situação, era necessário cancelar o plano, abrir um chamado para nossa equipe realizar a correção da meta, e só então criar um novo plano. Esse processo gerava dependência, retrabalho e podia impactar o andamento das operações.
+
+Agora isso mudou. Implementamos a possibilidade de atualizar o valor, valor base e sentido de uma meta, com efeito para os próximos planos gerados.
+
+O novo fluxo é simples: basta cancelar o plano atual, atualizar a meta com o valor correto, e gerar um novo plano. O novo plano já será criado com a meta atualizada. Tudo isso sem depender de chamados.
+
+Essa atualização pode ser feita de três formas:
+- Pela listagem de metas (no menu de ações da meta, selecione "Atualizar")
+- Via API, para integrações automatizadas
+- Por upload de arquivo, que antes funcionava apenas para cadastro e agora também permite atualização
+
+[IMAGEM 3: Tela de edição de meta com campos valor, valor base e sentido]
+>>> news_goal_update_form.png
+
+
+OUTRAS MELHORIAS
+
+A busca geral da plataforma foi otimizada para funcionar melhor com caracteres especiais e acentuação, facilitando encontrar registros com nomes ou identificadores que contenham esses caracteres.
+
+
+Estamos muito felizes em trazer essas evoluções para a plataforma, e esperamos que elas simplifiquem ainda mais o dia a dia de trabalho de vocês.
+
+Agradecemos pela parceria e nos colocamos à disposição para eventuais dúvidas e sugestões através do nosso canal meajuda@4shark.com.br.
+
+
+================================================================================
+FIM DO EMAIL GERAL
+================================================================================
+
+
+
+
+================================================================================
+ATENTO - SEÇÕES ADICIONAIS (inserir antes do parágrafo de fechamento)
+================================================================================
+
+INTEGRAÇÃO COM FOLHA DE PAGAMENTO
+
+Acompanhar a integração dos pagamentos de comissão com o sistema de folha agora ficou mais simples. Diretamente na tela do pagamento, vocês têm acesso rápido ao "Relatório da Integração".
+
+[IMAGEM 4: Tela do pagamento com botões "Visualizar Relatórios" e "Relatório da Integração"]
+>>> news_atento_payment_details.png
+
+
+ACOMPANHAMENTO DA INTEGRAÇÃO
+
+Nesse relatório, vocês têm visibilidade completa do processo de integração:
+- Filtrar por usuário, tipo de pagamento ou status de integração
+- Visualizar o identificador único e ID externo de cada registro, facilitando a conciliação com outros sistemas
+- Acompanhar o histórico completo de cada integração, com as etapas de verificação, execução e validação
+- Ver o tempo de processamento de cada etapa, garantindo mais controle e transparência sobre o processo
+- Identificar rapidamente registros com falha ou pendentes
+
+[IMAGEM 5: Relatório de integração com filtros e log expandido]
+>>> news_atento_integration_report.png
+
+
+================================================================================
+FIM DAS SEÇÕES ADICIONAIS DA ATENTO
+================================================================================

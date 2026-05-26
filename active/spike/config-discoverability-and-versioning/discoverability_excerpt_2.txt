@@ -1,0 +1,61 @@
+SOURCE: ~/.claude/settings.json (hooks section, lines 58-69 and 91-96)
+PURPOSE: Shows the existing hook injection pattern for capability surfacing
+
+---
+"UserPromptSubmit": [
+  {
+    "matcher": "*",
+    "hooks": [
+      {
+        "type": "command",
+        "command": "$HOME/.claude/scripts/check-claude-version.sh",
+        "timeout": 10
+      },
+      {
+        "type": "command",
+        "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
+        "timeout": 5
+      },
+      {
+        "type": "command",
+        "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
+        "timeout": 5
+      }
+    ]
+  }
+]
+---
+
+OBSERVATION: Three unconditional UserPromptSubmit hooks already fire on every
+prompt: version check, output-policy reminder, code-pattern reminder. The
+pattern is established: inject additionalContext unconditionally, keep it
+concise, always exit 0.
+
+---
+SOURCE: ~/.claude/scripts/inject-output-policy-reminder.sh (full file)
+PURPOSE: Shows the minimal-reminder injection pattern
+
+---
+reminder=$(cat <<'EOF'
+=== OUTPUT POLICY REMINDER ===
+
+Before producing output this turn, check the destination:
+
+- Research findings / code review / comparisons / decision matrices / timelines → render HTML ...
+- LLM-consumed planning docs ... → markdown in ~/.claude/plans/active/<topic>/.
+- ...
+EOF
+)
+
+jq -n --arg ctx "$reminder" '{
+    hookSpecificOutput: {
+        hookEventName: "UserPromptSubmit",
+        additionalContext: $ctx
+    }
+}'
+---
+
+OBSERVATION: Pattern for "stateless reminder on every prompt" is already
+in production in this repo. A capability-tip hook would follow the exact
+same shape. The risk is additive token cost: three hooks already inject
+context unconditionally on every prompt. A fourth adds to context size.

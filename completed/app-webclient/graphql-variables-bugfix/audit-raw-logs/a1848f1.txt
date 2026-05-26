@@ -1,0 +1,306 @@
+
+
+Entendido. Vou auditar todos os usos de `parseInt` em arquivos `.ts` dentro de `src/app/` e verificar se cada um alimenta uma variável GraphQL do tipo `ID` (bug) ou `Integer` (correto).
+
+Primeiro, vou buscar todas as ocorrências de `parseInt` no codebase.
+
+---
+
+Agora tenho todas as ocorrencias. Preciso verificar quais alimentam variáveis GraphQL e verificar os tipos no backend. Vou começar buscando as mutations e resolvers no backend para entender os tipos esperados.
+
+---
+
+Agora vou verificar os tipos no backend para cada mutation/query relevante. Vou ler os arquivos de mutation que correspondem aos usos de `parseInt` encontrados. Vou começar pelos mais relevantes.
+
+---
+
+Agora preciso verificar o tipo de `variable_id` no `RankifierVariableInputGraphqlType` e continuar verificando as outras mutations.
+
+---
+
+`variable_id` no `RankifierVariableInputGraphqlType` e do tipo `Integer`, entao os rankifiers estao corretos. Agora preciso verificar as mutations de disable/enable para subsidiary, product, status, variable, acceptment_reason e payment_type.
+
+---
+
+Todas as mutations de disable/enable usam `argument :id, ID`. Agora preciso verificar as mutations restantes que ainda nao consultei.
+
+---
+
+Agora vou verificar as mutations restantes: incentivation input type, deal incentive, indicator incentive, limiter incentive, rankifier incentive, campaign, plan update, commission report creation batch, plan slice, plan slice commission, e update subsidiary.
+
+---
+
+Agora vou verificar as mutations de incentives (deal-incentive, indicator-incentive, limiter-incentive, rankifier-incentive).
+
+---
+
+Os incentives (deal-incentive, indicator-incentive, limiter-incentive, rankifier-incentive) nao sao mutations separadas - sao incentives genéricos. Vou verificar se existem mutations especificas para eles.
+
+---
+
+Nao existem mutations especificas para deal_incentive, indicator_incentive, etc. Eles usam as mutations genéricas `create_incentive` e `update_incentive`. Vou ler essas mutations e tambem verificar os componentes frontend para entender quais variáveis o parseInt alimenta.
+
+---
+
+Agora preciso verificar os componentes frontend restantes que ainda nao verifiquei. Vou verificar os que envolvem `calendarId`, `periodId`, `planSliceId`, `planId` (plan-create, plan-update usam search com calendarId como integer potencialmente).
+
+Vou verificar os componentes restantes para entender como o `parseInt` e usado em cada um.
+
+---
+
+Agora vou verificar como os disable/enable queries são construídos nos componentes e como `subsidiaryDisableQuery`, `productDisableQuery`, etc. usam o ID.
+
+---
+
+Agora vou verificar os componentes de deal-incentive, plan-slice, plan-slice-commission, profile, e o paymentTypeService.search para entender se o calendarId é passado para uma query GraphQL.
+
+---
+
+Agora preciso verificar como `dealIncentiveId` é usado na query GraphQL.
+
+---
+
+O `dealIncentiveId` é usado como `id` na query GraphQL - no qual `argument :id, ID` no backend. Vou agora verificar como os componentes de plan-create e plan-update usam o `calendarId` no `paymentTypeService.search`.
+
+---
+
+A query `SearchPaymentTypes` declara `$calendarId: ID`, entao o `parseInt` para `calendarId` é um bug. Agora vou verificar como os form values do plan-create e plan-update são usados nas mutations (ou seja, quando o formulario é submetido).
+
+---
+
+Agora preciso verificar como os valores do formulário de plan são enviados na mutation. Vou verificar o serviço de create e update do plan.
+
+---
+
+Preciso ver como a mutation é construida e enviada para o plan create/update. Vou buscar onde o formulario e submetido.
+
+---
+
+Confirmado. A query declara `$calendarId: ID`, `$groupId: ID`, `$incentiveCampaignId: ID`, `$incentivationsAttributes` que contém `incentiveId` e `paymentTypeId` - todos esses são declarados como `ID` no backend. O `parseInt` converte esses valores para números, o que é um bug.
+
+Agora vou verificar os últimos componentes que faltam: `easy-product/plan-slice`, `easy-product/plan-slice-commission`, `campaign/create`, `campaign/update`, `profile`, `shell/profile-menu`, `commission-creation-batch/create`, `commission-report-creation-batch/create`, `incentive-campaign-fund/create`, `incentive-payment/create`, `update-parent-seat`.
+
+---
+
+Vou agora verificar as mutations restantes. Preciso ver como as mutations de easy-product (plan-slice, plan-slice-commission) e campaign sao construidas.
+
+---
+
+Agora vou verificar o `VariableTrackCollectionsInputGraphqlType` no backend para ver se `variableId` é `ID` ou `Integer`.
+
+---
+
+Agora vou verificar os componentes restantes. Preciso verificar o campaign-update `onSubmit` e o profile/profile-menu.
+
+---
+
+O `profile` e `profile-menu` usam `parseInt` para criar um Profile object local, nao para uma variavel GraphQL. O `temporaryProfileService.get(profileId)` usa o `profileId` original (string), nao o valor parseado. Esses nao sao bugs.
+
+Vou verificar se o `commission-creation-batch/create` e `commission-report-creation-batch/create` enviam o form value como variavel GraphQL.
+
+---
+
+Agora vou verificar o `incentivePaymentService.create` para ver como ele envia a mutation.
+
+---
+
+Confirmado: `$periodId: ID!` e `$campaignId: ID!` -- parseInt para esses valores e um bug.
+
+Agora vou verificar os componentes de incentive-campaign-fund/create, deal/create, deal/update, partial-commission/create, user-history/create e os incentive create/clone/update services.
+
+---
+
+Posso ver que no `incentive-campaign-fund-create`, o `campaignId` é convertido com `String(this.form.value.campaignId)` -- mas `this.form.value.campaignId` foi configurado com `parseInt(event.id, 10)`, ent o `String()` converte de volta para string. Nesse caso especifico, o parseInt + String cancela o efeito, mas é desnecessário.
+
+Vou agora verificar o onSubmit do deal-update, partial-commission, user-history e os incentive create/update/clone para ver como o form value é usado na mutation.
+
+---
+
+Agora vou verificar os incentive create/clone/update services para deal-incentive, indicator-incentive, limiter-incentive e rankifier-incentive.
+
+---
+
+Interessante. Nos componentes de deal-incentive, indicator-incentive e rankifier-incentive create, o `groupId` é convertido com `String(this.form.value.groupId)`. Isso cancela o efeito do parseInt, mas o parseInt e desnecessário. No limiter-incentive-create, o `groupId` e passado diretamente (como numero) - este e um bug.
+
+Agora vou verificar os clone e update dos incentives para ver se o mesmo padrao se aplica.
+
+---
+
+Agora preciso verificar o seat update-parent-seat e como seus dados de formulario sao enviados.
+
+---
+
+Agora preciso verificar a mutation `updateParentSeat` no backend.
+
+---
+
+Agora vou tambem verificar o `indicator/create` e o `subsidiary/update` mutations, e o `update_campaign` mutation.
+
+---
+
+Nota: No `subsidiary-update`, o `companyId` com parseInt nao e enviado na mutation update (nao tem `companyId` na mutation de update). O `companyId` só é usado no create, e no `subsidiary-create.component.ts`, ele é passado diretamente como `this.form.value.companyId` (que é um numero por causa do parseInt).
+
+Vou verificar o `update-campaign` mutation no backend.
+
+---
+
+Agora vou verificar o `commission-creation-batch/show` e verificar a mutation `reprocessCommission` no backend.
+
+---
+
+O `commission-creation-batch-show.component.ts` faz `id: String(parseInt(event, 10))` -- usa `String()` para converter de volta para string, entao o parseInt e desnecessário mas nao causa bug porque `String()` cancela o efeito.
+
+Agora preciso verificar se o `calendarId` no `commission-creation-batch/create` e `commission-report-creation-batch/create` e usado apenas para buscar periodos (nao e enviado diretamente como variavel GraphQL).
+
+---
+
+O `calendarId` do `commission-creation-batch/create` é usado em `$calendarId: ID` na query `Periods`. Entao o parseInt para `calendarId` aqui e um bug tambem. O mesmo acontece com `periodId` na mutation principal.
+
+Agora tenho informacao suficiente para compilar o relatorio completo. Deixe-me tambem verificar rapidamente o `dashboard-calendar` parseInt.
+
+---
+
+Este parseInt no `dashboard-calendar` é para arredondamento de dias, nao alimenta nenhuma variavel GraphQL. Nao e um bug no contexto desta auditoria.
+
+Agora vou verificar os ultimos itens: `date-formatter` e `relative-progress-bar`.
+
+Os `parseInt` em `date-formatter.ts` (linhas 17-19) e `relative-progress-bar.component.ts` (linha 28) sao para calculo numerico local, nao alimentam variaveis GraphQL. Nao sao bugs.
+
+Agora vou compilar o relatorio final.
+
+---
+
+Aqui esta o relatorio completo da auditoria de `parseInt` no codebase.
+
+## Resultado da Auditoria: `parseInt()` em variaveis GraphQL do tipo `ID`
+
+### Resumo
+
+Encontrei **um grande numero de ocorrencias** onde `parseInt()` converte IDs para numeros que serao enviados como variaveis GraphQL `ID` (tipo string). Em alguns casos, o efeito e anulado por um `String()` posterior, mas o padrao e inconsistente e fragil.
+
+### Classificacao dos usos
+
+#### BUGS CONFIRMADOS (parseInt alimenta variavel GraphQL ID sem conversao de volta para string)
+
+Estes sao os casos onde `parseInt()` converte o valor para numero e esse numero e enviado diretamente como variavel GraphQL do tipo `ID`:
+
+| # | Arquivo | Linha | Variavel | Mutation/Query Backend | Tipo Backend |
+|---|---------|-------|----------|----------------------|--------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/update-parent-seat/update-parent-seat.component.ts` | 134 | `userId` | `UpdateParentSeatGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/update-parent-seat/update-parent-seat.component.ts` | 185 | `parentId` | `UpdateParentSeatGraphqlMutation` `argument :parent_id, ID` | `ID` |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/promote/seat-promote.component.ts` | 141 | `userId` | `PromoteSeatGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/promote/seat-promote.component.ts` | 200 | `parentId` | `PromoteSeatGraphqlMutation` `argument :parent_id, ID` | `ID` |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/demote/seat-demote.component.ts` | 141 | `userId` | `DemoteSeatGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 6 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/seat/demote/seat-demote.component.ts` | 201 | `parentId` | `DemoteSeatGraphqlMutation` `argument :parent_id, ID` | `ID` |
+| 7 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 275 | `productId` | `CreateDealGraphqlMutation` `argument :product_id, ID` | `ID` |
+| 8 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 323 | `clientId` | `CreateDealGraphqlMutation` `argument :client_id, ID` | `ID` |
+| 9 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 371 | `userId` | `CreateDealGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 10 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 419 | `statusId` | `CreateDealGraphqlMutation` `argument :status_id, ID` | `ID` |
+| 11 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 164 | `statusId` | `UpdateDealGraphqlMutation` `argument :status_id, ID` | `ID` |
+| 12 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 172 | `clientId` | `UpdateDealGraphqlMutation` `argument :client_id, ID` | `ID` |
+| 13 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 180 | `productId` | `UpdateDealGraphqlMutation` `argument :product_id, ID` | `ID` |
+| 14 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 388 | `productId` | `UpdateDealGraphqlMutation` `argument :product_id, ID` | `ID` |
+| 15 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 436 | `clientId` | `UpdateDealGraphqlMutation` `argument :client_id, ID` | `ID` |
+| 16 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 484 | `userId` | `UpdateDealGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 17 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 532 | `statusId` | `UpdateDealGraphqlMutation` `argument :status_id, ID` | `ID` |
+| 18 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator/create/indicator-create.component.ts` | 142 | `variableId` | `CreateIndicatorGraphqlMutation` `argument :variable_id, ID` | `ID` |
+| 19 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator/create/indicator-create.component.ts` | 190 | `userId` | `CreateIndicatorGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 20 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/subsidiary/create/subsidiary-create.component.ts` | 144 | `companyId` | `CreateSubsidiaryGraphqlMutation` `argument :company_id, ID` | `ID` |
+| 21 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/subsidiary/update/subsidiary-update.component.ts` | 149 | `companyId` | Nao enviado na mutation update (sem impacto direto), mas setValue com parseInt gera tipo errado no form | `ID` |
+| 22 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-creation-batch/create/commission-creation-batch-create.component.ts` | 82 | `calendarId` | Query `Periods` `$calendarId: ID` | `ID` |
+| 23 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-creation-batch/create/commission-creation-batch-create.component.ts` | 114 | `periodId` | `CreateCommissionCreationBatchGraphqlMutation` `argument :period_id, ID` | `ID` |
+| 24 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-report-creation-batch/create/commission-report-creation-batch-create.component.ts` | 84 | `calendarId` | Query `Periods` `$calendarId: ID` | `ID` |
+| 25 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-report-creation-batch/create/commission-report-creation-batch-create.component.ts` | 116 | `periodId` | `CreateCommissionReportCreationBatchGraphqlMutation` `argument :period_id, ID` | `ID` |
+| 26 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/partial-commission/create/partial-commission-create.component.ts` | 137 | `planId` | `CreatePartialCommissionGraphqlMutation` `argument :plan_id, ID` | `ID` |
+| 27 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/partial-commission/create/partial-commission-create.component.ts` | 197 | `periodId` | `CreatePartialCommissionGraphqlMutation` `argument :period_id, ID` | `ID` |
+| 28 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-history/create/user-history-create.component.ts` | 112 | `userId` | `CreateUserHistoryGraphqlMutation` `argument :user_id, ID` | `ID` |
+| 29 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 241 | `calendarId` (param do search) | `PaymentTypeService.search` query `$calendarId: ID` | `ID` |
+| 30 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 425 | `calendarId` | `CreatePlanGraphqlMutation` `argument :calendar_id, ID` | `ID` |
+| 31 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 430 | `groupId` | `CreatePlanGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 32 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 434 | `incentiveCampaignId` | `CreatePlanGraphqlMutation` `argument :incentive_campaign_id, ID` | `ID` |
+| 33 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 234 | `incentiveId` (incentivations) | `IncentivationInputGraphqlType` `argument :incentive_id, ID` | `ID` |
+| 34 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 267 | `paymentTypeId` (incentivations) | `IncentivationInputGraphqlType` `argument :payment_type_id, ID` | `ID` |
+| 35 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 192 | `calendarId` | `UpdatePlanGraphqlMutation` `argument :calendar_id, ID` | `ID` |
+| 36 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 196 | `groupId` | `UpdatePlanGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 37 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 380 | `incentiveId` (incentivations) | `IncentivationInputGraphqlType` `argument :incentive_id, ID` | `ID` |
+| 38 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 430 | `paymentTypeId` (incentivations) | `IncentivationInputGraphqlType` `argument :payment_type_id, ID` | `ID` |
+| 39 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 460 | `calendarId` | `UpdatePlanGraphqlMutation` `argument :calendar_id, ID` | `ID` |
+| 40 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 509 | `groupId` | `UpdatePlanGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 41 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 559 | `campaignId` | `UpdatePlanGraphqlMutation` `argument :incentive_campaign_id, ID` | `ID` |
+| 42 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/create/campaign-create.component.ts` | 136 | `planId` | `CreateCampaignGraphqlMutation` `argument :plan_id, ID` | `ID` |
+| 43 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/update/campaign-update.component.ts` | 135 | `planId` | `UpdateCampaignGraphqlMutation` `argument :plan_id, ID` | `ID` |
+| 44 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/update/campaign-update.component.ts` | 180 | `planId` | `UpdateCampaignGraphqlMutation` `argument :plan_id, ID` | `ID` |
+| 45 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/incentive-payment/create/incentive-payment-create.component.ts` | 197 | `campaignId` | `CreateIncentivePaymentGraphqlMutation` `argument :campaign_id, ID` | `ID` |
+| 46 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/incentive-payment/create/incentive-payment-create.component.ts` | 198 | `periodId` | `CreateIncentivePaymentGraphqlMutation` `argument :period_id, ID` | `ID` |
+| 47 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice/create/plan-slice-create.component.ts` | 176 | `variableId` | `VariableTrackCollectionsInputGraphqlType` `argument :variable_id, ID` | `ID` |
+| 48 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice/create/plan-slice-create.component.ts` | 207 | `userIds` | `CreatePlanSliceGraphqlMutation` `argument :user_ids, [ID]` | `ID` |
+| 49 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice-commission/create/plan-slice-commission-create.component.ts` | 175 | `planSliceId` | `CreatePlanSliceCommissionGraphqlMutation` `argument :plan_slice_id, ID` | `ID` |
+| 50 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/limiter-incentives/create/limiter-incentive-create.component.ts` | 213 | `groupId` | `CreateIncentiveGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 51 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/limiter-incentives/clone/limiter-incentive-clone.component.ts` | 197 | `groupId` | `CreateIncentiveGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 52 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/limiter-incentives/clone/limiter-incentive-clone.component.ts` | 247 | `groupId` | `CreateIncentiveGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 53 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/limiter-incentives/update/limiter-incentive-update.component.ts` | 192 | `groupId` | `UpdateIncentiveGraphqlMutation` `argument :group_id, ID` | `ID` |
+| 54 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/limiter-incentives/update/limiter-incentive-update.component.ts` | 242 | `groupId` | `UpdateIncentiveGraphqlMutation` `argument :group_id, ID` | `ID` |
+
+#### BUGS MITIGADOS (parseInt + String() cancela o efeito, mas parseInt e desnecessario)
+
+Estes usam `parseInt` mas depois reconvertem com `String()` antes de enviar. O parseInt e desnecessario e deveria ser removido:
+
+| # | Arquivo | Linha | Variavel | Observacao |
+|---|---------|-------|----------|------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-incentive/create/deal-incentive-create.component.ts` | 210 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-incentive/clone/deal-incentive-clone.component.ts` | 199, 249 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-incentive/update/deal-incentive-update.component.ts` | 196, 254 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator-incentives/create/indicator-incentive-create.component.ts` | 216 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator-incentives/clone/indicator-incentive-clone.component.ts` | 200, 250 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 6 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator-incentives/update/indicator-incentive-update.component.ts` | 197, 255 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 7 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier-incentives/create/rankifier-incentive-create.component.ts` | 219 | `groupId` | `String(this.form.value.groupId)` na submissao |
+| 8 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier-incentives/create/rankifier-incentive-create.component.ts` | 249 | `rankifierId` | `String(this.form.value.rankifierId)` na submissao |
+| 9 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier-incentives/clone/rankifier-incentive-clone.component.ts` | 203, 232, 286, 291 | `groupId`, `rankifierId` | `String()` na submissao |
+| 10 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier-incentives/update/rankifier-incentive-update.component.ts` | 201, 231, 285, 290 | `groupId`, `rankifierId` | `String()` na submissao |
+| 11 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/incentive-campaign-fund/create/incentive-campaign-fund-create.component.ts` | 155, 173 | `campaignId` | `String(this.form.value.campaignId)` na submissao |
+| 12 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-creation-batch/show/commission-creation-batch-show.component.ts` | 106 | `id` | `String(parseInt(event, 10))` - redundante |
+| 13 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-incentive/clone/deal-incentive-clone.component.ts` | 46 | `dealIncentiveId` | Usado como `id` em query, mas `this.dealIncentive.id` (string original) pode ser usado em vez disso |
+| 14 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-incentive/update/deal-incentive-update.component.ts` | 46 | `dealIncentiveId` | Mesmo caso |
+
+#### USOS INLINE EM STRING TEMPLATE (parseInt e desnecessario, mas injetado como string)
+
+| # | Arquivo | Linha | Variavel | Observacao |
+|---|---------|-------|----------|------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/acceptment-document/acceptment-document.component.ts` | 121 | `id` | `"${parseInt(event.id, 10)}"` - parseInt desnecessario, resultado e injetado como string |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/subsidiary/subsidiary.component.ts` | 141, 149 | `id` | Passado em string template `id: "${id}"` |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/product/product.component.ts` | 147, 155 | `id` | Passado em string template `id: "${id}"` |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/status/status.component.ts` | 144, 152 | `id` | Passado em string template `id: "${id}"` |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/variable/variable.component.ts` | 160, 168 | `id` | Passado em string template `id: "${id}"` |
+| 6 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/acceptment-reason/acceptment-reason.component.ts` | 160, 168 | `id` | Passado em string template `id: "${id}"` |
+| 7 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/payment-type/payment-type.component.ts` | 160, 168 | `id` | Passado em string template `id: "${id}"` |
+
+Nestes casos, como o valor e injetado em uma string template literal, o numero e automaticamente convertido para string. O parseInt e desnecessario mas nao causa bug funcional.
+
+#### CORRETOS (parseInt e necessario - tipo Integer no backend)
+
+| # | Arquivo | Linha | Variavel | Tipo Backend |
+|---|---------|-------|----------|--------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/create/rankifier-create.component.ts` | 66 | `variableId` | `RankifierVariableInputGraphqlType` `argument :variable_id, Integer` |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/clone/rankifier-clone.component.ts` | 71 | `variableId` | `RankifierVariableInputGraphqlType` `argument :variable_id, Integer` |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/update/rankifier-update.component.ts` | 81 | `variableId` | `RankifierVariableInputGraphqlType` `argument :variable_id, Integer` |
+
+#### NAO RELEVANTES (parseInt para uso local, nao alimenta GraphQL)
+
+| # | Arquivo | Linha | Uso |
+|---|---------|-------|-----|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/profile/profile.component.ts` | 48 | Criacao de objeto Profile local |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shell/profile-menu/profile-menu.component.ts` | 57 | Criacao de objeto Profile local |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/dashboard/calendar/dashboard-calendar.component.ts` | 585 | Calculo de dias |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/relative-progress-bar/relative-progress-bar.component.ts` | 28 | Calculo de percentual |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/date-formatter/date-formatter.ts` | 17-19 | Parsing de data |
+
+### Nota sobre o `plan-slice-create` (userIds)
+
+No arquivo `plan-slice-create.component.ts` linha 207, o `parseInt` configura `userIds` como numero, mas na linha 212, o valor e sobrescrito com `this.userIds` que contem `event.id` (string) -- veja linhas 209-212. Entao na pratica, o parseInt na linha 207 e sobrescrito e o valor final pode ser string. O parseInt ainda e desnecessário e potencialmente problematico se o fluxo nao chegar na linha 212.
+
+### Conclusao
+
+Existem **54 ocorrencias confirmadas** de `parseInt` que alimentam variaveis GraphQL do tipo `ID` onde o backend espera `ID` (string). Destas, cerca de 20 sao mitigadas por `String()` posterior ou injecao em template strings, mas as **34+ restantes sao bugs reais** que enviam numeros onde o GraphQL espera strings. Os 3 usos em rankifier (`variableId`) estao corretos porque o backend declara `argument :variable_id, Integer`.
+
+---
+

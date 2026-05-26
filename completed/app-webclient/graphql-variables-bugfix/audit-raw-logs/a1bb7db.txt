@@ -1,0 +1,84 @@
+
+
+Entendido. Vou auditar o codebase Angular para encontrar referências a tipos GraphQL Input que estejam sem o sufixo `Graphql`, comparando com os tipos definidos no backend.
+
+Primeiro, vou buscar os tipos Input definidos no backend e as referências no frontend em paralelo.
+
+---
+
+Agora preciso verificar se existem referências que usam `Input` SEM o sufixo `Graphql`. Vou buscar especificamente por padrões incorretos.
+
+---
+
+Vou fazer uma busca mais ampla para garantir que nenhum caso escapou - buscando qualquer referência a `Input` em contextos de declaracao de tipo GraphQL que nao tenha `Graphql` depois.
+
+---
+
+Essas ocorrencias sao todas seguras - as de `rankifierVariablesInput` sao nomes de variaveis TypeScript (nao tipos GraphQL), e as de `Input` sao imports do Angular `@angular/core`.
+
+Vou fazer uma busca mais especifica para garantir: procurando por padroes de declaracao de variavel GraphQL com `Input` mas sem `Graphql`.
+
+---
+
+Vou tambem buscar dentro de strings de template GraphQL (gql ou mutation/query strings) por `Input` sem `Graphql`.
+
+---
+
+Vou confirmar que nao ha nenhum caso edge buscando de forma mais ampla, incluindo arquivos `.graphql` ou qualquer outro tipo de arquivo.
+
+---
+
+Analisei todas as ocorrencias. Vou agora filtrar apenas as linhas que contem referencias a tipos GraphQL Input (dentro de strings de mutation/query) para confirmar que todas estao corretas.
+
+Todas as referencias a tipos GraphQL Input encontradas no codebase do frontend:
+
+| Arquivo | Linha | Tipo Usado |
+|---|---|---|
+| `company-create.component.ts` | 153 | `CompanyBusinessTerritoryInputGraphql` |
+| `company-update.component.ts` | 240 | `CompanyBusinessTerritoryInputGraphql` |
+| `plan-create.component.ts` | 119 | `IncentivationInputGraphql` |
+| `plan-finish.component.ts` | 55 | `PlanVariableInputGraphql` |
+| `plan-update.component.ts` | 230 | `IncentivationInputGraphql` |
+| `deal-create.component.ts` | 161 | `DealFieldInputGraphql` |
+| `deal-update.component.ts` | 268 | `DealFieldInputGraphql` |
+| `collaborative-deal-create.component.ts` | 148 | `DealCollaborationInputGraphql` |
+| `collaborative-deal-update.component.ts` | 243 | `DealCollaborationInputGraphql` |
+| `user-create.component.ts` | 176 | `IdentifierInputGraphql` |
+| `user-create.component.ts` | 177 | `FieldInputGraphql` |
+| `user-update.component.ts` | 136 | `FieldInputGraphql` |
+| `payment-exportation-create.component.ts` | 108 | `PaymentExportationFieldsInputGraphql` |
+| `plan-slice-create.component.ts` | 119 | `VariableTrackCollectionsInputGraphql` |
+| `rankifier-create.component.ts` | 84 | `RankifierVariableInputGraphql` |
+| `rankifier-clone.component.ts` | 89 | `RankifierVariableInputGraphql` |
+| `rankifier-update.component.ts` | 101 | `RankifierVariableInputGraphql` |
+| Todos os `*-incentive-*.component.ts` | (varias) | `RuleInputGraphql` |
+
+## Resultado da Auditoria
+
+**Nenhum erro encontrado.** Todas as referencias a tipos GraphQL Input no frontend ja utilizam corretamente o sufixo `Graphql`.
+
+Aqui esta o mapeamento completo entre os tipos do backend e as referencias encontradas no frontend:
+
+| Backend (classe Ruby) | Tipo GraphQL exposto | Usado no frontend? | Correto? |
+|---|---|---|---|
+| `CompanyBusinessTerritoryInputGraphqlType` | `CompanyBusinessTerritoryInputGraphql` | Sim | Sim |
+| `DealCollaborationInputGraphqlType` | `DealCollaborationInputGraphql` | Sim | Sim |
+| `DealFieldInputGraphqlType` | `DealFieldInputGraphql` | Sim | Sim |
+| `FieldInputGraphqlType` | `FieldInputGraphql` | Sim | Sim |
+| `IdentifierInputGraphqlType` | `IdentifierInputGraphql` | Sim | Sim |
+| `IncentivationInputGraphqlType` | `IncentivationInputGraphql` | Sim | Sim |
+| `PaymentExportationFieldsInputGraphqlType` | `PaymentExportationFieldsInputGraphql` | Sim | Sim |
+| `PlanVariableInputGraphqlType` | `PlanVariableInputGraphql` | Sim | Sim |
+| `RankifierVariableInputGraphqlType` | `RankifierVariableInputGraphql` | Sim | Sim |
+| `RuleInputGraphqlType` | `RuleInputGraphql` | Sim | Sim |
+| `VariableTrackCollectionsInputGraphqlType` | `VariableTrackCollectionsInputGraphql` | Sim | Sim |
+| `VariableTracksInputGraphqlType` | `VariableTracksInputGraphql` | Nao referenciado diretamente | N/A |
+
+O tipo `VariableTracksInputGraphql` nao foi encontrado referenciado diretamente no frontend, mas isso nao constitui um bug -- pode ser usado internamente dentro de `VariableTrackCollectionsInputGraphql` no lado do backend, ou simplesmente nao ser utilizado pelo frontend.
+
+Todas as demais ocorrencias de "Input" nos arquivos `.ts` sao usos legitimos de Angular (`@Input()` decorator), `HTMLInputElement`, `MatDatepickerInputEvent`, ou nomes de variaveis TypeScript locais (como `ruleInput`, `rankifierVariablesInput`) -- nenhuma delas e uma referencia a tipo GraphQL.
+
+**Conclusao: O codebase esta limpo quanto ao erro 7. Nenhuma correcao e necessaria.**
+
+---
+

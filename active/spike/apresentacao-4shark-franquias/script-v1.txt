@@ -1,0 +1,103 @@
+Presentation Script — V1 (Original)
+
+Generated from spike research on 2026-03-09.
+Language: English (original spike language)
+Tool: Gamma.app
+Status: Superseded by V3
+
+
+Style instructions
+- Color palette: dark tones (navy / black) as background, vibrant blue and white accents
+- Font: modern, sans-serif, large titles in bold
+- Images: real photos of people in corporate/commercial settings
+- Visual tone: confident, clean, minimalist
+- Each slide: more visual than text — short, impactful titles are the priority
+
+
+SLIDE 1 — Opening
+Title: Your team sells. Who handles the rest?
+Visual: Photo of a team celebrating results / salesperson hitting a target
+
+SLIDE 2 — The reality of managing a sales team
+Title: Every month, the same chaos
+Visual: Icons representing spreadsheet, WhatsApp, email, bank, accountant
+
+SLIDE 3 — The invisible cost
+Title: The problem isn't just tedious. It's risky.
+Visual: Scale with "Wasted time + Labor risk" on one side
+
+SLIDE 4 — Introducing 4Shark
+Title: 4Shark — From calculation to payment, in one place
+Visual: 4Shark logo + highlighted map of Latin America
+
+SLIDE 5 — The ecosystem
+Title: Three products. One ecosystem.
+Visual: Visual diagram with three connected blocks: Nucleus > Pay > Incentive
+
+SLIDE 6 — Nucleus
+Title: Nucleus — Your operation's rules, under control
+Visual: Screenshot or mockup of performance dashboard
+Content:
+- Configure commission rules for your unit
+- Targets, percentages, bonus tiers — all structured
+- Automatic calculation
+- Declaration with employee electronic signature
+
+SLIDE 7 — Pay
+Title: Pay — Money arrives. No middleman. No delays.
+Visual: Phone with app showing balance / payment received notification
+Content:
+- Individual digital account for each employee
+- Real-time payment
+- Transfer to bank, physical or virtual card
+- No more managing transfer by transfer
+
+SLIDE 8 — Legal protection
+Title: Art. 457 of the CLT — Your ally, not your adversary
+Visual: Shield icon + clean visual highlight of the law text
+Content:
+- Prize model with no social security or labor charges
+- Backed by specialized labor law firm opinion
+- Pay more to your team and spend less doing it
+
+SLIDE 9 — Incentive
+Title: Incentive — Recognition that truly engages
+Visual: Grid of rewards — gift cards, experiences, well-known brands
+Content:
+- Incentive campaigns and spot awards
+- Employee chooses how to use it
+- Full visibility of what was distributed and to whom
+
+SLIDE 10 — Before vs After
+Title: What changes in practice
+Visual: Clean two-column visual table
+
+  Before                    With 4Shark
+  Manual spreadsheet        Automatic calculation
+  Individual transfers      Direct account payment
+  No documentation          Electronic signature
+  Labor risk                CLT compliance
+  Team in the dark          Real-time dashboard
+
+SLIDE 11 — Already approved by your network
+Title: The network already evaluated. And chose.
+Visual: Franchisor logo + 4Shark logo with contract/handshake icon
+
+SLIDE 12 — Numbers that back it up
+Title: 150,000 users. 9 countries. A reference.
+Visual: Latin America map + numbers in large typographic highlight
+
+SLIDE 13 — Next steps
+Title: How your unit gets started
+Visual: 3 simple visual steps with numbered icons
+1. Onboarding with the 4Shark team
+2. Configuration of your unit's rules
+3. First payment through the ecosystem
+
+SLIDE 14 — Close
+Title: Less risk. Less charges. Bulletproof process.
+Visual: Shield icon or graph showing cost reduction / compliance
+Content:
+- CLT compliance — documented and auditable
+- Reduction of social security charges via Art. 457, §2º
+- End-to-end process — no gaps, no exposure

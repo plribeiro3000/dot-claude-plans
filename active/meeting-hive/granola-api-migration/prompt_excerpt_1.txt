@@ -1,0 +1,85 @@
+## Source: meeting_hive/summarizers/__init__.py lines 12-49
+## The PROMPT_TEMPLATE constant (the actual Claude prompt)
+
+```python
+PROMPT_TEMPLATE = """You write meeting summaries in the exact format below. The meeting was transcribed automatically from audio — transcription errors may exist and you should infer the correct meaning.
+
+# Meeting
+- Title: {title}
+- Attendees: {attendees}
+
+# Summary format (required)
+
+Write EXACTLY in this structure, with no text before or after:
+
+```
+<one-sentence opening paragraph summarizing the objective>
+
+## Key Points
+- <Topic 1 name><one sentence describing the topic>
+- <bullet detailing a point discussed>
+- <bullet detailing another point>
+- <Topic 2 name><one sentence describing the topic>
+- <bullets>
+- ...
+
+## Action Items
+- <Owner 1>
+- <concrete action>
+- <concrete action>
+- <Owner 2>
+- <action>
+```
+
+If there are no clear Action Items, omit the entire section. Topics in "Key Points" should reflect the logical blocks of the conversation (2-5 topics). Don't invent attendees or facts — only what was discussed in the transcript.
+
+Respond in the same language as the transcript.
+
+# Transcript
+
+{transcript}
+"""
+```
+
+## How format_prompt is called (lines 95-102)
+
+```python
+def format_prompt(transcript: str, title: str, attendees: list[str]) -> str:
+    return PROMPT_TEMPLATE.format(
+        title=title,
+        attendees=", ".join(attendees) if attendees else "(not listed)",
+        transcript=transcript,
+    )
+```
+
+## How AnthropicSummarizer.summarize calls it (anthropic.py lines 52-72)
+
+```python
+def summarize(self, transcript: str, title: str, attendees: list[str]) -> str:
+    import anthropic
+
+    prompt = format_prompt(transcript, title, attendees)
+    client = anthropic.Anthropic(api_key=self._get_key(), base_url=self._base_url)
+
+    for attempt in range(self._retries):
+        message = client.messages.create(
+            model=self._model,
+            max_tokens=self._max_tokens,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        block = message.content[0]
+        text = getattr(block, "text", None)
+        return strip_fences(text)
+```
+
+## Key observations for the hybrid prompt integration (design question 3)
+
+1. The entire prompt is ONE user message. There is NO system message today.
+2. format_prompt is a module-level function shared by all three summarizer adapters (anthropic, openai, ollama).
+3. The transcript is the LAST section of the prompt — appended after the format instructions.
+4. Adding Granola's summary_markdown would require either:
+   a. Appending it to the transcript section (as a "# Reference Draft" block after the transcript)
+   b. Injecting it before the transcript section (as a "# Granola Pre-Summary" context block)
+   c. Passing it as a new parameter to format_prompt and a new slot in PROMPT_TEMPLATE
+5. The signature of format_prompt is (transcript, title, attendees) and is called directly by every adapter's summarize() method. Adding `granola_summary: str | None = None` as an optional param would NOT break the Protocol (the Protocol only defines summarize(transcript, title, attendees) → str at sync.py:170-174).
+6. The Protocol for Summarizer (sources/__init__.py analogue) defines: def summarize(self, transcript: str, title: str, attendees: list[str]) -> str. Adding granola_summary to format_prompt does NOT change the Summarizer Protocol — it changes how the source prepares the transcript string OR how a new argument flows from sync.py down.

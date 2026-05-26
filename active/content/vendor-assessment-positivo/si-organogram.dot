@@ -1,0 +1,27 @@
+// 4Shark - SI Organizational Structure
+// Render: dot -Tpng si-organogram.dot -o si-organogram.png
+
+digraph organogram {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=12, style=filled, shape=box, margin="0.4,0.2"];
+    edge [fontname="Helvetica", fontsize=10, penwidth=1.5];
+    label="4Shark - Estrutura de Segurança da Informação";
+    labelloc=t;
+    fontsize=18;
+    fontcolor="#333333";
+    nodesep=1.0;
+    ranksep=1.2;
+
+    diretoria [label="Diretoria Executiva", fillcolor="#1565C0", fontcolor="white", color="#0D47A1"];
+    dpo [label="DPO\n(Encarregado de Proteção de Dados)", fillcolor="#2E7D32", fontcolor="white", color="#1B5E20"];
+    ti [label="Tecnologia da Informação", fillcolor="#283593", fontcolor="white", color="#1A237E"];
+    gestores [label="Gestores de Área", fillcolor="#E65100", fontcolor="white", color="#BF360C"];
+    colaboradores [label="Colaboradores e Terceiros", fillcolor="#546E7A", fontcolor="white", color="#37474F"];
+
+    diretoria -> dpo;
+    diretoria -> ti;
+    dpo -> gestores [style=dashed, label="Orientação"];
+    ti -> gestores [style=dashed];
+    gestores -> colaboradores;
+}

@@ -1,0 +1,34 @@
+// 4Shark Platform - High-Level Architecture
+// Render: dot -Tpng architecture-diagram.dot -o architecture-diagram.png
+
+digraph architecture {
+    rankdir=TB;
+    fontname="Helvetica";
+    node [fontname="Helvetica", fontsize=12, style=filled, shape=box, margin="0.4,0.2"];
+    edge [fontname="Helvetica", fontsize=10, penwidth=1.5];
+    label="4Shark - Visão Geral da Arquitetura";
+    labelloc=t;
+    fontsize=18;
+    fontcolor="#333333";
+    nodesep=1.0;
+    ranksep=1.2;
+
+    users [label="Usuários Finais\n(Browser / Mobile)", shape=ellipse, fillcolor="#E3F2FD", color="#1565C0", fontsize=13];
+
+    cloudflare [label="CloudFlare\nWAF + CDN + DDoS Protection", fillcolor="#FFF3E0", color="#E65100"];
+
+    app [label="Aplicação\n(AWS ECS — Containers Gerenciados)", fillcolor="#E8EAF6", color="#283593"];
+
+    keycloak [label="Keycloak (SSO)\nSAML 2.0 / OpenID Connect", fillcolor="#E8F5E9", color="#2E7D32"];
+
+    client_idp [label="Identity Provider\ndo Cliente", shape=ellipse, fillcolor="#E8F5E9", color="#2E7D32"];
+
+    db [label="Banco de Dados\n(Aurora PostgreSQL — Criptografado)", fillcolor="#FFEBEE", color="#B71C1C"];
+
+    // Flow
+    users -> cloudflare [label="HTTPS (TLS 1.2+)", color="#1565C0"];
+    cloudflare -> app [label="Tráfego filtrado", color="#E65100"];
+    app -> keycloak [label="Autenticação", color="#2E7D32", style=dashed];
+    keycloak -> client_idp [label="Federação SSO", color="#2E7D32", style=dashed];
+    app -> db [label="Conexão criptografada", color="#B71C1C"];
+}

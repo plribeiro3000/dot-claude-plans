@@ -1,0 +1,236 @@
+Presentation Script — V4
+
+Planned on 2026-03-13. Complete rethink based on audience and strategic feedback.
+Language: Portuguese (pt-BR)
+Tool: Gamma.app — project "V4" (new project)
+Status: Ready to build
+
+
+STRATEGIC DECISIONS
+
+What changed from V3:
+- Main hook shifted: from "operational chaos" to "tax savings opportunity"
+- Pain redefined: franchisees with 2-3 salespeople don't feel spreadsheet/bank pain — their pain is too much work on the owner's plate
+- Value prop: less work, not better tools — 4Shark handles the onboarding and setup for them
+- Tone: formal and institutional (bank-like trust), not startup agility
+- Legal framing: broader than Art. 457 alone — established law, 8 years of practice, Siqueira Castro
+- Removed: aggressive "network already chose" framing — replaced with opportunity framing
+- Added: calculator demo as live closing argument, Kalaes special conditions
+
+Framing notes:
+- Art. 457 paragraph 2 CLT: in place since 2017, widely adopted in private sector, TST jurisprudence consolidated. Not yet government sector (different legal regime), but well established in commerce and industry. Safe to say: "already adopted by thousands of companies, legal framework is mature and validated."
+- Siqueira Castro: "one of the largest law firms in Brazil" — do NOT say "largest labor firm" (unconfirmed)
+- Banco BV: do NOT mention publicly (partnership not disclosed)
+- 4Shark since 2018: 8 years structuring this model
+
+
+NARRATIVE ARC
+
+Oportunidade > Credibilidade > Simplicidade > Economia > Proximo passo
+
+
+SLIDES
+
+SLIDE 1 — Abertura
+Title: Sua equipe vende. Quem cuida do resto?
+Visual: Team celebrating, dark corporate setting
+Note: Keep from V3 — strong opening hook
+
+SLIDE 2 — A oportunidade
+Title: Voce paga comissao. Mas paga mais encargo do que precisa.
+Visual: Split image — left: money going out (encargos), right: money staying in (economy)
+OR: Clean typographic slide with large number showing total encargo % (44,11%)
+Content (bullet points, impact style):
+- DSR: 16,67%
+- 13o salario: 8,33%
+- Ferias: 11,11%
+- FGTS: 8%
+- Total: 44,11% de encargos sobre cada comissao paga
+Presenter note: "Para cada R$1.000 de comissao, voce paga R$441 de encargo por cima. Existe uma forma legal de nao pagar isso."
+
+SLIDE 3 — A base legal
+Title: Isso nao e brecha. E lei.
+Visual: Clean image of Brazilian legislation / institutional document / scale of justice
+Content (bullet points):
+- Art. 457 paragraph 2 da CLT — lei desde 2017
+- Adotado por milhares de empresas no setor privado
+- Jurisprudencia consolidada no TST
+- Assessoria juridica: Siqueira Castro — um dos maiores escritorios do Brasil
+Presenter note: Tranquilize a sala: "Nao e workaround. E um modelo estruturado dentro da lei, que a 4Shark aplica ha 8 anos."
+
+SLIDE 4 — 8 anos fazendo isso
+Title: Desde 2018, estruturando esse modelo para funcionar sem risco.
+Visual: Timeline or institutional photo — corporate, trustworthy
+Content (bullet points):
+- 150.000 usuarios
+- 9 paises
+- 8 anos de operacao
+Presenter note: "A 4Shark nao e nova nisso. Quando a lei saiu em 2017, a gente comecou a trabalhar para ter um processo redondo. Hoje esta maduro."
+
+SLIDE 5 — Como funciona
+Title: Tres produtos. Um ecossistema.
+Visual: 3 cards with product logos (Nucleus blue / Pay gray / Incentive orange)
+- Nucleus — calcula e estrutura a remuneracao variavel
+- Pay — pagamento direto para o colaborador
+- Incentive — premiacoes em vouchers e experiencias
+Note: Keep from V3 — logos with brand colors work well
+
+SLIDE 6 — A gente faz por voce
+Title: Voce nao precisa fazer nada. A gente cuida.
+Visual: Photo of a person relaxed at desk, or a support/onboarding team
+Content (bullet points):
+- Voce fala as regras da sua unidade
+- A 4Shark configura tudo no sistema
+- A integracao e conduzida pela nossa equipe
+- Voce comeca a usar sem aumentar seu trabalho
+Presenter note: "Sei que voces ja tem muito o que fazer. Por isso o onboarding e 100% guiado pela 4Shark. Voces nao vao precisar aprender uma ferramenta do zero."
+
+SLIDE 7 — Quanto voce economiza
+Title: Veja quanto a sua unidade economiza.
+Visual: Screenshot or mockup of the calculator interface
+Content: Live demo moment — open 4shark.com.br/grupokalaes
+Presenter note: "Vou abrir a calculadora e colocar os numeros de uma unidade parecida com a de voces. Vejam o resultado."
+Key message to land: "Se voce paga R$X de comissao por mes, sua economia anual e R$Y. O custo da plataforma e 5% sobre o que paga. O ROI se paga em semanas."
+
+SLIDE 8 — Condicoes especiais
+Title: Parceria Grupo Kalaes e 4Shark — condicoes exclusivas para voce.
+Visual: Clean list or cards — formal, institutional
+Content:
+- Setup e integracao gratuitos
+- Sem mensalidade
+- Sem multa de cancelamento
+- Sem custo sobre salarios fixos
+- Taxa de 5% apenas sobre premiacoes pagas
+Presenter note: "Essas condicoes sao exclusivas para os franqueados do Grupo Kalaes. Nao estao disponiveis para o mercado em geral."
+
+SLIDE 9 — Proximo passo
+Title: Comece agora. Sem custo, sem risco.
+Visual: QR code linking to 4shark.com.br/grupokalaes + handshake or onboarding photo
+Content:
+- Acesse: 4shark.com.br/grupokalaes
+- Preencha o formulario
+- Nossa equipe entra em contato para o onboarding
+Presenter note: "O proximo passo e simples. Acesse o link, preencha seus dados, e a gente comeca o processo. Sem custo inicial, sem compromisso de permanencia."
+
+
+WHAT WAS REMOVED (AND WHY)
+
+  Removed                                                   Reason
+  "Todo mes, o mesmo caos" (spreadsheet pain)               Not their pain — 2-3 salespeople, owner does everything
+  "O problema nao e so trabalhoso. E arriscado."            Negative framing — leads with fear, not opportunity
+  "A rede ja avaliou. E escolheu."                          Aggressive — sounds like ultimatum
+  Nucleus/Pay/Incentive individual product slides            Too detailed for this audience — ecosystem overview is enough
+  "Menos risco. Menos encargos. Processo a prova de falhas" Good line but closing with risk/fear — replace with opportunity close
+
+
+VISUAL TONE GUIDANCE FOR GAMMA.APP
+
+- Less: Silicon Valley dark + neon accents (startup vibe)
+- More: Clean dark background, white space, institutional photography (handshakes, teams in boardrooms, legal documents)
+- Reference: Think Banco Itau, BTG Pactual — premium, trustworthy, established
+- Images: Real people in corporate settings, institutional environments, NOT tech dashboards or abstract visuals
+- Typography: Same bold white on dark — but less aggressive framing in the copy
+
+
+GAMMA.APP GENERATION PROMPT (V4 final)
+
+Crie uma apresentacao institucional em portugues (pt-BR) com as seguintes caracteristicas:
+
+Tema: fundo escuro (preto ou cinza muito escuro), tipografia branca em bold, estilo formal e
+institucional — referencia visual: banco premium, nao startup
+Fonte: moderna, sans-serif, titulos grandes e impactantes
+Imagens: fotos reais de pessoas em ambiente corporativo, documentos, reunioes, apertos de mao
+Cada slide deve ter mais visual do que texto — titulos impactantes sao prioridade
+Formato: 16:9
+
+Slide 1
+Titulo: Sua equipe vende. Mas quem controla os encargos trabalhistas sobre a comissao?
+Visual: foto de equipe comemorando resultados, ambiente corporativo escuro
+
+Slide 2
+Titulo: Ninguem esta controlando isso.
+Conteudo (lista de impacto):
+- DSR (Descanso Semanal Remunerado): 16,67%
+- 13o salario: 8,33%
+- Ferias: 11,11%
+- FGTS: 8%
+- Total: 44,11% sobre cada comissao paga
+Nota de rodape pequena: Reflexos trabalhistas — iguais para todos os regimes tributarios
+Visual: pessoa revisando documentos ou planilha, expressao de preocupacao
+
+Slide 3
+Titulo: Isso nao e brecha. E lei.
+Conteudo (bullets):
+- Art. 457 paragraph 2 da CLT — vigente desde 2017
+- Jurisprudencia consolidada no TST
+- Assessoria juridica: Siqueira Castro — um dos maiores escritorios do Brasil
+Visual: documento institucional, escala da justica ou sede de tribunal
+
+Slide 4
+Titulo: Desde 2018, estruturando esse modelo para funcionar sem risco.
+Conteudo (bullets):
+- 150.000 usuarios
+- 9 paises
+- 8 anos de operacao
+Visual: foto institucional, reuniao executiva ou ambiente corporativo
+
+Slide 5
+Titulo: Tres produtos. Um ecossistema.
+Conteudo: 3 cards lado a lado, sem imagem gerada — deixar espaco em branco em cada card
+para insercao manual de imagem depois:
+- Card 1: Nucleus — calcula e estrutura a remuneracao variavel
+- Card 2: Pay — pagamento direto para o colaborador
+- Card 3: Incentive — premiacoes em vouchers e experiencias
+IMPORTANTE: nao gerar imagem neste slide. Deixar area de imagem vazia em cada card.
+
+Slide 6
+Titulo: Voce nao precisa fazer nada. A gente cuida.
+Conteudo (bullets):
+- Voce fala as regras da sua unidade
+- A 4Shark configura tudo no sistema
+- Onboarding 100% conduzido pela nossa equipe
+- Voce comeca a usar sem aumentar seu trabalho
+Visual: foto de pessoa tranquila em escritorio ou equipe de suporte em atendimento
+
+Slide 7
+Titulo: Veja quanto a sua unidade economiza.
+Conteudo: slide limpo com chamada para demo ao vivo
+- Calculadora disponivel em 4shark.com.br/grupokalaes
+Visual: tela de notebook ou tablet com interface de calculadora
+
+Slide 8
+Titulo: Parceria Grupo Kalaes e 4Shark — condicoes exclusivas para voce.
+Conteudo (lista):
+- Setup e integracao gratuitos
+- Sem mensalidade
+- Sem multa de cancelamento
+- Sem custo sobre salarios fixos
+- Taxa de 5% apenas sobre premiacoes pagas
+Visual: aperto de mao em ambiente corporativo ou assinatura de contrato
+
+Slide 9
+Titulo: Comece agora. Sem custo, sem risco.
+Conteudo:
+- Acesse: 4shark.com.br/grupokalaes
+- Preencha o formulario
+- Nossa equipe entra em contato para o onboarding
+Visual: foto de equipe ou pessoa iniciando uma parceria, ambiente positivo e institucional
+
+
+NOTES
+
+Slide 5 (Tres produtos):
+- Nao usar imagem gerada por IA
+- Apos geracao, inserir manualmente os logos salvos em:
+  - ~/Downloads/nucleus.png (azul #1a4f8a)
+  - ~/Downloads/pay.png (cinza escuro #3a3a3a)
+  - ~/Downloads/incentive.png (laranja #f5a623)
+
+Slide 2 (encargos):
+- Os 44,11% sao reflexos trabalhistas fixos, iguais para todos os regimes tributarios
+- Confirmado nas fontes: Lei 605/1949 (DSR), CLT (13o e ferias), Lei 8.036/1990 (FGTS)
+- A calculadora do site confirma o mesmo numero — nao ha contradicao
+
+Slide 3 (lei):
+- Nao mencionar "milhares de empresas" — nao defensavel sem nomes
+- Credibilidade vem de: TST consolidado + Siqueira Castro + 8 anos de vigencia da lei

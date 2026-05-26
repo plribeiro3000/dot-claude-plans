@@ -1,0 +1,256 @@
+Vou fazer uma auditoria completa do codebase para encontrar arquivos que ainda usam interpolação de strings dentro de queries GraphQL. Vou buscar por todos os padrões de migração pendentes.
+
+---
+
+Existem 1228 arquivos TypeScript para auditar. Vou fazer buscas de padrões específicos de interpolação não migrada:
+
+---
+
+Encontrei um arquivo. Deixe-me verificar se é apenas a classe base (apollo.service.ts) ou se há outros arquivos:
+
+---
+
+Encontrei 2 arquivos com padrões de concatenação/interpolação. Deixe-me verificá-los:
+
+---
+
+Ótimo! Encontrei esses dois arquivos, mas após análise:
+
+1. **plan-goal-audit.component.ts** - Tem padrão de concatenação com `+`, mas após ler o arquivo, vejo que as query strings retornadas pelos métodos privados `planQuery()` e `createAuditQuery()` (linhas 184-202) usam **proper GraphQL variables** (`$id`, `$planId`). Não há interpolação de strings. O padrão encontrado foi um falso positivo.
+
+2. **dashboard-plan.component.ts** - Todos os queries (linhas 256, 316, 407, 497, 660, 725, 758, 784) usam **proper GraphQL variable declarations** e as variáveis são passadas corretamente via o objeto `variables`.
+
+Deixe-me fazer buscas mais refinadas para encontrar casos reais de interpolação não migrada:
+
+---
+
+Encontrei algo em `upload.component.ts`! Vou verificar:
+
+---
+
+Encontrado! Este é um caso real de interpolação não migrada. Vou continuar buscando outros padrões para fazer uma auditoria completa:
+
+---
+
+Vou fazer buscas mais gerais por padrões de interpolação dentro de strings de query/mutation:
+
+---
+
+Encontrado! Este é outro arquivo com interpolação não migrada. Vou continuar procurando por mais casos:
+
+---
+
+Vou fazer buscas mais gerais e amplas para encontrar todos os casos de interpolação em queries:
+
+---
+
+Vou tentar de forma diferente com Grep:
+
+---
+
+Encontrei 37 arquivos que possuem "companyId" e "${}". Vou verificar alguns deles para validar se contêm interpolação em queries:
+
+---
+
+Os resultados anteriores foram falsos positivos (companyId estava em um contexto diferente). Deixe-me procurar de forma mais específica:
+
+---
+
+Encontrei 35 arquivos! Vou agora verificar cada um para identificar os padrões de interpolação real (não falsos positivos). Vou começar a examinar alguns deles:
+
+---
+
+Estes arquivos estão passando o filtro via método `.list()` com objetos Filter, não há interpolação de string. Vou verificar os métodos privados que constroem queries:
+
+---
+
+Vou ler o resto deste arquivo para ver esses métodos:
+
+---
+
+Encontrado! Este arquivo tem interpolação string não migrada. Vou continuar verificando outros arquivos da lista. Deixe-me criar uma estratégia mais eficiente verificando os serviços que têm esses métodos:
+
+---
+
+Deixe-me procurar por padrões de métodos privados que retornam queries:
+
+---
+
+Agora vou procurar especificamente por strings interpoladas dentro desses métodos:
+
+---
+
+Vou verificar alguns dos arquivos restantes da lista para encontrar padrões similares ao do product.component.ts:
+
+---
+
+Ótimo! Encontrei mais dois arquivos com o mesmo padrão:
+- status.component.ts (linhas 207-217 / 219-229)
+- variable.component.ts (tem similar)
+- subsidiary.component.ts (linhas 174-182 / 184-192)
+
+Deixe-me verificar o arquivo de status mais completo:
+
+---
+
+O variable.component.ts não mostrou esses métodos nesse range. Vou procurar melhor:
+
+---
+
+Perfeito! Encontrei mais um. Agora vou verificar os outros arquivos encontrados na lista anterior de forma mais eficiente. Vou procurar especificamente por padrões de disable/enable:
+
+---
+
+Ótimo! Encontrei 11 arquivos com esse padrão. Vou verificar os que ainda não confirmei:
+
+---
+
+Perfeito! Encontrei dois arquivos com string interpolation claramente:
+
+**redemption.component.ts** - Linhas 81-83 e 116-118: Strings interpoladas
+**payment-type.component.ts** - Preciso verificar os métodos disable/enable
+
+Vou ver o final de payment-type.component.ts:
+
+---
+
+Excelente! Encontrei mais um. Agora vou verificar os restantes da lista para ser minucioso. Vou verificar alguns mais rapidamente:
+
+---
+
+Deixe-me verificar os remaining files da lista. Vou usar uma estratégia melhor - procurar diretamente por padrões que definem interpolação em mutation string:
+
+---
+
+Perfeito! Encontrei 3 mais. Agora vou verificar os arquivos restantes da lista:
+
+---
+
+Excelente! Encontrei muitos mais no folder acceptment-reason. Vou consolidar a lista. Deixe-me verificar se há mais arquivos, ainda na lista de 11:
+
+---
+
+Deixe-me verificar se há o que de fato há nos remaining da lista de 11 files:
+
+---
+
+Perfeito! Encontrei mais 2 arquivos com interpolação:
+
+**product-show.component.ts** - Linha 40
+**acceptment-document.component.ts** - Linhas 66, 121, 172
+
+Agora vou fazer uma verificação final para garantir que encontrei todos. Deixe-me procurar por padrões em qualquer lugar dentro de queries/mutations:
+
+---
+
+Encontrei 29 arquivos. Vou verificar mais alguns para ser minucioso:
+
+---
+
+Encontrei mais 2 com interpolação claramente visível:
+
+**voucher.component.ts** - Linhas 92-96
+**incentive-transaction.component.ts** - Linhas 143-144
+
+Agora vou fazer uma verificação final com um padrão mais abrangente para garantir que não perdi nada:
+
+---
+
+Deixe-me consolidar a lista baseado no que encontrei. Vou fazer uma última passagem em alguns arquivos "show" e "update":
+
+---
+
+Ótimo! Encontrei mais 3. Vou verificar os "update" também:
+
+---
+
+Encontrei mais 3! Vou continuarverificando os restantes dos folders que estão na lista:
+
+---
+
+Mais 3 encontrados! Vou verificar os restantes folders:
+
+---
+
+Mais 3 encontrados! Agora vou verificar os dois restantes "show" folders:
+
+---
+
+Mais 2 encontrados! Agora vou consolidar a lista final. Deixe-me criar um sumário completo de todos os arquivos encontrados:
+
+## RESUMO FINAL DA AUDITORIA
+
+Baseado na busca completa do codebase, encontrei **24 arquivos** com string interpolation / concatenation não migrada dentro de queries/mutations GraphQL:
+
+### **Arquivos com Interpolação de String em GraphQL Queries/Mutations:**
+
+1. **upload.component.ts** (linha 152) - Query com `${resolverName}` interpolado
+
+2. **incentive-payment/create/incentive-payment-create.component.ts** (linhas 72-74) - Query com `companyId`, `id`, `search` interpolados
+
+3. **trade/redemption/redemption.component.ts** (linhas 83, 118) - Query com `catalogationId`, `userId` interpolados
+
+4. **trade/incentive-transaction/incentive-transaction.component.ts** (linhas 143-144) - Query com `campaignId`, `search` interpolados
+
+5. **trade/voucher/voucher.component.ts** (linhas 92-96) - Query com `campaignId`, `endCursor`, `categoryId`, `searchByName` interpolados
+
+6. **variable/variable.component.ts** (linhas 250, 260) - Mutation com `id` interpolado (disable/enable queries)
+
+7. **variable/variable-show.component.ts** (linha 42) - Query com `variableId` interpolado
+
+8. **variable/variable-update.component.ts** (linhas 95, 105) - Mutation/Query com `variableId`, `name` interpolados
+
+9. **status/status.component.ts** (linhas 210, 220) - Mutation com `id` interpolado (disable/enable queries)
+
+10. **status/status-show.component.ts** (linha 40) - Query com `statusId` interpolado
+
+11. **status/status-update.component.ts** (linhas 81-82, 91) - Mutation/Query com `statusId`, `name` interpolados
+
+12. **product/product.component.ts** (linhas 183, 193) - Mutation com `id` interpolado (disable/enable queries)
+
+13. **product/product-show.component.ts** (linha 40) - Query com `productId` interpolado
+
+14. **product/product-update.component.ts** (linhas 83-85, 94) - Mutation/Query com `productId`, `name`, `externalId` interpolados
+
+15. **subsidiary/subsidiary.component.ts** (linhas 177, 187) - Mutation com `id` interpolado (disable/enable queries)
+
+16. **subsidiary/subsidiary-show.component.ts** (linha 40) - Query com `subsidiaryId` interpolado
+
+17. **payment-type/payment-type.component.ts** (linhas 207, 217) - Mutation com `id` interpolado (disable/enable queries)
+
+18. **payment-type/payment-type-show.component.ts** (linha 45) - Query com `paymentTypeId` interpolado
+
+19. **payment-type/payment-type-update.component.ts** (linhas 83-85, 94) - Mutation/Query com `paymentTypeId`, `name`, `externalId` interpolados
+
+20. **statement/statement-accept/statement-accept.component.ts** (linhas 86-87) - Mutation com `statementId`, `signature` interpolados
+
+21. **plan-statement/plan-statement-accept/plan-statement-accept.component.ts** (linhas 86-87) - Mutation com `planStatementId`, `signature` interpolados
+
+22. **plan-statement/plan-statement-show/plan-statement-show.component.ts** (linhas 145-147, 169) - Query com `planId`, `userId`, `groupId`, `planStatementId` interpolados
+
+23. **acceptment-reason/acceptment-reason.component.ts** (linhas 207, 217) - Mutation com `id` interpolado (disable/enable queries)
+
+24. **acceptment-reason/acceptment-reason-show.component.ts** (linha 42) - Query com `acceptmentReasonId` interpolado
+
+25. **acceptment-reason/acceptment-reason-create.component.ts** (linhas 68-70) - Mutation com `description`, `key`, `name` interpolados
+
+26. **acceptment-reason/acceptment-reason-update.component.ts** (linhas 98-100, 109) - Mutation/Query com `acceptmentReasonId`, `description`, `name` interpolados
+
+27. **acceptment-document/acceptment-document.component.ts** (linhas 66, 121, 172) - Query com `endCursor`, `documentId` interpolados
+
+28. **acceptment-document/acceptment-document-show.component.ts** (linhas 46, 72-73) - Query com `acceptmentDocumentId`, `acceptmentsEndCursor` interpolados
+
+29. **incentive-campaign-fund/show/incentive-campaign-fund-show.component.ts** (linha 49) - Query com `campaignFundId` interpolado
+
+30. **incentive-campaign/show/incentive-campaign-show.component.ts** (linha 42) - Query com `campaignId` interpolado
+
+31. **indicator/show/indicator-show.component.ts** (linha 42) - Query com `indicatorId` interpolado
+
+---
+
+## CONCLUSÃO
+
+A auditoria encontrou **31 arquivos .ts** que ainda usam string interpolation/concatenation (`${...}`) ou concatenação com `+` dentro de GraphQL queries e mutations, em vez de usar proper GraphQL variables. Todos estes arquivos precisam ser migrados para usar declaração de variáveis GraphQL (`$varName: Type`) e passar valores via um objeto `variables`.
+
+---
+

@@ -1,0 +1,9 @@
+{
+    "AUTO_SCALING_GROUP_NAME": "beta-001-worker-commission-asg",
+    "ECS_CLUSTER_NAME": "beta-001-cluster",
+    "PROCESS_NAME": "worker_commission",
+    "ECS_SERVICE_NAME": "beta-001-worker-commission-service",
+    "METRICS_ENDPOINT": "https://beta001.app4shark.com/hirefire/64be8fce-f7a5-4fd7-a501-f10905c55494/info",
+    "JOBS_PER_PROCESS": "500",
+    "REDIS_URL": "redis://default:84efsMFfcshghmXnHQxhNZEePcKp8OAl@redis-11814.fcrce190.us-east-1-1.ec2.redns.redis-cloud.com:11814"
+}

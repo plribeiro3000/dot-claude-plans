@@ -1,0 +1,143 @@
+Presentation Script — V5 (Final)
+
+Built on 2026-03-13. Consolidates all storytelling decisions made after V4 generation.
+Language: Portuguese (pt-BR)
+Tool: Gamma.app — project "V5"
+Status: Em revisao — compartilhado com socios para feedback
+PDF exportado: ~/Downloads/Sua-equipe-vende-Quem-cuida-do-resto-v5.pdf
+
+
+WHAT CHANGED FROM V4
+
+  Slide     Change
+  Cover     Adicionado slide de capa — so marca + tagline (palestrante convidado)
+  Slide 1   Title names encargos trabalhistas explicitly
+  Slide 2   Shows 4 encargo components with % + "sobre cada comissao paga" em cada item
+  Slide 3   Removed "adotado por milhares de empresas" — nao defensavel
+  Slide 6   Flow reduzido de 4 para 3 passos — removed ambiguous middle step
+  Slide 9   "Onboarding dedicado" > "Pronto" / passos renomeados para Acesse/Cadastre/Pronto
+
+
+NARRATIVE ARC
+
+Pergunta > Problema concreto > Lei > Credibilidade > Produto > Simplicidade > Economia > Oferta > CTA
+
+Each slide creates a question that the next one answers.
+
+
+SLIDES
+
+SLIDE CAPA — Identidade
+Titulo: 4Shark
+Subtitulo: Menos encargo trabalhista. Mais resultado.
+Visual: Equipe em reuniao executiva em sala de vidro, preto e branco, cidade ao fundo
+Nota: Slide de capa de palestrante convidado — so marca. Fica na tela enquanto publico se acomoda. Sem nome de evento, sem Grupo Kalaes, sem titulo de palestra.
+Status: Final
+
+SLIDE 1 — Pergunta de abertura
+Titulo: Sua equipe vende. Mas quem controla os encargos trabalhistas sobre a comissao?
+Visual: Equipe comemorando em sala de reuniao, preto e branco
+Status: Final
+
+SLIDE 2 — O problema concreto
+Badge: ATENCAO
+Titulo: Ninguem esta controlando isso.
+Conteudo (4 itens com percentual):
+- DSR — Descanso Semanal Remunerado / 16,67% sobre cada comissao paga
+- 13o Salario / 8,33% sobre cada comissao paga
+- Ferias / 11,11% sobre cada comissao paga
+- FGTS / 8% sobre cada comissao paga
+- Total: 44,11% sobre cada comissao paga — reflexos trabalhistas validos para todos os regimes tributarios
+Visual: Homem revisando documentos com expressao de preocupacao
+Nota: 44,11% e fixo para todos os regimes tributarios. Base legal: Lei 605/1949 (DSR), CLT (13o e ferias), Lei 8.036/1990 (FGTS).
+Status: Final
+
+SLIDE 3 — Base legal
+Badge: BASE LEGAL
+Titulo: Isso nao e brecha. E lei.
+Conteudo (3 itens com subtitulo):
+- Art. 457 paragraph 2 da CLT / Vigente desde 2017 — sem excecoes
+- Jurisprudencia consolidada no TST / Entendimento pacificado nos tribunais superiores
+- Siqueira Castro / Um dos maiores escritorios juridicos do Brasil
+Visual: Documento institucional sobre mesa + fachada de tribunal
+Nota: Nao dizer "maior escritorio trabalhista" — nao confirmado. "Um dos maiores escritorios juridicos do Brasil" e a formulacao correta.
+Status: Final
+
+SLIDE 4 — Credibilidade
+Titulo: Desde 2018, estruturando esse modelo para funcionar sem risco.
+Numeros (destaque grande):
+- 150K — Usuarios ativos
+- 9 — Paises de operacao
+- 8 — Anos de expertise
+Visual: Reuniao executiva, homens em trajes formais, preto e branco
+Status: Final
+
+SLIDE 5 — Ecossistema
+Titulo: Tres produtos. Um ecossistema.
+Subtitulo: Solucoes integradas para gestao completa da remuneracao variavel.
+Conteudo (3 cards com logo oficial):
+- Nucleus (logo azul #1a4f8a) / Calcula e estrutura a remuneracao variavel com precisao e conformidade legal
+- Pay (logo cinza escuro #3a3a3a) / Pagamento direto ao colaborador — rapido, seguro e rastreavel
+- Incentive (logo laranja #f5a623) / Premiacoes em vouchers e experiencias que motivam sua equipe
+Nota: Logos inseridos manualmente apos geracao. Arquivos: ~/Downloads/nucleus.png, ~/Downloads/pay.png, ~/Downloads/incentive.png
+Status: Final
+
+SLIDE 6 — Simplicidade
+Titulo: Voce nao precisa fazer nada. A gente cuida.
+Visual: Homem em reuniao de onboarding, ambiente informal de escritorio
+Fluxo (3 circulos conectados):
+1. Voce Define
+2. 4Shark Configura
+3. Voce Acompanha
+Nota: 3 passos, nao 4. Passo intermediario de operacao interna removido intencionalmente. Sem mencionar "integracao" para nao criar expectativa tecnica desde o dia 1.
+Status: Final
+
+SLIDE 7 — Calculadora (demo ao vivo)
+Badge: DEMO AO VIVO
+Titulo: Veja quanto a sua unidade economiza.
+Subtitulo: Simule agora o impacto real dos encargos sobre a sua folha de comissoes.
+CTA: Calculadora disponivel em 4shark.com.br/grupokalaes
+Visual: Notebook com interface de calculadora na tela
+Status: Final
+
+SLIDE 8 — Condicoes exclusivas
+Titulo: Parceria Grupo Kalaes e 4Shark — condicoes exclusivas para voce.
+Conteudo (5 itens numerados):
+1. Setup e integracao gratuitos
+2. Sem mensalidade
+3. Sem multa de cancelamento
+4. Sem custo sobre salarios fixos
+5. Taxa de 5% apenas sobre premiacoes pagas
+Visual: Aperto de mao em ambiente corporativo + contrato sobre mesa
+Nota: Condicoes exclusivas para franqueados do Grupo Kalaes — nao disponiveis no mercado geral.
+Status: Final
+
+SLIDE 9 — CTA
+Titulo: Comece agora.
+Subtitulo: Sem custo. Sem risco.
+Visual: Grupo em aperto de mao, equipe jovem em sala de reuniao iluminada
+Fluxo (3 passos numerados):
+- 01 — Acesse / 4shark.com.br/grupokalaes
+- 02 — Cadastre / Preencha o formulario em 2 minutos
+- 03 — Pronto / Nossa equipe configura tudo para voce
+Nota: Passos 01 e 02 sao acoes do franqueado. Passo 03 e o estado final — "Pronto" nomeia o resultado, nao a acao da equipe (que fica no subtitulo).
+Status: Final
+
+
+DESIGN DECISIONS (VALIDATED)
+
+- Tema escuro (Onyx) — fundo preto, tipografia branca bold
+- Formato 16:9
+- Fotos reais de pessoas em ambiente corporativo — tom banco premium, nao startup
+- Referencia visual: Banco Itau / BTG Pactual
+- Badges de label (ATENCAO, BASE LEGAL, DEMO AO VIVO) gerados automaticamente pelo Gamma — adicionam contexto visual sem poluir o slide
+- Logos dos produtos inseridos manualmente — Gamma gera imagens mesmo com instrucao de deixar em branco
+
+
+GAMMA.APP LIMITATIONS DISCOVERED DURING V5 BUILD
+
+- Nao aceita instrucao de "deixar area de imagem vazia" — sempre gera alguma imagem
+- Nao consegue aplicar cores de fundo personalizadas em cards individuais via prompt
+- Edicoes de texto via prompt as vezes quebram layout — preferir edicao manual para alteracoes pontuais
+- Prompt para trocar apenas texto de um elemento: incluir "Nao altere layout, visual ou estrutura" explicitamente
+- Undo (Cmd+Z) disponivel, redo nao disponivel

@@ -1,0 +1,58 @@
+SOURCE: ~/.claude/scripts/check-claude-version.sh (lines 41-63)
+PURPOSE: Current version-check mechanism — shows the "pull discipline" gap
+
+---
+if [[ "${1}" == "--run" ]]; then
+    git -C "${CLAUDE_DIR}" fetch --quiet origin "${branch}" 2>/dev/null || {
+        echo "Could not fetch from origin/${branch} (network or SSH authentication issue)."
+        exit 0
+    }
+
+    behind=$(git -C "${CLAUDE_DIR}" rev-list --count "HEAD..origin/${branch}" 2>/dev/null) || exit 0
+
+    touch "${MARKER}"
+
+    if [[ "${behind:-0}" -eq 0 ]]; then
+        echo "Claude config (dot-claude) is up to date on '${branch}'."
+        exit 0
+    fi
+
+    echo "Your Claude config (dot-claude) is on '${branch}'. There are ${behind} commit(s)"
+    echo "on origin/${branch} that you have not pulled yet."
+    if [[ "${branch}" == "master" ]]; then
+        echo "These are tagged release updates."
+    else
+        echo "These include all the latest development work, including changes not yet tagged in a release."
+    fi
+    exit 0
+fi
+---
+
+OBSERVATION: The script reports a raw commit count. It does not report the
+VERSION difference (e.g. "you are at 0.1.0, current is 0.3.0"). It also does
+not surface CHANGELOG entries for the missed commits. The gap: the engineer
+knows they are N commits behind, but not what changed or whether it matters.
+
+---
+SOURCE: ~/.claude/scripts/check-claude-version.sh (lines 72-97)
+PURPOSE: Consent notice — shows how pull is gated
+
+---
+cat <<EOF
+=== CLAUDE CONFIG VERSION CHECK (PENDING) ===
+
+The Claude config (dot-claude) is tracking '${branch}' and has not been
+checked for updates today. The check requires `git fetch`, which triggers
+a 1Password authentication popup for the SSH key — running it without
+warning is jarring.
+
+YOUR NEXT RESPONSE MUST ask the engineer (in the language of the current
+conversation) whether they want to run the version check now. Mention the
+1Password popup. Do this even if the engineer's prompt is about something
+else — answer their question AND ask about the version check together.
+EOF
+---
+
+OBSERVATION: The check fires once per day via a /tmp marker file. The
+consent gate is intentional (SSH popup). The mechanism works for "are you
+behind?" but stops there — no CHANGELOG digest, no "new since 0.1.0" surface.

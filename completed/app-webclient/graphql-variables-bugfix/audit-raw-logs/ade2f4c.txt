@@ -1,0 +1,422 @@
+
+
+Entendi. Vou auditar todas as mutations GraphQL no frontend Angular, comparar os tipos dos argumentos com os requisitos do backend, e identificar inconsistências entre nullable/non-nullable.
+
+Vou começar buscando todas as mutations no frontend.
+
+---
+
+Agora preciso ver os detalhes completos das mutations que têm argumentos multi-linha. Vou buscar as mutations que precisam de mais contexto e também listar os arquivos de mutations no backend.
+
+---
+
+Agora tenho a lista completa de todas as mutations no frontend. Preciso verificar os argumentos no backend. Vou identificar as mutations que usam tipos nullable (sem `!`) e que poderiam ter `required: true` no backend. Vou focar nas mutations mais suspeitas primeiro - aquelas com argumentos sem `!`.
+
+As mutations suspeitas (argumentos sem `!` que podem ser required no backend) sao:
+
+1. **Seat mutations**: `UpdateParentSeat`, `PromoteSeat`, `DemoteSeat`
+2. **CreateCommissionIndicatorAudit**: `$planId: ID, $periodId: ID`
+3. **CreateClient**: `$externalId: String, $name: String`
+4. **CreateIndicator**: `$variableId: ID, $userId: ID, $compiledAt: String, $value: String`
+5. **CreateCommissionReportCreationBatch**: `$periodId: ID`
+6. **CreateCalendarAudit**: `$calendarId: ID`
+7. **CreateCommission**: `$planId: ID, $periodId: ID`
+8. **CreatePartialCommission**: `$planId: ID, $periodId: ID`
+9. **CreateCommissionCreationBatch**: `$periodId: ID`
+10. **CreateCampaign**: `$name: String, $planId: ID`
+11. **CreateGroup**: `$externalId: String, $name: String`
+12. **CreateSubsidiary**: all nullable
+13. **Group/FinishGroupification/StartGroupification**: all nullable
+14. **CreateUserHistory**: `$userId: ID`
+15. **Various CreateIncentive**: all nullable args
+16. **CreateGoal**: all nullable
+17. **CreateDeal**: all nullable
+18. **CreateCalendar**: all nullable
+19. **CreatePlanSlice**: all nullable
+20. **CreatePlanSliceCommission**: all nullable
+21. **CreatePlanSliceCommissionReport**: `$planSliceCommissionId: ID`
+22. **CreatePayment (easy)**: `$commissionIds: [ID], $name: String`
+23. **CreateVariable (easy)**: all nullable
+24. **ChangePassword/PasswordChange**: all nullable
+25. **CreateCampaignAttachmentSignedUrl**: all nullable
+26. **CreateCampaignAttachment**: `$campaignId: ID`
+27. **CreateUser**: all nullable
+28. **CreateCompany**: all nullable
+29. **CreateCollaborativeDeal**: most nullable
+30. **CreatePayment**: `$periodId: ID, $referenceMonth: String` (only `$name: String!`)
+31. **CreateKpiDocument (easy)**: all nullable
+32. **CreateEasyUserDocument**: all nullable
+33. **CreateVariableDocument (easy)**: all nullable
+
+Vou verificar os arquivos de mutation do backend em lotes.
+
+---
+
+Esses estao todos com `required: false`, entao estao corretos. Agora vou verificar mais mutations.
+
+---
+
+Encontrei os primeiros bugs. `ChangePassword` tem `required: true` para todos os argumentos, mas o frontend usa nullable. `CreateCampaignAttachmentSignedUrl` tem `campaign_id` como `required: true` mas o frontend usa `$campaignId: ID` (nullable). Vou verificar mais mutations.
+
+---
+
+Mais bugs encontrados. Agora vou verificar as mutations de update, disable, enable, approve, etc., e mais mutations do tipo "document" e "attachment".
+
+---
+
+Agora vou verificar as mutations de disable/enable/approve/etc e as mutations de documentos/attachments.
+
+---
+
+Mais achados importantes. Agora vou verificar mutations que ainda faltam - disable/enable para todos, release, reprocess, integrate, delete documents, finish/start groupification, etc.
+
+---
+
+Todas as mutations disable/enable usam `$id: ID!` no frontend, o que corresponde corretamente ao `required: true` do backend. Agora vou verificar as mutations restantes que ainda preciso.
+
+---
+
+Muitas mutations de documents retornaram "No matches found" para `argument`. Vou verificar se elas herdam de uma classe base ou usam outro padrão.
+
+---
+
+Eles herdam de `CreateDocumentGraphqlMutation`. Vou verificar essa classe base e as restantes mutations que ainda faltam.
+
+---
+
+A classe base `CreateDocumentGraphqlMutation` define `filename` e `content_type` como `required: false`. Isso e importante porque o frontend usa `String!` (required) para varios desses documents -- esse e o caso inverso (frontend mais restritivo que backend). Nao e um bug critico mas e uma inconsistencia.
+
+Agora vou verificar as mutations restantes que faltam.
+
+---
+
+Agora vou verificar as mutations de attachment, release, reprocess, integrate, unlock, submit, finish/start groupification e o `PasswordChange` alias.
+
+---
+
+Agora tenho todos os dados necessarios. Vou verificar algumas mutations restantes que ainda preciso confirmar.
+
+---
+
+Agora preciso verificar o `ProcessPaymentExportation` que aparece no frontend como `mutation ProcessPaymentExportation($paymentId: ID!)`.
+
+---
+
+Agora mais um lote importante - vou verificar as mutations que o frontend marca como `!` (required) mas que no backend sao `required: false`, como o `CreatePaymentExportation`.
+
+---
+
+Esses arquivos nao existem como mutations separadas para `EnableSubsidiary`, `CreateEasyUserDocument`, `CreateEasyVariableDocument`. Vou verificar se existe um padrao de enable generico ou se eles sao gerados.
+
+---
+
+Nao ha `disable_subsidiary` nem `enable_subsidiary` como arquivos separados. Pode ser que as mutations de disable/enable para subsidiary sao geradas dinamicamente ou herdam de alguma classe. Isso nao impacta a auditoria porque o frontend usa `$id: ID!` para elas, que e o padrao correto para disable/enable.
+
+Agora vou verificar o `PasswordChange` (que e diferente de `ChangePassword`).
+
+---
+
+O frontend usa `PasswordChange` em `password.component.ts` e `ChangePassword` em `user-change-password.component.ts`. Ambos se mapeiam para `change_password_graphql_mutation.rb`. Vou verificar os argumentos do backend.
+
+Ja sei que `change_password_graphql_mutation.rb` tem:
+- `current_password: String, required: true`
+- `password: String, required: true`
+- `password_confirmation: String, required: true`
+
+E o frontend usa todos como `String` (nullable) -- isso e um BUG.
+
+Agora vou verificar mais mutations que podem ter o padrao reverso (frontend `!` mas backend `false`).
+
+---
+
+Agora vou verificar o `CreateMetric` - o frontend usa `$calculation: String!` e `$name: String!` mas o backend pode ser diferente.
+
+Ja verifiquei acima - `create_metric_graphql_mutation.rb` tem `calculation: String, required: false` e `name: String, required: false`. O frontend usa `String!` para ambos. Esse e o caso inverso -- frontend mais restritivo.
+
+Vou verificar o `CreateRankifier` da mesma forma.
+
+Ja vi que `create_rankifier_graphql_mutation.rb` tem `name: String, required: false`, `type: String, required: false`, `rankifier_variables: [...], required: false`. Mas o frontend usa `$name: String!`, `$type: String!`, `$rankifierVariables: [RankifierVariableInputGraphql!]`. Mais inconsistencias do tipo "frontend mais restritivo".
+
+Agora vou verificar o `UpdateRankifier` - backend tem `name, type, rankifier_variables` como `required: false` mas `id` como `required: true`. O frontend usa `$id: ID!`, `$name: String!`, `$type: String!` -- `id` correto, `name` e `type` sao mais restritivos no frontend.
+
+Preciso tambem verificar o `UpdateMetric`:
+- Backend: `name: String, required: false`, `id: ID, required: true`
+- Frontend: `$id: ID!, $name: String!` -- `name` e mais restritivo no frontend
+
+Vou agora verificar o `CreateCollaborativeDealDocument` que nao existe como arquivo separado e as mutations de `CreatePaymentExportation`.
+
+O `CreatePaymentExportation` no frontend usa:
+- `$completePosition: String!` -- backend: `required: false`
+- `$fieldsAttributes: [PaymentExportationFieldsInputGraphql!]!` -- backend: `required: false`
+- `$ignoreZeros: Boolean!` -- backend: `required: false`
+- `$paymentId: ID!` -- backend: `required: false`
+
+Todas essas sao mais restritivas no frontend que no backend.
+
+Agora tenho informacoes suficientes para compilar o relatorio completo. Vou tambem verificar se `CreateCollaborativeDealDocument` herda de `CreateDocumentGraphqlMutation`.
+
+---
+
+Confirmado - herda de `CreateDocumentGraphqlMutation` que tem `filename` e `content_type` como `required: false`. O frontend usa `$filename: String!` e `$contentType: String!` para `CreateCollaborativeDealDocument`.
+
+Vou verificar agora se existe uma mutation `DeleteCollaborativeDealDocument` no backend.
+
+---
+
+Nao ha `delete_collaborative_deal_document` separado. Deve usar o `DeleteDocument` generico ou algo similar.
+
+Agora vou compilar todas as informacoes. Vou verificar a mutation `CreateCampaignAttachment` (frontend `$campaignId: ID`) vs backend.
+
+Ja verifiquei: backend `create_campaign_attachment_graphql_mutation.rb` tem `campaign_id: ID, required: true`. Frontend usa `$campaignId: ID` (nullable) -- BUG.
+
+Tambem `CreateProfileAttachment` (frontend `$profileId: ID!`) vs backend `profile_id: ID, required: true` -- CORRETO.
+
+E `CreateProfileAttachmentSignedUrl` (backend tem `profile_id: ID, required: true`) - mas olhando o frontend, a mutation nao apareceu diretamente. Vou verificar se existe.
+
+A mutation `CreateProfile` no frontend usa `$filename: String!, $contentType: String!` - backend `create_profile_graphql_mutation.rb` tem ambos como `required: false`. Frontend mais restritivo.
+
+`UpdateProfile` no frontend usa `$filename: String!, $contentType: String!` - preciso verificar o backend.
+
+---
+
+Agora vou verificar `CreateIncentivePayment`:
+- Frontend: `$periodId: ID!, $campaignId: ID!`
+- Backend: `period_id: ID, required: true` e `campaign_id: ID, required: true`
+-- CORRETO
+
+Agora vou compilar o relatorio final completo. Preciso tambem verificar a mutation `format` no frontend `CreateIndicatorDocument`.
+
+O frontend `CreateIndicatorDocument` usa `$format: String!` - backend tem `format: String, required: false`. Mais restritivo no frontend.
+
+E `CreatePayment` (nao easy):
+- Frontend: `$name: String!, $periodId: ID, $referenceMonth: String`
+- Backend: `name: String, required: false`, `period_id: ID, required: false`, `reference_month: String, required: false`
+- `$name: String!` e mais restritivo no frontend
+
+Agora vou verificar a mutation `CreateCollaborativeDeal`. O frontend usa `$collaborations: [DealCollaborationInputGraphql!]!` (required) mas o backend tem `collaborations: [...], required: false`.
+
+E a mutation `UpdateCollaborativeDeal`. O frontend usa `$collaborations: [DealCollaborationInputGraphql!]!` mas o backend tem `collaborations: [...], required: false`.
+
+Agora tenho todos os dados. Vou compilar o relatorio final.
+
+---
+
+Aqui esta o relatorio completo da auditoria:
+
+## RELATORIO DE AUDITORIA: Inconsistencias de Tipos GraphQL (Nullable vs Non-Nullable)
+
+---
+
+### BUGS CRITICOS (Backend `required: true`, Frontend nullable sem `!`)
+
+Estes sao os bugs reais que podem causar rejeicao da request pelo backend:
+
+#### 1. ChangePassword / PasswordChange
+
+**Backend** (`/Users/plribeiro3000/Projects/4Shark/app/app/graphql_mutations/change_password_graphql_mutation.rb`):
+```ruby
+argument :current_password, String, required: true
+argument :password, String, required: true
+argument :password_confirmation, String, required: true
+```
+
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/change-password/user-change-password.component.ts`):
+```graphql
+mutation ChangePassword($currentPassword: String, $password: String, $passwordConfirmation: String)
+```
+
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/password/password.component.ts`):
+```graphql
+mutation PasswordChange($currentPassword: String, $password: String, $passwordConfirmation: String)
+```
+
+**Correcao**: Todos devem ser `String!`
+
+---
+
+#### 2. CreateCampaignAttachmentSignedUrl
+
+**Backend** (`/Users/plribeiro3000/Projects/4Shark/app/app/graphql_mutations/create_campaign_attachment_signed_url_graphql_mutation.rb`):
+```ruby
+argument :campaign_id, ID, required: true
+argument :content_type, String, required: false
+argument :filename, String, required: false
+```
+
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/campaign-attachment-signed-url.service.ts`):
+```graphql
+mutation CreateCampaignAttachmentSignedUrl($campaignId: ID, $contentType: String, $filename: String)
+```
+
+**Correcao**: `$campaignId` deve ser `ID!`
+
+---
+
+#### 3. CreateCampaignAttachment
+
+**Backend** (`/Users/plribeiro3000/Projects/4Shark/app/app/graphql_mutations/create_campaign_attachment_graphql_mutation.rb`):
+```ruby
+argument :campaign_id, ID, required: true
+```
+
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/campaign-attachment.service.ts`):
+```graphql
+mutation CreateCampaignAttachment($campaignId: ID)
+```
+
+**Correcao**: `$campaignId` deve ser `ID!`
+
+---
+
+### INCONSISTENCIAS DE MENOR CRITICIDADE (Frontend `!` required, Backend `required: false`)
+
+Estas nao causam falhas (GraphQL aceita enviar valores non-null para argumentos opcionais), mas representam inconsistencias que podem mascarar mudancas futuras no schema.
+
+#### 4. CreateMetric
+
+**Backend**: `calculation: String, required: false` / `name: String, required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/metric/create/metric-create.component.ts`):
+```graphql
+mutation CreateMetric($calculation: String!, $name: String!, ...)
+```
+
+#### 5. UpdateMetric
+
+**Backend**: `name: String, required: false`, `id: ID, required: true`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/metric/update/metric-update.component.ts`):
+```graphql
+mutation UpdateMetric($id: ID!, $name: String!)
+```
+`$name: String!` -- backend nao exige.
+
+#### 6. CreateRankifier
+
+**Backend**: `name: String, required: false` / `type: String, required: false` / `rankifier_variables: [...], required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/create/rankifier-create.component.ts` e `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/clone/rankifier-clone.component.ts`):
+```graphql
+mutation CreateRankifier($name: String!, $type: String!, $rankifierVariables: [RankifierVariableInputGraphql!])
+```
+
+#### 7. UpdateRankifier
+
+**Backend**: `name: String, required: false` / `type: String, required: false` / `rankifier_variables: [...], required: false` / `id: ID, required: true`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/update/rankifier-update.component.ts`):
+```graphql
+mutation UpdateRankifier($id: ID!, $name: String!, $type: String!, $rankifierVariables: [RankifierVariableInputGraphql!])
+```
+
+#### 8. CreatePaymentExportation
+
+**Backend**: Todos `required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/payment/exportation/payment-exportation-create.component.ts`):
+```graphql
+mutation CreatePaymentExportation(
+  $completeCharacter: String
+  $completePosition: String!
+  $fieldsAttributes: [PaymentExportationFieldsInputGraphql!]!
+  $ignoreZeros: Boolean!
+  $paymentId: ID!
+)
+```
+`$completePosition`, `$fieldsAttributes`, `$ignoreZeros`, `$paymentId` sao `!` no frontend mas `required: false` no backend.
+
+#### 9. CreatePayment
+
+**Backend**: `name: String, required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/payment/create/payment-create.component.ts`):
+```graphql
+mutation CreatePayment($name: String!, $periodId: ID, $referenceMonth: String)
+```
+`$name: String!` mas backend nao exige.
+
+#### 10. CreateProfile
+
+**Backend** (`create_profile_graphql_mutation.rb`): `filename: ID, required: false` / `content_type: String, required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/profile/profile.service.ts`):
+```graphql
+mutation CreateProfile($filename: String!, $contentType: String!)
+```
+
+#### 11. UpdateProfile
+
+**Backend** (`update_profile_graphql_mutation.rb`): `filename: ID, required: false` / `content_type: String, required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/profile/profile.service.ts`):
+```graphql
+mutation UpdateProfile($filename: String!, $contentType: String!)
+```
+
+#### 12. CreateIndicatorDocument
+
+**Backend** (`create_indicator_document_graphql_mutation.rb`): Todos `required: false`
+**Frontend** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/indicator-document/create/indicator-document-create.service.ts`):
+```graphql
+mutation CreateIndicatorDocument($contentType: String!, $filename: String!, $format: String!, $compiledAt: String, $frequency: String)
+```
+`$contentType`, `$filename`, `$format` sao `!` no frontend mas `required: false` no backend.
+
+#### 13. Todas as mutations "Create*Document" que herdam de CreateDocumentGraphqlMutation
+
+**Backend** (`create_document_graphql_mutation.rb`): `filename: String, required: false` / `content_type: String, required: false`
+
+Os seguintes frontends usam `String!` para `filename` e `contentType`:
+
+| Frontend File | Mutation |
+|---|---|
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-document/create/user-document-create.service.ts` | CreateUserDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/password-document/create/password-document-create.service.ts` | CreatePasswordDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/incentive-document/create/incentive-document-create.service.ts` | CreateIncentiveDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/client-document/create/client-document-create.service.ts` | CreateClientDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal-document/create/deal-document-create.service.ts` | CreateDealDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/goal-document/create/goal-document-create.service.ts` | CreateGoalDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/variable-document/create/variable-document-create.service.ts` | CreateVariableDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/group-document/create/group-document-create.service.ts` | CreateGroupDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/product-document/create/product-document-create.service.ts` | CreateProductDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal-document/create/collaborative-deal-document-create.service.ts` | CreateCollaborativeDealDocument |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-identifier-document/create/user-identifier-document-create.service.ts` | CreateUserIdentifierActionDocument |
+
+#### 14. CreateCollaborativeDeal e UpdateCollaborativeDeal
+
+**Backend**: `collaborations: [...], required: false`
+**Frontend Create** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/create/collaborative-deal-create.component.ts`):
+```graphql
+$collaborations: [DealCollaborationInputGraphql!]!
+```
+**Frontend Update** (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/update/collaborative-deal-update.component.ts`):
+```graphql
+$collaborations: [DealCollaborationInputGraphql!]!
+```
+
+---
+
+### MUTATIONS CORRETAS (sem inconsistencias)
+
+Todas as mutations de **Disable**, **Enable**, **Approve**, **Release**, **Reprocess**, **Integrate**, **Unlock**, **Delete** e **Submit** usam `$id: ID!` no frontend correspondendo corretamente a `id: ID, required: true` no backend.
+
+Tambem estao corretas:
+- CreateIncentivePayment (`$periodId: ID!, $campaignId: ID!`)
+- CreateCampaignFund (`$campaignId: ID!, $value: Float!`)
+- CreatePlanGoalAudit (`$planId: ID!`)
+- ProcessPaymentExportation (`$paymentId: ID!`)
+- CreateClickThrough (`$clickThroughCampaignId: ID!` mas backend `required: false` -- inconsistencia menor)
+- CreateProfileAttachment (`$profileId: ID!`)
+- ApprovePlanParticipation, ApprovePlanSlice, ApprovePlanSliceCommission, ApproveCommission, ApprovePayment, ApproveIncentivePayment, ApproveCampaignFund
+- Todas as mutations Create*DocumentAttachment (`$documentId: ID!` correspondendo a `document_id: ID, required: true`)
+- UpdateCompany, UpdateCalendar, UpdateDeal, UpdateGoal, UpdateUser, UpdateClient, UpdateGroup, UpdateSubsidiary, UpdateCampaign, UpdateIncentive, UpdateCollaborativeDeal (para o campo `$id: ID!`)
+
+---
+
+### RESUMO
+
+| Criticidade | Quantidade | Descricao |
+|---|---|---|
+| **BUG CRITICO** | **3 mutations (5 ocorrencias no codigo)** | Backend `required: true`, frontend nullable -- pode causar falha |
+| **Inconsistencia menor** | **~25 argumentos em ~15 mutations** | Frontend `!` (required) mas backend `required: false` -- funciona mas nao reflete o schema real |
+
+#### Bugs criticos que requerem correcao imediata:
+
+1. **ChangePassword** (2 arquivos) -- 3 argumentos nullable que devem ser `!`
+2. **CreateCampaignAttachmentSignedUrl** -- `$campaignId` nullable que deve ser `ID!`
+3. **CreateCampaignAttachment** -- `$campaignId` nullable que deve ser `ID!`
+
+---
+

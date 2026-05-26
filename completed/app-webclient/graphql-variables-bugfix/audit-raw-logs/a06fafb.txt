@@ -1,0 +1,281 @@
+
+
+Vou auditar o codebase buscando o padrão de bug onde o estado de loading é definido como `false` fora do callback do `.subscribe()`.
+
+Primeiro, vou buscar todos os arquivos que contêm tanto `loading` quanto `subscribe` para identificar candidatos.
+
+---
+
+Agora preciso encontrar o padrao especifico onde `loading` e setado como `false` FORA do callback do subscribe. Vou usar uma busca multiline para encontrar o padrao `});` seguido de `this.loading` em linhas subsequentes.
+
+---
+
+Tenho os resultados iniciais. Agora preciso verificar cada caso individualmente para distinguir os bugs reais dos falsos positivos. Vou verificar os casos que precisam de contexto adicional para confirmar se o `loading = false` esta realmente fora do subscribe do observable HTTP ou se esta dentro de um callback aninhado (o que seria correto).
+
+Vou ler os arquivos relevantes para verificar cada caso com contexto completo.
+
+---
+
+Agora preciso verificar mais arquivos para confirmar os outros casos. Vou ler os que faltam.
+
+---
+
+Agora preciso verificar mais alguns arquivos e tambem verificar os casos ambiguos. Vou verificar os que pareciam potencialmente corretos (dentro de subscribe aninhado).
+
+---
+
+Agora preciso verificar os demais arquivos. Vou verificar os restantes que o regex encontrou e tambem buscar por padroes adicionais que possam ter escapado.
+
+---
+
+Agora preciso verificar o `variable/update` tambem.
+
+---
+
+Agora vou buscar por mais padroes que possam ter sido perdidos, incluindo variantes do padrao como `loadingVariables`, `loadingProducts`, etc., apos fechar subscribe.
+
+---
+
+Agora tenho todos os resultados. Preciso classificar cada um. Existem dois tipos de padroes aqui:
+
+1. **Bugs reais (Categoria A)**: `loading = false` esta completamente FORA do callback principal do subscribe - executa imediatamente apos chamar subscribe.
+2. **Falsos positivos (Categoria B)**: `loading = false` esta fora de um subscribe INTERNO (aninhado como `ngZone.onStable.pipe(first()).subscribe()`), mas DENTRO do error callback do subscribe principal. Isso na verdade esta CORRETO - esta dentro do error callback do subscribe externo.
+3. **Falsos positivos (Categoria C)**: `loading = false` esta dentro do subscribe callback, apenas apos um `patchValue({...})` que fecha com `});`.
+
+Vou classificar cada caso agora com base nos arquivos que ja li.
+
+Agora vou verificar os casos das categorias que ainda nao confirmei - especificamente `dashboard-incentive`, `dashboard-calendar`, e `trade` linhas 357-359.
+
+---
+
+Agora tenho toda a informacao necessaria para classificar cada caso. Vou verificar tambem o `plan-statement/plan-statement.component.ts` mais de perto.
+
+---
+
+Agora classifiquei todos os casos. Vou tambem verificar o `statement/statement.component.ts` para confirmar.
+
+---
+
+Agora verifiquei que `plan-statement/plan-statement.component.ts` (linha 177) e `statement/statement.component.ts` (linha 371) tem o `loadingStatistics = false` DENTRO do subscribe callback - sao falsos positivos. O `});` na linha anterior fecha o `forEach`, nao o `subscribe`.
+
+Da mesma forma, `payment/exportation/payment-exportation-create.component.ts` (linha 269), `plan/finish/plan-finish.component.ts` (linha 126), `user/update/user-update.component.ts` (linha 420), `campaign/update/campaign-update.component.ts` (linha 182), `dashboard-incentive` (linha 133), e `dashboard-calendar` (linha 155) tambem sao falsos positivos - o `loading = false` esta DENTRO do subscribe callback, apenas apos um bloco interno (forEach, patchValue, etc.) que fecha com `});`.
+
+Para os update components com o padrao `ngZone.onStable.pipe(first()).subscribe()`, o `this.loading = false` na linha seguinte esta DENTRO do error callback do subscribe principal - tambem nao e um bug, pois esta dentro do segundo argumento do subscribe (error handler).
+
+Agora, vou confirmar os casos `trade.component.ts` linhas 357-359.
+
+O `trade.component.ts` linha 359 - `this.loading = false` esta DENTRO do callback do segundo subscribe aninhado. O `});` na linha 357 fecha o `.map()`. Portanto tambem e um falso positivo.
+
+Mas o `trade.component.ts` linha 126 - `this.loading = false` esta FORA do `.valueChanges.subscribe()`. O subscribe fecha na linha 125 com `});`, e a linha 126 `this.loading = false` esta fora. Este e um BUG REAL.
+
+Agora vou verificar os verdadeiros bugs de forma definitiva:
+
+---
+
+Agora entendo o caso do `statement-show.component.ts`. Aqui temos:
+
+- Linha 250: subscribe externo (variableService)
+- Linha 274: subscribe interno aninhado (aggregatedIndicatorService) 
+- Linha 306: `});` fecha o subscribe interno
+- Linha 307: `this.loading = false;` - esta DENTRO do subscribe externo, mas FORA do subscribe interno
+
+Isso e um bug parcial: o `this.loading = false` executa quando o subscribe externo recebe resposta, mas ANTES de o subscribe interno terminar. O loading deveria estar dentro do subscribe interno (linha 305, antes do `});` na linha 306). Isso e efetivamente um bug porque o loading sera `false` antes de os dados agregados serem carregados.
+
+Agora vou fazer a classificacao final completa. Deixe-me verificar tambem se existem mais padroes que nao foram capturados pelo regex, usando um padrao alternativo.
+
+---
+
+Agora tenho a lista completa. Preciso distinguir cuidadosamente entre bugs reais e falsos positivos. O padrao chave e verificar se o `});` que precede o `loading = false` fecha:
+- O subscribe callback inteiro (= falso positivo se loading esta dentro, bug se esta fora)
+- Um bloco interno (forEach, patchValue, etc.) dentro do subscribe callback (= falso positivo)
+
+Pelos arquivos que ja li, aqui esta a classificacao final:
+
+**BUGS REAIS** (loading definido FORA do subscribe callback - executa imediatamente):
+
+1. `trade.component.ts` linha 126 - `this.loading = false` - fora do `.valueChanges.subscribe()`
+2. `commission-creation-batch/create/commission-creation-batch-create.component.ts` linha 105 - `this.loadingCalendars = false` - fora do `.valueChanges.subscribe()`
+3. `plan/create/plan-create.component.ts` linha 289 - `this.loadingCalendars = false` - fora do `.valueChanges.subscribe()`
+4. `plan/create/plan-create.component.ts` linha 329 - `this.loadingGroups = false` - fora do `.valueChanges.subscribe()`
+5. `plan/create/plan-create.component.ts` linha 400 - `this.loadingUsers = false` - fora do `.valueChanges.subscribe()`
+6. `plan/update/plan-update.component.ts` linha 579 - `this.loadingUsers = false` - fora do `.valueChanges.subscribe()`
+7. `commission-report-creation-batch/create/commission-report-creation-batch-create.component.ts` linha 107 - `this.loadingCalendars = false` - fora do `.valueChanges.subscribe()`
+8. `user-commission/show/user-commission-show.component.ts` linha 367 - `this.loadingCollaborativeDealCommissionings = false` - fora do `.valueChanges.subscribe()`
+9. `user-commission/show/user-commission-show.component.ts` linha 465 - `this.loadingDealCommissionings = false` - fora do `.valueChanges.subscribe()`
+10. `easy-product/plan-slice/create/plan-slice-create.component.ts` linha 198 - `this.loadingUsers = false` - fora do `.valueChanges.subscribe()`
+11. `easy-product/plan-slice-commission/create/plan-slice-commission-create.component.ts` linha 166 - `this.loadingPlanSlices = false` - fora do `.valueChanges.subscribe()`
+12. `easy-product/easy-user/create/easy-user-create.component.ts` linha 202 - `this.loadingCountries = false` - fora do `.valueChanges.subscribe()`
+13. `easy-product/easy-user/create/easy-user-create.component.ts` linha 249 - `this.loadingStates = false` - fora do `.valueChanges.subscribe()`
+14. `easy-product/easy-payment/create/easy-payment-create.component.ts` linha 125 - `this.loadingPlans = false` - fora do `.valueChanges.subscribe()`
+15. `statement/statement-show/statement-show.component.ts` linha 307 - `this.loading = false` - dentro do subscribe externo mas fora do subscribe interno aninhado (executa antes dos dados internos carregarem)
+
+**FALSOS POSITIVOS** (loading esta corretamente DENTRO do subscribe callback ou do error handler):
+
+- `plan-statement/plan-statement.component.ts` linha 177 - DENTRO do subscribe (o `});` da linha 175 fecha um `forEach`, nao o subscribe)
+- `statement/statement.component.ts` linha 371 - DENTRO do subscribe (o `});` da linha 369 fecha um `forEach`)
+- `payment/exportation/payment-exportation-create.component.ts` linha 269 - DENTRO do subscribe (o `});` da linha 267 fecha um `forEach`)
+- `plan/finish/plan-finish.component.ts` linha 126 - DENTRO do subscribe (o `});` da linha 124 fecha um `patchValue()`)
+- `user/update/user-update.component.ts` linha 420 - DENTRO do subscribe (o `});` fecha um `patchValue()`)
+- `campaign/update/campaign-update.component.ts` linha 182 - DENTRO do subscribe (o `});` fecha um `patchValue()`)
+- `dashboard/incentive/dashboard-incentive.component.ts` linha 133 - DENTRO do subscribe callback `next:`
+- `dashboard/calendar/dashboard-calendar.component.ts` linha 155 - DENTRO do subscribe callback `next:`
+- `trade/trade.component.ts` linha 359 - DENTRO do subscribe callback interno (aninhado)
+- Todos os `*-update.component.ts` com `ngZone.onStable` - loading esta DENTRO do error handler do subscribe
+
+Aqui esta o resultado completo e organizado da auditoria.
+
+---
+
+## Resultado da Auditoria: Loading state definido FORA do subscribe callback
+
+Foram encontradas **15 instancias** deste bug no codebase. Em todos estes casos, o `loading = false` executa imediatamente apos o `.subscribe()` ser chamado, antes da resposta HTTP chegar, tornando o indicador de loading inutil.
+
+### Bugs Confirmados
+
+| # | Arquivo | Linha | Propriedade |
+|---|---------|-------|-------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/trade/trade.component.ts` | 126 | `this.loading` |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-creation-batch/create/commission-creation-batch-create.component.ts` | 105 | `this.loadingCalendars` |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 289 | `this.loadingCalendars` |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 329 | `this.loadingGroups` |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts` | 400 | `this.loadingUsers` |
+| 6 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts` | 579 | `this.loadingUsers` |
+| 7 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-report-creation-batch/create/commission-report-creation-batch-create.component.ts` | 107 | `this.loadingCalendars` |
+| 8 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-commission/show/user-commission-show.component.ts` | 367 | `this.loadingCollaborativeDealCommissionings` |
+| 9 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user-commission/show/user-commission-show.component.ts` | 465 | `this.loadingDealCommissionings` |
+| 10 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice/create/plan-slice-create.component.ts` | 198 | `this.loadingUsers` |
+| 11 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice-commission/create/plan-slice-commission-create.component.ts` | 166 | `this.loadingPlanSlices` |
+| 12 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/easy-user/create/easy-user-create.component.ts` | 202 | `this.loadingCountries` |
+| 13 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/easy-user/create/easy-user-create.component.ts` | 249 | `this.loadingStates` |
+| 14 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/easy-payment/create/easy-payment-create.component.ts` | 125 | `this.loadingPlans` |
+| 15 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/statement/statement-show/statement-show.component.ts` | 307 | `this.loading` |
+
+### Detalhes por Caso
+
+**Bug #1** - `trade.component.ts` (linha 126)
+```typescript
+// Metodo getCampaigns()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+    this.loadingCampaigns = false;
+  });
+this.loading = false;  // BUG: fora do subscribe
+```
+
+**Bugs #2 e #7** - `commission-creation-batch-create.component.ts` (linha 105) e `commission-report-creation-batch-create.component.ts` (linha 107)
+```typescript
+// Metodo getCalendars()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingCalendars = false;  // BUG: fora do subscribe
+```
+
+**Bugs #3, #4, #5** - `plan-create.component.ts` (linhas 289, 329, 400)
+```typescript
+// Metodos getCalendars(), getGroups(), getUsers()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingCalendars = false;  // BUG: fora do subscribe
+this.loadingGroups = false;     // BUG: fora do subscribe
+this.loadingUsers = false;      // BUG: fora do subscribe
+```
+
+**Bug #6** - `plan-update.component.ts` (linha 579)
+```typescript
+// Metodo getUsers()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingUsers = false;  // BUG: fora do subscribe
+```
+
+**Bugs #8 e #9** - `user-commission-show.component.ts` (linhas 367, 465)
+```typescript
+// Metodos getCollaborativeDealCommissionings() e getDealCommissionings()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingCollaborativeDealCommissionings = false;  // BUG: fora do subscribe
+this.loadingDealCommissionings = false;               // BUG: fora do subscribe
+```
+
+**Bug #10** - `plan-slice-create.component.ts` (linha 198)
+```typescript
+// Metodo getUsers()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingUsers = false;  // BUG: fora do subscribe
+```
+
+**Bug #11** - `plan-slice-commission-create.component.ts` (linha 166)
+```typescript
+// Metodo getPlanSlices()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingPlanSlices = false;  // BUG: fora do subscribe
+```
+
+**Bugs #12 e #13** - `easy-user-create.component.ts` (linhas 202, 249)
+```typescript
+// Metodos getCountries() e getStates()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingCountries = false;  // BUG: fora do subscribe
+this.loadingStates = false;     // BUG: fora do subscribe
+```
+
+**Bug #14** - `easy-payment-create.component.ts` (linha 125)
+```typescript
+// Metodo getPlans()
+.valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+
+this.loadingPlans = false;  // BUG: fora do subscribe
+```
+
+**Bug #15** - `statement-show.component.ts` (linha 307)
+Este caso e ligeiramente diferente. O `this.loading = false` esta DENTRO do subscribe externo (variableService), mas FORA do subscribe interno aninhado (aggregatedIndicatorService). O loading e marcado como `false` antes de os dados do subscribe interno serem carregados:
+```typescript
+this.variableService.query(...).valueChanges.subscribe((response: any) => {
+    // ...
+    this.aggregatedIndicatorService.query(...).valueChanges.subscribe((aggregatedResponse: any) => {
+        // ... processa dados agregados
+    });
+    this.loading = false;  // BUG: executa antes do subscribe interno completar
+});
+```
+
+### Casos Descartados (Falsos Positivos)
+
+Os seguintes casos foram analisados e confirmados como **nao sendo bugs** - o `loading = false` esta corretamente posicionado:
+
+- `plan-statement.component.ts` (linha 177) - dentro do subscribe, o `});` anterior fecha um `forEach`
+- `statement.component.ts` (linha 371) - dentro do subscribe, o `});` anterior fecha um `forEach`
+- `payment-exportation-create.component.ts` (linha 269) - dentro do subscribe, o `});` anterior fecha um `forEach`
+- `plan-finish.component.ts` (linha 126) - dentro do subscribe, o `});` anterior fecha `patchValue()`
+- `user-update.component.ts` (linha 420) - dentro do subscribe, o `});` anterior fecha `patchValue()`
+- `campaign-update.component.ts` (linha 182) - dentro do subscribe, o `});` anterior fecha `patchValue()`
+- `dashboard-incentive.component.ts` (linha 133) - dentro do subscribe callback `next:`
+- `dashboard-calendar.component.ts` (linha 155) - dentro do subscribe callback `next:`
+- `trade.component.ts` (linha 359) - dentro do subscribe callback interno aninhado
+- Todos os `*-update.component.ts` com padrao `ngZone.onStable.pipe(first()).subscribe()` seguido de `this.loading = false` - corretamente dentro do error handler do subscribe principal
+
+### Impacto
+
+O efeito pratico destes bugs e que o spinner/indicador de loading desaparece imediatamente apos a chamada HTTP ser disparada, em vez de esperar a resposta chegar. O usuario vê o loading piscar rapidamente e depois desaparecer, enquanto os dados ainda estao sendo carregados. Em conexoes lentas, o usuario pode ver uma tela sem dados e sem indicador de loading, causando confusao.
+
+---
+

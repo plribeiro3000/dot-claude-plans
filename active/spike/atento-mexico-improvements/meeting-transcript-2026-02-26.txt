@@ -1,0 +1,1055 @@
+Meeting Transcript — Dudas de desarrollo - Atento Mexico
+
+Date: 2026-02-26
+Time: 13:02 - 14:45 GMT-03:00
+Participants: Pablo (4Shark), Santiago (4Shark), Luis (Atento México), Jessica (Atento)
+
+
+
+00:12 Tengo permisos para grabar la videollamada.
+
+00:15 No sé si es por.
+
+00:17 No sé si ustedes tengan.
+
+00:21 No, a mí no me aparece el permiso.
+
+00:24 ¿A ti te aparece, Luin?
+
+00:30 Ah, no.
+
+00:33 No, no me sale la opción de grabar.
+
+00:38 Santiago, esa, ese convite fue nuestro, ¿né?
+
+00:43 Sí.
+
+00:44 A gente no tiene la funcionalidad de grabar aquí en Google Meet.
+
+00:48 Ah.
+
+00:49 Por eso, ah, entendí.
+
+00:51 Mira, y cualquier cosa formalizamos en la documentación, entonces, ahí los pasos para que Luis tenga todo documentando.
+
+01:02 Entonces, te parece, Jessica, si vamos empezando.
+
+01:05 Sí, vamos.
+
+01:07 Entonces, bueno, el motivo de esta reunión es porque hemos recibido las solicitudes por parte de Luis para algunos desarrollos dentro de la plataforma.
+
+01:23 En ese sentido hemos podido analizar todos ellos, tenemos algunas dudas sobre algunos puntos y algunos otros que ya hemos tomado la decisión de que podemos implementar y que no podemos implementar dentro de la plataforma, esto obviamente teniendo en cuenta de que cualquier desarrollo que tengamos, no solo va a afectar a la plataforma para atento México, sino para todos nuestros clientes, incluyendo pues atento en todos los países que estén, ¿sí?
+
+01:54 Esto como para que lo tengamos en cuenta al momento de hacer cualquier desarrollo, esto va a impactar, digamos, todos nuestros clientes y todos y atento en general, ¿sí?
+
+02:10 En ese sentido, tengo aquí los puntos, vamos a ir uno a uno.
+
+02:18 Posso compartir aqui, Santiago, se for o caso, que aí a gente segue.
+
+02:22 Okay, se sí.
+
+02:25 Voy a compartir aquí rápidamente.
+
+02:30 Já, já estou fazendo aqui já, Santiago, só para seguir, um minuto.
+
+02:35 Okay, si, entonces con tu yo, que esto.
+
+02:40 Ya, ya comparti aqui.
+
+02:43 Ah, bueno.
+
+02:49 Certo.
+
+02:54 Okay, entonces, en esta primera presentación es sobre el módulo de usos mensuales.
+
+03:03 Tenemos obviamente la solicitud para saber el tiempo de uso de los de cada uno de los usuarios, así que se tomó la decisión de implementar dentro de ese módulo una sección adicional donde van a aparecer los dates de registro de los usuarios dentro de la plataforma, es así Pablo, ¿cierto?
+
+03:28 Listo, listo, listo.
+
+03:34 Okay, es parte, perfecto, entonces, esta parte ya tomamos esa decisión.
+
+03:39 La siguiente sección será sobre la sábana de resultados simplificada, en este sentido tenemos algunas dudas, para Luis te queríamos preguntar, para esta que, ¿cuál es el propósito de este reporte?
+
+04:01 ¿Quién debe generar este reporte?
+
+04:04 ¿Cuándo se genera y cómo cuáles serían las columnas necesarias para el mismo?
+
+04:14 Claro, este tipo de reporte es generalmente solicitado uno cuando existe algún ejercicio de promoción para los colaboradores de cuando se convierte en supervisor o y se pasa a coordinador, por ejemplo, o existe algún movimiento de este lateral de, pues vamos a cambiar a un chico de contabilidad, ahora va a estar en impuestos, ¿no?
+
+04:37 Entonces, nos piden un resumen de cuál han sido las compensaciones que ha recibido a lo largo del año para poder determinar cuánto es lo que la percepción salarial a la cual viene acostumbrado y poder realizar un ejercicio para que en la nueva posición no se vea afectado la liquidez del colaborador.
+
+05:01 Entonces, en el módulo de historial cuando se descarga la sábana, pues presenta mucha más información de la que en este momento se pudiera estar requiriendo, ¿no?
+
+05:10 Muchos, muchas instituciones o luego inclusive entidades federales van primero sobre los importes y después sobre el cómo se calculó dicho importe.
+
+05:21 Entonces, si nos piden en los pagos de 100 empleados, bajar la sábana de historial que presenta el portal y estar bajando el scroll para estar buscando esta información, para después trasladarla manualmente a una sábana de Excel y estar haciendo las sumatorias, pues con tal vez con 10 empleados sea sencillo, ¿no?
+
+05:46 Pero, si tenemos un, no sé, una auditoría de algún banco y nos piden 1,000 o 2,000 empleados, pues esa sábana tan solo cómo poder generarla, ¿no?
+
+05:54 Entonces, por eso vemos y actualmente nosotros tenemos una tabla donde nada más se concentra por mes lo que se le pagó en cada infotipo, ¿no?
+
+06:08 Y ahí pues aprovechando un poco los filtros y criterios de agrupación que tiene el portal, pues por eso proponíamos la parte de pues en este calendario tuvo este plan y tuvo estos infotipos con tanto dinero.
+
+06:27 Entonces, esto sería específicamente para un número de usuario reducido.
+
+06:32 Bueno.
+
+06:34 ¿Cuántos no?
+
+06:34 Pues es la intención, pero no te podría decir que pudieran ser 10, 100 o no más de 100, ¿no?
+
+06:42 Si la intención es esta, hacer una extract, una extracción rápida de todos los importes pagados a cierto número de empleados.
+
+06:52 Precisa ser para esse número de empregados específico, ou pode ser da base toda?
+
+06:57 Para, que aí teria filtros, né?
+
+07:01 Nesse sentido, precisa ser sobre o número reduzido, o se podría hacer un reporte resumido sobre toda la base de usuarios.
+
+07:13 Hm, ahí sería el tema de como la extrae, como verificaríamos esa información, ¿no?
+
+07:21 Si esa sábana se crearía de forma mensual, entonces, si tengo que entregar un reporte de todo el año, tendría que bajar las 12 sábanas de los 10,000 empleados para luego filtrar 100 y ser el resultado que yo presente.
+
+07:40 Entonces, creo que es más funcional decirle al portal de quiénes necesito ver el dato para que genere esta estructura haciendo los filtros en los diferentes planes.
+
+07:51 Nese caso, é sempre para o mês atual, ou você precisa definir para qual mês você quer pegar esses valores?
+
+07:59 Justamente dependerá del criterio que en ese momento nos presente la autoridad.
+
+08:03 Si nos piden 12 meses, bajaría 12 meses de del portal, ¿no?
+
+08:07 Pero, si nos piden los últimos 3 meses, pues nada más tres.
+
+08:09 Ahí sí, la periodicidad de la información, pues es un criterio que vale totalmente en las manos de atento.
+
+08:13 A gente tem que ter uma opção lá na hora de pedir para informar sobre quanto tempo eu tenho que, tem que pegar os dados, né, então.
+
+08:21 Esto lo estaría generando los administradores de la plataforma únicamente o algún otro perfil dentro de la plataforma.
+
+08:30 Pues actualmente, solo lo usamos nosotros, pues es la información que proporcionamos, pero pues igual yo creo que hasta manager podrían darle funcionalidad, ¿no?
+
+08:41 Si, si pudiera haber este, y que el que dijera voy a revisar los pagos de este supervisor porque detecto que hay una incongruencia, a ver, voy a revisar los pagos de los últimos 2 años de este supervisor, ah, no, entonces pon el número de empleado, pone un filtro, del primero de enero del 2024 al 31 de diciembre del 2025 y se arma la sábana, ¿no?
+
+09:03 Y podría verificar que por lo menos todos los importes no son mayores a los $1,600 pesos que tiene autorizados, ¿no?
+
+09:13 Entonces, entiendo que también podrían darle esa herramienta al responsable para poder visualizar que todo ha estado bajo control, ¿no?
+
+09:24 Más que tener que meterse a todos los planes de compensación en los que el supervisor ha participado y ver que efectivamente cuánto dinero tiene y después sumarlo manualmente.
+
+09:33 To.
+
+09:35 Más una pregunta.
+
+09:36 Santiago, só um ponto.
+
+09:38 Eh, hoje a gente tem ali os pagos, né, que são os pagamentos na plataforma.
+
+09:43 Eh, a gente tem que pegar esses resultados somente do pagamento fechado, ou a gente tem que pegar das premiações também?
+
+09:54 Eso se tendría que hacer, sí, con los pagos cerrados, los finalizados o con las premiaciones también.
+
+10:00 Sim, não, é porque isso vira só uma constraint, na verdade, um requisito, e aí é só confirmar isso, Santiago, porque se a gente fala que é do pago, que é só pelo pagamento, aqueles resultados que não forem amarrados ao pagamento não sairia no
+
+10:40 Seu, por isso é a minha pergunta.
+
+10:42 É só confirmar se é de fato só o que tá no pagamento ou teria que em algum momento pegar algo que não está em pagamento ainda.
+
+10:49 Resultados finales, que se obtienen después de realizar todo el proceso que son los pagos, se necesita solo la información que sale al final de esos pagos o se necesita algo previo a eso o que esté fuera de esos pagos.
+
+11:00 Yo lo visualizo después de atravesar el flujo completo, no, a ver, después de haber terminado ya el proceso de pago, de haber sido autorizado el pago, porque al final de cuentas es el dinero real que ya se le, porque ya se le entregó al colaborador.
+
+11:09 Perfecto, perfecto.
+
+11:10 Então, então se tiver pagamento, mas não tiver aprovado, a gente desconsidera, a gente só vai pegar de pagamentos aprovados, entendi.
+
+11:18 Correcto.
+
+11:20 Sem fazer mais uma pergunta, eu te cortei, Santiago, desculpa.
+
+11:24 No, tranquilo, es era sobre esto.
+
+11:29 Entonces solo es obtener la información de los pagos finalizados.
+
+11:33 Essa aqui para mim agora acho que ficou claro qual que é a ideia, a gente pode sentar com mais calma e entender ela para entregar.
+
+11:44 En la siguiente sección en el request 3, que hablas de una sábana completa con todos los tipos de pago,
+
+11:57 De todos los planes dentro de la plataforma y que se pueda descargar a Excel, vamos a ver, aquí las preguntas que te tenemos son, ¿Cuál es el propósito de este reporte, a quién le sirve o en qué manera se va a utilizar?
+
+12:13 El cuándo se genera este reporte, si sería al final de cada uno de los pagos del mes del calendario,
+
+12:20 ¿Cómo se genera o cómo se están generando ese reporte a día de hoy?
+
+12:25 Si que herramientas están utilizando y qué tipo de reglamentación existe para eso?
+
+12:34 A esto le llamamos nosotros la sábana general, no?
+
+12:37 En la sábana general se depositan los todos los indicadores operativos que nos reporta el equipo de delivery, el equipo de recursos humanos, el equipo de calidad y se coloca en una única sábana homologada, no, donde las primeras columnas pues es una estructura general del empleado, con su coordinador, gerente, que este nombre, el número de empleado, el número de de logueo en el teléfono, entonces esos datos pues son la propia estructura, no, que todo colaborador debe de tener, y a partir de ahí empezamos a depositar los los indicadores que generaron el resultado del cálculo de bono.
+
+13:13 En nuestra estructura actual pues ponemos el la cantidad de puntos bonos que logró, y eso cuánto dinero se convirtió al final de dichos cálculos, no?
+
+13:26 No vienen las mecánicas de cálculo, no vienen los puntos sí, mayor que y todo eso, sino solo el resultado de to- de la integración de las fórmulas aritméticas.
+
+13:37 Entonces en una columna ponemos cuántos puntos bonos logró, y después esos puntos bono a cuánto dinero le corresponde según su política de faltas y al final lo convertimos a dinero.
+
+13:49 Y la,
+
+13:53 Y a partir de ahí es donde colocamos, actualmente tenemos nosotros activos 120 columnas en esta sábana general donde hemos tratado de homologar y simplificar la cantidad de indicadores que recibimos, no, este, número de llamadas y después nos dicen, es que hay un servicio que tiene un tipo de pago por número de llamadas de lunes a viernes y número de llamadas sábado y domingo, entonces para no crear otro nuevo indicador llamado llamada sábado y domingo, ponemos este número de llamadas dos y así hemos tratado de no crear más columnas para que la sábana no se hagan más grande, sin embargo, por ejemplo, indicadores, un prácticamente universales como pudiera ser una nota de calidad, ese, si todos los empleados tienen un resultado y todos los metemos en la misma columna.
+
+14:44 ¿Cuál es el objetivo de poder obtener esta data?
+
+14:46 Pues para hacer unas revisiones de control, por ejemplo, que no tengamos empleados con una nota de calidad mayor a 100%.
+
+14:53 No, es una forma muy fácil de poder identificar que al menos ese indicador está eh, fue correctamente proporcionado al portal, porque nadie tiene más de 100% de calidad y por ahí ves un 300, pues a lo mejor en tu formulación le estás pagando la nota de calidad al 100%, le está pagando el bono completo.
+
+15:12 ¿Por qué?
+
+15:12 Porque le entregaste un 300 de calidad, entonces, eh, hay poder observar que nadie tiene más de 300 de 100% de calidad, otros filtros que nosotros hacemos al momento de autorizar los pagos en estas sábanas es, eh, revisar, por ejemplo, el tope de bono, pero de todas las de,
+
+15:35 Campañas al mismo tiempo, no?
+
+15:36 Tenemos una columna llamada tope de bono donde ponemos ya sea en porcentaje o en dinero y después contrastamos contra el monto final y los puntos bono logrados, entonces es una forma rápida de verificar que nadie está superando el tope de bono.
+
+15:50 ¿Y por qué?
+
+15:51 ¿Cuál es la contraparte de del portal, no?
+
+15:53 Que nos dice, es que tú en la formulación ya te aseguraste de colocar un tope de bono, pero quien hace la formulación de dicha de dicha aritmética y quien autoriza el plan es quien tiene ese control, porque él pudo haber colocado, en lugar de $17, $170.
+
+16:16 Entonces la formulación sigue completa, todo se autoriza y se pagan, en lugar de 17, $170 a cada asesor, no?
+
+16:24 Porque todos dieron autorizar y siguió el proceso.
+
+16:26 Entonces, para que un controler pudiese garantizar que todos los topes de bonos se están respetando, tendría que entrar a las 100- a los 130 programas de compensación que hoy tengo en Forcech revisar uno por uno y asegurarme que los topes formulados coinciden contra el tope en algún archivo de control.
+
+16:48 Sin embargo, con la extracción de esta data, puedo hacer una multiplicación de tope de bono o inclusive hasta el simple buscar V y asegurarme que el tope de bono que se manda a llamar en las formulaciones es el tope de bono que yo tengo autorizado para ese plan de de compensación.
+
+17:06 Y entonces al administrador le puedes colocar un control financiero.
+
+17:14 Ok, eh, entonces, sim, para que o,
+
+17:18 Eh, então só para eu entender aqui, então, a necessidade desse, dessa planilha, então, é só para acompanhamento, certo?
+
+17:27 Não vai enviar ela para nenhum outro sistema, é só para ver se não tem nenhum problema, validar os dados, correto?
+
+17:32 En efectivamente, es para control.
+
+17:34 Ya lo que nosotros, cualquier revisión, auditoría, este, cualquier dato que tele queramos hacer a la data, pues la podremos realizar al tener acceso a la a la data de forma universal, no solo por por servicio, no?
+
+17:49 Cierto.
+
+17:50 Si un auditor este nos dice, oye, eh, área de operaciones, dame el número de llamadas que tú tienes controlado, ahora tus incentivos, dame el número de llamadas con la cual pagaste, pues mira, en esta sábana están registradas, no?
+
+18:03 Entonces, el auditor hace el buscar V, número de empleado y compara los números de llamada y dice, todo coincide, el número de llamadas que tiene el área operativa y el número de llamadas que tiene el área de compensación, son idénticos los resultados.
+
+18:15 Certo.
+
+18:15 Esto se generaría cuando se genera el pagamento final, el pago final y se cierre.
+
+18:23 Eh, así lo visualizo, correcto, actualmente así lo hacemos, una sábana la sábana maestra, la sábana general almacena todos los resultados y una vez que realizamos el pago, pues se limpia, se hace el respaldo y de ahí que después se reciben los los resultados del siguiente mes.
+
+18:43 Entonces, después de pago, correcto.
+
+18:46 Gracias, o sea.
+
+18:46 Se hace sobre algo ya vencido, o sea, sobre el pago vencido, no, sobre algo abierto.
+
+18:56 Justamente.
+
+18:57 Sí.
+
+18:58 Sí, este, y bueno, de ahí con el entendido de que pues nosotros ahorita tenemos los dos motores funcionando, no?
+
+19:06 Pero si, con respecto en este específico punto, pues igual y sí podría realizarse sobre las compensaciones antes de llegar a pago, porque quieres revisar justamente que todo coincida, que nadie tenga más de 31 faltas, que nadie tenga más de 100% de calidad, que nadie tenga eh, más de 1700 pesos de bono,
+
+19:33 Sí.
+
+19:33 Sí.
+
+19:35 Esos tipo de revisiones antes de mandar ese dinero a al área de nóminas, no?
+
+19:40 Exacto.
+
+19:41 Certo, entendi que isso aqui, então, não é só no momento final, é a qualquer momento para acompanhar como que tá acontecendo, né?
+
+19:46 Aí, mas algumas perguntas aqui.
+
+19:49 Eh, a gente precisa seguir exatamente essa estrutura?
+
+19:53 Porque algumas dessas informações a gente não tem.
+
+19:55 Por exemplo, centro, a gente não vai ter na Forshark, porque vocês não enviam.
+
+20:00 Aqui, por exemplo, esse login ac, ID, a gente.
+
+20:01 Essas informações aqui a gente também não tem.
+
+20:04 Eh, fecha de ingreso.
+
+20:05 Es correcto, esta es la estructura que actualmente manejamos nosotros con la data que hemos con la estructura que hemos diseñado dentro de nuestro motor.
+
+20:11 Ahí yo creo que igual podemos tener una sesión específica de las columnas que tenemos y no tenemos y, por ejemplo, la columna centro pues la podríamos alimentar nosotros a través de una variable llamada centro, aunque y con texto ahí lo colocarlo.
+
+20:25 Puede ser, entonces, en ese sentido, si teniendo en cuenta de que no está la información completa, se debería para este caso específico, revisar las maneras en que se puede completar la información dentro de la plataforma, sea con variables o sea con la si, no, si, sería con variables únicamente.
+
+20:47 Uma outra pergunta aqui.
+
+20:50 Eu não sei se eu entendi errado, Santiago, ou você me ajuda a traduzir, mas eu entendi de que esse Excel vai ter várias abas, é isso?
+
+20:57 Tem uma aba geral com os números e depois tem uma outra aba com essas outras informações?
+
+21:02 É isso?
+
+21:02 Eu entendi correto?
+
+21:03 En esto de ver ir todo diferentes pestañas dentro del documento o de ver ir todo dentro de la misma tabla.
+
+21:13 O sea, la parte de arriba es como que la parte de la estructura, que es lo que nosotros querían como los datos generales que cada empleado tiene y la parte.
+
+21:25 De abajo es donde nosotros estamos evidenciando cómo visualizamos la entrega de las variables.
+
+21:30 ¿No?
+
+21:30 ¿Qué va a pasar?
+
+21:32 Que vamos a tener, no sé, 200 variables, hoy actualmente activas en ForChat, aunque de esas 200, el empleado solo tenga cinco.
+
+21:42 Porque hay algunas que sí se van a repetir, pero hay algunas específicas de los servicios.
+
+21:46 Cierto.
+
+21:47 Entonces, la primera parte sería información general de los empleados y la segunda entrega de los indicadores.
+
+21:56 Exacto.
+
+21:58 Minha pergunta é, tem que ter duas abas no Excel, ou somente uma?
+
+22:02 A gente vai co- salvar só isso aqui?
+
+22:04 Só a de baixo.
+
+22:06 Solos debería, entonces, completar una sola, o sea, se debería sacarte la plataforma ambas tablas o se puede generar todo en una sola o la segunda únicamente que es lo que visualiza en ese sentido.
+
+22:19 Actualmente nosotros obtenemos una línea por cada empleado.
+
+22:22 ¿No?
+
+22:22 Entonces, el empleado tiene un esquema de compensación específico, con una, con las primeras columnas llenadas en automático después del cálculo de su bono y después 120, 120 columnas donde él se le llenan 10 de 120.
+
+22:40 ¿No?
+
+22:40 Porque son los indicadores que sí recibió para el cálculo de ese bono.
+
+22:44 Okay.
+
+22:47 Si.
+
+22:47 Pero entonces, podrías.
+
+22:50 Não sei se ficou claro, Santiago, ou você puder traduzir pra mim, a minha pergunta é, vai ter um, uma aba ou duas abas no Excel?
+
+22:59 A gente tem que usar o formato de baixo ou o formato de cima?
+
+23:02 O sea, diríamos entonces, en ese sentido, usar un único formato unificando ambas tablas o que, o como lo ves, o sea, que es que vamos a hacer.
+
+23:12 Que correcto, que se hace una una sola tabla con el empleado, con este tanto su resultado de pago como las variables que nos llevaron hasta allá.
+
+23:22 Entonces, Paulo, sería una sola tablera con todas las columnas en ambas abas.
+
+23:28 Arriba y abajo.
+
+23:29 Estar unificado.
+
+23:30 Tá, então a gente teria que entender quais que a gente tem, aí a gente colocaria as que a gente tem e as outras a gente deixaria de fora, né?
+
+23:38 Tá bom.
+
+23:39 O sea, ellos son, ellos lo que comentaron Paulo, es que podemos reunirnos para verificar cómo se puede completar esta información dentro de la plataforma.
+
+23:47 Ellos consideran que se podrían incluir las variables.
+
+23:51 Ahí esa parte aí, Santiago, a gente tem que entrar no planejamento para entender, porque aí envolve a gente desenvolver mais uma coluna lá, né?
+
+23:58 A gente não poderia colocar como variável, porque na variável a gente não consegue garantir a existência do valor, entendeu?
+
+24:02 Então assim, tem que entender o desenvolvimento, como que a gente vai fazer.
+
+24:06 Por isso que aqui eu tô perguntando da necessidade, o que que eles precisam, né?
+
+24:10 Se é um com o formato de baixo, com o formato de cima, porque aí a gente entendendo o problema, a gente analisa como que a gente consegue resolver.
+
+24:16 Por exemplo, essa primeira informação aqui,
+
+24:20 Né, que é o centro.
+
+24:22 A gente tem a coluna departamento, poderia colocar lá.
+
+24:25 Mas assim, não quero entrar em como a gente vai fazer, mas ficar mais no qual o problema, né?
+
+24:30 E o que que a gente tem que fazer para atender eles?
+
+24:33 Porque aí a gente volta pra dentro de casa com esse conhecimento e a gente estuda a melhor forma de atender eles.
+
+24:37 Certo.
+
+24:38 Certo.
+
+24:38 O sea, en ese sentido.
+
+24:39 Por ejemplo, sí, usted trae la pantalla tantito?
+
+24:44 Sí, Paulo, Luis va, compartir su tela, sí.
+
+24:48 Un segundo.
+
+24:54 Ahí va, adelante, Luis.
+
+24:56 Sí, voy.
+
+25:16 Y ya la pueden visualizar?
+
+25:18 Sí.
+
+25:19 Okay.
+
+25:20 Originalmente, como les decía, ¿no?
+
+25:22 Tenemos una sábana normal con, una tabla llamada la TBL general, donde vienen las columnas de los empleados que hacemos un respaldo mes a mes.
+
+25:30 Entonces, por ejemplo, si yo quiero sacar los pagos de diciembre que se depositaron en enero, pues esta sábana, claro que contiene criterios homologados entre los 168, entre los 130 programas de compensación que actualmente tenemos.
+
+25:47 Esos criterios homologados, pues claro, que es el coordinador, el jefe inmediato, el nombre del empleado, el mes y demás, ¿no?
+
+25:55 Estos datos se llenan a través de nuestro importador actual de indicadores operativos.
+
+26:02 Y después, tenemos, ahora sí, todos los indicadores operativos que pudieran, o más bien, que están activos dentro de la sábana, ¿no?
+
+26:13 El empleado, como pueden ver, muchos pues no van a tener todos los indicadores, ¿no?
+
+26:19 No existe un empleado que
+
+26:19 Que tenga 120 indicadores.
+
+26:22 ¿No?
+
+26:22 A lo mucho tiene 12, es el, los servicios que más tienen, ¿no?
+
+26:27 Pero, por ejemplo, lo que con esta sábana unificada donde descansan los 130 programas de compensación, se pueden hacer revisiones universales con las cuales te puedes ayudar a fortalecer tu proceso y pago de la compensación variable, más allá del que programe el programa de compensación.
+
+26:45 Tú puedes así verificar que ninguna nota de calidad sea mayor a 100, tú puedes verificar que los sueldos que proporcionaron son los sueldos de nómina, tú puedes verificar con un simple buscar de mes y no las del mes anterior, puedes verificar que el pago de bono que le está cayendo al empleado corresponde al la cantidad de puntos bono logrado, multiplicados por la columna tope de bono.
+
+27:27 Y entonces, personas con 100% del logro van a ganar 1.700 pesos y personas con 50% de logro estarían cobrando 1.700 / 2, ¿no?
+
+27:43 Entonces, esta sábana te da esa visibilidad en el sentido de poder confirmar uno, que la carga de indicadores fue apropiada, que los porcentajes corresponden y hacer inclusive comparativas, ¿no?
+
+28:01 De este servicio pagó $1.000 este mes, si la comparo contra la sábana del mes pasado, puedo ver que este servicio está pagó $10.000, ¿no?
+
+28:11 Entonces, algo está mal, ¿no?
+
+28:12 No puede ser que se haya caído 90% el pago.
+
+28:15 Entonces, el simple hecho de tener esta sábana unificada te permite hacer una mayor control, pero ya nivel compañía, no a nivel plan de compensación.
+
+28:23 Okay.
+
+28:25 Okay, en esta parte ya la comprendemos completamente.
+
+28:27 Tendríamos entonces que revisar la manera de completar la información que no está dentro de la plataforma.
+
+28:34 Certo.
+
+28:35 Aí, uma pergunta também, Santiago.
+
+28:38 Eu pensei aqui agora.
+
+28:39 O Luiz tinha comentado que isso aí é um controle de acompanhamento e que não necessariamente ele é só quando tem o pago, né?
+
+28:47 Então ele pode querer acompanhar esse processo antes de ter o pago.
+
+28:51 Aí tem algumas perguntas do nosso lado, pro mesmo período, a gente pode ter vários pagos, né?
+
+28:57 A gente faz um pago, aí pega o res.
+
+29:00 Da das células, né?
+
+29:05 Aí você faz um outro pago amanhã, que, a gente que no Brasil a gente chama de complementar, com as outras que fecharam amanhã.
+
+29:11 Então, isso vai pegar.
+
+29:13 Então assim, a gente tem vários cenários.
+
+29:15 No caso de a gente ter metade das operações que já estão fechadas e a outra metade não está, cuando a gente for buscar os dados, a gente coloca de ambos os cenários, as que finalizaram e as que não finalizaram, e aí a gente coloca uma coluna pra falar se foi pago?
+
+29:33 Como é que funcionaria isso?
+
+29:35 Y en ese sentido, como podríamos diferenciar Luis, entre dos tablas, una que haya, ya sea sobre pagos, completado, completados, o sea, los de pago completados y otra sobre procesos de pago que aún no estén completados, que sean activos, serían la misma, o sea, en la misma tabla habría que buscar una manera de diferenciarlos en la misma tabla o.
+
+30:00 Ah, claro, sí, es que nosotros actualmente con.
+
+30:06 Podemos revisar la tabla general en cualquier momento, ¿no?
+
+30:07 Sí, justo, ya entiendo lo que me dices, pues sí, si lo que buscamos es establecer un control financiero sobre los administradores, por ejemplo, pues yo visualizo que tendría que estar como en el momento que se genera el parcial, ¿no?
+
+30:17 Desde ahí ya la tabla ya se estuviese alimentando para estar recibiendo los cálculos de los indicadores proporcionados y está presentando resultados previos de pago.
+
+30:26 Quizás una columna que diga parcial realizado, o después el que se aprobó compensación realizada, y después de que se aprobó la compensación, pago aplicado.
+
+30:37 Debería tener, entonces, Paulo, en ese sentido, si debería tener una celda o que diferencie si es un pagamento fechado o parciado o algo así.
+
+30:48 Tá, entonces ahí existiría tá bom, então vamos só expandir isso um pouco mais, Santiago, só pra a gente garantir que tá na mesma página, porque não vão ser dois escenarios, a gente tem o cenário que já tá pago, o pagamento está aprovado, tem um cenário que tá no pagamento, mas não está aprovado, tem um cenário que não tem pagamento e tem premiação, tem um cenário que não tem premiação e tem parcial, a gente precisa separar e diferenciar todos esses cenários, ou só a gente falar: tá pago aprovado ou não tá pago aprovado, atende?
+
+31:23 En ese sentido, si Luis, deberíamos diferenciar todos los pasos.
+
+31:27 Tú sabes que dentro de la plataforma existen están los pasos del parcial, luego premiación, luego compensación sin aprobar, compensación aprobada y al final el pago sin aprobar y pago aprobado, sí, son cinco fases.
+
+31:41 Ay, claro.
+
+31:42 Debería estar diferenciado en cada una de las fases o solo tiene que demostrar si es pago aplicado y pago no aplicado.
+
+32:00 Ah, claro.
+
+32:05 Pues sí, es que yo entiendo que si es antes de los pagos, con que muestre que aún no se ha pagado, yo nada más sería pago aplicado o pago no aplicado y justamente.
+
+32:17 Paulo.
+
+32:17 Si.
+
+32:17 En el tema, si a veces en qué momento se podría consultar esa tabla.
+
+32:20 Si esa tabla se puede consultar hasta que el premio está aprobado, o sea la compensación en está aprobada, entiendo que si se descubre algo inapropiado, por ejemplo, que el tope de bono lo dejaron 1800 pesos y eran 1600 pesos, ahí cómo reaccionamos?
+
+32:47 Podemos cancelar la compensación, pero el colaborador ya recibió la carta de compensación aprobada, no la declaración de regla.
+
+32:55 Sim, sim.
+
+32:55 É até a minha pergunta, exatamente por causa disso, tá Luís?
+
+32:57 Eu tô entendendo a dor, e assim, para mim, tá ficando claro que esse Excel ele não vai talvez atender exatamente, então, por isso que eu tô tentando entender a dor para tentar propor uma outra solução, porque é o que eu falei, se a gente tem lá a gente gerou o plano e não fez nada, nem parcial nem nada, eu não tenho nada para informar desse cara, então vai ficar tudo zerado, se você gerar uma parcial, eu tenho, mas são dados parciais.
+
+33:30 Se você gerar uma premiação, essa premiação já pode ser aprovada, pode ser paga, então é um resultado diferente do resultado da parcial.
+
+33:36 Então, assim, como são vários passos, se a gente misturar tudo isso e não te informar aonde que tá cada status, eu acho que você vai, talvez, não vai ter a visão que você quer de saber aonde tem problema, e eu tô enxergando que muitos dessas dores talvez sejam uma validação, por exemplo, a hora que você cadastrar um indicador, qualidade, você fala que é porcentagem, você fala que o máximo que ele pode ser é 100 e o mínimo é zero.
+
+33:59 Então, você já não precisaria validar isso lá no final, já valida na entrada, entendeu?
+
+34:02 Então, garante que a informação entre correta.
+
+34:04 Então, tô tentando entender a dor para tentar já propor alguma coisa que vai solucionar de fato o problema e algo que vai ficar, vai funcionar melhor.
+
+34:16 Com certeza.
+
+34:21 Sim, en ese en ese sentido, Luis, creemos que pues la mejor manera, es entender básicamente cuál es la funcionalidad y lo que le soluciona a ustedes esta tabla, para entender en qué momento se debe aplicar dentro del proceso de de uso de la plataforma, ¿sí?
+
+34:39 Entonces, probablemente no tenga uso bueno, si después de que se cierre un pago, se hace la verificación y hasta y se verifica efectivamente el error.
+
+34:52 Entonces, creo que debe ser durante previo a cerrarse el pago que se debe mostrar esto, ¿sí?
+
+35:02 Y quizás no ser re consolidado al final, pero sí deberíamos comprender en esta situación para saber Sí.
+
+35:10 Que, qué debemos implementar y cómo debemos implementar esta esta funcionalidad.
+
+35:15 Sí, exacto, como que se iría se iría creando y actualizando dependiendo el estatus del plan, ¿no?
+
+35:23 Sí, el plan ya está parcial, pues bueno, ya tiene un resultado, ¿no?
+
+35:26 Y ya nada más una columna de parcial aprobado, compensación aprobado, pago a pago este aprobado, pero considerando que sería sobre calendario porque serían las 130 los las los 130 planes juntos, ¿no?
+
+35:46 No la, ya muy puntualmente, pues ya si detectas algo demasiado extraño, pues ya irías directo al plan que presenta ese ese problema.
+
+35:56 Correcto, sí.
+
+36:01 Eh, ¿tenés alguna duda, tu vida adicional, Paulo?
+
+36:04 No, eu acho que, eu acho que para esse, que é o último do do arquivo um, ficou claro, né?
+
+36:12 Todos os pontos, acho que agora a gente estuda a ver o que que a gente consegue fazer para atender esses pontos, né?
+
+36:20 Tô abrindo outro arquivo para a gente trabalhar.
+
+36:23 Ok.
+
+36:26 Entonces, Luis, vamos a verificar.
+
+36:27 Ve- me más sobre esto, vamos, y se va a evaluar las mejores posibilidades de implementación, ¿sí?
+
+36:33 Eh, queremos hacerlo como en el mejor momento, que tenga la mayor utilidad posible.
+
+36:38 Es, con el punto de la del punto anterior de la sábana de resultados, solo me queda la duda, por ejemplo, cuando se cree un tipo de pago adicional, entiendo que también la sábana irá creciendo si nosotros vamos creando más tipos de pago en la plataforma.
+
+36:54 Sí, si, si, tantos tantos tipos de pago, pero no quizás no siempre sean ocho, ¿no?
+
+37:01 Tanto tipos de pago quanto novos indicadores, Luis, por isso que eu tô falando da da planilha ali, entendeu?
+
+37:06 Fica mais difícil de controlar, mas a gente vai estudar internamente aqui e a gente vê uma forma de atender vocês com relação a esses cenários.
+
+37:12 Entendi que é, é muito mais para acompanhar o dia a dia e garantir que não tem problemas, então, dependendo da hora, se a gente criar triggers, né?
+
+37:17 Ou gatilhos que vão garantir que o dado sempre entra correto, alguma coisa desse tipo, talvez a gente consiga fazer algo no meio do caminho, porque eu entendo que só a planilha lá, talvez, seja tarde demais para resolver, né?
+
+37:28 Como você falou, se já mandou a declaração não adianta mudar, mas a gente vai estudar em volta com vocês com relação a isso aí.
+
+37:36 Vou compartilhar aqui pra a gente falar das outras funcionalidades agora.
+
+37:44 Eh, bueno, la siguiente funcionalidad que habían dicho era para cambiar en en la sección de usuarios, cambiar el estatus entre activo o inactivo y editar de una manera más rápida eso, esta esta sección.
+
+38:01 Queremos, ahí tenemos algunas dudas, queremos saber más o menos, qué es lo que hace lento este proceso para ustedes, cuál es el problema que están experimentando con el proceso de edición de usuarios actualmente?
+
+38:15 Cuántos usuarios necesitan editar al mismo tiempo y cada cuántos se hacen estas ediciones?
+
+38:25 Normalmente hacemos una actualización de datos con 20 colaboradores por quincena.
+
+38:33 Muchas veces es un tema del orden en el que se registró en las fichas de contratación, ¿no?
+
+38:39 Entonces, por ahí tenemos algunas diferencias en los nombres, nosotros tenemos que entrar al Forchar para cambiar el nombre, Casandra era con las dos C de casa, ¿no?
+
+38:52 Porque así viene en su acta de nacimiento.
+
+38:54 Entonces, el equipo de nómina hace el cambio normal en su sistema y cuando nosotros descargamos los catálogos y los comparo contra lo que tengo arriba, veo que hay diferencias, unas diferencias tan sencillas como una letra o diferencias como un doble espacio, cuando la persona tiene dos.
+
+39:11 O tres nombres, entonces me cambia el nombre o me cambia el largo de la celda y demás, entonces para estar haciendo esas modificaciones manuales, nosotros podamos tener el mismo layout de carga, o que el portal entienda que tiene que planchar esa información, reemplazarla con la nueva, o cómo podríamos proporcionar para no estar entrando empleado por empleado para cambiar una letra o un espacio en blanco que se quedó de más, o en dado, casos muy contados de, podré decirte que un escenario cada 6 meses, estos colaboradores que se cambian el nombre, ¿no?
+
+39:50 Por algún tema de identidad o por algún tema legal se cambian el nombre y presentan un documento oficial de ello, y hay que actualizar todo lo respecto, respecto a ellos.
+
+40:00 Perfecto, Luis, aquí, quedó claro, a nuestra duda mayor era porque como tenía una imagen del formulario, a gente achou que o problema fosse no formulário, mas agora eu entendi que
+
+40:48 Na verdade é para a gente disponibilizar lá no upload de usuários, que hoje só faz cadastro, para que ele também faça atualização.
+
+40:55 É isso, né?
+
+40:56 Sim, porque cuando vuelve a intentar subir pues te dice, ya está registrado.
+
+41:00 Isso.
+
+41:00 Hoje ele só faz cadastro, porque a parte de cadastro de usuários realmente ela é bem complexa, então a gente só faz cadastro, mas a gente vai analisar para a gente conseguir fazer atualização, caso a gente se identifique com o usuário existe.
+
+41:13 Aí um outro ponto aí, Luís, é que você até falou aqui de reiniciar a senha.
+
+41:18 Reiniciar a senha pelo upload hoje a gente já tem na plataforma, que é a funcionalidade de resiscialização de senhas.
+
+41:24 Aí você consegue fazer um upload e resiscializar a senha de vários usuários com um único upload.
+
+41:30 Não é no cadastro do usuário, é um outro processo separado.
+
+41:35 Mas a gente, quando a gente responder lá depois, a gente fala: "olha, isso aqui para atualização de usuário, a gente vai implementar.
+
+41:43 Para trocar de senha, a gente já passa o passo a passo como que você faz".
+
+41:46 Certo.
+
+41:48 Es decir, es una funcionalidad que ya existe, Luis.
+
+41:50 El cambio de contraseñas masivo para varios usuarios, no sé si te referías a esto específicamente.
+
+41:56 Con respecto a la contraseña, sí, pero con el layout que intentas subir, me dice que el registro no es válido.
+
+42:02 Sí.
+
+42:02 Sí, no, ese, esa es una cuestión que vamos a revisar.
+
+42:09 Ahora, la pregunta que yo te haría respecto a esto es si esto se podría.
+
+42:14 Paulo, no sé si entiendo bien el proceso de integración, sería.
+
+42:22 Quizás es, el proceso de integración soluciona los problemas de modificación, edición de usuarios.
+
+42:31 Sim.
+
+42:31 Sim, sim.
+
+42:31 Quando tiver a integração, com certeza essa parte aí vai ser feito todo automático.
+
+42:37 A gente vai trabalhar lá no banco normatizado, vai ter um script que vai ficar checando no banco de dados original.
+
+42:43 Não sei onde que busca, né?
+
+42:44 Mas vamos falar que é no book.com.
+
+42:47 Ele vai ver que mudou o nome no book.com, vai mudar o nome no banco normatizado, o integrador vai forçar que o outro vai, ver que mudou, vai atualizar na aplicação da Foreshare.
+
+42:57 Então você atualiza no book e a integração garante que atualiza na Foreshare, quando tiver a integração.
+
+43:03 Sim.
+
+43:04 Sí.
+
+43:04 Si, en ese sentido, Luis, pues, si vamos a verificar, obviamente, unas cosas interesantes de la funcionalidad de edición con upload, más te podemos asegurar que en el momento en que la integración esté completa, esta parte de la edición de nombres, detalles de los diferentes usuarios, va a ser, va a poder ser realizar de manera automática.
+
+43:30 Es solo van a tener que cambiar la información en book y ya en la plataforma estaría hecho.
+
+43:36 Salvo algunos criterios que no duermen en Simplex, ¿no?, como ciudad, este, estado, subsidiaria, esos sí usted, entiendo que se podrían manejar con importaciones manuales y el cambio de estatus, ¿no?
+
+43:57 Que ese quedaría con la integração.
+
+43:59 ¿No?, y solo que el cambio de contraseña masivo pues sí, cuando el colaborador pone su contraseña personal y la olvida completamente, ¿no?
+
+44:07 Sí, y igual, como te comento, o sea, ya la funcionalidad existe.
+
+44:12 De hecho, entre otros puntos que son de dudas, pues queríamos proponer una sesión de entrenamiento adicional, como para explicar estos puntos y pues dentro de eso podemos incluir la funcionalidad obvio de cambiar contraseña de manera masiva.
+
+44:36 Sí, de acuerdo, solo que ahí compartimos un listado de opciones que todavía son comprendemos la aritmética de ellos.
+
+44:48 Só pra gente fechar aqui, ó, mas vamos lá, cadê?
+
+44:54 Aqui.
+
+44:59 Já tá mostrando a minha tela?
+
+45:02 Sim.
+
+45:03 Seria aqui, Luís, em registro, estabelecer contrassenhas.
+
+45:13 E aí você vai, aqui o meu usuário não tem permissão, mas o seu usuário vai ter um botão.
+
+45:19 Aqui, fazer upload, que aí você vai passar somente o ID do usuário, e o sistema vai reiniciar a senha dele.
+
+45:29 É, para los usuarios que necesites, puede reiniciar, vai fazendo.
+
+45:33 De forma massiva.
+
+45:37 Ok.
+
+45:42 Ok, de la siguiente, eso, Luis.
+
+45:48 Sí, lo entiendo.
+
+45:52 La siguiente es.
+
+45:56 Bueno, la, el uso de, con forma en la funcionalidad de identificaciones de usuario, esto va a ser parte de cuando se tenga integrado con el payroll, entonces.
+
+46:13 Una sesión para ir explicando todas estas lecciones que ustedes mandaron.
+
+46:21 Sim.
+
+46:21 Para dar um meio, me diga como é que diz, pra eles, Santiago?
+
+46:24 Eu vou explicar, e você traduz, mas aqui a questão dos identificadores de usuário é porque na Foreshare o.
+
+46:33 O usuário pode ter mais de um ID, mais de um identificador.
+
+46:37 Então a gente não mapeia o identificador do usuário diretamente na tabela do usuário, a gente tem essa tabela de identificadores de usuário, porque dessa forma, cada usuário pode ter N identificadores.
+
+46:51 Então a gente pode subir pra Foreshare o identificador do book, o identificador, do RP, o identificador do CRM, e com isso, a integração como um todo se facilita, porque aí não precisa todo mundo saber um único ID.
+
+47:10 Todo mundo só sabe o seu próprio ID e a Foreshare resolve isso automaticamente, além disso, também pra parte de saída, né?
+
+47:17 Quando a gente vai mandar pra folha de pagamento, a gente tem que saber qual identificador a gente vai mandar pra folha.
+
+47:22 Se a gente mandar pra folha o ID do RP, ela não vai saber quem que é.
+
+47:24 Então isso aqui é pra ter mais de um, ou seja, você pode cadastrar o ID do usuário em cada um dos seus sistemas, que a Foreshare vai aceitar todos eles, e você vai falar qual deles que é o primário, né?
+
+47:37 Que esse vai ser usado no dashboard, em todas as pantallhas, em todos os, as saídas do sistema, vai usar sempre esse identificador primário.
+
+47:47 Então é uma forma de facilitar tanto a utilização quanto a integração com múltiplos sistemas, mas a gente faz um treinamento e explica pra vocês com mais detalhes.
+
+47:55 Certo.
+
+47:56 Sí.
+
+47:57 Eso hay que hacer, la siguiente sección es de.
+
+48:02 Planes de forma masiva.
+
+48:04 Y planificación de forma masiva, en ese sentido queremos, las dudas que tenemos son de.
+
+48:10 ¿Cuál es la dificultad que están afrontando actualmente, cuántos planes están creando al tiempo, y cada cuánto se están creando planes nuevos?
+
+48:18 Ok, nosotros creamos 130 planes de forma mensual, ¿no?, para realizar el cálculo de la, de la compensación.
+
+48:27 Entonces, lo estamos manejando de esta forma para no darle mantenimiento a los grupos.
+
+48:35 ¿No?, porque si el grupo lo asocias con un plan más largo, es correcto que puedes reciclar el plan, sin embargo, hay que entrar al módulo del grupo, entrar al grupo, sacar a las personas que ya no forman parte del grupo e integrar uno por uno a los colaboradores que ya forman parte del grupo, ¿no?
+
+48:57 Entonces, todos os meses se criam grupos novos, entendi.
+
+49:00 Entendi.
+
+49:01 Correcto.
+
+49:02 Sí, correcto.
+
+49:03 Entonces, al tener grupos masivos, pues se pueden re-aplicar los planes.
+
+49:09 Como nosotros tenemos grupos mensuales, necesitamos planes mensuales, entonces, creamos el plan y ya tenemos archivos de control donde registramos el nombre específico de la mecánica de cálculo, para ya nada más hacer el copiar, pegar, copiar, pegar, copiar, pegar, ¿no?
+
+49:29 Certo.
+
+49:30 Eh, sin embargo, pues, como ya tenemos el listado de las variables, pues, vemos la factibilidad de que ya nada más se suba mediante el layout y la creación del plan, donde hay que seleccionar calendario, grupo, variables, tipos de pago, y todo eso, pues, ya se le proporciona con el layout del mes pasado, y se eficiente ese tiempo.
+
+49:46 Mano.
+
+49:46 Eh, uma pergunta aí, tá, Luís, eh, a gente não tem isso hoje, porque a gente entende que na parte de criar plano, ela é bem complexa, mas ela é rápido de fazer, mas eu entendi a sua dor.
+
+49:57 Aí uma pergunta pra gente tentar entender a melhor forma de resolver.
+
+50:00 Se você fizer um upload com 130 planos, e 40 deles estiverem inválidos, por exemplo, mandou uma letra errada, eh, o esperado seria que os outros cadastrassem, e esses aí, com erro, falhem.
+
+50:32 Crear-se o faire-se todos.
+
+50:38 En ese sentido, sí, Luis.
+
+50:39 Si se hace el upload y que existen errores en algunos de los planos, puede ser errores del de los nombres de las formulaciones de los indica- de los incentivos, se esperaría que rechace todo el upload o que cargue lo que si aceptó.
+
+51:03 Por seguridad de la A al entonces que ahí sí, siento que sí son un poquito de gustos y criterios.
+
+51:10 Yo te diría que prefiero que rechace el layout completo.
+
+51:16 Al momento de que algo no coincida, que no encuentre el grupo, que no encuentre el calendario, que la parametrización tiene un espacio, en ese momento diga, "este layout no me sirve, revisarle", ¿no?
+
+51:29 Ya sabes el clásico error en la línea 51, validar, ¿no?
+
+51:35 El si sería todo.
+
+51:39 Una otra pregunta.
+
+51:41 En ese caso ahí, Luis, por ejemplo, cuando a gente faz o cadastro do plano, a gente tem que selecionar um incentivo, né, e depois o tipo de pago.
+
+51:49 Quando você faz via plataforma, você seleciona o incentivo pelo nome.
+
+51:52 Quando a gente fizer por upload, você vai ter que passar o ID do incentivo e isso você não tem hoje.
+
+51:56 Então, você teria que anteriormente ver todos os incentivos que você quer usar e pegar os IDs deles para colocar no arquivo, né?
+
+52:06 Como que funcionaria isso?
+
+52:07 Como que a gente poderia resolver isso?
+
+52:09 Porque hoje você não tem a lista dos IDs dos incentivos, né?
+
+52:16 Esse é um outro ponto porque a gente não tem o upload de plano.
+
+52:18 Sí, ya.
+
+52:19 Nosotros, en ese sentido, es tres cómo visualizan el uso de los incentivos.
+
+52:25 No se puede utilizar el nombre porque sería muy largo y la probabilidad de error muy grande.
+
+52:29 Cómo se ven en el manejo de los IDs de cada uno de los incentivos que crean de las mecánicas de pago.
+
+52:39 Ya te entiendo.
+
+52:40 Sí, pues actualmente nos, actualmente nuestros archivos de control, pues tienen el nombre completo de la parametrización, ¿no?
+
+52:51 TMO de servicio bancario, enero 2025, ¿no?
+
+52:54 O sea, así, tal cual, pero si el nombre no es un registro, pues igual, nomás nosotros en nuestro archivo de control tendríamos que manejar perfectamente el número de ID
+
+53:03 Y de dicha variable para colocar ese ID en la
+
+53:12 En el layout para que busque el ID y traiga la parametrización correcta.
+
+53:20 Entiendo entonces que ese dato sería como la parte final del layout, ¿no?
+
+53:25 Porque la estructura de arriba, los autorizadores, el portal, la URL, pues eso siempre va, ¿no?
+
+53:31 Pero lo que sí puede variar totalmente, pues es la cantidad de variables, ¿no?
+
+53:37 Sí.
+
+53:38 No sé si ficou claro, Santiago?
+
+53:39 Só me confirma o meu entendimento, que assim, como eu falei, quando ele for fazer o upload, ele vai ter que colocar o ID do incentivo na FortShare, e depois o ID do, o ID é, dentro do pacote do plano.
+
+53:54 Ele antes de fazer o upload, como ele quer o tudo ou nada, antes de fazer o upload, ele teria que ter um mapeamento de todos os incentivos que vão em cada um dos planos e cada um dos IDs.
+
+54:04 É isso.
+
+54:06 Sim, eles teriam externamente os nomes dos indicadores.
+
+54:11 Então, se eles eles não sei se tenha, se devam completar la, cadastro de los indicadores, con los IDs, pero ellos tienen los nombres externamente.
+
+54:28 Entonces, é exatamente isso.
+
+54:29 Os nomes não vão resolver, Santiago, teria que ser os IDs.
+
+54:31 Sim.
+
+54:32 Esse é o meu ponto.
+
+54:37 Certo.
+
+54:38 Como que ele teria isso?
+
+54:39 Entonces, creo que, ellos
+
+54:43 Ah, claro, pues no.
+
+54:43 Mi equipo de trabajo tiene tablas de Excel donde dice, al plan de compensación número 110, le corresponden estas 10 parametrizaciones, ¿no?
+
+54:53 Con estos 10 nombres.
+
+54:54 Y después copian y pegan cada uno de esos nombres dentro de la lista desplegable de parametrizaciones porque se muestran todas las parametrizaciones activas que tiene el portal.
+
+55:03 Sí.
+
+55:04 Entonces.
+
+55:06 Si.
+
+55:06 Ellos.
+
+55:06 Ellos están divididos por bloques y equipos de trabajo, pues no les daría el tiempo de estar buscando por nombre la calidad de segmento bancario, enero.
+
+55:17 No, sino que ya nomás copian y pegan del Excel y dejan que el portal la busque y la seleccionen.
+
+55:22 Y claro.
+
+55:23 Ellos tienen la manera de adicionar al mapeamento que tienen, necesitarían una manera de adicionar el ID, o sea, el número que se le que le hay que le asigne al portal, a cada uno de esos indicadores, de esos incentivos, o necesitarían una manera de lograr extraer esos IDs, ¿ah?
+
+55:50 Eso es una cuestión muy importante, porque si se va a trabajar con layout lo que se debe asignar para la identificación de los incentivos va a ser el ID, no puede ser el nombre.
+
+56:02 Ok, y solo por lo
+
+56:03 Obviar el ID entre el módulo de indicadores, clasificaciones, limitadores y redenciones, no se duplica, ¿verdad?
+
+56:13 Es exclusivo, es independiente.
+
+56:16 No.
+
+56:16 Es único.
+
+56:16 Sí, sí, sí.
+
+56:19 Independiente del segmento.
+
+56:22 Ok.
+
+56:23 Ok.
+
+56:24 Tá bom, então nesse Pues, actualmente no lo tenemos el ID porque no lo hemos manejado, tendríamos que buscar dentro de las sábanas todos los IDs, o si el módulo puede presentar un layout descargable de ID nombre, este, pues haríamos el buscar.
+
+56:37 Tá bom, tá bom.
+
+56:38 Então, aqui, eu concordo, aí, Luis, acho que o ideal seria a gente ter uma auditoria de incentivos que te traz todos, e aí, você consegue fazer um ProCV do seu lado pelo nome para achar os IDs.
+
+56:46 E aí você consegue fazer.
+
+56:47 E o tipo de pago, ele tem o ID externo, que é o ID que tá na folha.
+
+56:50 Então, esse aí, você não precisaria do ID do nosso lado.
+
+56:51 Você poderia passar o ID que tem na folha, e a gente conseguiria resolver.
+
+56:56 Beleza.
+
+56:56 Se você tá ok em fazer alguma coisa desse jeito, acho que a gente pode seguir para tentar planejar em como resolver isso aqui, que eu acho que não vamos ter problema.
+
+57:04 [Música].
+
+57:09 Ok.
+
+57:10 En la siguiente sección es de el menú desplegable de calendarios.
+
+57:15 A ver, en este sentido, aquí hay un problema relativamente complejo y es que esta manera en que el sistema organiza alfabéticamente los calendarios, está puesto así, porque, por ejemplo, en Atento Brasil, ellos han nombrado los calendarios de manera alfabética.
+
+57:37 Entonces, como la modificación aplicaría, por ejemplo, los puede ordenar ustedes, pero los desordenaría ellos, ¿sí?
+
+57:46 En ese sentido, es muy complicado venderles a ustedes como el
+
+57:57 La solución específica.
+
+58:00 De gustos y criterios, ¿no?
+
+58:01 Sí, si ellos lo ocupan con A, doble A, triple A, cuatro A, para que vayan botando hasta arriba, pues lo entiendo, ¿no?
+
+58:08 Pero que esto también pasaría a quedar, esa solicitud pase a quedar obsoleta, si los planes se pueden crear de forma por layout, ¿no?
+
+58:16 Porque entonces ya podríamos poner el calendario en el layout y ya no seleccionarlo manualmente.
+
+58:20 Sí.
+
+58:22 Ok.
+
+58:23 Entonces, esta parte creo que ya, bien.
+
+58:25 La siguiente sería la parte de mostrar estos campos adicionales en los parciales, creo que el único problema, Paulo, era el tercer campo, el importe final, porque dependiendo la persona que visualice en la tabula va a ser un valor diferente.
+
+58:45 Cierto?
+
+58:46 Sim.
+
+58:46 Eh, aqui, como o sistema ele faz muito controle de hierarquia, o administrador, quando ele acessar, ele vai ver
+
+58:52 Ver o valor final, montante total.
+
+58:53 Mas um gerente, ele vai ver só o montante das pessoas abaixo dele.
+
+58:56 Então, essa informação, tanto da quantidade de colaboradores no grupo, quanto do importe final, ela muda de pessoa pra pessoa.
+
+59:04 Então, essa não é uma informação que a gente consegue ter ela salva no banco de dados.
+
+59:07 É uma informação que a gente tem que criar algum mecanismo para processar em tempo de execução, porque a hora que a pessoa que tiver logada, a gente tem que ver quem que tá logado para saber quem que
+
+59:16 Ela tem acesso para aí depois calcular o montante total e as pessoas.
+
+59:18 Então, isso aí é só uma coisa que a gente tem que ver com mais calma, colocar o nome do grupo é simples, até o de colaboradores é simples, só o do importe final, Luís, que a gente vai precisar analisar, porque dependendo da quantidade de registros que tiver na página, isso pode demorar muito e acabar tendo um timeout na execução, né?
+
+59:31 Então a gente só precisa planejar um pouquinho mais.
+
+59:34 Sim.
+
+01:00:00 Entonces,
+
+01:00:15 Y para nosotros siempre es un resultado totalizado.
+
+01:00:20 No, no lo vemos a nivel supervisor o a nivel, el nivel gerente.
+
+01:00:26 Buscábamos esto precisamente para en el módulo de parciales, pues, con el monto final, por lo menos, ya tiene cierta certeza de que todo salió bien.
+
+01:00:39 Entonces, en el momento de que creas el plan y te dice final, hay que entrar al plan, esperar a que cargue el encabezado, esperar a que cargue a los empleados, para que puedas confirmar que el monto final sí era el adecuado.
+
+01:00:59 ¿No?
+
+01:00:59 Entonces, por ahí pierdes unos dos, un minuto en estar abriendo cada una de las compensaciones para ver cuál es el monto final proporcionado, que es el dato que más te va a ser una referencia entre todo está bien o todo está mal.
+
+01:01:19 Entonces, si desde la pantalla de inicio, ya ves medio millón y tú estabas esperando medio millón, pues dices, "Ah, está bien realizada el cálculo, puedo pasar a compensación."
+
+01:01:31 Ah, entonces...
+
+01:01:33 ¿No?
+
+01:01:34 Y si generas, por ejemplo, el lote de parciales, pues entonces aquí ya nada más abres la sábana, copias la sábana, la pegas Excel, acomodas columnas y haces un buscar B, ¿no?
+
+01:01:53 De plan o grupo versus cantidad de dinero esperado versus cantidad de dinero reportado por Forche, ah, entonces todo igual a cero, listo, todas mis compensaciones están bien calculadas.
+
+01:02:08 Aja, no, em primeiro ponto, aí Luis, sopra, sim.
+
+01:02:13 Se falou que os supervisores não acessam isso, né?
+
+01:02:17 Só o administrador.
+
+01:02:18 Mas hoje os supervisores têm acesso a essa página, né?
+
+01:02:22 Se eles acessarem, eles vão ver.
+
+01:02:24 Então, aí a preocupação aqui é porque, como a gente falou, né?
+
+01:02:27 A gente tem outros clientes que têm supervisores acessando, e como a gente é SaaS, a gente tem que pensar em todo mundo, né?
+
+01:02:35 Então, o ponto que a gente colocou é mais esse.
+
+01:02:39 A gente tem que entender como que isso vai afetar pra gente ver como que a gente pode resolver.
+
+01:02:44 E aí até o ponto pra gente trazer aqui era isso.
+
+01:02:48 Mas até antes de eu entrar na um outro, uma outra pergunta, eu percebi uma coisa que talvez a gente tenha entendido errado.
+
+01:02:56 Vai, se me traduzir pra confirmar, Santiago.
+
+01:03:00 Essa informação do importe final é o importe, o importe final gerado de cada linha ou é o total da página?
+
+01:03:16 ¿Ese sería para cada uno de las, de los planos o sería para toda el, la página?
+
+01:03:29 No, de cada uno de los planes, porque la idea es que nos ves revisar cada una de las parciales generadas, ¿no?
+
+01:03:39 Una vez que ya creaste, ya subiste tus indicadores y le das calcular al parcial, lo que quiere saber es cuánto dinero debes te está pagando, ¿no?
+
+01:03:52 Y validarlo versus tu archivo de control.
+
+01:03:56 Entonces, si hoy tienes que entrar compensación por compensación, para ver cuál es el importe generado.
+
+01:04:09 Entonces, sí, Pablo, sería para cada línea.
+
+01:04:14 Ok.
+
+01:04:14 [remaining transcript continues with discussion about batch compensation processing, report generation, permissions, and training needs]

@@ -1,0 +1,115 @@
+## granola.db — binary format investigation (read-only, 2026-05-20)
+
+### File identification
+
+Command: python3 -c "with open(path, 'rb') as f: print(f.read(32).hex())"
+Output:  b8c3eaf2dc72f6fde607be5869dd9dd116532666fd863d5fd54f5e8816852e67
+
+SQLite plaintext header would start with: 53514c69 74652066 6f726d61 74203300
+                                          ("SQLite format 3\x00")
+
+Actual header starts with:               b8c3eaf2
+Verdict: NOT a standard SQLite database. File is encrypted or uses a proprietary
+         binary format. Standard sqlite3 CLI and Python sqlite3 module both
+         return "file is not a database" error.
+
+file(1) output: "COM executable for DOS"
+  (tool misidentifies the first byte 0xb8 as a COM program header;
+   this is a known false-positive for arbitrary binary blobs)
+
+### WAL files present
+
+granola.db       4,530,176 bytes  mtime: 2026-05-20 11:45
+granola.db-shm      32,768 bytes  mtime: 2026-05-20 11:59
+granola.db-wal   4,845,152 bytes  mtime: 2026-05-20 12:56
+
+Both shm and wal are actively updated throughout the day, confirming
+the Granola app is writing to these files. Schema is inaccessible
+without the encryption key.
+
+### storage.dek — key wrapper file
+
+Command: python3 -c "with open(path, 'rb') as f: d = f.read(); print(d.hex()); print(repr(d))"
+Size:    51 bytes
+Hex:     76313042eb36c8208fc225a4672faeaafd73248d1ea11987890881cd5162b37b585e9b0ed5caec565dd4ddaa456325bfbb7312
+ASCII:   b'v10B\xeb6\xc8 \x8f\xc2%\xa4g/\xae\xaa\xfds$\x8d\x1e\xa1\x19\x87\x89\x08\x81\xcdQb\xb3{X^\x9b\x0e\xd5\xca\xecV]\xd4\xdd\xaaEc%\xbf\xbbs\x12'
+
+First 4 bytes ASCII: "v10B"
+
+This is the Electron/Chromium safeStorage prefix format:
+  - "v10" = version tag used by Electron safeStorage on macOS
+  - Following bytes = AES-GCM ciphertext (encrypted with macOS Keychain key)
+  - The Keychain entry name for Granola is "Granola Safe Storage"
+
+The safeStorage prefix v10 on macOS means:
+  - The plaintext key (DEK) was encrypted with a key stored in the macOS Keychain
+  - The Keychain item service name is "Granola Safe Storage"
+  - To decrypt: retrieve the raw key from Keychain → use it as AES-128-GCM key
+    to decrypt the 47 bytes following "v10" → that yields the actual DEK
+  - The DEK then decrypts cache-v6.json.enc, supabase.json.enc, granola.db, etc.
+
+References:
+  - Electron safeStorage docs: https://www.electronjs.org/docs/latest/api/safe-storage
+  - Chrome OSCrypt / v10 prefix: https://source.chromium.org/chromium/chromium/src/+/main:components/os_crypt/
+  - Chrome decryption in Python (v10 pattern): https://n8henrie.com/2014/05/decrypt-chrome-cookies-with-python/
+
+### local-state.json feature flags (relevant subset)
+
+File: ~/Library/Application Support/Granola/local-state.json
+mtime: 2026-05-05 20:42
+
+Flags that confirm storage migration:
+  "ydoc_sqlite_storage": true
+      → YDoc (CRDT document format) content stored in SQLite
+  "encrypted_preferences_storage": true
+      → Preferences/config stored encrypted
+  "disable_storage_process": true
+      → The separate storage process is disabled (possibly replaced by main process)
+  "partytime_use_ydocs": true
+  "partytime_use_ydocs_private_notes": true
+      → Meeting notes stored as YDoc CRDTs
+  "partytime_ydoc_version": 1
+  "partytime_ydoc_version_private_notes": 2
+      → YDoc schema versions in use
+
+These flags were active as of 2026-05-05. The cache migration happened ~2026-05-12.
+
+### cache-v6.json — current state (plaintext skeleton)
+
+File: ~/Library/Application Support/Granola/cache-v6.json
+Size: 1,987 bytes (was ~hundreds KB when functional)
+mtime: 2026-05-12 14:18 (frozen)
+
+Top-level structure still present but empty:
+{
+  "cache": {
+    "state": {
+      "transcripts": {},          ← was populated with transcript segments
+      "documents": MISSING,       ← key absent entirely
+      "sharedWithMeUnreadDocuments": [],
+      "dismissedEventSuggestions": {},
+      ... (UI/preference state keys present, all empty)
+    }
+  }
+}
+
+The "documents" key is absent (not present at all, not just empty {}).
+meeting_hive/sources/granola.py:110 does cache.get("cache",{}).get("state",{}).get("documents",{})
+which returns {} when the key is absent — hence "0 meetings in last 7 days".
+
+### Files still plaintext (not encrypted)
+
+stored-accounts.json    3,157 bytes  mtime: 2026-05-20 08:52
+  Structure: {"accounts": "[{...}]"}   (JSON-stringified accounts array)
+  Contains: userId, email — tokens masked
+
+supabase.json           2,735 bytes  mtime: 2026-05-12 14:18 (frozen — same day as cache)
+  Structure: {"workos_tokens": "{...}", "session_id": "...", "user_info": "{...}"}
+  workos_tokens is a JSON string containing {"access_token": "...", "refresh_token": "..."}
+  Note: access_token expires in ~1 hour. The token here is from 2026-05-12.
+  Refresh token is single-use and was consumed when Granola last started.
+  To get a fresh token: open Granola desktop app → it silently refreshes
+  and writes a new token back to supabase.json.
+
+supabase.json.enc       2,794 bytes  mtime: 2026-05-20 08:52 (updated daily)
+  This is the encrypted version being kept current.

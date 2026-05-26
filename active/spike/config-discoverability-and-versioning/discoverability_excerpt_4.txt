@@ -1,0 +1,68 @@
+SOURCE: https://arxiv.org/html/2410.04596v1
+TITLE: "Need Help? Designing Proactive AI Assistants for Programming" (CHI 2025)
+PURPOSE: Empirical data on when proactive suggestions help vs. harm
+
+KEY QUOTES (verbatim from fetched page):
+
+1. Timing mechanism:
+"Suggestions are not requested when the user is interacting with a previous
+suggestion, typing in the chat, sending a message, or waiting for a response."
+
+"When the user is idle—likely due to planning and brainstorming, the assistant
+provides suggestions every 5 seconds, limited to every 20 seconds since the
+last suggestion."
+
+2. Productivity gains with caveats:
+"the proactive assistant improved productivity by 12-18% across conditions"
+
+3. The overload problem:
+"when a proactive assistant provides too many suggestions, participants can be
+easily distracted and thus still want to view the suggestions at a similar
+frequency. However, when the suggestions are provided too often, participants
+are less likely to make use of the suggestions."
+
+4. Frequency preference:
+"Only 45% of participants preferred this more aggressive approach [5-second
+interval], compared to 80-90% preference for the moderated versions."
+"the non-proactive chat assistant was best because it didn't interrupt what I was doing."
+
+RELEVANCE TO 4SHARK:
+The research shows proactive tips improve outcomes only when:
+- Rate-limited (not on every interaction)
+- Surfaced during idle/planning moments (not mid-task)
+- High precision (tip is actually relevant to the user's current context)
+
+In Claude Code: "idle/planning moments" maps to session start (SessionStart hook)
+and the beginning of a new task thread. "Mid-task" maps to UserPromptSubmit on
+every turn. The existing inject-output-policy-reminder.sh fires on EVERY prompt —
+this is the aggressive pattern (equivalent to 5-second interval in the study).
+
+---
+SOURCE: NN/g — https://www.nngroup.com/articles/pop-up-adaptive-help/
+PURPOSE: UX guidance on adaptive help systems
+
+KEY QUOTES (verbatim from fetched page):
+"Systems cannot predict everything, and users know it."
+"For most companies, the cost of developing an intelligent adaptive help system
+far outweighs the benefits to the user."
+"help should be 'Available without interfering' and remain 'out of the way until
+users need it'"
+
+RELEVANCE: The NN/g guidance points toward passive availability (slash commands,
+CHANGELOG entries the engineer can read) over active interruption (injected tips).
+The cost observation is about development cost, not token cost — but the principle
+translates: an imprecise tip system is worse than no tip system.
+
+---
+SOURCE: https://www.command.ai/blog/what-clippy-taught-us-all/
+PURPOSE: Documents Clippy failure mode
+
+KEY QUOTES (from search result summary — verbatim):
+"Clippy's number-one problem was overeagerness—imagine a waiter interrupting your
+dinner conversation every 30 seconds asking if you're ready for dessert."
+"Clippy lacked real contextual awareness and would offer writing tips or formatting
+help based on shallow triggers, not actual user intent."
+
+RELEVANCE: The "shallow trigger" failure mode maps directly to keyword-based hook
+injection in 4Shark. A hook that fires on every UserPromptSubmit with "did you know
+we have /pr-triage?" regardless of context is the Clippy anti-pattern.

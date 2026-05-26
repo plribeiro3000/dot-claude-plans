@@ -1,0 +1,22 @@
+Raw Audit Agent Logs
+
+These are the complete transcripts (text output) from each audit agent executed on 2025-01-26.
+They contain the full reasoning process, intermediate searches, and final conclusions.
+
+For a structured summary, see ../ANALYSIS-v2.md.
+
+File Index
+
+  File              Agent ID    Category    Description
+  a0f37fe.txt       a0f37fe     Cat 0       Find unmigrated GraphQL files (string interpolation)
+  ade2f4c.txt       ade2f4c     Cat 1       Mutation arguments nullability audit (frontend vs backend required)
+  a06fafb.txt       a06fafb     Cat 2       Loading state set outside subscribe() callback
+  a44cfd2.txt       a44cfd2     Cat 3       Boolean params with simple if check (CLEAN)
+  a827558.txt       a827558     Cat 4       Query parameters using ID! instead of ID
+  a892532.txt       a892532     Cat 5       String "true" passed to Boolean GraphQL variable
+  a1848f1.txt       a1848f1     Cat 6       parseInt() feeding GraphQL ID variables
+  a1bb7db.txt       a1bb7db     Cat 7       Wrong Input type names (CLEAN)
+  ac1c9d1.txt       ac1c9d1     Cat 8       Numeric fields failing when value is 0
+  a7f1a97.txt       a7f1a97     Verify      Cross-verification of Categories 1, 2, 5
+  a1232ad.txt       a1232ad     Verify      Comprehensive parseInt bugs search
+  ad492c2.txt       ad492c2     Verify      Comprehensive numeric zero bugs search

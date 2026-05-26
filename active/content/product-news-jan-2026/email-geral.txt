@@ -1,0 +1,62 @@
+Olá,
+
+Feliz Ano Novo! Desejamos que 2026 seja um ano de muito sucesso e conquistas para você e toda sua equipe.
+
+Iniciamos o ano com uma série de novidades que gostaríamos de compartilhar com vocês, fruto do trabalho contínuo de evolução da plataforma 4Shark.
+
+
+1. Segurança e Estabilidade
+
+Realizamos melhorias internas que aumentam a estabilidade e reduzem riscos de segurança, garantindo uma plataforma mais robusta e confiável para o dia a dia de vocês.
+
+
+2. Identificação Completa nas Auditorias
+
+Sabemos que a conciliação de dados entre sistemas é uma necessidade frequente, e que muitas vezes o CPF ou documento de identificação é a chave para essa integração.
+
+Atendendo a essa solicitação, incluímos colunas de identificação (tipo do documento e valor, como CPF, RUT etc.) nas auditorias da plataforma, incluindo relatórios de usuários, extratos, metas e consumo mensal. Agora, ao exportar esses arquivos, vocês terão acesso direto à identificação de cada pessoa, facilitando a conciliação com folha de pagamento e outros sistemas internos.
+
+E podem ficar tranquilos quanto à segurança desses dados: os arquivos de auditoria ficam disponíveis por até 15 dias e são apagados automaticamente após esse período. O acesso é restrito a usuários autenticados na plataforma.
+
+
+3. Nova Auditoria de Metas do Plano
+
+Acompanhar as metas configuradas em cada plano era um processo que exigia navegar por diversas telas da plataforma, dificultando a identificação rápida de possíveis inconsistências.
+
+Entendendo essa necessidade, desenvolvemos uma nova funcionalidade de auditoria específica para metas. Com ela, vocês podem visualizar todas as metas associadas a um plano em um único relatório, identificando rapidamente quais usuários possuem metas configuradas, quais ainda precisam de atenção, e se os valores estão de acordo com o esperado.
+
+Para acessar, abra o Plano desejado e clique em "Auditoria de Metas".
+
+[INSERIR IMAGEM: news_plan_goal_audit_button.png]
+
+Na listagem, clique em "+ Gerar Nova Auditoria" para criar um novo relatório.
+
+[INSERIR IMAGEM: news_plan_goal_audit_listing.png]
+
+
+4. Atualização de Metas
+
+Erros acontecem, e sabemos o quanto é frustrante perceber que uma meta foi cadastrada com o valor errado depois que o plano já foi vinculado.
+
+Antes, para corrigir esse tipo de situação, era necessário cancelar o plano, abrir um chamado para nossa equipe realizar a correção da meta, e só então criar um novo plano. Esse processo gerava dependência, retrabalho e podia impactar o andamento das operações.
+
+Agora isso mudou. Implementamos a possibilidade de atualizar o valor, valor base e sentido de uma meta, com efeito para os próximos planos gerados.
+
+O novo fluxo é simples: basta cancelar o plano atual, atualizar a meta com o valor correto, e gerar um novo plano. O novo plano já será criado com a meta atualizada. Tudo isso sem depender de chamados.
+
+Essa atualização pode ser feita de três formas:
+- Pela listagem de metas (no menu de ações da meta, selecione "Atualizar")
+- Via API, para integrações automatizadas
+- Por upload de arquivo, que antes funcionava apenas para cadastro e agora também permite atualização
+
+[INSERIR IMAGEM: news_goal_update_form.png]
+
+
+5. Outras Melhorias
+
+A busca geral da plataforma foi otimizada para funcionar melhor com caracteres especiais e acentuação, facilitando encontrar registros com nomes ou identificadores que contenham esses caracteres.
+
+
+Estamos muito felizes em trazer essas evoluções para a plataforma, e esperamos que elas simplifiquem ainda mais o dia a dia de trabalho de vocês.
+
+Agradecemos pela parceria e nos colocamos à disposição para eventuais dúvidas e sugestões através do nosso canal meajuda@4shark.com.br.

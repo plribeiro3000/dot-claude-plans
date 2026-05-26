@@ -1,0 +1,9 @@
+{
+    "AUTO_SCALING_GROUP_NAME": "shared-001-worker-system-asg",
+    "ECS_CLUSTER_NAME": "shared-001-cluster",
+    "PROCESS_NAME": "worker_system",
+    "ECS_SERVICE_NAME": "shared-001-worker-system-service",
+    "METRICS_ENDPOINT": "https://shared001.app4shark.com/hirefire/958288a3-dc10-4f09-a325-7d0e85695b5e/info",
+    "JOBS_PER_PROCESS": "500",
+    "REDIS_URL": "redis://default:bwjm3iy6OqJhAh5TcR3VKNOcaWPjHKtb@redis-19787.crce214.us-east-1-3.ec2.redns.redis-cloud.com:19787"
+}

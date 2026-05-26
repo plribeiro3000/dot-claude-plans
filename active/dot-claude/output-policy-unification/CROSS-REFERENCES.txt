@@ -1,0 +1,182 @@
+CROSS-REFERENCES AUDIT — Output Policy Unification
+Generated: 2026-05-14
+Source grep: /tmp/cross_references_audit_20260514.txt (33 matches)
+Search terms: Delegation Context Principle | Output Formatting | OUTPUT-FORMATTING.md
+             | Research-First | Bash Single-Line | Command Safety Policy
+             | >3 gate | code excerpt | flow narrative
+
+Legend
+  [STAY]   keep as-is — match is a generic phrase or section that stays
+  [TASK4]  edit during Task 4 (CLAUDE.md migration)
+  [TASK5]  edit during Task 5 (rename + persona update)
+  [NOTE]   informational, no action
+
+================================================================================
+A) CLAUDE.md (working copy)
+================================================================================
+
+L12     [STAY]   "### Bash Single-Line Policy"
+                 Section header. Section stays after migration; only cross-link added.
+
+L248    [STAY]   "code excerpt, file paths with line numbers, and why it matters"
+                 Inside `Communication Style § Bring full context when reporting`.
+                 Generic phrase, NOT the DCP-specific rule. Stays.
+
+L250    [TASK4]  "### Delegation Context Principle"
+                 Section header. Entire section to be DELETED.
+                 Mechanics (excerpt + flow narrative + >3 gate) absorbed into Output Policy.
+
+L258    [TASK4]  "1. **The code excerpt** — ~10–15 lines around the line of interest..."
+                 Inside DCP section. Dies with the section.
+                 Mechanic moves to Output Policy master table.
+
+L262    [TASK4]  "**Pacing — the >3 gate:**"
+                 Inside DCP section. Dies with the section.
+                 Pacing-gate rule moves to Output Policy anchor rules.
+
+L272    [STAY]   "### Research-First Policy"
+                 Section header. Stays. Citation requirement bullets move to Output Policy
+                 master table; rest of section unchanged.
+
+L312    [TASK4]  "### Output Formatting and Delivery"
+                 Section header. Renamed/replaced by `### Output Policy`.
+
+L351    [TASK5]  "**See:** `~/.claude/docs/OUTPUT-FORMATTING.md` for per-destination edge cases"
+                 At end of Output Formatting and Delivery section.
+                 Update doc name → `OUTPUT-EDGE-CASES.md`.
+                 Will be regenerated as part of new Output Policy section text.
+
+L388    [STAY]   "### Command Safety Policy"
+                 Section header. Stays. "Output must be preserved" rule moves to
+                 Output Policy master table; rest of section unchanged.
+
+L394    [TASK4]  "...following the Output Formatting and Delivery section above..."
+                 Cross-reference inside Command Safety Policy. Update to:
+                 "following § Output Policy above".
+
+L486    [TASK4]  "│   ├── OUTPUT-FORMATTING.md         # Per-destination output formatting edge cases"
+                 Inside "Repository Structure" ASCII tree. Update name + comment.
+
+================================================================================
+B) docs/ (working copy)
+================================================================================
+
+docs/TERRAFORM-CONVENTIONS.md
+  L97   [TASK5]  "...following the Output Formatting and Delivery section in `CLAUDE.md`."
+                 Update → "following § Output Policy in `CLAUDE.md`".
+
+docs/OUTPUT-FORMATTING.md
+  L1    [TASK5]  "# Output Formatting"
+                 File title. Will be renamed AND retitled to "Output Edge Cases".
+  L3    [TASK5]  "This document expands on the **Output Formatting and Delivery** section..."
+                 Update → "This document expands on the **Output Policy** section
+                 in `~/.claude/CLAUDE.md` with per-destination edge cases."
+
+docs/COMMAND-SAFETY.md
+  L71   [TASK5]  "...following the Output Formatting and Delivery section in `CLAUDE.md`..."
+                 Update → "following § Output Policy in `CLAUDE.md`".
+
+docs/TERRAFORM-POLICY.md
+  L6    [STAY]   "(see Command Safety Policy). The `| tee` for plan capture is the only exception"
+                 Reference to a section that STAYS. No change.
+
+================================================================================
+C) agents/ (working copy)
+================================================================================
+
+agents/task-creator.md
+  L64   [TASK5]  "**Honor the gate (see § Delegation Context Principle in `~/.claude/CLAUDE.md`):**"
+                 Update → "**Honor the gate (see § Output Policy in `~/.claude/CLAUDE.md`):**"
+
+agents/planner.md
+  L196  [TASK5]  "**Honor the gate (see § Delegation Context Principle in `~/.claude/CLAUDE.md`):**"
+                 Same pattern as task-creator.md. Update to Output Policy.
+
+agents/code-reviewer.md
+  L100  [TASK5]  "This implements the Delegation Context Principle gate from `~/.claude/CLAUDE.md`."
+                 Update → "This implements the pacing gate from § Output Policy in
+                 `~/.claude/CLAUDE.md`."
+  L104  [TASK5]  "A bare `file:line + suggestion` does not satisfy the Delegation Context Principle."
+                 Update → "...does not satisfy § Output Policy."
+  L216  [TASK5]  "(see § Delegation Context Principle in `~/.claude/CLAUDE.md`)"
+                 Update → "(see § Output Policy in `~/.claude/CLAUDE.md`)"
+
+agents/spike.md
+  L38   [TASK5]  "See § Delegation Context Principle in `~/.claude/CLAUDE.md`"
+                 Update → "See § Output Policy in `~/.claude/CLAUDE.md`"
+  L70   [TASK5]  "follow § Delegation Context Principle in `~/.claude/CLAUDE.md` — snippet
+                  + flow narrative for code evidence, and the >3 gate..."
+                 Update → "follow § Output Policy in `~/.claude/CLAUDE.md` — snippet +
+                 flow narrative for code evidence, and the >3 gate..."
+
+agents/security-reviewer.md
+  L91   [TASK5]  "This implements the Delegation Context Principle gate from `~/.claude/CLAUDE.md`."
+                 Update → "This implements the pacing gate from § Output Policy in
+                 `~/.claude/CLAUDE.md`."
+  L95   [TASK5]  "...does not satisfy the Delegation Context Principle."
+                 Update → "...does not satisfy § Output Policy."
+  L204  [TASK5]  "(see § Delegation Context Principle in `~/.claude/CLAUDE.md`)"
+                 Update → "(see § Output Policy in `~/.claude/CLAUDE.md`)"
+
+================================================================================
+D) commands/ (working copy)
+================================================================================
+
+commands/cleanup-memories.md
+  L186  [TASK5]  "Per the Output Formatting and Delivery policy in `~/.claude/CLAUDE.md`:"
+                 Update → "Per § Output Policy in `~/.claude/CLAUDE.md`:"
+
+commands/meeting-context.md
+  L75   [TASK5]  "See § Delegation Context Principle in `~/.claude/CLAUDE.md`."
+                 Update → "See § Output Policy in `~/.claude/CLAUDE.md`."
+  L114  [TASK5]  "This implements the Delegation Context Principle gate from `~/.claude/CLAUDE.md`."
+                 Update → "This implements the pacing gate from § Output Policy in
+                 `~/.claude/CLAUDE.md`."
+  L124  [STAY]   "Do not skip the >3 gate"
+                 Generic phrase using ">3 gate" as a concept — concept is preserved
+                 in Output Policy under the same name. No edit needed.
+
+commands/create-integrator.md
+  L140  [TASK5]  "follow the Output Formatting and Delivery section in `~/.claude/CLAUDE.md`"
+                 Update → "follow § Output Policy in `~/.claude/CLAUDE.md`"
+
+commands/triage-pr.md
+  L94   [TASK5]  "This implements the Delegation Context Principle gate from `~/.claude/CLAUDE.md`."
+                 Update → "This implements the pacing gate from § Output Policy in
+                 `~/.claude/CLAUDE.md`."
+  L126  [TASK5]  "See `~/.claude/CLAUDE.md` § \"Delegation Context Principle\"."
+                 Update → "See `~/.claude/CLAUDE.md` § \"Output Policy\"."
+
+================================================================================
+E) skills/ (working copy)
+================================================================================
+
+No matches. integration-debug/SKILL.md does not reference any of the search terms.
+
+================================================================================
+SUMMARY BY ACTION
+================================================================================
+
+Task 4 (CLAUDE.md migration): 7 edit points
+  - L250-271: DELETE Delegation Context Principle section entirely
+  - L312-388: REPLACE Output Formatting and Delivery → Output Policy section
+  - L394:     Update cross-reference to "§ Output Policy"
+  - L486:     Update Repository Structure tree (OUTPUT-EDGE-CASES.md)
+
+Task 5 (rename + personas + docs): 20 edit points
+  - 1 file rename: docs/OUTPUT-FORMATTING.md → docs/OUTPUT-EDGE-CASES.md
+  - 2 docs edits: TERRAFORM-CONVENTIONS.md, COMMAND-SAFETY.md
+  - 1 doc retitle + intro: OUTPUT-EDGE-CASES.md (former OUTPUT-FORMATTING.md)
+  - 1 hook script edit: scripts/read-context.sh (pointer line)
+  - 5 agent updates: task-creator, planner, code-reviewer (3x), spike (2x),
+                    security-reviewer (3x) → 11 edit points
+  - 5 command updates: cleanup-memories, meeting-context (2x), create-integrator,
+                       triage-pr (2x) → 6 edit points
+
+Stay (no change): 4 points
+  - CLAUDE.md L12, L248, L272, L388 (section headers and generic phrases)
+  - docs/TERRAFORM-POLICY.md L6 (refs section that stays)
+  - commands/meeting-context.md L124 (generic ">3 gate" usage)
+
+================================================================================
+END OF AUDIT

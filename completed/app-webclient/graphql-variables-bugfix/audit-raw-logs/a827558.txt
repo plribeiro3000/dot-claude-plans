@@ -1,0 +1,225 @@
+
+
+Entendido. Vou auditar o codebase Angular buscando queries GraphQL (não mutations) que usam `ID!` (required) quando deveriam usar `ID` (nullable) para parâmetros de filtro.
+
+Vou começar buscando todas as declarações de query em arquivos `.ts` que usam `ID!`.
+
+---
+
+Tenho uma lista extensa. Agora preciso verificar no backend quais desses usam `option` (nullable) vs `argument` (required). Vou verificar os resolvers correspondentes.
+
+---
+
+Agora preciso verificar cada resolver correspondente. Vou agrupar as verificacoes por categorias. Vou comecar verificando os resolvers para os "temporary" services e os outros queries encontrados.
+
+---
+
+Todos os resolvers usam `option(:id, type: ID)` -- confirmando que `id` e opcional no backend. Agora preciso verificar tambem os parametros que nao sao `:id`, como `:plan_id`, `:group_id`, `:period_id`, `:user_id`.
+
+---
+
+Todos os resolvers backend usam `option` para `:id`, `:plan_id`, `:group_id`, `:user_id` -- todos opcionais. Agora preciso verificar os resolvers especificos para os queries nao-"temporary" encontrados. Vou verificar os casos especificos: `goal_dataset`, `download_document`, `groupification`, `company`, `plan_goal_audit`.
+
+---
+
+Todos os `period_id` tambem sao `option` (nullable). Agora vou verificar especificamente o resolver `goal_dataset` para entender o caso do `GoalDatasets` query.
+
+---
+
+Interessante. O resolver `GoalDatasetGraphqlResolver` usa `argument :plan_id, ID, required: true` -- este e um caso diferente dos demais. `plan_id` e realmente required (`argument` com `required: true`), entao `$planId: ID!` no frontend esta correto para este caso. Mas `period_id` e `user_id` sao `required: false`, entao devem ser nullable no frontend.
+
+Agora vou verificar os arquivos especificos do frontend para confirmar os detalhes. Vou ler os arquivos com queries nao-"temporary" que podem ter padroes especificos.
+
+---
+
+Agora vou verificar os resolvers para os "temporary" queries e tambem para `plan_goal_audit`, `plan_goal_audit_permissions`, `download_document`, `company`, `group`, `groupification`, `rankifier`, `user`, `deal`.
+
+---
+
+Agora vou verificar o `plan_goal_audit_permissions_graphql_resolver.rb`.
+
+---
+
+Agora preciso verificar os "temporary" resolvers. Vou verificar como esses funcionam no backend.
+
+---
+
+Esses herdam de `TemporaryFileGraphqlResolver`. Vou verificar essa classe base.
+
+---
+
+Achado importante. O `TemporaryFileGraphqlResolver` usa `argument :id, ID, required: true` na linha 20. Isso significa que para os temporary resolvers, `id` e **realmente required** no backend. Portanto, usar `$id: ID!` no frontend para esses e **correto**.
+
+Da mesma forma, `PlanGoalAuditPermissionsGraphqlResolver` usa `argument :plan_id, ID, required: true` e `GoalDatasetGraphqlResolver` usa `argument :plan_id, ID, required: true`.
+
+Agora preciso distinguir quais queries usam resolvers baseados em `CollectionGraphqlResolver` (que usam `option`) vs resolvers baseados em `ApplicationGraphqlResolver` com `argument required: true`.
+
+Vou verificar os resolvers restantes que nao sao "temporary":
+
+1. `GroupShow` e `GroupUpdate` - usam `groups(id: $id)` -> `GroupGraphqlResolver` usa `option(:id)` -> `ID!` esta ERRADO
+2. `GroupificationsShow` - usa `groupifications(groupId: $groupId)` -> `GroupificationGraphqlResolver` usa `option(:group_id)` -> `ID!` esta ERRADO
+3. `DownloadDocument` - generico, preciso verificar o resolver
+4. `Company` - usa `companies(id: $id)` -> `CompanyGraphqlResolver` usa `option(:id)` -> `ID!` esta ERRADO
+5. `RankifierClone/Show/Update` - usa `rankifiers(id: $id)` -> `RankifierGraphqlResolver` usa `option(:id)` -> `ID!` esta ERRADO
+6. `UserShow/Update` - usa `users(id: $id)` -> `UserGraphqlResolver` usa `option(:id)` -> `ID!` esta ERRADO
+7. `DealShow/Update` - usa `deals(id: $id)` -> `DealGraphqlResolver` usa `option(:id)` -> `ID!` esta ERRADO
+8. `PlanGoalAudits` - usa `planGoalAudits(planId: $planId)` -> `PlanGoalAuditGraphqlResolver` usa `option(:plan_id)` -> `ID!` esta ERRADO
+
+Vou verificar os restantes em detalhe para confirmar.
+
+---
+
+Agora preciso verificar o `DownloadDocument` -- ele usa um `resolverName` dinamico. Vou entender melhor esse caso.
+
+---
+
+Vou verificar quais resolvers o `DownloadDocument` pode chamar.
+
+---
+
+O `DownloadDocument` chama resolvers "temporary" que usam `argument :id, ID, required: true`. Portanto, `$id: ID!` esta **correto** para o `DownloadDocument`.
+
+Agora vou verificar o `TemporarySignatureGraphqlResolver` e `TemporaryCampaignGraphqlResolver` para confirmar que tambem herdam de `TemporaryFileGraphqlResolver`.
+
+---
+
+Todos os "temporary" resolvers herdam de `TemporaryFileGraphqlResolver` que usa `argument :id, ID, required: true`. Portanto, todos os temporary queries com `$id: ID!` estao **corretos**.
+
+Agora vou compilar os resultados. Preciso identificar quais queries usam resolvers com `option` (Collection resolvers) mas declaram `ID!` no frontend. Vou verificar mais dois resolvers para cobrir todos os casos encontrados.
+
+---
+
+Agora tenho tudo o que preciso. Vou compilar a lista final dos queries que incorretamente usam `ID!` quando o backend define o parametro como opcional (`option`).
+
+---
+
+## Resultado da Auditoria
+
+Abaixo estao todas as queries que **incorretamente** usam tipos required (`!`) para parametros de filtro que sao opcionais no backend. Excluidos desta lista estao:
+
+- **Todos os "temporary" queries** (`TemporaryMonthlyUsageAudit`, `TemporaryStatementAudit`, etc.) -- estes estao **corretos** porque `TemporaryFileGraphqlResolver` usa `argument :id, ID, required: true`
+- **`DownloadDocument`** -- **correto** porque chama resolvers "temporary" com `argument required: true`
+- **`GoalDatasets` e `GetGoalDatasets`** com `$planId: ID!` -- **correto** porque `GoalDatasetGraphqlResolver` usa `argument :plan_id, ID, required: true`
+- **`PlanGoalAuditPermissions`** com `$planId: ID!` -- **correto** porque `PlanGoalAuditPermissionsGraphqlResolver` usa `argument :plan_id, ID, required: true`
+
+### Queries com Bug (ID! quando deveria ser ID)
+
+| # | Arquivo | Linha | Query Name | Parametro Incorreto | Resolver Backend | Backend define como |
+|---|---------|-------|------------|---------------------|-----------------|-------------------|
+| 1 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/group/show/group-show.component.ts` | 63 | `GroupShow` | `$id: ID!` | `GroupGraphqlResolver` | `option(:id, type: ID)` |
+| 2 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/group/show/group-show.component.ts` | 109 | `GroupificationsShow` | `$groupId: ID!` | `GroupificationGraphqlResolver` | `option(:group_id, type: ID)` |
+| 3 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/group/update/group-update.component.ts` | 44 | `GroupUpdate` | `$id: ID!` | `GroupGraphqlResolver` | `option(:id, type: ID)` |
+| 4 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/create/user-create.component.ts` | 545 | `Company` | `$id: ID!` | `CompanyGraphqlResolver` | `option(:id, type: ID)` |
+| 5 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/show/user-show.component.ts` | 35 | `UserShow` | `$id: ID!` | `UserGraphqlResolver` | `option(:id, type: ID)` |
+| 6 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/update/user-update.component.ts` | 348 | `UserUpdate` | `$id: ID!` | `UserGraphqlResolver` | `option(:id, type: ID)` |
+| 7 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/show/deal-show.component.ts` | 42 | `DealShow` | `$id: ID!` | `DealGraphqlResolver` | `option(:id, type: ID)` |
+| 8 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 92 | `DealUpdate` | `$id: ID!` | `DealGraphqlResolver` | `option(:id, type: ID)` |
+| 9 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/clone/rankifier-clone.component.ts` | 233 | `RankifierClone` | `$id: ID!` | `RankifierGraphqlResolver` | `option(:id, type: ID)` |
+| 10 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/show/rankifier-show.component.ts` | 34 | `RankifierShow` | `$id: ID!` | `RankifierGraphqlResolver` | `option(:id, type: ID)` |
+| 11 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/rankifier/update/rankifier-update.component.ts` | 246 | `RankifierUpdate` | `$id: ID!` | `RankifierGraphqlResolver` | `option(:id, type: ID)` |
+| 12 | `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan-goal-audit/plan-goal-audit.service.ts` | 42 | `PlanGoalAudits` | `$planId: ID!` | `PlanGoalAuditGraphqlResolver` | `option(:plan_id, type: ID)` |
+
+### Detalhes por arquivo
+
+**1-3. Group (show + update + groupifications)**
+
+```typescript
+// group-show.component.ts:63 - ERRADO: $id: ID! deveria ser $id: ID
+query GroupShow($id: ID!) {
+  groups(id: $id) { ... }
+}
+
+// group-show.component.ts:109 - ERRADO: $groupId: ID! deveria ser $groupId: ID
+query GroupificationsShow($first: Int, $groupId: ID!, $after: String) {
+  groupifications(first: $first, groupId: $groupId, after: $after) { ... }
+}
+
+// group-update.component.ts:44 - ERRADO: $id: ID! deveria ser $id: ID
+query GroupUpdate($id: ID!) {
+  groups(id: $id) { ... }
+}
+```
+
+Backend: `GroupGraphqlResolver` e `GroupificationGraphqlResolver` usam `option(:id)` e `option(:group_id)` respectivamente -- ambos opcionais.
+
+**4. Company**
+
+```typescript
+// user-create.component.ts:545 - ERRADO: $id: ID! deveria ser $id: ID
+query Company($first: Int, $enabled: Boolean, $id: ID!) {
+  companies(first: $first, enabled: $enabled, id: $id) { ... }
+}
+```
+
+Backend: `CompanyGraphqlResolver` usa `option(:id, type: ID)` -- opcional.
+
+**5-6. User (show + update)**
+
+```typescript
+// user-show.component.ts:35 - ERRADO: $id: ID! deveria ser $id: ID
+query UserShow($id: ID!) {
+  users(id: $id) { ... }
+}
+
+// user-update.component.ts:348 - ERRADO: $id: ID! deveria ser $id: ID
+query UserUpdate($id: ID!) {
+  users(id: $id) { ... }
+}
+```
+
+Backend: `UserGraphqlResolver` usa `option(:id, type: ID)` -- opcional.
+
+**7-8. Deal (show + update)**
+
+```typescript
+// deal-show.component.ts:42 - ERRADO: $id: ID! deveria ser $id: ID
+query DealShow($id: ID!) {
+  deals(id: $id) { ... }
+}
+
+// deal-update.component.ts:92 - ERRADO: $id: ID! deveria ser $id: ID
+query DealUpdate($id: ID!) {
+  deals(id: $id) { ... }
+}
+```
+
+Backend: `DealGraphqlResolver` usa `option(:id, type: ID)` -- opcional.
+
+**9-11. Rankifier (clone + show + update)**
+
+```typescript
+// rankifier-clone.component.ts:233 - ERRADO: $id: ID! deveria ser $id: ID
+query RankifierClone($id: ID!) {
+  rankifiers(id: $id) { ... }
+}
+
+// rankifier-show.component.ts:34 - ERRADO: $id: ID! deveria ser $id: ID
+query RankifierShow($id: ID!) {
+  rankifiers(id: $id) { ... }
+}
+
+// rankifier-update.component.ts:246 - ERRADO: $id: ID! deveria ser $id: ID
+query RankifierUpdate($id: ID!) {
+  rankifiers(id: $id) { ... }
+}
+```
+
+Backend: `RankifierGraphqlResolver` usa `option(:id, type: ID)` -- opcional.
+
+**12. PlanGoalAudits**
+
+```typescript
+// plan-goal-audit.service.ts:42 - ERRADO: $planId: ID! deveria ser $planId: ID
+query PlanGoalAudits($planId: ID!, $first: Int, $after: String) {
+  planGoalAudits(planId: $planId, first: $first, after: $after) { ... }
+}
+```
+
+Backend: `PlanGoalAuditGraphqlResolver` usa `option(:plan_id, type: ID)` -- opcional.
+
+### Resumo
+
+**12 queries** estao incorretamente usando tipos required (`!`) para parametros que o backend define como opcionais via `option`. A correcao para cada caso e remover o `!` do tipo da variavel na declaracao da query (ex: `$id: ID!` -> `$id: ID`, `$planId: ID!` -> `$planId: ID`, `$groupId: ID!` -> `$groupId: ID`).
+
+---
+

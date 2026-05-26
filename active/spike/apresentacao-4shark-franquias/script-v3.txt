@@ -1,0 +1,90 @@
+Presentation Script — V3
+
+Built on 2026-03-13 in Gamma.app, iterating over V2 (headlines-only version).
+Language: Portuguese (pt-BR)
+Tool: Gamma.app — project "V3" (copy of V2)
+Status: Partially complete — superseded by V4 planning
+
+
+Design principles applied
+- Audience: non-business franchisees (doctors, hairdressers, etc.) with 2-3 salespeople
+- One big bold title + at most 3-4 impact words per slide — presenter explains the rest
+- No descriptive text inside cards or bullets
+- Images carry emotional tone; text carries concept label
+- Dark theme (Onyx), white bold typography
+
+
+SLIDE 1 — Abertura [done]
+Title: Sua equipe vende. Quem cuida do resto?
+Visual: Photo of team celebrating with glasses, corporate setting
+
+SLIDE 2 — Todo mês, o mesmo caos [done]
+Title: Todo mês, o mesmo caos
+Visual: Overhead photo of desk completely covered in papers and documents (no laptop, no phone)
+Cards (icon + title only):
+- Planilhas infinitas
+- Comunicação fragmentada
+- Gestão bancária
+
+SLIDE 3 — O problema não é só trabalhoso. É arriscado. [done]
+Title: O problema não é só trabalhoso. É arriscado.
+Visual: Warning signs and documents on a desk
+
+SLIDE 4 — 4Shark intro [done]
+Title: 4Shark — Do cálculo ao pagamento, em um único lugar.
+Visual: Two professionals doing high five in modern office
+Content: 3 numbered steps side by side:
+- 01 — Configure suas regras
+- 02 — Calcule automaticamente
+- 03 — Pague com facilidade
+
+SLIDE 5 — Três produtos. Um ecossistema. [done]
+Title: Três produtos. Um ecossistema.
+Visual: 3 cards side by side with official product logos
+- Nucleus (blue — #1a4f8a)
+- Pay (dark gray — #3a3a3a)
+- Incentive (orange — #f5a623)
+Logo files: ~/Downloads/nucleus.png, ~/Downloads/pay.png, ~/Downloads/incentive.png
+
+SLIDE 6 — Nucleus [done]
+Title: Nucleus — As regras da sua operação, no controle.
+Visual: Dashboard screenshot on monitor
+Bullet points (arrow + word):
+- Flexibilidade total
+- Produtividade
+- Segurança jurídica
+- Transparência
+
+SLIDE 7 — Pay [in progress]
+Title: Pay — O dinheiro chega. Sem intermediário. Sem atraso.
+Visual: Phone with app
+Bullet points (arrow + phrase):
+- Pagamento centralizado
+- Visibilidade total
+- Zero retrabalho
+
+SLIDE 8 — Art. 457 da CLT [in progress]
+Title: Art. 457 da CLT — Seu aliado, não seu adversário.
+Visual: Shield image
+Quote: "Você paga mais para o time e gasta menos para fazer isso."
+Bullet points:
+- 100% dentro da lei
+- Respaldo jurídico garantido
+- Zero risco trabalhista
+
+SLIDE 9 — Incentive [done]
+Title: Incentive — Reconhecimento que engaja de verdade
+Visual: 3 photos — gift cards, travel voucher, premium products
+Labels only: Cartões-presente | Experiências | Produtos premium
+
+SLIDE 10 — A rede já avaliou [needs tone adjustment]
+Title: A rede já avaliou. E escolheu.
+Note: Too aggressive — will be replaced in V4
+
+SLIDE 11 — Prova social [may be repositioned]
+Title: 150.000 usuários. 9 países. Uma referência.
+Visual: Latin America map + large numbers
+
+SLIDE 12 — Fechamento [done]
+Title: Menos risco. Menos encargos. Processo à prova de falhas.
+Visual: Handshake photo

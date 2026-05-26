@@ -1,0 +1,135 @@
+TERRAFORM CROSS-PROJECT REFERENCE - FILE PATHS
+
+=== KEY FILES ANALYZED ===
+
+1. TERRAMATE CONFIGURATION
+   /Users/plribeiro3000/Projects/4Shark/terraform/terramate.tm.hcl
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-beta-001/stack.tm.hcl
+   /Users/plribeiro3000/Projects/4Shark/terraform/dns/stack.tm.hcl
+
+2. SSM PARAMETERS (Networking Cross-Project Contract)
+   /Users/plribeiro3000/Projects/4Shark/terraform/networking/ssm.tf
+
+3. NETWORKING DATA MODULE (reads SSM)
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/networking_data/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/networking_data/outputs.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/networking_data/variables.tf
+
+4. PROJECTS USING NETWORKING_DATA
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-almaviva/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-redebrasil/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-maqnelson/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-commcenter/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-aster-maquinas/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/integrator-atento-br/main.tf
+
+5. ALB DNS REFERENCES
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-beta-001/main.tf (lines 40-70)
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-beta-001/locals.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-beta-001/output.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/setup/main.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/setup/output.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-demo-001/locals.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-atento-001/locals.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/app-shared-001/locals.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/auth-001/outputs.tf
+
+6. DNS PROJECT (Hardcoded ALB DNS)
+   /Users/plribeiro3000/Projects/4Shark/terraform/dns/public_dns_app4shark_com.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/dns/locals.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/dns/outputs.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/dns/stack.tm.hcl
+
+7. MODULES
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/integrator/outputs.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/public_alb/outputs.tf
+   /Users/plribeiro3000/Projects/4Shark/terraform/modules/internal_alb/outputs.tf
+
+=== KEY FINDINGS ===
+
+SEARCH 1: terraform_remote_state
+Result: 0 matches (NO remote state references anywhere)
+
+SEARCH 2: data "terraform_remote_state"
+Result: 0 matches (NO remote state data sources anywhere)
+
+SEARCH 3: alb_dns_name
+Result: 12 matches
+Locations:
+  - app-demo-001/locals.tf:9
+  - setup/output.tf:16-18
+  - setup/main.tf:34
+  - app-shared-001/locals.tf:9
+  - app-beta-001/locals.tf:9
+  - app-atento-001/locals.tf:9
+  - modules/public_alb/outputs.tf:1
+  - modules/internal_alb/outputs.tf:1
+  - auth-001/outputs.tf:5-6
+
+SEARCH 4: remote_state, state_key, tfstate
+Result: 0 matches (NO explicit remote state references)
+
+SEARCH 5: Terramate files (*.tm.hcl)
+Result: 18 files found
+  /Users/plribeiro3000/Projects/4Shark/terraform/terramate.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/app-atento-001/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/app-atento-br/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/app-beta-001/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/app-demo-001/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/app-shared-001/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/auth-001/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/dns/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-almaviva/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-aster-maquinas/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-atento-br/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-commcenter/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-maqnelson/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/integrator-redebrasil/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/setup/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/shared-resources/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/vpn/stack.tm.hcl
+  /Users/plribeiro3000/Projects/4Shark/terraform/networking/stack.tm.hcl
+
+SEARCH 6: Generated files
+Result: 0 matches (NO _generated, _terramate_generated files)
+
+SEARCH 7: aws_ssm_parameter resources
+Result: 87 parameters in networking/ssm.tf
+
+=== CROSS-PROJECT COMMUNICATION MECHANISMS ===
+
+1. SSM PARAMETERS (Primary)
+   - Networking infrastructure published via AWS Systems Manager Parameter Store
+   - Structured as: /networking/{environment}/{resource_type}
+   - Read by modules/networking_data module
+   - Used by all app and integrator projects
+
+2. LOCAL MODULES (Same-stack references)
+   - Projects reference modules in ../modules/ locally
+   - ALB DNS available via module.public_alb.alb_dns_name
+   - Only works within same Terraform state/stack
+
+3. HARDCODED DNS (Cross-project)
+   - DNS project contains hardcoded ALB DNS names
+   - Values extracted from deployed infrastructure
+   - Manual process required after ALB creation
+
+4. TERRAMATE DEPENDENCIES
+   - Stack execution ordering via "after" property
+   - Ensures networking runs before app environments
+   - Ensures apps run before dns
+   - NOT used for data sharing
+
+=== CRITICAL ISSUE ===
+
+app-beta-001/output.tf does NOT export alb_dns_name
+This forces dns project to use hardcoded values instead of dynamic references
+
+Current hardcoded values in dns/public_dns_app4shark_com.tf:
+- beta-001-pub-lb-32118907.us-east-1.elb.amazonaws.com → beta001.app4shark.com
+- atento-001-pub-lb-2131878159.us-east-1.elb.amazonaws.com → atento001.app4shark.com
+- demo-001-pub-lb-367378674.us-east-1.elb.amazonaws.com → demo001.app4shark.com
+- setup-pub-lb-1094379503.us-east-1.elb.amazonaws.com → setup.app4shark.com
+- shared-001-pub-lb-1711668524.us-east-1.elb.amazonaws.com → shared001.app4shark.com
+- auth-001-1499755417.sa-east-1.elb.amazonaws.com → auth-001.app4shark.com
+

@@ -1,0 +1,103 @@
+## Sample: GET /v1/notes response (from /tmp/granola_notes_20260520_v3.json)
+## Shows the list-level schema — no attendees at this level
+
+{
+  "notes": [
+    {
+      "id": "not_3rso8G3HHv8PeL",
+      "object": "note",
+      "title": "Punto de control - Integrador 4 Shark",
+      "owner": { "name": "Paulo Ribeiro", "email": "paulo@4shark.com.br" },
+      "created_at": "2026-05-20T14:59:31.309Z",
+      "updated_at": "2026-05-20T16:32:59.395Z"
+    },
+    ...9 more items...
+  ],
+  "hasMore": true,
+  "cursor": "eyJjcmVhdGVkX2F0IjoiMjAyNi0wNS0xOFQxMTo1OTozNS44MTBaIiwibGFzdF9kb2NfaWQiOiI2NDBkOTc5NC1jNzRjLTQyMzUtYmJmYi03OGMyZWU3ZmFkMTYifQ"
+}
+
+Observations:
+- page size is 10 (10 items returned)
+- pagination: cursor string in top-level "cursor" key (NOT "next_cursor")
+- hasMore: boolean (NOT a null cursor to signal end)
+- NO "attendees" field at list level
+- NO "calendar_event" at list level
+- "id" format: "not_<base62>"
+
+---
+
+## Sample: GET /v1/notes/{id}?include=transcript response (from /tmp/granola_note_detail_20260520.json)
+## Shows the full detail schema including attendees and transcript
+
+{
+  "id": "not_3rso8G3HHv8PeL",
+  "object": "note",
+  "title": "Punto de control - Integrador 4 Shark",
+  "web_url": "https://notes.granola.ai/d/cb7266e5-9b04-4453-b9fb-0f445360c239",
+  "owner": { "name": "Paulo Ribeiro", "email": "paulo@4shark.com.br" },
+  "created_at": "2026-05-20T14:59:31.309Z",
+  "updated_at": "2026-05-20T16:32:59.395Z",
+  "calendar_event": {
+    "event_title": "Punto de control - Integrador 4 Shark",
+    "invitees": [
+      {"email": "paulo@4shark.com.br"},
+      {"email": "sergio@4shark.com.br"},
+      ...8 more...
+    ],
+    "organiser": "mjmarina@atento.com",
+    "calendar_event_id": "...",
+    "scheduled_start_time": "2026-05-20T12:00:00-03:00",
+    "scheduled_end_time": "2026-05-20T12:30:00-03:00"
+  },
+  "attendees": [
+    {"name": "Paulo Ribeiro", "email": "paulo@4shark.com.br"},
+    {"email": "sergio@4shark.com.br", "name": "Sergio Ajimura"},
+    ... 8 more with name+email ...
+  ],
+  "folder_membership": [],
+  "transcript": [
+    {
+      "text": "Hola, buenos días.",
+      "start_time": "2026-05-20T15:00:17.941Z",
+      "end_time": "2026-05-20T15:00:20.041Z",
+      "speaker": {"source": "speaker"}
+    },
+    {
+      "text": "Todos.",
+      "start_time": "2026-05-20T15:00:19.993Z",
+      "end_time": "2026-05-20T15:00:24.203Z",
+      "speaker": {"source": "microphone"}
+    },
+    ... more segments ...
+  ],
+  "summary_text": "Estado del Integrador\nEjecutado dos veces ...",
+  "summary_markdown": "### Estado del Integrador\n\n- Ejecutado dos veces ayer...\n..."
+}
+
+Key observations:
+- "attendees" IS present at detail level — list of {name, email} objects. Email key is "email", same as old cache path.
+- "transcript" IS present when ?include=transcript is used.
+- Transcript segment keys: "text", "start_time", "end_time", "speaker": {"source": "speaker"|"microphone"}
+  OLD _join_segments expected key: "start_timestamp" (ISO string) — BROKEN for new API
+  NEW key: "start_time" (ISO string) — confirmed in live response
+- "summary_markdown" is present and non-empty — Granola's own structured summary
+- "summary_text" is also present — plain text version
+- "calendar_event.invitees" exists but only has "email" (no "name") — less rich than "attendees"
+- "calendar_event.scheduled_start_time" gives scheduled start with timezone offset (not UTC)
+- No "duration_seconds" field — duration must be computed from scheduled_start_time/scheduled_end_time if needed
+
+---
+
+## Field mapping: old cache → new API
+
+| Pipeline uses       | Old cache path                        | New API path (detail)             |
+|---------------------|---------------------------------------|-----------------------------------|
+| Meeting.id          | doc_id (dict key)                     | note["id"]                        |
+| Meeting.title       | doc["title"]                          | note["title"]                     |
+| Meeting.attendees   | doc["people"]["attendees"][]["email"] | note["attendees"][]["email"]      |
+| Meeting.created_at  | doc["created_at"]                     | note["created_at"]                |
+| Meeting.duration_seconds | not in old cache either          | computable from calendar_event    |
+| transcript segment  | segments[]["text"]                    | transcript[]["text"]              |
+| segment timestamp   | segments[]["start_timestamp"]         | transcript[]["start_time"]        |
+| Granola summary     | not available                         | note["summary_markdown"]          |

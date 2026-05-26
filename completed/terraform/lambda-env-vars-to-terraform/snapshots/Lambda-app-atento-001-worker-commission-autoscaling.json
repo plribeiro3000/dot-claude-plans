@@ -1,0 +1,9 @@
+{
+    "AUTO_SCALING_GROUP_NAME": "app-atento-001-worker-commission-asg",
+    "ECS_CLUSTER_NAME": "app-atento-001-cluster",
+    "PROCESS_NAME": "worker_commission",
+    "ECS_SERVICE_NAME": "app-atento-001-worker-commission-service",
+    "METRICS_ENDPOINT": "https://atento001.app4shark.com/hirefire/191080bf-1429-42d4-8a53-0f8df3e8354a/info",
+    "JOBS_PER_PROCESS": "500",
+    "REDIS_URL": "redis://default:Gj3UtJC0yA666DvVnkjgsDVv84Nqjs68@redis-19904.c263.us-east-1-2.ec2.redns.redis-cloud.com:19904"
+}

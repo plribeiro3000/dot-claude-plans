@@ -1,0 +1,297 @@
+Vou procurar essas categorias de bugs no codebase. Deixa eu fazer as buscas de forma sistemática.
+
+---
+
+Agora vou ler os arquivos para verificar os bugs nas categorias.
+
+---
+
+Agora preciso procurar pela mutation de ChangePassword e PasswordChange. Deixa eu buscar nos form builders:
+
+---
+
+Agora vou procurar por mutations de ChangePassword e PasswordChange com grep:
+
+---
+
+Ótimo! Encontrei os bugs na categoria 1. Agora vou procurar pelos componentes mencionados na categoria 4 (loading state):
+
+---
+
+Agora vou ler esses arquivos para procurar por loading state bugs. Deixa eu fazer isso em paralelo:
+
+---
+
+Agora deixa eu ler os outros componentes:
+
+---
+
+Deixa eu ler os últimos 2 componentes:
+
+---
+
+Perfeito! Agora tenho todas as informações. Deixa eu compilar o relatório com todos os bugs encontrados:
+
+## Relatório de Bugs - Verificação de Código Angular/GraphQL
+
+Encontrei múltiplos bugs nas categorias solicitadas. Vou detalhar cada um:
+
+---
+
+### CATEGORIA 1 - Mutation Arguments Should Be Required (!)
+
+#### Bug 1.1: ChangePassword Mutation com $currentPassword nullable
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/user/change-password/user-change-password.component.ts`
+**Linha:** 52
+**Código atual:**
+```typescript
+const changePasswordMutation = `mutation ChangePassword($currentPassword: String, $password: String, $passwordConfirmation: String) {
+```
+**Deveria ser:**
+```typescript
+const changePasswordMutation = `mutation ChangePassword($currentPassword: String!, $password: String!, $passwordConfirmation: String!) {
+```
+
+#### Bug 1.2: PasswordChange Mutation com $currentPassword nullable
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/password/password.component.ts`
+**Linha:** 47
+**Código atual:**
+```typescript
+const passwordMutation = `mutation PasswordChange($currentPassword: String, $password: String, $passwordConfirmation: String) {
+```
+**Deveria ser:**
+```typescript
+const passwordMutation = `mutation PasswordChange($currentPassword: String!, $password: String!, $passwordConfirmation: String!) {
+```
+
+#### Bug 1.3: CreateCampaignAttachmentSignedUrl com $campaignId nullable
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/campaign-attachment-signed-url.service.ts`
+**Linha:** 56
+**Código atual:**
+```typescript
+mutation CreateCampaignAttachmentSignedUrl($campaignId: ID, $contentType: String, $filename: String) {
+```
+**Deveria ser:**
+```typescript
+mutation CreateCampaignAttachmentSignedUrl($campaignId: ID!, $contentType: String!, $filename: String!) {
+```
+
+#### Bug 1.4: CreateCampaignAttachment com $campaignId nullable
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/campaign/campaign-attachment.service.ts`
+**Linha:** 42
+**Código atual:**
+```typescript
+mutation CreateCampaignAttachment($campaignId: ID) {
+```
+**Deveria ser:**
+```typescript
+mutation CreateCampaignAttachment($campaignId: ID!) {
+```
+
+---
+
+### CATEGORIA 3 - Boolean Parameters Not Converted From String
+
+#### Bug 3.1: plan.service.ts - Variables override and shared não convertem de string
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`
+**Linhas:** 61-62 e 73-74
+
+**Código atual:**
+```typescript
+if (params.override !== undefined && params.override !== null) {
+  variables.override = params.override;
+}
+...
+if (params.shared !== undefined && params.shared !== null) {
+  variables.shared = params.shared;
+}
+```
+
+**Problema:** Se `params.override` e `params.shared` forem strings (como `"true"` ou `"false"`), elas não são convertidas para boolean. Deveriam ser:
+
+```typescript
+if (params.override !== undefined && params.override !== null && params.override !== '') {
+  variables.override = params.override === 'true';
+}
+...
+if (params.shared !== undefined && params.shared !== null && params.shared !== '') {
+  variables.shared = params.shared === 'true';
+}
+```
+
+(Comparar com linha 52-54 onde `params.enabled` é corretamente convertido com `params.enabled === 'true'`)
+
+---
+
+### CATEGORIA 4 - Loading State Set Outside Subscribe
+
+#### Bug 4.1: trade.component.ts - loading set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/trade/trade.component.ts`
+**Linha:** 126
+**Código atual:**
+```typescript
+getCampaigns(value = '', id: string = this.filter.campaignId) {
+  this.loadingCampaigns = true;
+  // ... setup code
+  this.campaignService
+    .query(...)
+    .valueChanges.subscribe((response: any) => {
+      // ... handle response
+      this.loadingCampaigns = false;
+    });
+  this.loading = false;  // BUG: Set outside subscribe, executes immediately
+}
+```
+**Deveria ser:**
+```typescript
+this.loading = false;  // Move inside the subscribe success callback
+```
+
+#### Bug 4.2: commission-creation-batch-create.component.ts - loadingCalendars set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-creation-batch/create/commission-creation-batch-create.component.ts`
+**Linha:** 105
+**Código atual:**
+```typescript
+getCalendars(value = '') {
+  this.loadingCalendars = true;
+  this.calendarService
+    .list(null, new Filter({ search: value, enabled: 'true' }))
+    .valueChanges.subscribe((response: any) => {
+      // ... handle response
+    });
+  this.loadingCalendars = false;  // BUG: Set outside subscribe
+}
+```
+
+#### Bug 4.3: plan-create.component.ts - Multiple loading states set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts`
+**Linhas:** 289, 329, 400, 401
+
+Exemplos:
+```typescript
+getCalendars(value = '') {
+  this.loadingCalendars = true;
+  this.calendarService
+    .list(null, new Filter({ search: value, enabled: 'true' }))
+    .valueChanges.subscribe((response: any) => {
+      // ... handle response
+    });
+  this.loadingCalendars = false;  // BUG: Line 289
+}
+
+getGroups(value = '', id: string = this.filter.groupId) {
+  this.loadingGroups = true;
+  // ... code
+  this.groupService.query('group', query, variables).valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+  this.loadingGroups = false;  // BUG: Line 329
+}
+
+getUsers(value = '') {
+  this.loadingUsers = true;
+  this.userService.searchResponsible(value).valueChanges.subscribe((response: any) => {
+    // ... handle response
+  });
+  this.loadingUsers = false;  // BUG: Line 400-401
+}
+```
+
+#### Bug 4.4: plan-update.component.ts - Multiple loading states set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts`
+**Linhas:** 450, 500, 579
+
+Similar pattern to plan-create.component.ts
+
+#### Bug 4.5: commission-report-creation-batch-create.component.ts - loadingCalendars set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/commission-report-creation-batch/create/commission-report-creation-batch-create.component.ts`
+**Linha:** 107
+
+#### Bug 4.6: plan-slice-create.component.ts - Multiple loading states set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice/create/plan-slice-create.component.ts`
+**Linhas:** 165, 172, 198
+```typescript
+getVariables(value = '') {
+  this.loadingVariables = true;
+  // ... 
+  this.variableService.search(value, filter).valueChanges.subscribe((response: any) => {
+    // ...
+    this.loadingVariables = false;
+  });
+}
+
+clearVariable(arrayIndex: number) {
+  // ...
+  this.loadingVariables = false;  // BUG: Line 172 - unrelated to subscribe
+}
+
+getUsers(value = '') {
+  this.loadingUsers = true;
+  this.userService.search(value).valueChanges.subscribe((response: any) => {
+    // ...
+  });
+  this.loadingUsers = false;  // BUG: Line 198 - set outside subscribe
+}
+```
+
+#### Bug 4.7: plan-slice-commission-create.component.ts - loadingPlanSlices set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/plan-slice-commission/create/plan-slice-commission-create.component.ts`
+**Linha:** 166
+
+#### Bug 4.8: easy-user-create.component.ts - Multiple loading states set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/easy-user/create/easy-user-create.component.ts`
+**Linhas:** 202, 249, 308
+```typescript
+getCountries(value = '') {
+  this.loadingCountries = true;
+  this.countryService
+    .query(...)
+    .valueChanges.subscribe((response: any) => {
+      // ...
+    });
+  this.loadingCountries = false;  // BUG: Line 202
+}
+
+getStates(value = '') {
+  this.loadingStates = true;
+  this.stateService
+    .query(...)
+    .valueChanges.subscribe((response: any) => {
+      // ...
+    });
+  this.loadingStates = false;  // BUG: Line 249
+}
+
+getParents(value = '') {
+  this.loadingParents = true;
+  this.userService
+    .query(...)
+    .valueChanges.subscribe((response: any) => {
+      if (response.data.users.nodes.length > 0) {
+        // ...
+        this.loadingParents = false;  // This is INSIDE, but others skip it on empty
+      } else {
+        this.parents = [];
+        this.parentIdErrorMessage = this.translateService.instant('user.page.without_user');
+        this.loadingParents = false;  // Line 306 inside, Line 308 outside
+      }
+    });
+}
+```
+
+#### Bug 4.9: easy-payment-create.component.ts - loadingPlans set outside subscribe
+**Arquivo:** `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/easy-product/easy-payment/create/easy-payment-create.component.ts`
+**Linha:** 125
+
+---
+
+### RESUMO DOS BUGS ENCONTRADOS:
+
+**Categoria 1 (Mutation Arguments):** 4 ocorrências
+**Categoria 3 (Boolean Conversion):** 1 arquivo com múltiplas linhas
+**Categoria 4 (Loading State):** 9 componentes com múltiplas ocorrências
+
+**Total:** 14 arquivos afetados com problemas potenciais.
+
+---
+

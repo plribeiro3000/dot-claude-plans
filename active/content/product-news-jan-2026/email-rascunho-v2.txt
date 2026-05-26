@@ -1,0 +1,88 @@
+Olá,
+
+Feliz Ano Novo! Desejamos que 2026 seja um ano de muito sucesso e conquistas para você e toda sua equipe.
+
+Iniciamos 2026 com um marco importante para a 4Shark: o lançamento de dois novos produtos que ampliam significativamente as possibilidades da nossa plataforma.
+
+O 4Shark Incentive e o 4Shark Pay chegam para complementar a solução de remuneração variável que vocês já conhecem, oferecendo novas formas de premiar, reconhecer e pagar seus colaboradores — tudo dentro do mesmo ecossistema, com a mesma segurança e facilidade de uso.
+
+Além desses lançamentos, continuamos evoluindo a plataforma com melhorias que facilitam o dia a dia de vocês. Confira abaixo todas as novidades.
+
+
+1. 4Shark Incentive
+
+Temos o prazer de apresentar o 4Shark Incentive, nossa nova solução para programas de incentivo e reconhecimento.
+
+Com o 4Shark Incentive, os colaboradores da sua empresa podem resgatar gift cards de diversas marcas parceiras e utilizá-los quando e onde preferirem. É a forma ideal de premiar quem faz a diferença, oferecendo liberdade de escolha e uma experiência de reconhecimento verdadeiramente personalizada.
+
+O 4Shark Incentive foi desenvolvido para empresas de todos os portes que buscam uma solução completa e flexível para seus programas de incentivo — tudo integrado ao ecossistema 4Shark que vocês já conhecem.
+
+[INSERIR IMAGEM: 4Shark Incentive - catálogo de gift cards ou tela principal]
+
+
+2. 4Shark Pay
+
+Apresentamos também o 4Shark Pay, a maneira mais simples de transformar premiações em dinheiro.
+
+Com o 4Shark Pay, os colaboradores podem converter pontos ou bônus em pagamentos instantâneos, com transferência direta para suas contas bancárias — tudo dentro do mesmo ecossistema 4Shark.
+
+Além da conveniência para os colaboradores, o 4Shark Pay permite que sua empresa reduza custos de folha de pagamento ao aplicar integralmente o enquadramento previsto na legislação de premiação em vigor desde 2017.
+
+[INSERIR IMAGEM: 4Shark Pay - tela de conversão ou fluxo de pagamento]
+
+
+3. Segurança e Estabilidade
+
+Realizamos melhorias internas que aumentam a estabilidade e reduzem riscos de segurança, garantindo uma plataforma mais robusta e confiável para o dia a dia de vocês.
+
+
+4. Identificação Completa nas Auditorias
+
+Sabemos que a conciliação de dados entre sistemas é uma necessidade frequente, e que muitas vezes o CPF ou documento de identificação é a chave para essa integração.
+
+Atendendo a essa solicitação, incluímos colunas de identificação (tipo do documento e valor, como CPF, RUT etc.) nas auditorias da plataforma, incluindo relatórios de usuários, extratos, metas e consumo mensal. Agora, ao exportar esses arquivos, vocês terão acesso direto à identificação de cada pessoa, facilitando a conciliação com folha de pagamento e outros sistemas internos.
+
+E podem ficar tranquilos quanto à segurança desses dados: os arquivos de auditoria ficam disponíveis por até 15 dias e são apagados automaticamente após esse período. O acesso é restrito a usuários autenticados na plataforma.
+
+
+5. Nova Auditoria de Metas do Plano
+
+Acompanhar as metas configuradas em cada plano era um processo que exigia navegar por diversas telas da plataforma, dificultando a identificação rápida de possíveis inconsistências.
+
+Entendendo essa necessidade, desenvolvemos uma nova funcionalidade de auditoria específica para metas. Com ela, vocês podem visualizar todas as metas associadas a um plano em um único relatório, identificando rapidamente quais usuários possuem metas configuradas, quais ainda precisam de atenção, e se os valores estão de acordo com o esperado.
+
+Para acessar, abra o Plano desejado e clique em "Auditoria de Metas".
+
+[INSERIR IMAGEM: news_plan_goal_audit_button.png]
+
+Na listagem, clique em "+ Gerar Nova Auditoria" para criar um novo relatório.
+
+[INSERIR IMAGEM: news_plan_goal_audit_listing.png]
+
+
+6. Atualização de Metas
+
+Erros acontecem, e sabemos o quanto é frustrante perceber que uma meta foi cadastrada com o valor errado depois que o plano já foi vinculado.
+
+Antes, para corrigir esse tipo de situação, era necessário cancelar o plano, abrir um chamado para nossa equipe realizar a correção da meta, e só então criar um novo plano. Esse processo gerava dependência, retrabalho e podia impactar o andamento das operações.
+
+Agora isso mudou. Implementamos a possibilidade de atualizar o valor, valor base e sentido de uma meta, com efeito para os próximos planos gerados.
+
+O novo fluxo é simples: basta cancelar o plano atual, atualizar a meta com o valor correto, e gerar um novo plano. O novo plano já será criado com a meta atualizada. Tudo isso sem depender de chamados.
+
+Essa atualização pode ser feita de três formas:
+- Pela listagem de metas (no menu de ações da meta, selecione "Atualizar")
+- Via API, para integrações automatizadas
+- Por upload de arquivo, que antes funcionava apenas para cadastro e agora também permite atualização
+
+[INSERIR IMAGEM: news_goal_update_form.png]
+
+
+7. Outras Melhorias
+
+A busca geral da plataforma foi otimizada para funcionar melhor com caracteres especiais e acentuação, facilitando encontrar registros com nomes ou identificadores que contenham esses caracteres.
+
+
+Estamos muito felizes em trazer essas novidades para vocês, e esperamos que elas simplifiquem ainda mais o dia a dia de trabalho de toda a equipe.
+
+Agradecemos pela parceria e nos colocamos à disposição para eventuais dúvidas e sugestões através do nosso canal meajuda@4shark.com.br.

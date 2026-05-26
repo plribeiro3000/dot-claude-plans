@@ -1,0 +1,229 @@
+
+
+Entendi. Vou auditar o codebase buscando instâncias onde parâmetros booleanos são verificados com checagem simples de truthy (`if (params.something)`) ao invés de checagem explícita de null/undefined, o que causa a omissão silenciosa de valores `false`.
+
+---
+
+Agora preciso identificar quais desses campos podem ser booleanos. Vou buscar especificamente pelos nomes de campo booleanos mencionados e também verificar os patterns mais amplos.
+
+---
+
+Os nomes `enabled`, `override`, `shared`, `active` nao foram encontrados diretamente. Preciso buscar mais amplamente por campos que possam ser booleanos. Vou procurar por interfaces/types que definam booleanos e tambem por outros nomes comuns de campos booleanos.
+
+---
+
+Vou ler o arquivo completo de resultados para entender quais campos booleanos existem nos models/interfaces que são usados como parâmetros de consulta.
+
+---
+
+Encontrei campos booleanos importantes nos models. Agora preciso cruzar esses campos com os services que fazem a checagem com `if (params.xxx)`. Os campos booleanos relevantes que podem ser usados como filtros sao: `override`, `shared`, `active`. Vou verificar os models de filtro e os services que os utilizam.
+
+---
+
+Agora tenho a confirmacao. Os campos `override` e `shared` sao booleanos no `Filter` model. Preciso agora verificar todos os services que usam esses campos com checagem simples de truthy. Vou buscar especificamente por `override` e `shared` nos services, e tambem qualquer outro padrao relevante.
+
+---
+
+`plan.service.ts` ja usa a checagem correta com `!== undefined && !== null` para `override` e `shared`. Agora preciso verificar os incentive services que tambem possuem `override` e `shared` nos seus models.
+
+---
+
+Todos esses incentive services ja usam checagem correta para `enabled`. Agora preciso verificar todos os outros services para `this.form.value` com campos booleanos, e tambem verificar se ha outros services/componentes que fazem essa checagem. Vou expandir a busca para cobrir mais patterns.
+
+---
+
+Agora preciso verificar os componentes de create/update/clone dos incentives que possuem campos `override` e `shared` nos seus formularios. Vou tambem verificar o plan-create e plan-update para esses campos.
+
+---
+
+Encontrei instancias com problemas. Vou analisar cada uma em detalhe. Agora vou verificar os componentes de create/clone/update dos incentives para `override` e `shared`.
+
+---
+
+Os incentive components de create/clone nao usam `override` ou `shared` nas variaveis de mutacao. Agora vou examinar detalhadamente os dois casos encontrados no plan-create e verificar se o plan-create tem o bug.
+
+---
+
+Encontrei o bug. Agora vou verificar se existem outros arquivos que tambem possam ter o mesmo problema. Vou verificar o `payment-exportation-create` para `ignoreZeros` e procurar qualquer outro padrao com `accumulatedDeals`.
+
+---
+
+O `ignoreZeros` no `payment-exportation-create` e atribuido diretamente no objeto inicial (linha 76), o que esta correto - ele sempre envia o valor, seja `true` ou `false`. O `accumulatedDeals` nao e usado como parametro de filtro em formularios.
+
+Agora vou verificar se ha mais algum caso com `this.form.value` e campos booleanos sendo checados com truthy. Tambem quero ver se `plan-create` e `plan-update` sao os unicos com esse bug.
+
+---
+
+Agora vou fazer uma busca mais abrangente para qualquer `if` que verifique um valor que possa ser booleano com truthy check antes de atribuir a `variables`. Preciso verificar todos os nomes de parametros que sao de tipo booleano no `Filter` model (`override`, `shared`) e qualquer outro campo booleano nos form values.
+
+---
+
+Vou verificar se ha algum service que checa `params.override` ou `params.shared` com truthy simples (o plan.service.ts ja mostrou que usa o pattern correto). Vou tambem verificar os patterns nos componentes.
+
+---
+
+Nenhum service usa `if (params.enabled)` etc. com truthy simples - os que existem ja usam o pattern correto. Agora vou verificar se ha alguma outra variacao no codebase que eu possa ter perdido - como componentes de filtro ou outros patterns.
+
+---
+
+Agora vou verificar se existe algum outro lugar que use checagem simples para campos numericos que poderiam ser zero (outro caso semelhante ao bug de booleano).
+
+---
+
+Esse resultado e muito amplo. Vou focar a busca nos campos especificamente numericos que usam truthy check (que tambem e um bug parecido, pois `0` e falsy).
+
+---
+
+Os campos numericos com truthy check tambem sao um problema similar (o valor `0` seria descartado), mas o escopo desta auditoria e especificamente campos booleanos. Vou concluir a analise focando no escopo solicitado.
+
+Vou verificar se os `company` update/create components tem campos booleanos com truthy check, ja que o model `Company` tem muitos campos booleanos.
+
+---
+
+Encontrei mais instancias. Na `company-create.component.ts`, linhas 120-127, ha varios campos booleanos usando `|| false` que tem o mesmo bug. Quando o valor e `false`, a expressao `false || false` retorna `false`, o que neste caso esta correto por acaso - mas conceitualmente o pattern `value || false` para booleanos funciona corretamente porque `false || false === false` e `true || false === true`. Entao esse pattern nao e um bug para booleanos, pois ambos `true` e `false` sao corretamente tratados.
+
+Vou verificar o company-update tambem.
+
+---
+
+Aqui na `company-update.component.ts`, apenas `autoDataProcessing` e enviado com `|| false`. Os outros campos booleanos como `goalCalculationModule`, `managerLegalModule`, `operatorLegalModule`, `subsidiariesModule` e `verifiedEmails` nao estao sendo enviados na mutacao de update (a mutation de update nao aceita esses campos).
+
+Agora vou me concentrar no ponto principal: `plan-create.component.ts` linhas 179 e 183. Vou confirmar se o pattern e realmente bugado.
+
+Na linha 179: `variables.override = this.form.value.override ? this.form.value.override : false;`
+- Se `override` e `true` -> resultado: `true` (correto)
+- Se `override` e `false` -> resultado: `false` (correto, porque `false ? ... : false` = `false`)
+- Se `override` e `undefined`/`null` -> resultado: `false` (correto)
+
+Espera - na verdade, para este caso especifico, o pattern `value ? value : false` funciona corretamente para booleanos! Quando `value` e `false`, a expressao avalia como `false ? this.form.value.override : false` que retorna `false`. E quando e `true`, retorna `true`. Entao este pattern, apesar de nao ser idiomatico, nao tem o bug descrito.
+
+Vou reavaliar todos os patterns encontrados, verificando mais cuidadosamente o que constitui o bug real (um `if (value)` que descarta o parametro quando e `false`).
+
+O bug descrito na auditoria e:
+```typescript
+if (params.enabled) {
+  variables.enabled = params.enabled;
+}
+```
+Neste caso, quando `params.enabled === false`, o bloco if nao executa e `variables.enabled` nunca e setado.
+
+Diferente de:
+```typescript
+variables.override = this.form.value.override ? this.form.value.override : false;
+```
+Que sempre seta `variables.override`, mesmo quando e `false`.
+
+Vou confirmar se `plan-update.component.ts` tem algum issue.
+
+Na `plan-update.component.ts` linhas 305-306:
+```typescript
+variables.override = this.form.value.override;
+variables.shared = this.form.value.shared;
+```
+Isso esta correto - sempre atribui o valor diretamente.
+
+Agora vou retornar ao foco principal: procurar por `if (params.someBoolean)` que descarta o parametro. Ja confirmei que nos services, `override` e `shared` usam checagem explícita de null/undefined e `enabled` tambem.
+
+Vou procurar se ha algum service/component adicional que nao verifiquei, com campos que sao efetivamente booleanos na API mas estao tipados como string no Filter model.
+
+---
+
+Vou agora fazer uma busca exaustiva especifica para o pattern descrito no bug: `if (someValue) { variables.x = someValue; }` onde o campo e potencialmente booleano, considerando todos os patterns possiveis.
+
+---
+
+Todos os campos nos services que usam `if (params.xxx)` com truthy check sao campos do tipo `string` no Filter model (como `id`, `search`, `status`, `companyId`, `userId`, etc.). Os dois campos booleanos no Filter (`override` e `shared`) ja usam checagem explícita de null/undefined no `plan.service.ts`.
+
+O campo `enabled` no Filter esta tipado como `string` (nao `boolean`), e todos os incentive services fazem a conversao correta: `if (params.enabled !== undefined && params.enabled !== null && params.enabled !== '') { variables.enabled = params.enabled === 'true'; }`.
+
+Vou fazer uma ultima verificacao para confirmar se nao existem outros services que eu possa ter perdido.
+
+---
+
+Agora preciso verificar como `enabled: true` e passado nos componentes e services de listagem. Muitos componentes usam `enabled: true` como parametro fixo (para buscar apenas itens ativos). Vou verificar se ha algum componente que passe `enabled` como variavel de filtro booleana com truthy check.
+
+---
+
+Todos os services usam a checagem correta para `enabled`, `override`, e `shared`. O codebase foi corrigido previamente para esses campos nos services.
+
+Agora vou confirmar se o plan-create tem de fato um problema ou nao. Preciso reavaliar:
+
+```typescript
+// plan-create.component.ts line 179
+variables.override = this.form.value.override ? this.form.value.override : false;
+// plan-create.component.ts line 183
+variables.shared = this.form.value.shared ? this.form.value.shared : false;
+```
+
+Analise logica:
+- `this.form.value.override` = `true` -> `true ? true : false` = `true` (correto)
+- `this.form.value.override` = `false` -> `false ? false : false` = `false` (correto)
+- `this.form.value.override` = `undefined` -> `undefined ? undefined : false` = `false` (correto)
+- `this.form.value.override` = `null` -> `null ? null : false` = `false` (correto)
+
+Na pratica, embora o pattern `value ? value : false` seja equivalente a `value || false`, ele funciona corretamente para booleanos porque o fallback e o mesmo valor (`false`). A variavel SEMPRE e atribuida, diferente do pattern `if (value) { variables.x = value; }` que omite completamente o campo.
+
+Portanto, os cases em `plan-create.component.ts` NAO possuem o bug descrito na auditoria. O valor `false` e corretamente enviado para o servidor.
+
+Vou verificar se ha algum service restante que eu nao cobri.
+
+---
+
+Esse e um caso diferente - esta verificando se um array existe, nao um booleano. Nao e o bug descrito.
+
+Vou fazer uma ultima busca abrangente para ter certeza de nao perder nenhum caso.
+
+---
+
+Nenhuma instancia do bug descrito foi encontrada. Todas as checagens de campos booleanos (`enabled`, `override`, `shared`) ja usam checagem explicita de null/undefined nos services, ou usam patterns de atribuicao direta que funcionam corretamente para booleanos.
+
+---
+
+Resultado da auditoria: **Nenhuma instancia do bug descrito foi encontrada no codebase.**
+
+Aqui esta o resumo completo da analise:
+
+## Resultado da Auditoria - Boolean params com simple `if` check
+
+### Campos booleanos investigados
+
+Os seguintes campos booleanos foram identificados no codebase como potencialmente vulneraveis ao bug descrito:
+
+1. **`enabled`** - Tipado como `string` no `FilterAttributes` (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/filter.model.ts`, linha 18). Usado como parametro de query booleano (`$enabled: Boolean`) em 30+ services/components.
+
+2. **`override`** - Tipado como `boolean` no `FilterAttributes` (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/filter.model.ts`, linha 30). Usado no `plan.service.ts` e nos components de create/update de plans.
+
+3. **`shared`** - Tipado como `boolean` no `FilterAttributes` (`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/shared/filter.model.ts`, linha 43). Usado no `plan.service.ts` e nos components de create/update de plans.
+
+### Resultados por campo
+
+#### `enabled` - SEM BUG
+Todos os 28 services que usam `enabled` como filtro ja utilizam o pattern correto:
+```typescript
+if (params.enabled !== undefined && params.enabled !== null && params.enabled !== '') {
+  variables.enabled = params.enabled === 'true';
+}
+```
+Services verificados: `deal.service.ts`, `commission.service.ts`, `deal-incentive.service.ts`, `calendar.service.ts`, `variable.service.ts`, `group.service.ts`, `plan.service.ts`, `user.service.ts`, `collaborative-deal.service.ts`, `status.service.ts`, `product.service.ts`, `rankifier-incentives.service.ts`, `payment-type.service.ts`, `redemption-incentives.service.ts`, `incentive.service.ts`, `indicator-incentives.service.ts`, `campaign.service.ts`, `rankifier.service.ts`, `limiter-incentives.service.ts`, `metric.service.ts`, `acceptment-reason.service.ts`, `client.service.ts`, `subsidiary.service.ts`, `company.service.ts`.
+
+#### `override` - SEM BUG
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`**, linhas 61-62: Usa checagem correta `if (params.override !== undefined && params.override !== null)`.
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts`**, linha 179: Usa `variables.override = this.form.value.override ? this.form.value.override : false;` - Apesar de nao-idiomatico, funciona corretamente para booleanos porque a variavel e sempre atribuida (nunca omitida).
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts`**, linha 305: Usa atribuicao direta `variables.override = this.form.value.override;` - correto.
+
+#### `shared` - SEM BUG
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/plan.service.ts`**, linhas 73-74: Usa checagem correta `if (params.shared !== undefined && params.shared !== null)`.
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/create/plan-create.component.ts`**, linha 183: Usa `variables.shared = this.form.value.shared ? this.form.value.shared : false;` - Mesmo caso do `override`, funciona corretamente.
+- **`/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/plan/update/plan-update.component.ts`**, linha 306: Usa atribuicao direta `variables.shared = this.form.value.shared;` - correto.
+
+#### `active` - NAO UTILIZADO
+Nao ha nenhum campo `active` sendo utilizado como parametro de filtro em services ou components.
+
+### Conclusao
+
+**Zero instancias do bug descrito foram encontradas.** Todos os campos booleanos que sao condicionalmente adicionados a objetos `variables` ja utilizam checagem explicita de null/undefined (`!== undefined && !== null`), ou patterns de atribuicao direta que nao omitem valores `false`.
+
+O codebase aparenta ter sido corrigido previamente para este padrao de bug, de forma consistente em todos os services.
+
+---
+

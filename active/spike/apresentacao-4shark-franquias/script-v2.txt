@@ -1,0 +1,52 @@
+Presentation Script — V2 (Versão Resumida)
+
+Derived from V1. Headlines-only version — no descriptive text, no cards, no bullet points.
+Language: Portuguese (pt-BR)
+Tool: Gamma.app
+Status: Archived — superseded by V3
+
+
+Design principle
+Each slide has only a bold headline + full photo. No supporting text whatsoever.
+The presenter delivers all context verbally.
+
+
+SLIDE 1 — Abertura
+Title: Sua equipe vende. Quem cuida do resto?
+Visual: Team celebrating with glasses, corporate setting (left half)
+
+SLIDE 2 — Caos
+Title: Todo mês, o mesmo caos
+Visual: Man with head in hands at desk covered in papers (left half)
+
+SLIDE 3 — Risco
+Title: O problema não é só trabalhoso. É arriscado.
+Visual: Warning signs and documents on a desk (right half)
+
+SLIDE 4 — Introdução 4Shark
+Title: 4Shark — Do cálculo ao pagamento, em um único lugar.
+Visual: Laptop with 4Shark dashboard (right half)
+
+SLIDE 5 — Ecossistema
+Title: Três produtos. Um ecossistema.
+Visual: Three text cards only — Nucleus / Pay / Incentive (no images, no icons)
+
+SLIDE 6 — Nucleus
+Title: Nucleus — As regras da sua operação, no controle.
+Visual: Dashboard on monitor (left half)
+
+SLIDE 7 — Pay
+Title: Pay — O dinheiro chega. Sem intermediário. Sem atraso.
+Visual: Phone with app (right half)
+
+SLIDE 8 — Art. 457
+Title: Art. 457 da CLT — Seu aliado, não seu adversário.
+Visual: Shield image (right half)
+
+SLIDE 9 — Incentive
+Title: Incentive — Reconhecimento que engaja de verdade
+Visual: 3 photos — gift cards, travel voucher, premium products (labels only: Cartões-presente | Experiências | Produtos premium)
+
+SLIDE 10 — Fechamento
+Title: Menos risco. Menos encargos. Processo à prova de falhas.
+Visual: Handshake photo (left half)

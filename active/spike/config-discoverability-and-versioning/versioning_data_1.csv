@@ -1,0 +1,6 @@
+repo,url,branch_model,tags,changelog,releases,versioning_scheme,notes
+mathiasbynens/dotfiles,https://github.com/mathiasbynens/dotfiles,single main branch,none,none,none,none,"Continuous update model; re-run bootstrap.sh to update"
+holman/dotfiles,https://github.com/holman/dotfiles,single master branch,no version tags,none,none,none,"Designed to be forked; no formal release cycle"
+nicknisi/dotfiles,https://github.com/nicknisi/dotfiles,single main branch,no version tags,none,none,none,"Living dotfiles; organic iteration"
+ulhpc-dotfiles,https://ulhpc-dotfiles.readthedocs.io,git-flow (master+develop),yes,yes,yes,semver MAJOR.MINOR.PATCH[-bN],"Build number = total commit count on master; makefile-automated release"
+4Shark/dot-claude,internal,GitFlow+HubFlow (master+develop+feature/*),one tag: 0.1.0,CHANGELOG.md (Unreleased heavy),yes (HubFlow),semver 0.x,"Single tag 0.1.0; all subsequent work in Unreleased; check-claude-version.sh surfaces behind-count"

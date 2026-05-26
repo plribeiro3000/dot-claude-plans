@@ -1,0 +1,171 @@
+Vou realizar uma busca abrangente por verificações numéricas que falharam quando o valor é 0. Vou procurar em todos os arquivos TypeScript sob src/app/.
+
+---
+
+Agora vou procurar por padrões de verificação de campos numéricos. Vou fazer buscas com múltiplos padrões em paralelo:
+
+---
+
+Excelente! Encontrei vários padrões. Agora vou analisar os arquivos específicos para entender o contexto e confirmar quais são de fato campos numéricos. Vou ler os arquivos com mais detalhes:
+
+---
+
+Perfeito! Agora vou procurar por mais ocorrências. Vou também fazer busca para encontrar todos os padrões com context broader:
+
+---
+
+Agora vou procurar por outros padrões potenciais e coletar informações sobre as ocorrências encontradas. Vou buscar com números de linha exatos:
+
+---
+
+Perfeito! Agora vou procurar por outros campos numéricos potenciais que podem ter sido mencionados:
+
+---
+
+Agora vou fazer uma busca mais ampla para encontrar padrões similares com outros campos numéricos. Vou procurar por padrões de campos em variáveis que possam ser numéricos:
+
+---
+
+Excelente! Agora vou procurar pela GraphQL schema para confirmar os tipos dos campos. Vou procurar pelos tipos GraphQL:
+
+---
+
+Agora vou verificar os arquivos do modelo para confirmar os tipos dos campos:
+
+---
+
+Perfeito! Agora vou consolidar meus achados. Vou fazer uma varredura final para garantir que não perdi nenhuma ocorrência:
+
+---
+
+Perfeito! Agora vou criar um relatório consolidado com contexto de cada arquivo. Vou ler os trechos específicos para adicionar contexto:
+
+---
+
+Agora vou ler os trechos dos arquivos collaborative-deal e metric:
+
+---
+
+Excelente! Agora tenho todas as informações. Vou fazer uma varredura final para garantir que não há mais campos numéricos sem verificação explícita que eu possa ter perdido:
+
+---
+
+Vou procurar por alguns outros campos numéricos em padrões alternativos:
+
+---
+
+Perfeito! Agora tenho todas as informações necessárias. Deixa-me compilar um relatório consolidado com todos os achados.
+
+## Relatório Consolidado: Verificações de Campos Numéricos com Falha para Valor 0
+
+Encontrei **10 ocorrências** de verificações de campos numéricos que falham quando o valor é 0 (zero) no código da aplicação. Estes são bugs potenciais porque `if (value)` retorna `false` quando `value === 0`, mesmo que 0 seja um valor válido para campos numéricos.
+
+### Resumo dos Achados
+
+| Campo | Tipo | Ocorrências |
+|-------|------|-------------|
+| `installment` | Int | 4 |
+| `soldPrice` | Float | 2 |
+| `workHours` | Float | 4 |
+| `unitaryValue` | Float | 2 |
+| **Total** | | **12** |
+
+---
+
+### Detalhamento por Campo
+
+#### 1. **installment** (Int) - 4 ocorrências
+
+| Arquivo | Linha | Verificação |
+|---------|-------|-------------|
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 208 | `if (this.form.value.installment) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 99 | `if (this.form.value.installment) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/create/collaborative-deal-create.component.ts` | 93 | `if (this.form.value.installment) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/metric/create/metric-create.component.ts` | 79 | `if (this.form.value.installment) {` |
+
+**Tipo no modelo:** `installment?: number` (DealAttributes, CollaborativeDealAttributes)
+
+---
+
+#### 2. **soldPrice** (Float) - 2 ocorrências
+
+| Arquivo | Linha | Verificação |
+|---------|-------|-------------|
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 220 | `if (this.form.value.soldPrice) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 115 | `if (this.form.value.soldPrice) {` |
+
+**Tipo no modelo:** `soldPrice?: number` (DealAttributes)
+
+---
+
+#### 3. **workHours** (Float) - 4 ocorrências
+
+| Arquivo | Linha | Verificação |
+|---------|-------|-------------|
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts` | 236 | `if (this.form.value.workHours) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts` | 131 | `if (this.form.value.workHours) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/update/collaborative-deal-update.component.ts` | 217 | `if (this.form.value.workHours) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/create/collaborative-deal-create.component.ts` | 121 | `if (this.form.value.workHours) {` |
+
+**Tipo no modelo:** `workHours?: number` (DealAttributes, CollaborativeDealAttributes)
+
+---
+
+#### 4. **unitaryValue** (Float) - 2 ocorrências
+
+| Arquivo | Linha | Verificação |
+|---------|-------|-------------|
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/update/collaborative-deal-update.component.ts` | 213 | `if (this.form.value.unitaryValue) {` |
+| `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/create/collaborative-deal-create.component.ts` | 109 | `if (this.form.value.unitaryValue) {` |
+
+**Tipo no modelo:** `unitaryValue?: number` (CollaborativeDealAttributes)
+
+---
+
+### Campo Corrigido Já Identificado
+
+O campo `quantity` em alguns arquivos JÁ FOI CORRIGIDO com verificação explícita:
+
+```typescript
+if (this.form.value.quantity !== undefined && this.form.value.quantity !== null) {
+  variables.quantity = this.form.value.quantity;
+}
+```
+
+Exemplos:
+- `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/update/deal-update.component.ts:216`
+- `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/deal/create/deal-create.component.ts:111`
+- `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/update/collaborative-deal-update.component.ts:205`
+- `/Users/plribeiro3000/Projects/4Shark/app-webclient/src/app/collaborative-deal/create/collaborative-deal-create.component.ts:105`
+
+---
+
+### Padrão de Correção Recomendado
+
+Para cada ocorrência, alterar de:
+```typescript
+if (this.form.value.fieldName) {
+  variables.fieldName = this.form.value.fieldName;
+}
+```
+
+Para:
+```typescript
+if (this.form.value.fieldName !== undefined && this.form.value.fieldName !== null) {
+  variables.fieldName = this.form.value.fieldName;
+}
+```
+
+---
+
+### Impacto
+
+Quando um usuário tenta salvar um deal, collaborative deal ou métrica com qualquer desses campos numéricos definido como `0`, o valor não será incluído na mutação GraphQL, causando:
+- Perda silenciosa de dados
+- Comportamento inesperado onde 0 não é salvo
+- Inconsistência de dados entre o formulário e a API
+
+Todos os 12 problemas identificados precisam de correção.
+
+---
+

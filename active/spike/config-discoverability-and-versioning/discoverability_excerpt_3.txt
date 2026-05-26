@@ -1,0 +1,59 @@
+SOURCE: Official Claude Code skills documentation — https://code.claude.com/docs/en/skills
+PURPOSE: Shows the two-stage skill loading and description-field auto-trigger mechanism
+
+KEY QUOTES (verbatim from fetched page):
+
+1. Description field and auto-invocation:
+"description: What the skill does and when to use it. Claude uses this to decide
+when to apply the skill. If omitted, uses the first paragraph of markdown content.
+Put the key use case first: the combined `description` and `when_to_use` text is
+truncated at 1,536 characters in the skill listing to reduce context usage."
+
+2. when_to_use field:
+"when_to_use: Additional context for when Claude should invoke the skill, such as
+trigger phrases or example requests. Appended to `description` in the skill listing
+and counts toward the 1,536-character cap."
+
+3. Context loading model (always in context vs. loaded on invoke):
+"In a regular session, skill descriptions are loaded into context so Claude knows
+what's available, but full skill content only loads when invoked."
+
+4. Budget overflow behavior:
+"When it overflows, descriptions for the skills you invoke least are dropped first,
+so the skills you actually use keep their full text."
+
+5. Auto-invocation control:
+"disable-model-invocation: true — Set to true to prevent Claude from automatically
+loading this skill. Use for workflows you want to trigger manually with /name."
+"user-invocable: false — Set to false to hide from the / menu. Use for background
+knowledge users shouldn't invoke directly."
+
+6. Skill not triggering troubleshooting:
+"If Claude doesn't use your skill when expected:
+1. Check the description includes keywords users would naturally say
+2. Verify the skill appears in 'What skills are available?'
+3. Try rephrasing your request to match the description more closely
+4. Invoke it directly with /skill-name if the skill is user-invocable"
+
+OBSERVATION: The description field is Claude's primary signal for deciding when to
+auto-invoke. This is the mechanism by which "I know HTML is better here, just do HTML"
+(Sub-mechanism A) is already partially implemented — if Output Policy rules are in a
+skill's description + when_to_use, Claude will self-invoke. The gap in 4Shark: the
+Output Policy lives in CLAUDE.md and hooks (inject-output-policy-reminder.sh) but NOT
+in a skill with when_to_use trigger phrases. Hooks can fire but the agent may barrel
+ahead per scottspence.com finding below.
+
+---
+SOURCE: https://scottspence.com/posts/claude-code-skills-dont-auto-activate
+PURPOSE: Documents real-world skill auto-activation failure
+
+KEY QUOTES (verbatim from fetched page):
+"Spoiler: they don't."
+"Claude is so goal focused that it barrels ahead with what it thinks is the best approach."
+"INSTRUCTION: Use Skill(research) to handle this request with source verification."
+
+OBSERVATION: Even with correct description fields, skills may not auto-trigger because
+Claude prioritizes its own goal-completion path over checking available tools. The
+workaround (a hook that injects "INSTRUCTION: Use Skill(X)") is the same pattern
+already used by inject-code-pattern-rule.sh and inject-subagent-contract.sh.
+The 4Shark hook infrastructure is already the reliable activation path.

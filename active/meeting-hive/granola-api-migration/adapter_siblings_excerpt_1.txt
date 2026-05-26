@@ -1,0 +1,139 @@
+## Source: meeting_hive/sources/fathom.py (the Mother Rule sibling — full REST API adapter)
+## Relevant lines: 1–83 (constructor + _request + list_meetings)
+
+```
+class FathomSource:
+    """Read meetings from Fathom's REST API.
+
+    Config keys (all optional):
+        base_url:    Override the API endpoint. Default: https://api.fathom.ai/external/v1.
+        api_key_env: Env var holding the API key. Default: FATHOM_API_KEY.
+        api_key:     Inline key (takes precedence over env). Avoid in production.
+        retries:     Retry attempts on 429/5xx. Default: 3.
+    """
+
+    def __init__(self, config: dict[str, Any] | None = None):
+        cfg = config or {}
+        self._base_url = cfg.get("base_url", DEFAULT_BASE_URL).rstrip("/")
+        self._api_key_env = cfg.get("api_key_env", "FATHOM_API_KEY")
+        self._explicit_key = cfg.get("api_key")
+        self._retries = int(cfg.get("retries", 3))
+
+    def _headers(self) -> dict[str, str]:
+        key = self._explicit_key or os.environ.get(self._api_key_env)
+        if not key:
+            raise SourceAuthError(f"{self._api_key_env} not set — check secrets.env")
+        return {
+            "X-Api-Key": key,
+            "Accept": "application/json",
+        }
+
+    def _request(self, path: str, params: dict | None = None) -> dict:
+        url = f"{self._base_url}{path}"
+        last_error: Exception | None = None
+        for attempt in range(self._retries):
+            try:
+                resp = requests.get(url, headers=self._headers(), params=params, timeout=30)
+                if resp.status_code == 401:
+                    raise SourceAuthError("Fathom rejected the API key (401)")
+                if resp.status_code == 429:
+                    wait = 2**attempt
+                    log.warning("Fathom 429 — sleeping %ds", wait)
+                    time.sleep(wait)
+                    continue
+                resp.raise_for_status()
+                return resp.json()
+            except requests.ConnectionError as e:
+                raise SourceUnavailable(f"Cannot reach Fathom at {self._base_url}") from e
+            except requests.HTTPError as e:
+                last_error = e
+                if attempt == self._retries - 1:
+                    raise SourceError(f"Fathom HTTP error: {e}") from e
+                time.sleep(2**attempt)
+        raise SourceError(f"Fathom request failed after {self._retries} attempts: {last_error}")
+
+    def list_meetings(self, since_days: int) -> list[Meeting]:
+        cutoff = datetime.now(UTC) - timedelta(days=since_days)
+        params = {"created_after": cutoff.isoformat()}
+        meetings: list[Meeting] = []
+        cursor: str | None = None
+
+        while True:
+            if cursor:
+                params["cursor"] = cursor
+            data = self._request("/meetings", params=params)
+
+            for item in data.get("items") or data.get("meetings") or data.get("data") or []:
+                meetings.append(self._to_meeting(item))
+
+            cursor = data.get("next_cursor") or data.get("cursor") or None
+            if not cursor:
+                break
+
+        meetings.sort(key=lambda m: m.created_at)
+        log.info("Fathom: %d meetings in last %d days", len(meetings), since_days)
+        return meetings
+```
+
+---
+
+## Source: meeting_hive/sources/__init__.py (adapter protocol)
+## Lines: 19–77
+
+```
+@dataclass
+class Meeting:
+    id: str
+    title: str
+    attendees: list[str]
+    created_at: datetime
+    duration_seconds: int | None = None
+
+@runtime_checkable
+class MeetingSource(Protocol):
+    def list_meetings(self, since_days: int) -> list[Meeting]: ...
+    def get_transcript(self, meeting_id: str) -> str | None: ...
+
+class SourceError(RuntimeError): ...
+class SourceAuthError(SourceError): ...
+class SourceUnavailable(SourceError): ...
+class SourceNotFoundError(RuntimeError): ...
+```
+
+---
+
+## Source: meeting_hive/sources/markdown.py (third sibling — local filesystem adapter)
+## Key constructor lines: 63–73
+
+```
+def __init__(self, config: dict[str, Any] | None = None):
+    cfg = config or {}
+    path = cfg.get("path")
+    if not path:
+        raise ValueError("MarkdownSource requires `path` in config")
+    self._root = Path(path).expanduser()
+    self._pattern = cfg.get("pattern", "**/*.md")
+    self._id_field = cfg.get("id_field", "id")
+    self._attendees_field = cfg.get("attendees_field")
+    self._ignore_summary = cfg.get("ignore_summary", True)
+    self._index: dict[str, Path] = {}  # populated on list_meetings
+```
+
+---
+
+## Pattern observation
+
+All three siblings follow the same shape:
+- __init__ accepts `config: dict[str, Any] | None = None`, extracts all keys via `cfg.get(...)`.
+- No positional args for config settings.
+- Private HTTP method (_request / _api_post) is NOT exposed in the Protocol — it is an internal implementation detail.
+- Logging at INFO with "Source: N meetings in last D days" after list_meetings completes.
+- get_transcript returns `str | None` — None is a valid "not ready yet" signal (not an exception).
+- Error types used: SourceAuthError (auth failures), SourceUnavailable (config/network issues), SourceError (generic HTTP failures).
+
+Anti-patterns check:
+- NO Iceberg Class — the Protocol surface is small (list_meetings, get_transcript) and the private methods are just _request/_headers, not a large hidden surface.
+- NO Parameter-Passing Pipeline — config dict is unpacked in __init__ and stored; it is not threaded through every method.
+- NO Extracted Wrapper Methods — _request in FathomSource is a meaningful retry loop, not a thin wrapper.
+- NO Phase Extraction — no save_/finalize_ split.
+- NO Per-Branch Delegation — no case/switch.

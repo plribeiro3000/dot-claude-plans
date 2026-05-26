@@ -1,0 +1,165 @@
+S3 Storage Cleanup - Scripts Reference
+=======================================
+
+All SQL scripts and shell commands used during the S3 storage cleanup analysis.
+All scripts are stored in ~/atento_s3_cleanup/.
+
+Database Connection
+-------------------
+
+Atento Database:
+postgresql://[credentials]@atento-001-app-cluster-cluster.cluster-cvw5l7p4adp1.us-east-1.rds.amazonaws.com:5432/dk2016j8l9blr
+
+
+DOCUMENT ANALYSIS SCRIPTS
+==========================
+
+atento_document_orphans.sql
+  Purpose: Find documents that exist in S3 but not in the database (orphans).
+  Query:
+    SELECT s.id AS orphan_id
+    FROM s3_document_ids s
+    LEFT JOIN attachments a ON a.attachable_id = s.id AND a.type = 'DocumentAttachment'
+    WHERE a.id IS NULL;
+  Result: 83 orphan documents
+
+atento_document_missing.sql
+  Purpose: Find documents that exist in the database but not in S3 (missing files).
+  Query:
+    SELECT a.attachable_id AS missing_id
+    FROM attachments a
+    LEFT JOIN s3_document_ids s ON s.id = a.attachable_id
+    WHERE a.type = 'DocumentAttachment' AND s.id IS NULL;
+  Result: 7 missing documents (explained - PasswordDocument by design)
+
+atento_document_missing_state.sql
+  Purpose: Check the state of missing documents to understand why files are missing.
+  Query:
+    SELECT d.id, d.type, d.state, d.filename
+    FROM documents d
+    WHERE d.id IN (SELECT a.attachable_id FROM attachments a
+                   LEFT JOIN s3_document_ids s ON s.id = a.attachable_id
+                   WHERE a.type = 'DocumentAttachment' AND s.id IS NULL);
+  Finding: 6 are PasswordDocument with state=3 (final) - files removed by design after processing.
+
+atento_document_150_check.sql
+  Purpose: Verify specific document ID 150.
+  Query:
+    SELECT * FROM documents WHERE id = 150;
+  Finding: Document doesn't exist in database - query error in original analysis.
+
+atento_document_analysis.sql
+  Purpose: Comprehensive document analysis combining multiple checks.
+
+shared_document_orphans.sql
+  Purpose: Check if orphan documents exist in the shared database (belong to other companies).
+  Query:
+    SELECT a.attachable_id AS doc_id, d.type AS doc_type, d.filename,
+           c.id AS company_id, c.name AS company_name
+    FROM attachments a
+    JOIN documents d ON d.id = a.attachable_id
+    JOIN companies c ON c.id = d.company_id
+    WHERE a.type = 'DocumentAttachment'
+    AND a.attachable_id IN (85078,80281,84998,...) -- 83 IDs
+    ORDER BY c.name;
+  Finding: Only 3 documents found (Brisanet and Rede Brasil). 80 don't exist anywhere.
+
+shared_document_missing.sql
+  Purpose: Verify missing documents in shared database.
+
+
+SIGNATURE ANALYSIS SCRIPTS
+===========================
+
+atento_signature_orphans.sql / atento_signature_orphans_query.sql
+  Purpose: Find signatures that exist in S3 but not in the database.
+  Query:
+    SELECT s.id AS orphan_id
+    FROM s3_signature_ids s
+    LEFT JOIN signatures sig ON sig.id = s.id
+    WHERE sig.id IS NULL;
+  Result: 0 orphans
+
+atento_signature_missing.sql
+  Purpose: Find signatures that exist in the database but not in S3.
+  Query:
+    SELECT sig.id AS missing_id
+    FROM signatures sig
+    LEFT JOIN s3_signature_ids s ON s.id = sig.id
+    WHERE s.id IS NULL;
+  Result: 9 missing (false positives - created after CSV extraction)
+
+atento_signature_missing_state.sql
+  Purpose: Check state of missing signatures.
+  Finding: All 9 were created on 2026-01-01, after the S3 CSV was extracted.
+
+shared_signature_missing.sql
+  Purpose: Verify missing signatures in shared database.
+
+
+AUDIT ANALYSIS SCRIPTS
+=======================
+
+atento_audit_orphans.sql
+  Purpose: Find audit records pointing to files from other companies.
+  Result: 39 orphans found
+
+atento_audit_missing.sql
+  Purpose: Find audit records with missing files.
+
+atento_audit_check.sql
+  Purpose: Detailed audit verification.
+
+atento_audit_companies.sql / atento_audit_missing_companies.sql
+  Purpose: Identify which companies the orphan audit records belong to.
+  Finding: All 39 belonged to companies other than Atento.
+
+shared_audit_companies.sql
+  Purpose: Cross-reference audit records with shared database.
+
+
+GENERAL SCRIPTS
+================
+
+atento_attachment_count.sql
+  Purpose: Count total attachments.
+  Query:
+    SELECT COUNT(*) FROM attachments;
+
+shared_atento_attachment_count.sql
+  Purpose: Count attachments in shared database.
+
+atento_orphan_analysis.sql
+  Purpose: Comprehensive orphan analysis across all attachment types.
+
+
+SHELL SCRIPTS
+==============
+
+check_signature_files.sh
+  Purpose: Verify if specific signature files exist in S3.
+  Script:
+    #!/bin/bash
+    for id in 1111247 1111248 1111249 1111250 1111251 1111252 1111253 1111254 1111255; do
+      aws s3 ls s3://4shark-atento-001/signatures/$id/ 2>/dev/null && echo "$id exists" || echo "$id missing"
+    done
+  Finding: All 9 signatures exist in S3 - CSV was outdated.
+
+
+DATA FILES
+===========
+
+atento_s3_files.csv           - Complete S3 listing (3.6 MB)
+atento_s3_document_ids.csv    - Document IDs from S3 paths (121 KB)
+atento_s3_signature_ids.csv   - Signature IDs from S3 paths (120 KB)
+
+
+USAGE NOTES
+============
+
+1. Temporary tables required: Scripts assume s3_document_ids and s3_signature_ids tables exist
+2. Run on correct database: Most scripts run on Atento database, shared_* scripts run on shared
+3. Order matters: Run analysis scripts before cleanup scripts
+4. Preserve evidence: Keep CSV files for audit trail
+
+Last Update: 2026-01-04
