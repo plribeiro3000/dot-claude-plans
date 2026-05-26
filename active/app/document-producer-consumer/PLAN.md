@@ -2,72 +2,72 @@
 
 ## Overview
 
-Refactoring dos Document workers para usar padrão Producer/Consumer/Finalizer com processamento paralelo e idempotência.
+Refactor the Document workers to use the Producer/Consumer/Finalizer pattern with parallel processing and idempotency.
 
 ## PRs
 
 ### PR #4754 - DealDocument
 - **Branch:** `feature/deal-document-producer-consumer`
-- **Status:** ✅ PRONTO PARA MERGE
+- **Status:** ✅ READY TO MERGE
 - **URL:** https://github.com/4shark/app/pull/4754
 
-**Mudanças:**
-- Substituiu `Processor` por `Producer/Consumer/Finalizer`
-- Criou `DealDocument::Row` model para armazenamento temporário
-- Migrations: `create_deal_document_rows` + índice único `(document_id, document_line)`
-- Moveu `CLEANUP_BATCH_SIZE` de `Audit` para `ApplicationRecord`
-- Batch deletion no Finalizer (evita timeout)
+**Changes:**
+- Replaced `Processor` with `Producer/Consumer/Finalizer`
+- Created `DealDocument::Row` model for temporary storage
+- Migrations: `create_deal_document_rows` + unique index `(document_id, document_line)`
+- Moved `CLEANUP_BATCH_SIZE` from `Audit` to `ApplicationRecord`
+- Batch deletion in the Finalizer (avoids timeout)
 
-**Correções aplicadas:**
+**Fixes applied:**
 - `Document.find` → `DealDocument.find`
-- `invalid_file` → `invalid_encoding` (manter mensagem original)
-- Tratamento de CSV vazio (marca como `error!` e retorna)
-- `TypeError` adicionado no `parsed_date`
+- `invalid_file` → `invalid_encoding` (keep the original message)
+- Handling of empty CSV (mark as `error!` and return)
+- `TypeError` added to `parsed_date`
 
 ---
 
 ### PR #4755 - GroupDocument
 - **Branch:** `feature/group-document-idempotent`
 - **Worktree:** `/private/tmp/4shark-worktrees/group-document`
-- **Status:** ⏳ AGUARDANDO VALIDAÇÃO
+- **Status:** ⏳ AWAITING VALIDATION
 - **URL:** https://github.com/4shark/app/pull/4755
 
-**Mudanças:**
-- Tornou Producer idempotente (reset computation, delete rows antes de reprocessar)
-- Batch deletion no Finalizer
-- Índice único: `(document_id, line)`
+**Changes:**
+- Made Producer idempotent (reset computation, delete rows before reprocessing)
+- Batch deletion in the Finalizer
+- Unique index: `(document_id, line)`
 
-**Correções aplicadas:**
-- Tratamento de CSV vazio
+**Fixes applied:**
+- Handling of empty CSV
 
 ---
 
 ### PR #4756 - IndicatorDocument
 - **Branch:** `feature/indicator-document-idempotent`
 - **Worktree:** `/private/tmp/4shark-worktrees/indicator-document`
-- **Status:** ⏳ AGUARDANDO VALIDAÇÃO
+- **Status:** ⏳ AWAITING VALIDATION
 - **URL:** https://github.com/4shark/app/pull/4756
 
-**Mudanças:**
-- Tornou Producer idempotente
-- Dropou índice antigo `(document_id, user_identifier_value, subsidiary_external_id, variable_key, compiled_at)`
-- Criou índice novo: `(document_id, document_line, variable_key)`
-- Batch deletion no Finalizer
+**Changes:**
+- Made Producer idempotent
+- Dropped old index `(document_id, user_identifier_value, subsidiary_external_id, variable_key, compiled_at)`
+- Created new index: `(document_id, document_line, variable_key)`
+- Batch deletion in the Finalizer
 
-**Correções aplicadas:**
+**Fixes applied:**
 - `Document.find` → `IndicatorDocument.find`
-- Tratamento de CSV vazio
-- `TypeError` adicionado no `parsed_date`
+- Handling of empty CSV
+- `TypeError` added to `parsed_date`
 
 ---
 
-## Padrões Estabelecidos
+## Established Patterns
 
-### 1. Índice Único
-- Deve ser por `(document_id, document_line)` - relacionado ao ARQUIVO, não ao recurso
-- IndicatorDocument inclui `variable_key` porque uma linha CSV pode gerar múltiplas rows (formato horizontal)
+### 1. Unique Index
+- Must be on `(document_id, document_line)` — tied to the FILE, not to the resource
+- IndicatorDocument includes `variable_key` because a single CSV line can produce multiple rows (horizontal format)
 
-### 2. CSV Vazio
+### 2. Empty CSV
 ```ruby
 if row_ids.empty?
   Document.with_uncached_connection { document.error! }
@@ -86,21 +86,21 @@ end
 ```
 
 ### 4. Find
-- Usar a classe específica: `DealDocument.find`, não `Document.find`
+- Use the specific class: `DealDocument.find`, not `Document.find`
 
-### 5. Constantes Herdadas
-- `Row::CLEANUP_BATCH_SIZE` funciona porque Ruby herda constantes da superclasse
-- Copilot estava ERRADO ao dizer que daria NameError
+### 5. Inherited Constants
+- `Row::CLEANUP_BATCH_SIZE` works because Ruby inherits constants from the superclass
+- Copilot was WRONG when it claimed this would raise `NameError`
 
-### 6. Mensagem de Erro
-- DealDocument usa `invalid_encoding` (era assim no original)
-- IndicatorDocument e GroupDocument usam `invalid_file` (era assim no original)
+### 6. Error Message
+- DealDocument uses `invalid_encoding` (that was the original)
+- IndicatorDocument and GroupDocument use `invalid_file` (that was the original)
 
 ---
 
-## Próximos Passos
+## Next Steps
 
-1. [ ] Validar PR #4755 (GroupDocument)
-2. [ ] Validar PR #4756 (IndicatorDocument)
-3. [ ] Fazer merge dos 3 PRs
-4. [ ] Mover esta pasta para `~/.claude/plans/completed/`
+1. [ ] Validate PR #4755 (GroupDocument)
+2. [ ] Validate PR #4756 (IndicatorDocument)
+3. [ ] Merge the 3 PRs
+4. [ ] Move this folder to `~/.claude/plans/completed/`

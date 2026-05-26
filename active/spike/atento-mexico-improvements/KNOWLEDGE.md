@@ -269,7 +269,7 @@ Comprehensive training session to cover all 12 modules. The initial training foc
 
 ## Additional Items Discovered
 
-### #18 — Audit de Acesso (Session Monitoring)
+### #18 — Access Audit (Session Monitoring)
 
 **Decision:** Implement via Keycloak configuration — no development required. Conditional on SSO migration.
 

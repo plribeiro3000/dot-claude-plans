@@ -61,74 +61,60 @@ Style characteristics:
 
 ---
 
-## Draft (with image placeholders)
+## Draft (with image placeholders — described in English, final pt-BR text lives in `EMAIL-GERAL.md`)
 
-The text below is ready for use. The `[IMAGE X]` markers indicate where to insert each screenshot.
+The sections below describe each block of the email. The actual pt-BR copy ready to send is in `EMAIL-GERAL.md`. The `[IMAGE X]` markers indicate where each screenshot is inserted.
 
-**Important:** The email content is in Portuguese (pt-BR) as it's intended for Brazilian clients.
+**Important:** The final email body that goes to clients is in Portuguese (pt-BR) since the audience is Brazilian. This PLAN.md describes the sections in English for the team.
 
 ---
 
-Olá,
+### Greeting
 
-Feliz Ano Novo! Desejamos que 2026 seja um ano de muito sucesso e conquistas para você e toda sua equipe.
+Happy New Year wishes for 2026, framing the email as the first of a series with platform updates from 4Shark.
 
-Iniciamos o ano com uma série de novidades que gostaríamos de compartilhar com vocês, fruto do trabalho contínuo de evolução da plataforma 4Shark.
+### SECURITY AND STABILITY
 
+Generic block about internal improvements that increase platform stability and reduce security risk. No technical detail — just reassurance that the platform got more robust.
 
-SEGURANÇA E ESTABILIDADE
+### COMPLETE IDENTIFICATION IN AUDITS
 
-Realizamos melhorias internas que aumentam a estabilidade e reduzem riscos de segurança, garantindo uma plataforma mais robusta e confiável para o dia a dia de vocês.
+Highly requested change. Audits now include identification columns (document type and value — CPF, RUT, etc.) in user reports, statements, goals, and monthly usage exports. Helps clients reconcile data with payroll and other internal systems.
 
+Security reassurance: audit files are available for up to 15 days and deleted automatically; access restricted to authenticated platform users.
 
-IDENTIFICAÇÃO COMPLETA NAS AUDITORIAS
+### NEW PLAN GOAL AUDIT
 
-Sabemos que a conciliação de dados entre sistemas é uma necessidade frequente, e que muitas vezes o CPF ou documento de identificação é a chave para essa integração.
+Goal tracking per plan used to require navigating many screens. The new feature exposes all goals associated with a plan in a single report so the client can quickly identify which users have goals configured, which still need attention, and whether values match expectations.
 
-Atendendo a essa solicitação, incluímos colunas de identificação (tipo do documento e valor, como CPF, RUT etc.) nas auditorias da plataforma, incluindo relatórios de usuários, extratos, metas e consumo mensal. Agora, ao exportar esses arquivos, vocês terão acesso direto à identificação de cada pessoa, facilitando a conciliação com folha de pagamento e outros sistemas internos.
-
-E podem ficar tranquilos quanto à segurança desses dados: os arquivos de auditoria ficam disponíveis por até 15 dias e são apagados automaticamente após esse período. O acesso é restrito a usuários autenticados na plataforma.
-
-
-NOVA AUDITORIA DE METAS DO PLANO
-
-Acompanhar as metas configuradas em cada plano era um processo que exigia navegar por diversas telas da plataforma, dificultando a identificação rápida de possíveis inconsistências.
-
-Entendendo essa necessidade, desenvolvemos uma nova funcionalidade de auditoria específica para metas. Com ela, vocês podem visualizar todas as metas associadas a um plano em um único relatório, identificando rapidamente quais usuários possuem metas configuradas, quais ainda precisam de atenção, e se os valores estão de acordo com o esperado.
-
-Para acessar, abra o Plano desejado e clique em "Auditoria de Metas". Na listagem, clique em "+ Gerar Nova Auditoria" para criar um novo relatório.
+Access: open the desired Plan and click "Auditoria de Metas". On the listing, click "+ Gerar Nova Auditoria" to create a new report.
 
 [IMAGE 1: Plan view with "Auditoria de Metas" button]
 
 [IMAGE 2: Goal audit listing with "+ Gerar Nova Auditoria" button]
 
+### GOAL UPDATE
 
-ATUALIZAÇÃO DE METAS
+Mistakes happen, and discovering a wrong goal value after the plan is already linked has been a frustrating workflow. Before: cancel the plan, open a ticket for the team to fix the goal, then create a new plan — heavy dependency, rework, and operational impact.
 
-Erros acontecem, e sabemos o quanto é frustrante perceber que uma meta foi cadastrada com o valor errado depois que o plano já foi vinculado.
+Now: the value, base value, and direction of a goal can be updated at any time. The change is recorded on the goal and applies to future plans generated from it.
 
-Antes, para corrigir esse tipo de situação, era necessário cancelar o plano, abrir um chamado para nossa equipe realizar a correção da meta, e só então criar um novo plano. Esse processo gerava dependência, retrabalho e podia impactar o andamento das operações.
+New flow: cancel the current plan, update the goal with the correct value, generate a new plan — the new plan picks up the updated goal automatically. No support ticket needed.
 
-Agora isso mudou. Implementamos a possibilidade de atualizar o valor, valor base e sentido de uma meta a qualquer momento. A alteração fica registrada na meta e passa a valer nos próximos planos gerados.
-
-O novo fluxo é simples: basta cancelar o plano atual, atualizar a meta com o valor correto, e gerar um novo plano. O novo plano já será criado com a meta atualizada. Tudo isso sem depender de chamados.
-
-Essa atualização pode ser feita de três formas:
-- Pela listagem de metas (no menu de ações da meta, selecione "Atualizar")
-- Via API, para integrações automatizadas
-- Por upload de arquivo, que antes funcionava apenas para cadastro e agora também permite atualização
+The update can be done in three ways:
+- From the goal listing (in the goal actions menu, select "Atualizar")
+- Via API, for automated integrations
+- Via file upload — which previously only worked for creation, now also supports update
 
 [IMAGE 3: Screenshot of goal edit screen]
 
+### OTHER IMPROVEMENTS
 
-OUTRAS MELHORIAS
+Platform-wide search optimized to handle special characters and accents — easier to find records with names or identifiers that contain them.
 
-A busca geral da plataforma foi otimizada para funcionar melhor com caracteres especiais e acentuação, facilitando encontrar registros com nomes ou identificadores que contenham esses caracteres.
+### Closing
 
-
-Estamos muito felizes em trazer essas evoluções para a plataforma, e esperamos que elas simplifiquem ainda mais o dia a dia de trabalho de vocês.
-
-Agradecemos pela parceria e nos colocamos à disposição para eventuais dúvidas e sugestões através do nosso canal meajuda@4shark.com.br.
+Thanking the client for the partnership and pointing them to `meajuda@4shark.com.br` for questions or suggestions.
 
 ---
 

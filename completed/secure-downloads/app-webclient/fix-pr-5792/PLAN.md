@@ -1,17 +1,17 @@
-# Plano de Correção - PR #5792 (old-front-secure-downloads)
+# Fix Plan - PR #5792 (old-front-secure-downloads)
 
 > **Note:** This fix plan refers to the legacy frontend that still exists on the `old-front` branch of the app-webclient repository.
 
-## Problema Identificado
+## Identified Problem
 
-A migração do Secure Downloads para a branch `old-front` foi feita incorretamente:
-- **Arquivos HTML foram copiados inteiros do master**, mudando layout, estrutura e classes CSS
-- **Arquivos TS foram copiados inteiros do master**, trazendo dependências que não existem no old-front
-- **Resultado**: ~7000 linhas alteradas quando deveria ser muito menos
+The Secure Downloads migration to the `old-front` branch was done incorrectly:
+- **HTML files were copied wholesale from master**, changing layout, structure, and CSS classes
+- **TS files were copied wholesale from master**, pulling in dependencies that do not exist in old-front
+- **Result**: ~7000 lines changed when it should be far fewer
 
-### Exemplo do Erro (user-audit.component.html)
+### Example of the error (user-audit.component.html)
 
-**Original do old-front:**
+**Original old-front:**
 ```html
 <div class="row">
   <div class="col-md-6 col-12">
@@ -22,7 +22,7 @@ A migração do Secure Downloads para a branch `old-front` foi feita incorretame
       </li>
 ```
 
-**O que foi feito (ERRADO - copiado do master):**
+**What was done (WRONG — copied from master):**
 ```html
 <section>
   <h1 class="title">{{ 'user_audit.other' | translate }}</h1>
@@ -30,48 +30,48 @@ A migração do Secure Downloads para a branch `old-front` foi feita incorretame
     <span class="breadcrumb" [routerLink]="['/users/']">{{ 'user.other' | translate }}</span>
 ```
 
-**O que deveria ter sido feito (CORRETO - mudança mínima):**
-- Manter TODA a estrutura HTML original
-- Apenas trocar `href="{{ element.attachment?.file?.file?.publicUrl }}"` para `(click)="download($event, element)"`
+**What should have been done (CORRECT — minimal change):**
+- Keep ALL the original HTML structure
+- Only swap `href="{{ element.attachment?.file?.file?.publicUrl }}"` for `(click)="download($event, element)"`
 
 ---
 
-## Erro de Build Atual
+## Current Build Error
 
 ```
 Error: src/app/upload/upload.component.ts:131:35 - error TS2339: Property 'type' does not exist on type 'Document'.
 ```
 
-**Causa**: O `upload.component.ts` foi copiado do master e usa `document.type`, mas o modelo `Document` do old-front não tem essa propriedade.
+**Cause**: `upload.component.ts` was copied from master and uses `document.type`, but the `Document` model in old-front does not have that property.
 
 ---
 
-## Estatísticas do PR Atual
+## Current PR Stats
 
-| Tipo | Quantidade |
-|------|------------|
-| Arquivos criados (corretos) | 29 |
-| Arquivos modificados | 99 |
-| Linhas adicionadas | ~3,277 |
-| Linhas removidas | ~5,431 |
+| Type | Quantity |
+|------|----------|
+| Created files (correct) | 29 |
+| Modified files | 99 |
+| Lines added | ~3,277 |
+| Lines removed | ~5,431 |
 
 ---
 
-## Plano de Correção
+## Fix Plan
 
-### Fase 1: Reverter TODOS os arquivos modificados para o estado original do old-front
+### Phase 1: Revert ALL modified files to the original old-front state
 
 ```bash
-# Listar todos os arquivos modificados
+# List every modified file
 git diff --diff-filter=M --name-only old-front...old-front-secure-downloads
 
-# Reverter cada arquivo para a versão do old-front
-git checkout old-front -- <cada-arquivo>
+# Revert each file to the old-front version
+git checkout old-front -- <each-file>
 ```
 
-**Arquivos a reverter (99 arquivos):**
+**Files to revert (99 files):**
 
-#### HTML (34 arquivos):
+#### HTML (34 files):
 - src/app/acceptment-document/acceptment-document.component.html
 - src/app/calendar-audit/calendar-audit.component.html
 - src/app/campaign/show/campaign-show.component.html
@@ -107,25 +107,25 @@ git checkout old-front -- <cada-arquivo>
 - src/app/variable-audit/variable-audit.component.html
 - src/app/variable-document/variable-document.component.html
 
-#### TypeScript Components (30+ arquivos):
-- Todos os *.component.ts listados no diff
+#### TypeScript Components (30+ files):
+- All `*.component.ts` listed in the diff
 
-#### TypeScript Services (15+ arquivos):
-- Todos os *.service.ts que NÃO são temporary*.service.ts
+#### TypeScript Services (15+ files):
+- All `*.service.ts` that are NOT `temporary*.service.ts`
 
-#### TypeScript Models (4 arquivos):
+#### TypeScript Models (4 files):
 - src/app/accumulated-deal/accumulated-deal.model.ts
 - src/app/attachment/attachment.model.ts
 - src/app/campaign/campaign.model.ts
 - src/app/core/authentication/user-credential.model.ts
 
-#### Outros:
+#### Other:
 - src/assets/scripts/card.js
 
-### Fase 2: Manter APENAS os arquivos de serviços temporários (já corretos)
+### Phase 2: Keep ONLY the temporary service files (already correct)
 
-**Arquivos a MANTER (29 arquivos criados):**
-- src/app/acceptment-document/acceptment-document.service.ts (novo)
+**Files to KEEP (29 created files):**
+- src/app/acceptment-document/acceptment-document.service.ts (new)
 - src/app/calendar-audit/temporary-calendar-audit.service.ts
 - src/app/campaign/temporary-campaign.service.ts
 - src/app/client-document/temporary-client-document.service.ts
@@ -133,7 +133,7 @@ git checkout old-front -- <cada-arquivo>
 - src/app/commission-indicator-audit/temporary-commission-indicator-audit.service.ts
 - src/app/commission/temporary-commission.service.ts
 - src/app/deal-document/temporary-deal-document.service.ts
-- src/app/deal-extraction/deal-extraction.service.ts (novo)
+- src/app/deal-extraction/deal-extraction.service.ts (new)
 - src/app/goal-document/temporary-goal-document.service.ts
 - src/app/group-audit/temporary-group-audit.service.ts
 - src/app/group-document/temporary-group-document.service.ts
@@ -155,27 +155,27 @@ git checkout old-front -- <cada-arquivo>
 - src/app/variable-audit/temporary-variable-audit.service.ts
 - src/app/variable-document/temporary-variable-document.service.ts
 
-### Fase 3: Fazer a migração CORRETA (mínima)
+### Phase 3: Apply the CORRECT (minimal) migration
 
-Para cada componente que precisa de Secure Downloads, fazer APENAS:
+For each component that needs Secure Downloads, change ONLY:
 
-#### 3.1 No arquivo .component.ts:
+#### 3.1 In the .component.ts file:
 
 ```typescript
-// 1. Adicionar import do temporary service
+// 1. Import the temporary service
 import { TemporaryXxxService } from './temporary-xxx.service';
 
-// 2. Injetar no constructor
+// 2. Inject in the constructor
 constructor(
-  // ... outros serviços existentes
+  // ... other existing services
   private temporaryXxxService: TemporaryXxxService,
 ) {}
 
-// 3. Adicionar método download()
+// 3. Add the download() method
 download(event: Event, element: any) {
   event.preventDefault();
 
-  const id = element.id; // ou element.attachment?.id dependendo do caso
+  const id = element.id; // or element.attachment?.id depending on the case
 
   if (!id) {
     return;
@@ -191,9 +191,9 @@ download(event: Event, element: any) {
 }
 ```
 
-#### 3.2 No arquivo .component.html:
+#### 3.2 In the .component.html file:
 
-**ANTES:**
+**BEFORE:**
 ```html
 <a href="{{ element.attachment?.file?.file?.publicUrl }}">
   <i class="fas fa-cloud-download-alt"></i>
@@ -201,7 +201,7 @@ download(event: Event, element: any) {
 </a>
 ```
 
-**DEPOIS:**
+**AFTER:**
 ```html
 <a href="#" (click)="download($event, element)">
   <i class="fas fa-cloud-download-alt"></i>
@@ -209,9 +209,9 @@ download(event: Event, element: any) {
 </a>
 ```
 
-#### 3.3 No arquivo .service.ts (de listagem):
+#### 3.3 In the .service.ts file (listing):
 
-**ANTES:**
+**BEFORE:**
 ```graphql
 attachment {
   file {
@@ -223,7 +223,7 @@ attachment {
 }
 ```
 
-**DEPOIS:**
+**AFTER:**
 ```graphql
 attachment {
   id
@@ -233,17 +233,17 @@ attachment {
 
 ---
 
-## Lista de Componentes a Migrar Corretamente
+## Components to migrate correctly
 
-| Componente | Temporary Service | Tipo de Download |
-|------------|-------------------|------------------|
+| Component | Temporary Service | Download Type |
+|-----------|-------------------|---------------|
 | acceptment-document | temporaryAcceptmentDocument | attachment |
 | calendar-audit | temporaryCalendarAudit | audit |
 | campaign-show | temporaryCampaign | campaign |
 | client-document | temporaryClientDocument | attachment |
 | collaborative-deal-document | temporaryCollaborativeDealDocument | attachment |
 | commission-indicator-audit | temporaryCommissionIndicatorAudit | audit |
-| commission-report-creation-batch-show | (usa commission) | batch |
+| commission-report-creation-batch-show | (uses commission) | batch |
 | commission-show | temporaryCommission | attachment |
 | dashboard-calendar | temporaryCampaign | campaign |
 | deal-document | temporaryDealDocument | attachment |
@@ -254,13 +254,13 @@ attachment {
 | incentive-document | temporaryIncentiveDocument | attachment |
 | indicator-document | temporaryIndicatorDocument | attachment |
 | monthly-usage | temporaryMonthlyUsageAudit | audit |
-| payment-show | (vários) | payment |
+| payment-show | (multiple) | payment |
 | plan-statement-audit | temporaryPlanStatementAudit | audit |
-| plan-statement-show | (vários) | statement |
+| plan-statement-show | (multiple) | statement |
 | product-document | temporaryProductDocument | attachment |
 | responsible-audit | temporaryResponsibleAudit | audit |
 | statement-audit | temporaryStatementAudit | audit |
-| statement-show | (vários) | statement |
+| statement-show | (multiple) | statement |
 | upload | (document-resolver-map) | upload |
 | user-audit | temporaryUserAudit | audit |
 | user-document | temporaryUserDocument | attachment |
@@ -273,22 +273,22 @@ attachment {
 
 ---
 
-## Próximos Passos
+## Next Steps
 
-1. **Decisão do usuário**: Confirmar se este plano está correto
-2. **Executar Fase 1**: Reverter todos os 99 arquivos modificados
-3. **Executar Fase 2**: Garantir que os 29 arquivos de serviços temporários estão intactos
-4. **Executar Fase 3**: Fazer a migração mínima arquivo por arquivo
-5. **Build e testes**: Validar que tudo funciona
-6. **Atualizar PR**: Force push para atualizar o PR #5792
+1. **User decision**: confirm this plan is correct
+2. **Run Phase 1**: revert all 99 modified files
+3. **Run Phase 2**: ensure the 29 temporary service files are intact
+4. **Run Phase 3**: apply the minimal migration file by file
+5. **Build and tests**: verify everything works
+6. **Update PR**: force push to update PR #5792
 
 ---
 
-## Estimativa de Mudanças Corretas
+## Estimate of Correct Changes
 
-| Tipo | Estimativa |
-|------|------------|
-| Arquivos modificados | ~65 (vs 99 atualmente) |
-| Linhas por HTML | ~5-10 linhas por arquivo |
-| Linhas por TS | ~15-20 linhas por arquivo |
-| Total aproximado | ~600-800 linhas (vs ~8700 atualmente) |
+| Type | Estimate |
+|------|----------|
+| Modified files | ~65 (vs 99 currently) |
+| Lines per HTML | ~5-10 lines per file |
+| Lines per TS | ~15-20 lines per file |
+| Approximate total | ~600-800 lines (vs ~8700 currently) |

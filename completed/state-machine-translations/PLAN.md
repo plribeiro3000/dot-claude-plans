@@ -5,15 +5,15 @@
 
 ## Overview
 
-Garantir que todos os estados das máquinas de estado do backend estejam traduzidos no frontend nos 3 idiomas (pt-BR, en, es).
+Ensure all backend state machine states are translated in the frontend across 3 languages (pt-BR, en, es).
 
 ## Scope
 
 **Type**: Multi-project (Backend + Frontend)
 
 **Projects Affected**:
-- `app` (Backend - Rails) - Fonte dos estados
-- `app-webclient` (Frontend - Angular) - Traduções
+- `app` (Backend - Rails) - State source
+- `app-webclient` (Frontend - Angular) - Translations
 
 ---
 

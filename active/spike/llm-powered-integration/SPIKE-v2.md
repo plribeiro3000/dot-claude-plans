@@ -1,152 +1,152 @@
-# Research: LangChain e Soluções LLM para Integração de Dados
+# Research: LangChain and LLM Solutions for Data Integration
 
-## Contexto do Problema
+## Problem Context
 
-Startup pequena que precisa integrar dados de vendas de múltiplos clientes, onde cada cliente tem regras de negócio diferentes (filtros, multiplicadores, categorias) que não estão documentadas — existem apenas na cabeça de pessoas ou em APIs legadas.
+Small startup that needs to integrate sales data from multiple clients, where each client has different business rules (filters, multipliers, categories) that are not documented — they only live in people's heads or in legacy APIs.
 
 ---
 
-## A) LangChain para Integração de Dados
+## A) LangChain for Data Integration
 
 ### Text-to-SQL
 
-LangChain possui integração nativa com bancos SQL via `create_sql_query_chain` e `SQLDatabaseToolkit`. O fluxo: pergunta em linguagem natural → LLM gera SQL → executa → retorna resultado.
+LangChain has native integration with SQL databases via `create_sql_query_chain` and `SQLDatabaseToolkit`. The flow: natural-language question → LLM generates SQL → executes → returns result.
 
-**Desafios críticos em produção:**
-- Usuários falam em "linguagem de negócio", não em nomes de tabelas
-- Bancos grandes não cabem no contexto do prompt — precisa de RAG para metadados
-- LLMs alucinam nomes de colunas/tabelas que não existem
-- Benchmark Spider 2.0 (casos reais): apenas **6% de precisão** vs. 86% em benchmarks sintéticos
+**Critical challenges in production:**
+- Users speak in "business language", not in table names
+- Large databases do not fit in the prompt context — RAG is needed for metadata
+- LLMs hallucinate column/table names that do not exist
+- Spider 2.0 benchmark (real-world cases): only **6% accuracy** vs. 86% on synthetic benchmarks
 
-**Fontes:**
+**Sources:**
 - https://python.langchain.com/docs/integrations/toolkits/sql_database/
 - https://www.getwren.ai/post/how-do-you-use-langchain-to-build-a-text-to-sql-solution-what-are-the-challenges-how-to-solve-it
 - https://medium.com/dataherald/high-accuracy-text-to-sql-with-langchain-840742133b83
 
-### LangGraph (Agentes Stateful)
+### LangGraph (Stateful Agents)
 
-LangGraph permite criar agentes que consultam múltiplas fontes, corrigem erros automaticamente e mantêm estado entre etapas.
+LangGraph allows building agents that query multiple sources, auto-correct errors, and maintain state across steps.
 
-**Casos reais em produção (2024):**
-- **LinkedIn**: SQL Bot multi-agente (linguagem natural → SQL)
-- **Fastweb + Vodafone**: Pipeline ETL automatizado com LangGraph (9.5M clientes, 90% precisão)
-- **Uber**: Migrações de código em larga escala
+**Real production cases (2024):**
+- **LinkedIn**: multi-agent SQL Bot (natural language → SQL)
+- **Fastweb + Vodafone**: automated ETL pipeline with LangGraph (9.5M clients, 90% accuracy)
+- **Uber**: large-scale code migrations
 
-**Fontes:**
+**Sources:**
 - https://blog.langchain.com/top-5-langgraph-agents-in-production-2024/
 - https://www.langchain.com/customers
 
 ### LangChain + Airbyte
 
-Integração oficial: PyAirbyte para mover dados (600+ conectores) + LangChain para processar com LLMs. Airbyte lançou Agent Connectors compatíveis com LangChain.
+Official integration: PyAirbyte to move data (600+ connectors) + LangChain to process it with LLMs. Airbyte launched LangChain-compatible Agent Connectors.
 
-**Fontes:**
+**Sources:**
 - https://airbyte.com/tutorials/end-to-end-rag-using-github-pyairbyte-and-langchain
 - https://github.com/airbytehq/airbyte-agent-connectors
 
 ---
 
-## B) Competidores e Alternativas
+## B) Competitors and Alternatives
 
 ### LlamaIndex
-- Foco em data retrieval e RAG (300+ conectores)
-- **Multi-tenant RAG nativo**: particionamento por cliente
-- Complementar ao LangChain (retrieval vs. orquestração)
+- Focus on data retrieval and RAG (300+ connectors)
+- **Native multi-tenant RAG**: per-client partitioning
+- Complementary to LangChain (retrieval vs. orchestration)
 - https://www.llamaindex.ai/
 - https://www.llamaindex.ai/blog/building-multi-tenancy-rag-system-with-llamaindex-0d6ab4e0c44b
 
 ### Airbyte (Open-source)
-- 600+ conectores, AI-powered Connector Builder
-- Self-healing jobs (reescreve mapeamento quando schema muda)
+- 600+ connectors, AI-powered Connector Builder
+- Self-healing jobs (rewrites the mapping when the schema changes)
 - https://airbyte.com/data-engineering-resources/ai-data-integration
 
-### Fivetran + dbt (fusão em 2025)
-- **dbt Semantic Layer** define métricas/regras de negócio centralizadas
-- LLMs geram MetricFlow requests (estruturados) em vez de SQL direto
-- Resultado: **83% precisão** com Semantic Layer vs. ~40% com SQL direto
+### Fivetran + dbt (merged in 2025)
+- **dbt Semantic Layer** defines centralized metrics/business rules
+- LLMs generate MetricFlow requests (structured) instead of raw SQL
+- Result: **83% accuracy** with the Semantic Layer vs. ~40% with direct SQL
 - https://www.getdbt.com/blog/semantic-layer-as-the-data-interface-for-llms
 
 ### Vanna AI
-- Open-source (MIT, ~20k stars), especializado em Text-to-SQL com RAG
-- Treinável com terminologia de negócio por cliente
-- Compatível com qualquer LLM
+- Open-source (MIT, ~20k stars), specialized in Text-to-SQL with RAG
+- Trainable with per-client business terminology
+- Compatible with any LLM
 - https://github.com/vanna-ai/vanna
 - https://vanna.ai/
 
 ### Wren AI
-- Open-source, Generative BI com Semantic Engine
-- Mapeia termos de negócio para fontes de dados
+- Open-source, Generative BI with a Semantic Engine
+- Maps business terms to data sources
 - https://github.com/Canner/WrenAI
 - https://www.getwren.ai/oss
 
 ### n8n
-- Automação de workflow open-source com 70+ nós de IA
-- Integração nativa com LangChain
-- Self-hostable, cobra por execução de workflow
+- Open-source workflow automation with 70+ AI nodes
+- Native LangChain integration
+- Self-hostable, charges per workflow execution
 - https://n8n.io/ai/
 
 ---
 
-## C) Padrões Práticos
+## C) Practical Patterns
 
-### 1. Semantic Layer + LLM (padrão mais eficaz)
+### 1. Semantic Layer + LLM (most effective pattern)
 
-Em vez de LLM gerar SQL diretamente:
-1. Definir regras de negócio em semantic layer (dbt MetricFlow, Cube.dev)
-2. LLM gera query semântica estruturada
-3. Semantic layer compila em SQL correto
+Instead of the LLM generating SQL directly:
+1. Define business rules in a semantic layer (dbt MetricFlow, Cube.dev)
+2. The LLM generates a structured semantic query
+3. The semantic layer compiles the correct SQL
 
-Resultado: 83% precisão vs. ~40% com SQL direto.
+Result: 83% accuracy vs. ~40% with raw SQL.
 
-### 2. Multi-tenant RAG para regras por cliente
+### 2. Multi-tenant RAG for per-client rules
 
 ```
-[Regras do Cliente A] → Embeddings → Vector Store (namespace A)
-[Regras do Cliente B] → Embeddings → Vector Store (namespace B)
+[Client A rules] → Embeddings → Vector Store (namespace A)
+[Client B rules] → Embeddings → Vector Store (namespace B)
 
-Query → Recupera regras do namespace correto → LLM gera SQL contextualizado
+Query → Retrieves rules from the correct namespace → LLM generates contextualized SQL
 ```
 
-### 3. Abordagem Híbrida (consenso da literatura)
+### 3. Hybrid approach (consensus from the literature)
 
-| Situação | LLM | Código Tradicional |
+| Situation | LLM | Traditional Code |
 |----------|-----|-------------------|
-| Dados não estruturados, lógica ambígua | Sim | Não |
-| Extração de regras de texto/código legado | Sim | Não |
-| Volume alto (1TB+), ETL simples | Não | Sim |
-| Cálculos financeiros exatos | Não | Sim |
-| Queries previsíveis | Não | Sim |
+| Unstructured data, ambiguous logic | Yes | No |
+| Extracting rules from text / legacy code | Yes | No |
+| High volume (1TB+), simple ETL | No | Yes |
+| Exact financial calculations | No | Yes |
+| Predictable queries | No | Yes |
 
 ---
 
-## D) Prós e Contras Gerais
+## D) General Pros and Cons
 
-### Prós
-- Lida com dados não estruturados e regras ambíguas
-- Reduz tempo de desenvolvimento de conectores
-- Self-healing em mudanças de schema
-- Acessível a usuários não-técnicos
-- Custo de LLMs em queda
+### Pros
+- Handles unstructured data and ambiguous rules
+- Reduces connector development time
+- Self-healing on schema changes
+- Accessible to non-technical users
+- LLM cost is dropping
 
-### Contras
-- **Alucinação**: até 28-39% de erro sem mitigação
-- **Inconsistência**: mesma pergunta pode gerar respostas diferentes
-- **Precisão real**: benchmark Spider 2.0 = apenas 6% em casos reais
-- **Custo**: vendors premium $50k-$200k/ano
-- **Latência**: mais lento que código tradicional
-- **LGPD/GDPR**: RAG + LLMs externos criam riscos
+### Cons
+- **Hallucination**: up to 28-39% error rate without mitigation
+- **Inconsistency**: the same question can produce different answers
+- **Real-world accuracy**: Spider 2.0 benchmark = only 6% in real cases
+- **Cost**: premium vendors $50k-$200k/year
+- **Latency**: slower than traditional code
+- **LGPD/GDPR**: RAG + external LLMs create risks
 
 ---
 
-## E) Stack Recomendado para Startup com Baixo Orçamento
+## E) Recommended Stack for a Low-Budget Startup
 
-1. **Airbyte (open-source, self-hosted)** — movimentação de dados, 600+ conectores, custo zero
+1. **Airbyte (open-source, self-hosted)** — data movement, 600+ connectors, zero cost
 2. **LlamaIndex** — multi-tenant RAG, open-source
-3. **Vanna AI ou Wren AI** — Text-to-SQL open-source, treinável por cliente
-4. **dbt Core + MetricFlow** — semantic layer open-source para regras de negócio
-5. **n8n (self-hosted)** — orquestração de workflows com LLM
+3. **Vanna AI or Wren AI** — open-source Text-to-SQL, trainable per client
+4. **dbt Core + MetricFlow** — open-source semantic layer for business rules
+5. **n8n (self-hosted)** — workflow orchestration with LLM
 
-### Gestão de custos de LLM:
-- Modelos open-source (Llama, Mistral) via Ollama para casos simples (~zero)
-- GPT-4o ou Claude apenas para queries complexas (roteamento inteligente reduz 85% dos custos)
-- Semantic caching com Redis (até 80% cache hit rate)
+### LLM cost management:
+- Open-source models (Llama, Mistral) via Ollama for simple cases (~zero)
+- GPT-4o or Claude only for complex queries (smart routing reduces 85% of cost)
+- Semantic caching with Redis (up to 80% cache hit rate)

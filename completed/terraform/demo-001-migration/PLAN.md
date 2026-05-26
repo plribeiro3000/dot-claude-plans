@@ -4,7 +4,7 @@
 
 ## Context
 
-Criar uma nova pasta `demo-001/` seguindo o padrão exato de `beta-001/`. A pasta `demo/` existente será apagada depois. O mesmo padrão seguido na migração beta → beta-001: pasta nova, não edição da antiga.
+Create a new `demo-001/` folder following the exact pattern of `beta-001/`. The existing `demo/` folder will be deleted afterwards. Same pattern followed in the beta → beta-001 migration: new folder, not editing the old one.
 
 ## AWS State (already collected)
 

@@ -1,5 +1,7 @@
 # Prompting Engineering for Dummies — Presentation Plan
 
+> Note: prompt examples and facilitator quotes below are translated to English for planning purposes. The actual delivery is in Portuguese (pt-BR). A future auxiliary file will hold the original pt-BR copy that goes into Gamma slides.
+
 ## Objective
 
 Internal team presentation to shake the team out of their comfort zone. The title says "Prompt Engineering" but the real subject is **communication**. The goal: they leave thinking "I know nothing, I need to catch up."
@@ -29,11 +31,11 @@ Hook. Show how the same request, poorly communicated, produces wrong results eve
 | Slide | Type | Content |
 |-------|------|---------|
 | 1 | Title | **Prompting Engineering for Dummies** |
-| 2 | Text only | Prompt: *"Faz um carro pra mim"* |
+| 2 | Text only | Prompt: *"Build me a car"* |
 | 3 | Image | A picture of a car (just an image, a photo) |
-| 4 | Text | *"Pô, mas não era isso. Faz a imagem de um carro que funciona."* |
+| 4 | Text | *"Hey, that's not what I meant. Make an image of a car that works."* |
 | 5 | Image | A car driving on a road (still just an image) |
-| 6 | Text | *"Não, cara, eu não quero imagem. Eu quero um carro que funciona!"* |
+| 6 | Text | *"No, dude, I don't want an image. I want a car that works!"* |
 | 7 | Image | A technical blueprint/architectural drawing of a car — exploded view showing how parts connect (doors, steering wheel, engine, chassis) |
 
 **Purpose**: Each iteration shows the AI doing *exactly* what was asked — the problem is never the AI, it's the instruction.
@@ -42,18 +44,18 @@ Hook. Show how the same request, poorly communicated, produces wrong results eve
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 8 | Question slide | **"Onde está o erro?"** |
+| 8 | Question slide | **"Where is the error?"** |
 
-**Facilitator notes**: Pause here. Ask the team directly. Let them articulate the problem themselves. Push until someone says "communication" or "context." Reinforce: *"Eu sei que tô batendo na mesma tecla, mas ficou claro pra vocês o problema?"*
+**Facilitator notes**: Pause here. Ask the team directly. Let them articulate the problem themselves. Push until someone says "communication" or "context." Reinforce: *"I know I'm hammering the same point, but did the problem land for you?"*
 
 ### Act 3 — The Bakery Joke (Slides 9–12)
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 9 | Text + illustration | The setup: A mother tells her son: *"Vai lá na padaria e compra cinco pães. Mas se tiver leite, traz dois."* |
-| 10 | Text + illustration | The result: The kid comes back with **two breads**. His logic: there was milk → bring two (instead of five). |
-| 11 | Text | The lesson: *"Você pode culpar a criança? No entendimento dela, ela fez o melhor que podia. A mensagem era ambígua. Sem contexto, sem experiência, sem malandragem — ela interpretou literalmente."* |
-| 12 | Practical tool | **"Teste do colega"**: *"Antes de mandar seu prompt, mostra pra um colega que não sabe nada do contexto. Se ele ficar confuso, a IA também vai ficar."* — Essa é a forma prática de evitar o problema da padaria. |
+| 9 | Text + illustration | The setup: A mother tells her son: *"Go to the bakery and buy five loaves of bread. But if they have milk, bring two."* |
+| 10 | Text + illustration | The result: The kid comes back with **two loaves**. His logic: there was milk → bring two (instead of five). |
+| 11 | Text | The lesson: *"Can you blame the kid? In his understanding, he did the best he could. The message was ambiguous. Without context, without experience, without street smarts — he interpreted literally."* |
+| 12 | Practical tool | **"Colleague Test"**: *"Before sending your prompt, show it to a colleague who knows nothing about the context. If they get confused, the AI will too."* — That is the practical way to avoid the bakery problem. |
 
 **Purpose**: The joke proves the concept emotionally. The Colleague Test gives them a practical tool to prevent it. Same idea, two forms: story + action.
 
@@ -63,8 +65,8 @@ Hook. Show how the same request, poorly communicated, produces wrong results eve
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 13 | Statement | *"Qualquer problema de comunicação é um problema de..."* |
-| 14 | Big reveal + mind-blown image | **CONTEXTO** (full screen, bold). Image: the "mind blown" meme/reaction. |
+| 13 | Statement | *"Any communication problem is a problem of..."* |
+| 14 | Big reveal + mind-blown image | **CONTEXT** (full screen, bold). Image: the "mind blown" meme/reaction. |
 
 ### Act 5 — This Is About Communication (Slides 15–19)
 
@@ -72,13 +74,13 @@ This is the heart of the presentation. Not about AI — about them.
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 15 | Text | *"A IA tem acesso a praticamente toda informação do mundo. Ela consegue processar qualquer coisa em tempo real. É um poder absurdo."* |
-| 16 | Text (contrast) | *"Mas ela é como uma criança de 10 anos. Ela sabe falar, se expressar, tem opiniões, tem capacidade de fazer qualquer coisa — mas ela faz exatamente o que você falar. Se você não falar direito, ela não faz direito."* |
-| 17 | Statement (big, bold) | **"Essa apresentação não é sobre IA. É sobre comunicação."** |
-| 18 | The deeper insight | *"Quando você se comunica mal com uma pessoa, ela se esforça pra entender. Ela preenche os gaps. Ela se vira nos 30. Por isso você acha que se comunica bem."* |
-| 19 | The mirror | *"A IA não faz isso. Ela interpreta exatamente o que você fala. A IA é o espelho da sua comunicação real."* |
+| 15 | Text | *"AI has access to virtually all the information in the world. It can process anything in real time. That is absurd power."* |
+| 16 | Text (contrast) | *"But it is like a 10-year-old kid. It can talk, express itself, have opinions, do anything — but it does exactly what you say. If you don't say it right, it doesn't do it right."* |
+| 17 | Statement (big, bold) | **"This presentation is not about AI. It's about communication."** |
+| 18 | The deeper insight | *"When you communicate poorly with a person, they make a huge effort to understand you. They fill the gaps. They figure it out. That's why you think you communicate well."* |
+| 19 | The mirror | *"AI doesn't do that. It interprets exactly what you say. AI is the mirror of your real communication."* |
 
-**Facilitator notes**: This is where the audience should feel uncomfortable. The point: *"Se vocês estão falhando pra se comunicar com IA, é porque vocês também falham pra se comunicar com pessoas. A diferença é que pessoas se esforçam pra entender vocês. A IA não."*
+**Facilitator notes**: This is where the audience should feel uncomfortable. The point: *"If you are failing to communicate with AI, it is because you also fail to communicate with people. The difference is that people make an effort to understand you. AI doesn't."*
 
 ### Act 6 — Your First Framework: APE (Slides 20–23)
 
@@ -86,16 +88,16 @@ Start simple. APE is the most recommended beginner framework (Action, Purpose, E
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 20 | Framework intro | **APE — O framework mais simples pra começar.** Validado pela comunidade de prompt engineering como o ponto de partida ideal pra iniciantes. |
-| 21 | Element: **A — Ação** | *O que você quer que a IA faça?* Ex: *"Escreve um e-mail", "Resume esse texto", "Me ajuda a organizar"* |
-| 22 | Element: **P — Propósito** | *Por que você precisa disso?* Ex: *"Porque preciso responder um cliente insatisfeito", "Porque tenho que apresentar isso pro meu chefe amanhã"* |
-| 23 | Element: **E — Expectativa** | *Como o resultado tem que ser?* Ex: *"Tom profissional, máximo 5 linhas", "Em formato de lista com bullet points", "Linguagem simples que qualquer pessoa entenda"* |
+| 20 | Framework intro | **APE — The simplest framework to get started.** Validated by the prompt engineering community as the ideal starting point for beginners. |
+| 21 | Element: **A — Action** | *What do you want the AI to do?* Examples: *"Write an email", "Summarize this text", "Help me organize"* |
+| 22 | Element: **P — Purpose** | *Why do you need this?* Examples: *"Because I need to reply to an unhappy client", "Because I have to present this to my boss tomorrow"* |
+| 23 | Element: **E — Expectation** | *What does the result have to look like?* Examples: *"Professional tone, max 5 lines", "Bullet-point list", "Simple language anyone can understand"* |
 
-**Facilitator notes**: *"Pessoal, isso aqui é o mínimo. Só de fazer isso, o resultado já muda completamente. Existem frameworks mais completos — RACE, CO-STAR — mas hoje a gente começa pelo mais simples."*
+**Facilitator notes**: *"Folks, this is the minimum. Just doing this changes the result completely. There are more complete frameworks — RACE, CO-STAR — but today we start with the simplest."*
 
 ### Act 7 — The Catches: Common Mistakes (Slides 24–43)
 
-**Transition slide (24)**: *"Agora que vocês entenderam o APE, vamos ver o que acontece quando a gente erra. Pra cada problema, vou mostrar: o prompt errado, o desastre, a correção, e o comparativo."*
+**Transition slide (24)**: *"Now that you understand APE, let's see what happens when we get it wrong. For each problem I'll show: the bad prompt, the disaster, the fix, and the side-by-side."*
 
 Each "catch" follows a 4-slide storytelling mechanic:
 1. **The bad prompt** — just the text, clean
@@ -103,62 +105,62 @@ Each "catch" follows a 4-slide storytelling mechanic:
 3. **The fix** — the correct prompt overlays/replaces the bad one (crossing out / overwriting effect)
 4. **Side by side** — bad prompt + bad result vs. good prompt + good result. The good prompt visibly follows APE. A small tag or label shows which part is A, which is P, which is E — connecting back to the framework.
 
-#### Catch 1 — Ser vago / não dar contexto (Slides 25–28)
+#### Catch 1 — Being vague / no context (Slides 25–28)
 
 Merged: being vague and not giving context are the same root problem. The #1 most cited mistake across 100% of sources.
 
 | Slide | Beat | Content |
 |-------|------|---------|
-| 25 | Bad prompt | *"Faz uma planilha de controle"* |
-| 26 | Disaster + reaction image | Result: random spreadsheet with irrelevant columns — expenses, dates from 2019, categories that make no sense. *"Nada a ver com o que eu precisava!"* |
-| 27 | Fix (overlays) | ~~Faz uma planilha de controle~~ → *"Sou do operacional. Preciso controlar entregas de 15 clientes por semana. Quero uma planilha com: cliente, data prevista, data real, status (atrasado/no prazo/entregue), e uma coluna de observações."* |
-| 28 | Side by side | Left: vague → useless. Right: with context → ready to use. **Labels on the good prompt**: [A] controlar entregas / [P] 15 clientes por semana / [E] colunas específicas. |
+| 25 | Bad prompt | *"Build me a control spreadsheet"* |
+| 26 | Disaster + reaction image | Result: random spreadsheet with irrelevant columns — expenses, dates from 2019, categories that make no sense. *"Nothing to do with what I needed!"* |
+| 27 | Fix (overlays) | ~~Build me a control spreadsheet~~ → *"I'm in operations. I need to track deliveries for 15 clients per week. I want a spreadsheet with: client, expected date, actual date, status (late/on time/delivered), and an observations column."* |
+| 28 | Side by side | Left: vague → useless. Right: with context → ready to use. **Labels on the good prompt**: [A] track deliveries / [P] 15 clients per week / [E] specific columns. |
 
-#### Catch 2 — Falar demais sem estrutura (Slides 29–32)
+#### Catch 2 — Wall of text without structure (Slides 29–32)
 
 The "wall of text" anti-pattern — overloading with noise is as bad as being vague.
 
 | Slide | Beat | Content |
 |-------|------|---------|
-| 29 | Bad prompt | *"Preciso de ajuda com um negócio aqui, é que o cliente ligou bravo porque não tá funcionando o negócio lá, e meu chefe pediu pra resolver, e eu não sei o que falar, e já tentei ligar mas não atendeu, e acho que é um problema do sistema mas não tenho certeza, e ele é um cliente importante..."* |
-| 30 | Disaster + reaction image | Result: confused, contradictory response that tries to address everything and solves nothing. *"A IA ficou tão perdida quanto eu!"* |
-| 31 | Fix (overlays) | ~~wall of text~~ → *"Cliente: João Silva. Problema: sem acesso ao sistema desde ontem. Causa provável: erro no login. O que preciso: e-mail de desculpas com previsão de solução até amanhã 10h. Tom: profissional e empático."* |
-| 32 | Side by side | Left: wall of text → confused. Right: structured → precise. **"Dar contexto não é falar muito. É falar exatamente o que precisa. Não mais, não menos."** Labels: [A] e-mail de desculpas / [P] cliente sem acesso / [E] tom profissional, previsão de solução. |
+| 29 | Bad prompt | *"I need help with a thing here, the client called angry because the thing isn't working, and my boss asked me to fix it, and I don't know what to say, and I tried calling but no one answered, and I think it's a system problem but I'm not sure, and they are an important client..."* |
+| 30 | Disaster + reaction image | Result: confused, contradictory response that tries to address everything and solves nothing. *"The AI got as lost as I was!"* |
+| 31 | Fix (overlays) | ~~wall of text~~ → *"Client: João Silva. Problem: no system access since yesterday. Likely cause: login error. What I need: apology email with a fix ETA by tomorrow 10am. Tone: professional and empathetic."* |
+| 32 | Side by side | Left: wall of text → confused. Right: structured → precise. **"Giving context isn't talking a lot. It's saying exactly what you need. No more, no less."** Labels: [A] apology email / [P] client without access / [E] professional tone, fix ETA. |
 
-#### Catch 3 — Pedir tudo de uma vez (Slides 33–36)
+#### Catch 3 — Asking everything at once (Slides 33–36)
 
 Overloading a single prompt with multiple tasks.
 
 | Slide | Beat | Content |
 |-------|------|---------|
-| 33 | Bad prompt | *"Resume esse documento, depois faz um e-mail pro cliente, cria uma apresentação sobre o tema, e me dá 5 ideias de como melhorar o processo"* |
-| 34 | Disaster + reaction image | Result: superficial summary, generic email, no real presentation, random ideas. *"Fez tudo pela metade!"* |
-| 35 | Fix (overlays) | ~~tudo de uma vez~~ → *"Primeiro: resume esse documento em 5 bullet points."* (depois, em outro prompt: *"Agora, com base no resumo, escreve um e-mail..."*) |
-| 36 | Side by side | Left: everything at once → shallow. Right: one at a time → deep and useful. **"Uma coisa de cada vez. A IA faz melhor quando foca."** |
+| 33 | Bad prompt | *"Summarize this document, then write an email to the client, create a presentation about it, and give me 5 ideas to improve the process"* |
+| 34 | Disaster + reaction image | Result: superficial summary, generic email, no real presentation, random ideas. *"Did everything half-way!"* |
+| 35 | Fix (overlays) | ~~all at once~~ → *"First: summarize this document into 5 bullet points."* (then, in another prompt: *"Now, based on the summary, write the email..."*) |
+| 36 | Side by side | Left: everything at once → shallow. Right: one at a time → deep and useful. **"One thing at a time. The AI does better when it focuses."** |
 
-#### Catch 4 — Usar linguagem negativa (Slides 37–40)
+#### Catch 4 — Using negative language (Slides 37–40)
 
 Counter-intuitive finding from research: telling AI what NOT to do is less effective than telling what TO do. Positive instructions give a clear target; negative ones leave ambiguity.
 
 | Slide | Beat | Content |
 |-------|------|---------|
-| 37 | Bad prompt | *"Escreve um texto sobre o produto, mas não usa palavras difíceis, não faz muito longo, não coloca termos técnicos, não escreve de forma formal"* |
-| 38 | Disaster + reaction image | Result: AI avoids everything you said not to, but has no idea what TO do — produces a bland, directionless text. *"Tá... mas o que eu queria mesmo?"* |
-| 39 | Fix (overlays) | ~~não isso, não aquilo~~ → *"Escreve um texto sobre o produto em linguagem simples e direta, como se tivesse explicando pra um amigo. Máximo 150 palavras, tom leve e acessível."* |
-| 40 | Side by side | Left: "não faça X" → lost. Right: "faça Y" → clear. **"Diga o que você QUER, não o que você NÃO quer."** Labels: [A] texto sobre o produto / [P] explicar pra um amigo / [E] 150 palavras, tom leve. |
+| 37 | Bad prompt | *"Write a text about the product, but don't use hard words, don't make it long, don't use technical terms, don't be formal"* |
+| 38 | Disaster + reaction image | Result: AI avoids everything you said not to, but has no idea what TO do — produces a bland, directionless text. *"Okay... but what did I actually want?"* |
+| 39 | Fix (overlays) | ~~don't this, don't that~~ → *"Write a text about the product in simple, direct language, as if explaining it to a friend. Max 150 words, light and accessible tone."* |
+| 40 | Side by side | Left: "don't do X" → lost. Right: "do Y" → clear. **"Say what you WANT, not what you DON'T want."** Labels: [A] text about the product / [P] explain to a friend / [E] 150 words, light tone. |
 
-#### Catch 5 — Não iterar / mentalidade "one-shot" (Slides 41–44)
+#### Catch 5 — Not iterating / "one-shot" mindset (Slides 41–44)
 
 The "prompt and pray" anti-pattern — send one prompt, get a bad result, give up or complain. Directly connected to the evolution message.
 
 | Slide | Beat | Content |
 |-------|------|---------|
-| 41 | Bad prompt | *"Faz um plano de ação pro meu time"* → resultado ruim → pessoa desiste. *"IA não funciona."* |
-| 42 | Disaster + reaction image | Shows the person giving up. One prompt, one bad result, done. *"Ah, essa IA é inútil."* |
-| 43 | Fix (overlays) | ~~desistir~~ → **Conversa com a IA**: *"Isso não ficou bom. O que eu poderia ter feito de diferente nesse prompt pra ter um resultado melhor?"* → A IA responde com sugestões → Você refaz o prompt melhor → Resultado 10x melhor. |
-| 44 | Side by side | Left: one-shot → bad result → give up. Right: iterate → ask why → improve → great result. **"A IA é uma conversa, não um formulário. Se deu errado, pergunta o que melhorar."** |
+| 41 | Bad prompt | *"Write an action plan for my team"* → bad result → person gives up. *"AI doesn't work."* |
+| 42 | Disaster + reaction image | Shows the person giving up. One prompt, one bad result, done. *"Ugh, this AI is useless."* |
+| 43 | Fix (overlays) | ~~give up~~ → **Talk to the AI**: *"This didn't turn out well. What could I have done differently in this prompt to get a better result?"* → The AI responds with suggestions → You rewrite the prompt better → 10x better result. |
+| 44 | Side by side | Left: one-shot → bad result → give up. Right: iterate → ask why → improve → great result. **"AI is a conversation, not a form. If it didn't work, ask what to improve."** |
 
-**Facilitator note for Catch 5**: *"Isso é o que eu faço todo dia. Deu errado? Pergunto pra IA: 'o que eu fiz de errado nesse prompt?' Ela me fala, eu melhoro, e o próximo resultado é melhor. É assim que se evolui."*
+**Facilitator note for Catch 5**: *"This is what I do every day. Didn't work? I ask the AI: 'what did I do wrong in this prompt?' It tells me, I improve, and the next result is better. That's how you evolve."*
 
 ### Act 8 — The Wake-Up Call (Slides 45–53)
 
@@ -166,19 +168,19 @@ This is one continuous storytelling arc. Each slide builds on the previous — i
 
 | Slide | Type | Content |
 |-------|------|---------|
-| 45 | Opening question | *"Vocês têm problemas com a IA fazendo o que vocês querem?"* |
-| 46 | Build | *"Se a IA não faz o que você quer, é porque a comunicação não foi clara o suficiente."* |
-| 47 | Statement | *"A IA é o estagiário mais inteligente do mundo. Ela sabe tudo, mas não sabe nada sobre o SEU problema — até você contar pra ela."* |
-| 48 | Wake-up (big, bold) | **"E aí, o que você tá fazendo pra melhorar?"** |
-| 49 | Challenge | *"A IA não é uma ferramenta estática — todo dia ela tá diferente. Se você faz o mesmo prompt todo dia, sofre do mesmo problema todo dia e não muda nada — não vai evoluir."* |
-| 50 | The learning loop | *"Quando dá errado, não fica puto. Investiga. Pergunta pra IA: 'por que você foi por esse caminho? O que no meu prompt te levou a essa resposta?' E aí você descobre: às vezes o erro é seu — sua comunicação não foi clara. Às vezes é uma limitação da IA — ela funciona assim. Nos dois casos, você ajusta o seu processo."* |
-| 51 | Key insight (big, bold) | **"Todo erro é uma oportunidade de aprender."** *Ou você melhora sua comunicação, ou você adapta seu processo pra como a IA funciona. Nos dois casos, você evolui.* |
-| 52 | Personal example | *"Eu também erro. Todo dia. Mas quando erro, pergunto pra IA por que foi por aquele caminho. Já descobri coisas que são do meu processo — e ajustei. Já descobri limitações da IA — e adaptei. Uso speech-to-text pra dar mais contexto sem perder agilidade. Isso é o que eu faço diariamente. E vocês?"* |
-| 53 | Closing (celebration image — champagne, confetti, success) | **"Melhore a sua comunicação."** |
+| 45 | Opening question | *"Are you having trouble getting AI to do what you want?"* |
+| 46 | Build | *"If the AI isn't doing what you want, it's because the communication wasn't clear enough."* |
+| 47 | Statement | *"AI is the smartest intern in the world. It knows everything, but it knows nothing about YOUR problem — until you tell it."* |
+| 48 | Wake-up (big, bold) | **"So, what are you doing to get better?"** |
+| 49 | Challenge | *"AI is not a static tool — it's different every day. If you send the same prompt every day, you suffer from the same problem every day, you don't change anything — you won't evolve."* |
+| 50 | The learning loop | *"When it goes wrong, don't get angry. Investigate. Ask the AI: 'why did you take that path? What in my prompt led you there?' And there you find out: sometimes the error is yours — your communication wasn't clear. Sometimes it's an AI limitation — it works that way. In both cases, you adjust your process."* |
+| 51 | Key insight (big, bold) | **"Every error is a learning opportunity."** *Either you improve your communication, or you adapt your process to how the AI works. Either way, you evolve.* |
+| 52 | Personal example | *"I mess up too. Every day. But when I do, I ask the AI why it went that way. I've already found things about my process — and adjusted. I've already found AI limitations — and adapted. I use speech-to-text to give more context without losing speed. That's what I do daily. And you?"* |
+| 53 | Closing (celebration image — champagne, confetti, success) | **"Improve your communication."** |
 
 **Purpose**: One arc: "You have problems? → The communication wasn't clear → What are YOU doing about it? → You need to evolve → When it goes wrong, investigate — is it your communication or an AI limitation? → Adjust your process → I do this every day, here's how → Now it's your turn."
 
-**Facilitator notes**: The tone here is a coach giving a shake, not a boss pointing fingers. It's: "Pessoal, eu entendo a frustração. Mas ficar puto não resolve. O que resolve é entender por que deu errado. Às vezes é a gente que tem que melhorar. Às vezes é a IA que funciona diferente e a gente tem que adaptar o processo. Nos dois casos, a gente evolui."
+**Facilitator notes**: The tone here is a coach giving a shake, not a boss pointing fingers. It's: "Folks, I get the frustration. But staying angry doesn't solve anything. What solves it is understanding why it went wrong. Sometimes it's us who need to improve. Sometimes the AI works differently and we need to adapt the process. Either way, we evolve."
 
 ---
 
@@ -214,84 +216,84 @@ Full research documented in `SPIKE.md` (this directory) and raw data in:
 >
 > **Act 1 — The Car Example (hook)**
 > 1. Title slide: "Prompting Engineering for Dummies"
-> 2. Text slide: the prompt "Faz um carro pra mim" (just the text, nothing else)
+> 2. Text slide: the prompt "Build me a car" (just the text, nothing else)
 > 3. Image slide: a photo of a car (the AI made an image of a car — not what was wanted)
-> 4. Text slide: "Não era isso. Faz a imagem de um carro que funciona."
+> 4. Text slide: "That's not it. Make an image of a car that works."
 > 5. Image slide: a car driving on a road (still just an image)
-> 6. Text slide: "Eu não quero imagem! Eu quero um carro que funciona!"
+> 6. Text slide: "I don't want an image! I want a car that works!"
 > 7. Image slide: a technical blueprint/exploded diagram of a car — engineering schematic
 >
 > **Act 2 — Where's the Error?**
-> 8. Question slide: "Onde está o erro?" — big, centered, bold. Pause for discussion.
+> 8. Question slide: "Where is the error?" — big, centered, bold. Pause for discussion.
 >
 > **Act 3 — The Bakery Joke**
-> 9. Story slide with illustration: A mother tells her son: "Vai na padaria e compra cinco pães. Mas se tiver leite, traz dois."
-> 10. Result slide with illustration: The kid comes back with two breads. There was milk, so he brought two instead of five.
-> 11. Lesson slide: "Você pode culpar a criança? No entendimento dela, ela fez o melhor que podia. Sem contexto, a interpretação literal vence."
-> 12. Practical tool slide: "Teste do colega — Antes de mandar seu prompt, mostra pra um colega que não sabe nada do contexto. Se ele ficar confuso, a IA também vai ficar." This is the practical way to avoid the bakery problem.
+> 9. Story slide with illustration: A mother tells her son: "Go to the bakery and buy five loaves of bread. But if they have milk, bring two."
+> 10. Result slide with illustration: The kid comes back with two loaves. There was milk, so he brought two instead of five.
+> 11. Lesson slide: "Can you blame the kid? In his understanding, he did the best he could. Without context, literal interpretation wins."
+> 12. Practical tool slide: "Colleague Test — Before sending your prompt, show it to a colleague who knows nothing about the context. If they get confused, the AI will too." This is the practical way to avoid the bakery problem.
 >
 > **Act 4 — The Revelation**
-> 13. Build-up slide: "Qualquer problema de comunicação é um problema de..."
-> 14. Reveal slide: "CONTEXTO" — big, bold, with a mind-blown reaction image
+> 13. Build-up slide: "Any communication problem is a problem of..."
+> 14. Reveal slide: "CONTEXT" — big, bold, with a mind-blown reaction image
 >
 > **Act 5 — This Is About Communication**
-> 15. Power slide: "A IA tem acesso a toda informação do mundo. Processa qualquer coisa em tempo real. É um poder absurdo."
-> 16. Analogy slide: "Mas ela é como uma criança de 10 anos. Sabe falar, se expressar, tem capacidade de fazer qualquer coisa — mas faz exatamente o que você falar. Se você não falar direito, ela não faz direito."
-> 17. Reframe slide (big, bold): "Essa apresentação não é sobre IA. É sobre comunicação."
-> 18. Deeper insight slide: "Quando você se comunica mal com uma pessoa, ela se esforça pra entender. Ela preenche os gaps. Ela se vira nos 30. Por isso você acha que se comunica bem."
-> 19. Mirror slide: "A IA não faz isso. Ela interpreta exatamente o que você fala. A IA é o espelho da sua comunicação real."
+> 15. Power slide: "AI has access to all information in the world. Processes anything in real time. That is absurd power."
+> 16. Analogy slide: "But it is like a 10-year-old kid. It can talk, express itself, do anything — but it does exactly what you say. If you don't say it right, it doesn't do it right."
+> 17. Reframe slide (big, bold): "This presentation is not about AI. It is about communication."
+> 18. Deeper insight slide: "When you communicate poorly with a person, they make a huge effort to understand you. They fill the gaps. They figure it out. That's why you think you communicate well."
+> 19. Mirror slide: "AI doesn't do that. It interprets exactly what you say. AI is the mirror of your real communication."
 >
 > **Act 6 — Your First Framework: APE**
-> 20. Framework intro: "APE — O framework mais simples pra começar." Subtitle: "Validado pela comunidade de prompt engineering como o ponto de partida ideal."
-> 21. A = Ação: "O que você quer que a IA faça?" Examples: "Escreve um e-mail", "Resume esse texto", "Me ajuda a organizar"
-> 22. P = Propósito: "Por que você precisa disso?" Examples: "Porque preciso responder um cliente insatisfeito", "Porque tenho que apresentar isso pro meu chefe amanhã"
-> 23. E = Expectativa: "Como o resultado tem que ser?" Examples: "Tom profissional, máximo 5 linhas", "Em formato de lista", "Linguagem simples"
+> 20. Framework intro: "APE — The simplest framework to get started." Subtitle: "Validated by the prompt engineering community as the ideal starting point."
+> 21. A = Action: "What do you want the AI to do?" Examples: "Write an email", "Summarize this text", "Help me organize"
+> 22. P = Purpose: "Why do you need this?" Examples: "Because I need to reply to an unhappy client", "Because I have to present this to my boss tomorrow"
+> 23. E = Expectation: "What does the result have to look like?" Examples: "Professional tone, max 5 lines", "Bullet-point list", "Simple language"
 >
 > **Act 7 — The Catches (Common Mistakes)**
-> 24. Transition slide: "Agora que vocês entenderam o APE, vamos ver o que acontece quando a gente erra."
+> 24. Transition slide: "Now that you understand APE, let's see what happens when we get it wrong."
 >
 > This section uses a repeating 4-slide mechanic for each mistake. The slides should feel like the same slide building — adding content progressively, not jumping to new layouts. On each "side by side" slide, the good prompt has small [A], [P], [E] labels showing how it follows the framework.
 >
 > **Catch 1 — Being vague / no context:**
-> 25. Bad prompt: "Faz uma planilha de controle"
-> 26. Disaster: random spreadsheet with irrelevant columns. "Nada a ver com o que eu precisava!"
-> 27. Fix (overlays): "Sou do operacional. Preciso controlar entregas de 15 clientes por semana. Quero uma planilha com: cliente, data prevista, data real, status, e observações."
+> 25. Bad prompt: "Build me a control spreadsheet"
+> 26. Disaster: random spreadsheet with irrelevant columns. "Nothing to do with what I needed!"
+> 27. Fix (overlays): "I'm in operations. I need to track deliveries for 15 clients per week. I want a spreadsheet with: client, expected date, actual date, status, and observations."
 > 28. Side-by-side with APE labels on the good prompt.
 >
 > **Catch 2 — Wall of text (talking too much without structure):**
 > 29. Bad prompt: a long rambling paragraph about a client problem, full of noise.
-> 30. Disaster: confused AI response. "A IA ficou tão perdida quanto eu!"
+> 30. Disaster: confused AI response. "The AI got as lost as I was!"
 > 31. Fix (overlays): clean structured version — Client, Problem, Cause, What I need, Tone.
-> 32. Side-by-side + message: "Dar contexto não é falar muito. É falar exatamente o que precisa."
+> 32. Side-by-side + message: "Giving context isn't talking a lot. It's saying exactly what you need."
 >
 > **Catch 3 — Asking everything at once:**
-> 33. Bad prompt: "Resume, faz e-mail, cria apresentação, e dá 5 ideias"
-> 34. Disaster: everything shallow. "Fez tudo pela metade!"
-> 35. Fix (overlays): "Primeiro: resume em 5 bullet points." Then another prompt for the next step.
-> 36. Side-by-side + message: "Uma coisa de cada vez. A IA faz melhor quando foca."
+> 33. Bad prompt: "Summarize, write email, build presentation, give 5 ideas"
+> 34. Disaster: everything shallow. "Did everything half-way!"
+> 35. Fix (overlays): "First: summarize into 5 bullet points." Then another prompt for the next step.
+> 36. Side-by-side + message: "One thing at a time. The AI does better when it focuses."
 >
 > **Catch 4 — Negative language (saying what NOT to do):**
-> 37. Bad prompt: "Escreve um texto, mas não usa palavras difíceis, não faz longo, não usa termos técnicos, não escreve formal"
-> 38. Disaster: bland, directionless text. "Tá... mas o que eu queria mesmo?"
-> 39. Fix (overlays): "Escreve um texto em linguagem simples, como se tivesse explicando pra um amigo. 150 palavras, tom leve."
-> 40. Side-by-side + message: "Diga o que você QUER, não o que você NÃO quer."
+> 37. Bad prompt: "Write a text, but don't use hard words, don't make it long, don't use technical terms, don't be formal"
+> 38. Disaster: bland, directionless text. "Okay... but what did I actually want?"
+> 39. Fix (overlays): "Write a text in simple language, as if explaining to a friend. 150 words, light tone."
+> 40. Side-by-side + message: "Say what you WANT, not what you DON'T want."
 >
 > **Catch 5 — Not iterating (one-shot mentality):**
-> 41. Bad prompt: "Faz um plano de ação pro meu time" → bad result → person gives up. "IA não funciona."
-> 42. Disaster: person giving up after one try. "Ah, essa IA é inútil."
-> 43. Fix (overlays): Instead of giving up, ask the AI: "O que eu poderia ter feito de diferente nesse prompt?" → AI suggests improvements → Better prompt → Great result.
-> 44. Side-by-side + message: "A IA é uma conversa, não um formulário. Se deu errado, pergunta o que melhorar."
+> 41. Bad prompt: "Write an action plan for my team" → bad result → person gives up. "AI doesn't work."
+> 42. Disaster: person giving up after one try. "Ugh, this AI is useless."
+> 43. Fix (overlays): Instead of giving up, ask the AI: "What could I have done differently in this prompt?" → AI suggests improvements → Better prompt → Great result.
+> 44. Side-by-side + message: "AI is a conversation, not a form. If it didn't work, ask what to improve."
 >
 > **Act 8 — The Wake-Up Call (one continuous storytelling arc, coach tone — not accusatory)**
-> 45. Opening question: "Vocês têm problemas com a IA fazendo o que vocês querem?"
-> 46. Build: "Se a IA não faz o que você quer, é porque a comunicação não foi clara o suficiente."
-> 47. Statement: "A IA é o estagiário mais inteligente do mundo. Ela sabe tudo, mas não sabe nada sobre o SEU problema — até você contar."
-> 48. Wake-up (big, bold): "E aí, o que você tá fazendo pra melhorar?"
-> 49. Challenge: "A IA não é uma ferramenta estática — todo dia ela tá diferente. Se você faz o mesmo prompt todo dia e não muda nada — não vai evoluir."
-> 50. Learning loop: "Quando dá errado, não fica puto. Investiga. Pergunta pra IA: 'por que você foi por esse caminho?' Descobre: às vezes o erro é seu, às vezes é uma limitação da IA. Nos dois casos, você ajusta o seu processo."
-> 51. Key insight (big, bold): "Todo erro é uma oportunidade de aprender." Ou melhora sua comunicação, ou adapta seu processo.
-> 52. Personal example (leading by example, not vulnerability): "Eu também erro. Todo dia. Mas quando erro, pergunto pra IA por que foi por aquele caminho. Já descobri coisas do meu processo — e ajustei. Já descobri limitações da IA — e adaptei. Uso speech-to-text pra dar mais contexto. Isso é o que eu faço diariamente. E vocês?"
-> 53. Closing (celebration image — champagne, confetti): "Melhore a sua comunicação."
+> 45. Opening question: "Are you having trouble getting AI to do what you want?"
+> 46. Build: "If the AI isn't doing what you want, it's because the communication wasn't clear enough."
+> 47. Statement: "AI is the smartest intern in the world. It knows everything, but it knows nothing about YOUR problem — until you tell it."
+> 48. Wake-up (big, bold): "So, what are you doing to get better?"
+> 49. Challenge: "AI is not a static tool — it's different every day. If you send the same prompt every day and don't change anything — you won't evolve."
+> 50. Learning loop: "When it goes wrong, don't get angry. Investigate. Ask the AI: 'why did you go that way?' You'll find: sometimes the error is yours, sometimes it's an AI limitation. Either way, adjust your process."
+> 51. Key insight (big, bold): "Every error is a learning opportunity." Either improve your communication, or adapt your process.
+> 52. Personal example (leading by example, not vulnerability): "I mess up too. Every day. But when I do, I ask the AI why it went that way. I've found things about my process — and adjusted. I've found AI limitations — and adapted. I use speech-to-text to give more context. That's what I do daily. And you?"
+> 53. Closing (celebration image — champagne, confetti): "Improve your communication."
 >
 > **Style notes:**
 > - Minimal text, maximum images, dark theme, high contrast
@@ -302,4 +304,4 @@ Full research documented in `SPIKE.md` (this directory) and raw data in:
 > - Act 8 tone is COACH, not JUDGE — it's a wake-up call, not an attack. Energy builds toward action, not guilt
 >> - Closing should feel celebratory and light — "it's simpler than you think"
 > - All examples universal — no code, no jargon, no area-specific scenarios
-> - Language: Portuguese (Brazil)
+> - Language: English (planning version). Final delivery is in Portuguese (Brazil) — to be produced as an auxiliary file with the pt-BR slide copy.

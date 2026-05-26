@@ -1,9 +1,9 @@
 # PLAN - Integrator Module: Multi-VPN Support
 
-**Status**: ✅ **FINALIZADO** — merged to `develop` via PR #347 on 2026-04-21
+**Status**: ✅ **COMPLETED** — merged to `develop` via PR #347 on 2026-04-21
 **Branch**: `feature/integrator-multi-vpn` (deleted post-merge)
-**Stack alvo**: `integrator-atento/`
-**Módulo**: `modules/integrator/`
+**Target stack**: `integrator-atento/`
+**Module**: `modules/integrator/`
 
 ## Completion Summary
 

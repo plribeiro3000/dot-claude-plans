@@ -322,7 +322,7 @@ While rolling commcenter the role failed with `apt_pkg.Error: Conflicting values
 
 ### Atento incident — replSetName drift
 
-Atento's real `replSetName` is `atento-br` (sufixo de país, herdado da migração antiga). The playbook hardcodes `mongodb_conf_replSetName: "{{ client_name }}"`, so passing `client_name=atento` rendered `mongod.conf` with `replication.replSetName: atento`. The role's mongod.conf template substitution triggered the `restart mongod` handler on all 3 nodes simultaneously. Each mongod restarted with the wrong replSetName, refused to load `local.system.replset` (id was `atento-br`), and returned `InvalidReplicaSetConfig` (code 93) to any client.
+Atento's real `replSetName` is `atento-br` (country suffix, inherited from the old migration). The playbook hardcodes `mongodb_conf_replSetName: "{{ client_name }}"`, so passing `client_name=atento` rendered `mongod.conf` with `replication.replSetName: atento`. The role's mongod.conf template substitution triggered the `restart mongod` handler on all 3 nodes simultaneously. Each mongod restarted with the wrong replSetName, refused to load `local.system.replset` (id was `atento-br`), and returned `InvalidReplicaSetConfig` (code 93) to any client.
 
 Cluster was offline for ~2 minutes. Engineer was already aware integrators were idle so user impact was zero.
 

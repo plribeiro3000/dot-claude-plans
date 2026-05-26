@@ -149,7 +149,7 @@ These should be cleaned up separately. **Each requires per-stack investigation b
 | `app-` only on atento (Group C) | ECS cluster/service/CP/ASG, Lambda, ECS log groups, scheduler, CodeDeploy, most IAM roles/policies | atento outlier ✗ |
 | ALB pattern (Group D) | ALB, TG, bluegreen role, ALB SG | 3 different patterns ✗ |
 
-### Why "Ou tudo tem app ou nada tem app" isn't achievable today
+### Why "all-or-nothing app- prefix" isn't achievable today
 
 The "all or nothing" goal would require:
 - **Removing `app-` from Group A:** breaks GitHub Actions (IAM user rename = new credentials), breaks VPC SSM consumers, requires Aurora rename (downtime), impossible for OpenSearch (immutable name)
@@ -186,7 +186,7 @@ This means the codebase WILL have "some things with `app-`, some things without.
 |---|---|
 | OpenSearch domain `app-atento-001` | Domain name immutable in AWS — no rename API exists |
 | ALB `app-atento-001-lb` | Same `replace_triggered_by` blocker as shared-001 (Camada 4) |
-| IAM user `app-atento-001` | Mantém para compatibilidade com GitHub Actions secrets |
+| IAM user `app-atento-001` | Kept for GitHub Actions secrets compatibility |
 
 ### Success metrics
 

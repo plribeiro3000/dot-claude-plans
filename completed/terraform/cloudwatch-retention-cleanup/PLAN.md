@@ -1,81 +1,81 @@
 # CloudWatch Log Groups — Retention & Cleanup
 
-**Análise executada em:** 2026-03-07
-**Regiões:** us-east-1 e sa-east-1
-**Total de grupos analisados:** 139 (129 + 10)
+**Analysis executed on:** 2026-03-07
+**Regions:** us-east-1 and sa-east-1
+**Total groups analyzed:** 139 (129 + 10)
 
 ---
 
-## Contexto
+## Context
 
-Auditoria completa de todos os log groups do CloudWatch revelou grupos sem política de retenção (custo crescente indefinido), grupos órfãos (sem eventos há meses/anos) e grupos vazios. Resultados salvos em `/tmp/cw_analysis_report_*.txt` e `/tmp/cw_analysis_full_results.json`.
-
----
-
-## ✅ Fase 1 — Deleções via CLI (us-east-1) — CONCLUÍDA 2026-03-08
-
-```
-/aws/rds/cluster/production-app/postgresql           → deletado
-/aws/rds/cluster/poc-app/postgresql                  → deletado
-/aws/OpenSearchService/domains/elastic-index-2/audit-logs  → deletado
-/aws/OpenSearchService/domains/elastic-index-2/index-logs  → deletado
-/aws/OpenSearchService/domains/elastic-index-2/search-logs → deletado
-/ecs/teste                                           → deletado
-/ecs/TESTE                                           → deletado
-/ecs/teste-puma                                      → deletado
-```
-
-## ✅ Fase 2 — Deleções via CLI (sa-east-1) — CONCLUÍDA 2026-03-08
-
-```
-/ecs/keycloak       → deletado
-/ecs/keycloak-task  → deletado
-```
+Complete audit of every CloudWatch log group revealed groups with no retention policy (indefinite cost growth), orphan groups (no events for months/years), and empty groups. Results saved in `/tmp/cw_analysis_report_*.txt` and `/tmp/cw_analysis_full_results.json`.
 
 ---
 
-## ✅ Fase 3 — Órfãos adicionais descobertos e deletados — CONCLUÍDA 2026-03-08
-
-O plano original previa `put-retention-policy` para estes grupos, mas verificação confirmou que os recursos subjacentes não existem mais. Todos foram deletados.
-
-### RDS clusters (us-east-1) — clusters não existem
+## ✅ Phase 1 — CLI deletions (us-east-1) — COMPLETED 2026-03-08
 
 ```
-/aws/rds/cluster/atento-001-app-cluster-cluster/postgresql → deletado
-/aws/rds/cluster/demo-prd/postgresql                       → deletado
-/aws/rds/cluster/atento-001-cluster/postgresql             → deletado
-/aws/rds/cluster/demo-001-cluster/postgresql               → deletado
+/aws/rds/cluster/production-app/postgresql           → deleted
+/aws/rds/cluster/poc-app/postgresql                  → deleted
+/aws/OpenSearchService/domains/elastic-index-2/audit-logs  → deleted
+/aws/OpenSearchService/domains/elastic-index-2/index-logs  → deleted
+/aws/OpenSearchService/domains/elastic-index-2/search-logs → deleted
+/ecs/teste                                           → deleted
+/ecs/TESTE                                           → deleted
+/ecs/teste-puma                                      → deleted
 ```
 
-> `production-app-2` mantido — já tinha `retention_in_days=30`, será limpo naturalmente.
-
-### CodeDeploy hooks formato antigo (us-east-1) — lambdas não existem
+## ✅ Phase 2 — CLI deletions (sa-east-1) — COMPLETED 2026-03-08
 
 ```
-/aws/lambda/codedeploy-hook-lambda-atento-001  → deletado
-/aws/lambda/codedeploy-hook-lambda-beta-001    → deletado
-/aws/lambda/codedeploy-hook-lambda-demo-001    → deletado
-/aws/lambda/codedeploy-hook-lambda-shared-001  → deletado
-/aws/lambda/codedeploy-hook-lambda-poc         → deletado
-```
-
-### OpenSearch (us-east-1) — domínio não existe
-
-```
-/aws/OpenSearchService/domains/elastic-index-2/application-logs → deletado
+/ecs/keycloak       → deleted
+/ecs/keycloak-task  → deleted
 ```
 
 ---
 
-## 🔲 Fase 4 — Retenção via Terraform (PENDENTE)
+## ✅ Phase 3 — Additional orphans discovered and deleted — COMPLETED 2026-03-08
 
-Feature branch necessária. Adicionar `aws_cloudwatch_log_group` com `retention_in_days = 30` e fazer `terraform import` antes do apply.
+The original plan called for `put-retention-policy` on these groups, but verification confirmed the underlying resources no longer exist. All were deleted.
 
-### 4.1 — RDS clusters ativos
+### RDS clusters (us-east-1) — clusters do not exist
 
-Clusters existentes: `app-atento-001-cluster`, `app-shared-001-cluster`, `app-demo-001-cluster`.
+```
+/aws/rds/cluster/atento-001-app-cluster-cluster/postgresql → deleted
+/aws/rds/cluster/demo-prd/postgresql                       → deleted
+/aws/rds/cluster/atento-001-cluster/postgresql             → deleted
+/aws/rds/cluster/demo-001-cluster/postgresql               → deleted
+```
 
-Adicionar em cada `rds.tf` da stack correspondente:
+> `production-app-2` kept — already had `retention_in_days=30`, will be cleaned naturally.
+
+### CodeDeploy hooks old format (us-east-1) — lambdas do not exist
+
+```
+/aws/lambda/codedeploy-hook-lambda-atento-001  → deleted
+/aws/lambda/codedeploy-hook-lambda-beta-001    → deleted
+/aws/lambda/codedeploy-hook-lambda-demo-001    → deleted
+/aws/lambda/codedeploy-hook-lambda-shared-001  → deleted
+/aws/lambda/codedeploy-hook-lambda-poc         → deleted
+```
+
+### OpenSearch (us-east-1) — domain does not exist
+
+```
+/aws/OpenSearchService/domains/elastic-index-2/application-logs → deleted
+```
+
+---
+
+## 🔲 Phase 4 — Retention via Terraform (PENDING)
+
+Feature branch required. Add `aws_cloudwatch_log_group` with `retention_in_days = 30` and run `terraform import` before applying.
+
+### 4.1 — Active RDS clusters
+
+Existing clusters: `app-atento-001-cluster`, `app-shared-001-cluster`, `app-demo-001-cluster`.
+
+Add to each stack's `rds.tf`:
 
 ```hcl
 resource "aws_cloudwatch_log_group" "rds_postgresql" {
@@ -85,7 +85,7 @@ resource "aws_cloudwatch_log_group" "rds_postgresql" {
 }
 ```
 
-| Arquivo | Resource name | Import path |
+| File | Resource name | Import path |
 |---|---|---|
 | `app-atento-001/rds.tf` | `aws_cloudwatch_log_group.rds_app_atento_001` | `/aws/rds/cluster/app-atento-001-cluster/postgresql` |
 | `app-shared-001/rds.tf` | `aws_cloudwatch_log_group.rds_shared_001` | `/aws/rds/cluster/shared-001-cluster/postgresql` |
@@ -106,9 +106,9 @@ terraform import aws_cloudwatch_log_group.rds_app_demo_001   /aws/rds/cluster/ap
 
 ---
 
-### 4.2 — CodeDeploy hook lambda — formato novo
+### 4.2 — CodeDeploy hook lambda — new format
 
-Adicionar em `modules/codedeploy/main.tf`:
+Add to `modules/codedeploy/main.tf`:
 
 ```hcl
 resource "aws_cloudwatch_log_group" "codedeploy_hook" {
@@ -120,7 +120,7 @@ resource "aws_cloudwatch_log_group" "codedeploy_hook" {
 }
 ```
 
-Adicionar variável em `modules/codedeploy/variables.tf`:
+Add variable in `modules/codedeploy/variables.tf`:
 
 ```hcl
 variable "cloudwatch_log_group_retention_in_days" {
@@ -130,7 +130,7 @@ variable "cloudwatch_log_group_retention_in_days" {
 }
 ```
 
-Import por stack:
+Import per stack:
 
 ```bash
 cd terraform/app-atento-001
@@ -145,10 +145,10 @@ terraform import 'module.codedeploy_web.aws_cloudwatch_log_group.codedeploy_hook
 cd ../app-beta-001
 terraform import 'module.codedeploy_web.aws_cloudwatch_log_group.codedeploy_hook[0]' /aws/lambda/Lambda-beta-001-codedeploy-hook
 
-cd ../app-atento-001   # novo stack VPC
+cd ../app-atento-001   # new VPC stack
 terraform import 'module.codedeploy_web.aws_cloudwatch_log_group.codedeploy_hook[0]' /aws/lambda/Lambda-app-atento-001-codedeploy-hook
 
-cd ../app-shared-001   # novo stack VPC
+cd ../app-shared-001   # new VPC stack
 terraform import 'module.codedeploy_web.aws_cloudwatch_log_group.codedeploy_hook[0]' /aws/lambda/Lambda-app-shared-001-codedeploy-hook
 ```
 
@@ -156,7 +156,7 @@ terraform import 'module.codedeploy_web.aws_cloudwatch_log_group.codedeploy_hook
 
 ### 4.3 — EC2-start-integrator (sa-east-1)
 
-Lambdas existem mas não estão no Terraform. Adicionar em cada stack `integrator-*`:
+Lambdas exist but are not in Terraform. Add to each `integrator-*` stack:
 
 ```hcl
 resource "aws_cloudwatch_log_group" "ec2_start_lambda" {
@@ -165,7 +165,7 @@ resource "aws_cloudwatch_log_group" "ec2_start_lambda" {
 }
 ```
 
-Import por stack:
+Import per stack:
 
 ```bash
 cd terraform/integrator-almaviva
@@ -189,7 +189,7 @@ terraform import aws_cloudwatch_log_group.ec2_start_lambda /aws/lambda/EC2-start
 
 ---
 
-## Notas
+## Notes
 
-- `RDSOSMetrics` em sa-east-1 está órfão (390 dias) mas tem retenção de 30d — será limpo naturalmente pelo CloudWatch.
-- `production-app-2/postgresql` mantido com retenção=30 já configurada — sem ação necessária.
+- `RDSOSMetrics` in sa-east-1 is orphan (390 days) but has 30d retention — will be cleaned naturally by CloudWatch.
+- `production-app-2/postgresql` kept with retention=30 already configured — no action needed.

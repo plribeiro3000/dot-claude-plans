@@ -1,44 +1,44 @@
-# Plano: Migração de swagger-blocks para zero-rails_openapi
+# Plan: Migrate from swagger-blocks to zero-rails_openapi
 
 **Status:** ✅ COMPLETED
 
-## Contexto
+## Context
 
-Migração da documentação da API de swagger-blocks (Swagger 2.0) para zero-rails_openapi (OpenAPI 3.0), mantendo os schemas definidos nos serializers.
+Migrate API documentation from swagger-blocks (Swagger 2.0) to zero-rails_openapi (OpenAPI 3.0), keeping schemas defined in serializers.
 
-## Estado Atual
+## Current State
 
-- Controllers e serializers usam `swagger-blocks` gem
-- Serializers definem schemas de resposta (Client, User, etc.) e erros (CreateClientErrors, etc.)
-- Controllers definem schemas de request params
+- Controllers and serializers use the `swagger-blocks` gem
+- Serializers define response schemas (Client, User, etc.) and errors (CreateClientErrors, etc.)
+- Controllers define request param schemas
 
-## Objetivo
+## Objective
 
-Manter a mesma estrutura organizacional (schemas nos serializers), usando zero-rails_openapi.
+Keep the same organizational structure (schemas in serializers), using zero-rails_openapi.
 
-## Descobertas da Sessão
+## Session Findings
 
-### Sintaxe Correta do zero-rails_openapi
+### Correct zero-rails_openapi syntax
 
 ```ruby
-# CORRETO - Arrow syntax com array
+# CORRECT - Arrow syntax with array
 schema :Name => [{ prop!: Type, prop2: Type }, {}]
 
-# ERRADO - Não funciona
+# WRONG - Does not work
 schema :Name, :object, { prop!: { type: Type } }
 ```
 
-### Configuração Necessária
+### Required configuration
 
-1. **ApplicationSerializer** - Classe base que inclui OpenApi::DSL
-2. **base_doc_classes** - Deve incluir tanto ApiController quanto ApplicationSerializer
-3. **Patch para tags nil** - Serializers geram tags com name: nil que quebram o sort
+1. **ApplicationSerializer** — base class that includes OpenApi::DSL
+2. **base_doc_classes** — must include both ApiController and ApplicationSerializer
+3. **Patch for nil tags** — serializers generate tags with name: nil that break the sort
 
-## Plano de Execução
+## Execution Plan
 
-### Fase 1: Infraestrutura ✅
+### Phase 1: Infrastructure ✅
 
-1. **Criar ApplicationSerializer**
+1. **Create ApplicationSerializer**
    ```ruby
    # app/serializers/application_serializer.rb
    class ApplicationSerializer < ActiveModel::Serializer
@@ -46,51 +46,51 @@ schema :Name, :object, { prop!: { type: Type } }
    end
    ```
 
-2. **Atualizar config/initializers/open_api.rb**
-   - Adicionar patch para filtrar tags nil
-   - Adicionar ApplicationSerializer ao base_doc_classes
+2. **Update config/initializers/open_api.rb**
+   - Add patch to filter out nil tags
+   - Add ApplicationSerializer to base_doc_classes
 
-### Fase 2: Converter Serializers (22 arquivos) ✅
+### Phase 2: Convert Serializers (22 files) ✅
 
-Para cada serializer:
-1. Mudar herança: `< ActiveModel::Serializer` → `< ApplicationSerializer`
-2. Remover: `include Swagger::Blocks`
-3. Converter `swagger_schema` para `schema :Name => [{ props }, {}]`
+For each serializer:
+1. Change inheritance: `< ActiveModel::Serializer` → `< ApplicationSerializer`
+2. Remove: `include Swagger::Blocks`
+3. Convert `swagger_schema` to `schema :Name => [{ props }, {}]`
 
-**Mapeamento de tipos:**
+**Type mapping:**
 - `key :type, :string` → `String`
 - `key :type, :integer` → `Integer`
 - `key :type, :boolean` → `'boolean'`
-- `key :type, :array` com `items` → `{ type: Array, items: :RefName }`
+- `key :type, :array` with `items` → `{ type: Array, items: :RefName }`
 - `key :$ref` → `:RefName` (symbol reference)
 
-**Mapeamento de required:**
-- `key :required, %i[field1 field2]` → usar `!` no nome: `field1!: Type, field2!: Type`
+**Required mapping:**
+- `key :required, %i[field1 field2]` → use `!` in the name: `field1!: Type, field2!: Type`
 
-### Fase 3: Converter Controllers (28 arquivos) ✅
+### Phase 3: Convert Controllers (28 files) ✅
 
-Para cada controller V3:
-1. Remover: `include Swagger::Blocks`
-2. Converter `swagger_schema` para `schema :Name => [{ props }, {}]`
+For each V3 controller:
+1. Remove: `include Swagger::Blocks`
+2. Convert `swagger_schema` to `schema :Name => [{ props }, {}]`
 
-### Fase 4: Atualizar ApiController ✅
+### Phase 4: Update ApiController ✅
 
-1. Remover: `include Swagger::Blocks` (se existir)
-2. Manter: `include OpenApi::DSL`
-3. Converter schema InvalidJsonErrors para nova sintaxe
+1. Remove: `include Swagger::Blocks` (if present)
+2. Keep: `include OpenApi::DSL`
+3. Convert the InvalidJsonErrors schema to the new syntax
 
-### Fase 5: Limpeza ✅
+### Phase 5: Cleanup ✅
 
-1. Remover gem swagger-blocks do Gemfile (se não usada em outros lugares)
-2. Remover assets/configs relacionados ao Swagger UI antigo
+1. Remove the swagger-blocks gem from the Gemfile (if not used elsewhere)
+2. Remove assets/configs related to the old Swagger UI
 
-### Fase 6: Validação ✅
+### Phase 6: Validation ✅
 
-1. Regenerar api.json
-2. Validar estrutura do JSON
-3. Testar no Scalar frontend
+1. Regenerate api.json
+2. Validate JSON structure
+3. Test on the Scalar frontend
 
-## Arquivos a Modificar
+## Files to Modify
 
 ### Serializers (22)
 - client_serializer.rb
@@ -150,9 +150,9 @@ Para cada controller V3:
 ### Config
 - config/initializers/open_api.rb
 
-## Exemplo de Conversão
+## Conversion Example
 
-### Antes (swagger-blocks)
+### Before (swagger-blocks)
 ```ruby
 class ClientSerializer < ActiveModel::Serializer
   include Swagger::Blocks
@@ -182,7 +182,7 @@ class ClientSerializer < ActiveModel::Serializer
 end
 ```
 
-### Depois (zero-rails_openapi)
+### After (zero-rails_openapi)
 ```ruby
 class ClientSerializer < ApplicationSerializer
   attributes :external_id, :name
@@ -194,7 +194,7 @@ class ClientSerializer < ApplicationSerializer
 end
 ```
 
-## Patch Necessário para open_api.rb
+## Required patch for open_api.rb
 
 ```ruby
 # Patch to filter out tags with nil names (from serializers that only define components)
@@ -220,13 +220,13 @@ module OpenApi
 end
 ```
 
-## Riscos e Mitigações
+## Risks and Mitigations
 
-1. **Risco**: Perder trabalho com git checkout
-   **Mitigação**: Fazer commits incrementais após cada fase
+1. **Risk**: Lose work via `git checkout`
+   **Mitigation**: Make incremental commits after each phase
 
-2. **Risco**: Sintaxe incorreta quebrar geração
-   **Mitigação**: Testar com um arquivo antes de converter todos
+2. **Risk**: Incorrect syntax breaking generation
+   **Mitigation**: Test with one file before converting all
 
-3. **Risco**: Schemas complexos com refs não converterem corretamente
-   **Mitigação**: Revisar manualmente schemas com referências a outros schemas
+3. **Risk**: Complex schemas with refs failing to convert correctly
+   **Mitigation**: Manually review schemas that reference other schemas

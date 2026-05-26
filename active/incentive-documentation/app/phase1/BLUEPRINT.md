@@ -249,9 +249,9 @@ campaign_account.increment!(:balance, user_commission.billable_money)
 
 **Bug Discovered During Implementation:**
 
-O código original chamava `release_payment` (validação de orçamento) no `ApprovalFinalizer`, DEPOIS de criar os créditos. Isso era um bug - criava créditos sem validar se havia orçamento disponível.
+The original code called `release_payment` (budget validation) in `ApprovalFinalizer`, AFTER creating the credits. This was a bug — it created credits without validating whether budget was available.
 
-**Solution:** `release_payment` agora é chamado SINCRONAMENTE dentro de `approve_by`, na mesma transaction da aprovação:
+**Solution:** `release_payment` is now called SYNCHRONOUSLY inside `approve_by`, in the same approval transaction:
 
 ```ruby
 # app/models/incentive_payment.rb

@@ -4,33 +4,33 @@
 
 ## Overview
 
-Garantir que todas as mensagens de erro de validação geradas pelos processadores de documentos (uploads CSV) estejam traduzidas no frontend nos 3 idiomas (pt-BR, en, es).
+Ensure all validation error messages produced by document processors (CSV uploads) are translated in the frontend across 3 languages (pt-BR, en, es).
 
 ## Scope
 
 **Type**: Multi-project (Backend + Frontend)
 
 **Projects Affected**:
-- `app` (Backend - Rails) - Validações e mensagens de erro
-- `app-webclient` (Frontend - Angular) - Traduções
+- `app` (Backend - Rails) - Validations and error messages
+- `app-webclient` (Frontend - Angular) - Translations
 
 ---
 
 ## Analysis Summary
 
 ### Total Keys
-- **163 error keys** identificadas
-- **Cobertura final**: 163/163 (100%) em todos os 3 idiomas
+- **163 error keys** identified
+- **Final coverage**: 163/163 (100%) across all 3 languages
 
 ### Backend Translation Sources
 
 1. **Generic Rails Messages** (`config/locales/{locale}/gems/rails.yml`)
-   - Mensagens padrão: blank, invalid, taken, too_short, too_long, etc.
-   - Disponível em: pt-BR, en, es
+   - Default messages: blank, invalid, taken, too_short, too_long, etc.
+   - Available in: pt-BR, en, es
 
 2. **Model-Specific Messages** (`config/locales/{locale}/models/*.yml`)
-   - Mensagens customizadas por modelo
-   - Algumas só têm pt-BR (pendente adicionar en, es no backend)
+   - Custom messages per model
+   - Some only have pt-BR (pending addition of en, es on the backend)
 
 ---
 
@@ -57,7 +57,7 @@ Garantir que todas as mensagens de erro de validação geradas pelos processador
 
 ### Completed (Frontend)
 
-Todas as 163 chaves implementadas nos 3 idiomas:
+All 163 keys implemented across the 3 languages:
 
 | Resource | Keys Added |
 |----------|------------|

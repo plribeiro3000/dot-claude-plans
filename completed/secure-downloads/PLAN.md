@@ -718,44 +718,44 @@ Migrate profile image storage from CarrierWave-in-Profile to Attachment pattern,
 
 ## Architectural Decision
 
-**Migrar para Attachment pattern** - decisão tomada após análise de design de domínio:
+**Migrate to Attachment pattern** — decision made after domain design analysis:
 
-- Profile é entidade de domínio (dados do usuário), não deve conhecer detalhes de storage
-- Attachment é objeto de valor/serviço especializado em arquivos externos
-- Consistência com Campaign, Document, Audit que já usam Attachment pattern
-- Código centralizado: mudanças de storage afetam só Attachment, não Profile
+- Profile is a domain entity (user data); it should not know storage details
+- Attachment is a value object/service specialized in external files
+- Consistency with Campaign, Document, Audit which already use the Attachment pattern
+- Centralized code: storage changes only affect Attachment, not Profile
 
 ## LGPD Decision
 
-Foto de perfil (avatar) **não é dado biométrico sensível** segundo LGPD - só seria se usada para reconhecimento facial. Porém, **vamos implementar policy mesmo assim** para manter consistência de segurança em todo o bucket S3.
+Profile picture (avatar) **is not sensitive biometric data** under LGPD — it would only be if used for facial recognition. However, **a policy will be implemented anyway** to keep security consistency across the whole S3 bucket.
 
 ## Current Architecture (Tech Debt)
 
 ```ruby
-# app/models/profile.rb - PROBLEMA: usa CarrierWave direto
+# app/models/profile.rb - PROBLEM: uses CarrierWave directly
 class Profile < ApplicationRecord
-  mount_uploader :image, ProfileUploader  # ← Deveria ser has_one :attachment
+  mount_uploader :image, ProfileUploader  # ← Should be has_one :attachment
 
-  def upload_url  # ← Lógica de S3 que não deveria estar aqui
-    # ...gera presigned PUT URL...
+  def upload_url  # ← S3 logic that should not live here
+    # ...generates presigned PUT URL...
   end
 end
 
 # Schema profiles: id, user_id, image, filename, content_type
 ```
 
-**Comparação com Campaign (correto):**
+**Comparison with Campaign (correct):**
 ```ruby
-# app/models/campaign.rb - PADRÃO CORRETO
+# app/models/campaign.rb - CORRECT PATTERN
 class Campaign < ApplicationRecord
   has_one :attachment, as: :attachable, class_name: 'BannerAttachment', dependent: :destroy
 
-  def upload_url  # ← Gera URL para PUT, attachment salvo depois
+  def upload_url  # ← Generates URL for PUT, attachment saved later
     # ...
   end
 end
 
-# Schema campaigns: id, filename, content_type (sem coluna file)
+# Schema campaigns: id, filename, content_type (no file column)
 # Schema attachments: id, attachable_id, attachable_type, file, type
 ```
 
@@ -1382,36 +1382,36 @@ Remove `X-Amz-Acl` header from all `upload_url` methods in uploaders.
 
 ---
 
-# Phase 9.5 - Cleanup: Remover dependência do UploaderGraphqlType/FileGraphqlType (PENDING)
+# Phase 9.5 - Cleanup: Remove dependency on UploaderGraphqlType/FileGraphqlType (PENDING)
 
-## Objetivo
+## Objective
 
-Avaliar e possivelmente eliminar o uso de `file { file { ... } }` (UploaderGraphqlType/FileGraphqlType do CarrierWave) em favor de campos diretos no `AttachmentGraphqlType`.
+Evaluate and possibly eliminate the use of `file { file { ... } }` (UploaderGraphqlType/FileGraphqlType from CarrierWave) in favor of direct fields on `AttachmentGraphqlType`.
 
-## Situação Atual
+## Current Situation
 
-Frontend acessa dados do arquivo assim:
+The frontend accesses file data like this:
 ```
 attachment.file.file.publicUrl
 attachment.file.file.filename
 attachment.file.file.extension
 ```
 
-Isso depende de:
-- `UploaderGraphqlType` - wrapper do CarrierWave
-- `FileGraphqlType` - expõe campos do CarrierWave::SanitizedFile
+This depends on:
+- `UploaderGraphqlType` — CarrierWave wrapper
+- `FileGraphqlType` — exposes fields from CarrierWave::SanitizedFile
 
-## Proposta
+## Proposal
 
-Adicionar campos diretamente no `AttachmentGraphqlType`:
+Add fields directly on `AttachmentGraphqlType`:
 ```ruby
-field :presigned_url, String, null: true  # ✅ Já existe
-field :filename, String, null: true       # 🔜 Adicionar
-field :extension, String, null: true      # 🔜 Adicionar
-field :content_type, String, null: true   # 🔜 Opcional
+field :presigned_url, String, null: true  # ✅ Already exists
+field :filename, String, null: true       # 🔜 Add
+field :extension, String, null: true      # 🔜 Add
+field :content_type, String, null: true   # 🔜 Optional
 ```
 
-Implementação delegaria para o uploader:
+The implementation would delegate to the uploader:
 ```ruby
 def filename
   object.file&.file&.filename
@@ -1422,23 +1422,23 @@ def extension
 end
 ```
 
-## Benefícios
+## Benefits
 
-1. **Simplifica acesso no frontend**: `attachment.filename` em vez de `attachment.file.file.filename`
-2. **Desacopla do CarrierWave**: GraphQL não expõe estrutura interna do uploader
-3. **Consistência**: Todos os dados do arquivo vêm do `AttachmentGraphqlType`
-4. **Facilita migração futura**: Se trocar CarrierWave por outro storage, só muda o model
+1. **Simplifies frontend access**: `attachment.filename` instead of `attachment.file.file.filename`
+2. **Decouples from CarrierWave**: GraphQL does not expose the uploader's internal structure
+3. **Consistency**: every file attribute comes from `AttachmentGraphqlType`
+4. **Eases future migration**: swapping CarrierWave for another storage only changes the model
 
-## Análise Necessária
+## Required Analysis
 
-1. Verificar todos os lugares que usam `file.file.X` no frontend
-2. Listar quais campos são realmente usados (filename, extension, publicUrl, contentType, size?)
-3. Decidir se remove `UploaderGraphqlType`/`FileGraphqlType` ou mantém para backwards compat
+1. Check every place that uses `file.file.X` in the frontend
+2. List which fields are actually used (filename, extension, publicUrl, contentType, size?)
+3. Decide whether to remove `UploaderGraphqlType`/`FileGraphqlType` or keep them for backwards compat
 
-## Dependências
+## Dependencies
 
-- Todas as phases anteriores (6-9) completas
-- Migração de todos os frontends para usar novos campos
+- All previous phases (6-9) complete
+- Migration of every frontend to use the new fields
 
 ---
 
@@ -2270,7 +2270,7 @@ Replace the single `TemporaryAttachmentsGraphqlResolver` with type-specific reso
 
 ### Architecture
 
-**1 Type genérico** - `TemporaryFileGraphqlType` retorna `id` e `url` para todos os recursos:
+**1 generic Type** — `TemporaryFileGraphqlType` returns `id` and `url` for every resource:
 
 ```ruby
 class TemporaryFileGraphqlType < ObjectType
@@ -2285,7 +2285,7 @@ class TemporaryFileGraphqlType < ObjectType
 end
 ```
 
-**1 Base class** - `TemporaryFileGraphqlResolver` com DSL para `model`, `scope`, `policy`:
+**1 Base class** — `TemporaryFileGraphqlResolver` with a DSL for `model`, `scope`, `policy`:
 
 ```ruby
 class TemporaryFileGraphqlResolver < ApplicationGraphqlResolver
@@ -2321,7 +2321,7 @@ class TemporaryFileGraphqlResolver < ApplicationGraphqlResolver
 end
 ```
 
-**29 Resolvers filhos** - apenas 3 linhas de configuração cada:
+**29 child Resolvers** — only 3 lines of configuration each:
 
 ```ruby
 class TemporaryVariableAuditGraphqlResolver < TemporaryFileGraphqlResolver
@@ -2356,10 +2356,10 @@ end
 
 | Before | After |
 |--------|-------|
-| 29 types específicos (`TemporaryVariableAuditGraphqlType`, etc) | 1 type genérico (`TemporaryFileGraphqlType`) |
-| `TemporaryGraphqlResolver` com DSL `policy` apenas | `TemporaryFileGraphqlResolver` com DSL `model`, `scope`, `policy` |
-| Cada resolver tinha `argument`, `type`, `def resolve` | Resolvers filhos têm apenas 3 linhas de config |
-| Campo `presigned_url` | Campo `url` (domínio, não implementação) |
+| 29 specific types (`TemporaryVariableAuditGraphqlType`, etc) | 1 generic type (`TemporaryFileGraphqlType`) |
+| `TemporaryGraphqlResolver` with DSL `policy` only | `TemporaryFileGraphqlResolver` with DSL `model`, `scope`, `policy` |
+| Each resolver had `argument`, `type`, `def resolve` | Child resolvers have only 3 config lines |
+| Field `presigned_url` | Field `url` (domain, not implementation) |
 
 ## Status: ✅ COMPLETE
 

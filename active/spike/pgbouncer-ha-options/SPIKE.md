@@ -2,39 +2,39 @@
 
 ## Investigation question
 
-Quais opções existem para tornar o PgBouncer do app Atento 001 mais resiliente a falhas de host e mais fácil de operar (observabilidade, logs persistentes), comparando custo, RTO, complexidade operacional e compatibilidade com Rails 8 + Aurora PostgreSQL 15?
+What options exist to make the PgBouncer on app Atento 001 more resilient to host failures and easier to operate (observability, persistent logs), comparing cost, RTO, operational complexity, and compatibility with Rails 8 + Aurora PostgreSQL 15?
 
 ---
 
 ## Sources consulted
 
-- [AWS EC2 Automatic Instance Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html) — tabela comparativa simplified vs CloudWatch action based recovery; texto sobre RTO relativo
-- [AWS CloudWatch Action Based Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/cloudwatch-recovery.html) — métrica `StatusCheckFailed_System`, configuração de alarme, limitação com Auto Scaling groups
-- [AWS Simplified Automatic Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html) — habilitado por padrão, limitações com Auto Scaling groups
-- [AWS Auto Scaling Health Checks](https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html) — comportamento de substituição de instância, lógica de espera
-- [AWS ECS Fargate Task Definitions](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html) — tabela de CPU/memory válidos, networking awsvpc obrigatório, log drivers suportados
-- [AWS Fargate Pricing](https://aws.amazon.com/fargate/pricing/) — taxa por vCPU-segundo e por GB-segundo para Linux/X86 em us-east-1
-- [AWS NLB Pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) — taxa horária NLB $0.0225/hr e LCU TCP $0.006 por NLCU
-- [AWS RDS Proxy for Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.html) — limitações PostgreSQL, porta 5432, CancelRequest, pinning
-- [AWS RDS Proxy Pinning](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html) — condições de pinning para Aurora PostgreSQL
-- [AWS RDS Proxy Planning](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-planning.md) — texto sobre failover Aurora; redução de DNS propagation delays
-- [AWS RDS Proxy Concepts](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.howitworks.html) — multiplexing, pinning, infraestrutura multi-AZ do proxy
-- [economize.cloud — t3a.micro pricing](https://www.economize.cloud/resources/aws/pricing/ec2/t3a.micro/) — preço on-demand t3a.micro us-east-1
-- [AWS ELB Features Comparison](https://aws.amazon.com/elasticloadbalancing/features/) — tabela comparativa de protocolos suportados por tipo de load balancer
-- [AWS NLB Listeners](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html) — protocolos e portas suportados por listeners NLB
-- [AWS How ELB Works](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html) — TTL 60s do DNS entry do ELB; flow hash NLB
-- [AWS Cloud Map Service Creation](https://docs.aws.amazon.com/cloud-map/latest/dg/creating-services.html) — TTL configurável no create-service; exemplo mostrando TTL=60 como padrão da CLI
-- AWS API — snapshot do ambiente (instância, cluster Aurora, cluster ECS, ASGs, task definition existente)
+- [AWS EC2 Automatic Instance Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html) — comparative table simplified vs CloudWatch action-based recovery; text on relative RTO
+- [AWS CloudWatch Action Based Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/cloudwatch-recovery.html) — `StatusCheckFailed_System` metric, alarm configuration, limitation with Auto Scaling groups
+- [AWS Simplified Automatic Recovery](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html) — enabled by default, limitations with Auto Scaling groups
+- [AWS Auto Scaling Health Checks](https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html) — instance replacement behavior, wait logic
+- [AWS ECS Fargate Task Definitions](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html) — valid CPU/memory combos table, required awsvpc networking, supported log drivers
+- [AWS Fargate Pricing](https://aws.amazon.com/fargate/pricing/) — per vCPU-second and per GB-second rate for Linux/X86 in us-east-1
+- [AWS NLB Pricing](https://aws.amazon.com/elasticloadbalancing/pricing/) — NLB hourly rate $0.0225/hr and TCP LCU $0.006 per NLCU
+- [AWS RDS Proxy for Aurora](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.html) — PostgreSQL limitations, port 5432, CancelRequest, pinning
+- [AWS RDS Proxy Pinning](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html) — pinning conditions for Aurora PostgreSQL
+- [AWS RDS Proxy Planning](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-planning.md) — text on Aurora failover; reduction of DNS propagation delays
+- [AWS RDS Proxy Concepts](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.howitworks.html) — multiplexing, pinning, multi-AZ proxy infrastructure
+- [economize.cloud — t3a.micro pricing](https://www.economize.cloud/resources/aws/pricing/ec2/t3a.micro/) — t3a.micro on-demand price in us-east-1
+- [AWS ELB Features Comparison](https://aws.amazon.com/elasticloadbalancing/features/) — comparative table of supported protocols by load balancer type
+- [AWS NLB Listeners](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html) — protocols and ports supported by NLB listeners
+- [AWS How ELB Works](https://docs.aws.amazon.com/elasticloadbalancing/latest/userguide/how-elastic-load-balancing-works.html) — 60s TTL of the ELB DNS entry; NLB flow hash
+- [AWS Cloud Map Service Creation](https://docs.aws.amazon.com/cloud-map/latest/dg/creating-services.html) — TTL configurable on create-service; example showing TTL=60 as the CLI default
+- AWS API — snapshot of the environment (instance, Aurora cluster, ECS cluster, ASGs, existing task definition)
 
 ---
 
 ## Findings
 
-### Finding 1: Estado atual — simplified automatic recovery está habilitado, mas não há CloudWatch alarm de recovery
+### Finding 1: Current state — simplified automatic recovery is enabled, but no CloudWatch recovery alarm exists
 
 **Evidence:**
 
-Consulta AWS API retornou:
+AWS API query returned:
 
 ```json
 {
@@ -46,7 +46,7 @@ Consulta AWS API retornou:
 }
 ```
 
-E:
+And:
 
 ```json
 {
@@ -55,64 +55,64 @@ E:
 }
 ```
 
-A propriedade `MaintenanceOptions.AutoRecovery = "default"` significa que o simplified automatic recovery está ativo (valor `"default"` ativa o comportamento padrão, que inclui recovery em instâncias suportadas). O campo `Monitoring.State = "disabled"` reflete apenas que detailed monitoring do CloudWatch está desligado — não o recovery.
+The property `MaintenanceOptions.AutoRecovery = "default"` means simplified automatic recovery is active (the `"default"` value enables the standard behavior, which includes recovery on supported instances). The `Monitoring.State = "disabled"` field reflects only that CloudWatch detailed monitoring is off — not recovery.
 
-Não existe nenhum CloudWatch alarm configurado para `i-0b6f70bc905727770`:
+There is no CloudWatch alarm configured for `i-0b6f70bc905727770`:
 
 ```
 aws cloudwatch describe-alarms --alarm-name-prefix "pgbouncer-atento"
 → MetricAlarms: [], CompositeAlarms: []
 ```
 
-O incidente relatado (10 min de indisponibilidade, `StatusCheckFailed_System=1`, auto-recovery com reboot) é o comportamento esperado do simplified automatic recovery: a AWS detecta a falha de hardware, tenta migrar o host, e o processo aparece como reboot não planejado para a instância.
+The reported incident (10 min of unavailability, `StatusCheckFailed_System=1`, auto-recovery with reboot) is the expected behavior of simplified automatic recovery: AWS detects the hardware failure, attempts to migrate the host, and the process appears as an unplanned reboot to the instance.
 
-**Source:** `aws ec2 describe-instances` + `aws cloudwatch describe-alarms` (leitura direta da API)
+**Source:** `aws ec2 describe-instances` + `aws cloudwatch describe-alarms` (direct API reads)
 
-**Significance:** A proteção atual é o simplified automatic recovery sem alarme CloudWatch. O incidente foi contido por esse mecanismo, mas levou ~10 minutos de downtime. Não há visibilidade via SNS do evento de recovery, e os logs do PgBouncer ficam apenas no journald da instância — ao perder o host, o contexto de diagnóstico se perde.
+**Significance:** Current protection is simplified automatic recovery without a CloudWatch alarm. The incident was contained by that mechanism, but it took ~10 minutes of downtime. There is no SNS visibility for the recovery event, and PgBouncer logs only live in the instance journald — when the host is lost, diagnostic context is lost.
 
 **Verification:**
-- URL fetched: N/A (AWS API direct)
+- URL fetched: N/A (direct AWS API)
 - Verbatim quote checked: N/A (API response JSON)
-- Quote substring confirmed at: Output direto do `describe-instances` e `describe-alarms`
+- Quote substring confirmed at: direct output of `describe-instances` and `describe-alarms`
 
 ---
 
-### Finding 2: Diferença de RTO entre simplified automatic recovery e CloudWatch action based recovery
+### Finding 2: RTO difference between simplified automatic recovery and CloudWatch action-based recovery
 
 **Evidence:**
 
-A documentação AWS apresenta uma tabela de comparação com a seguinte linha verbatim:
+AWS documentation presents a comparison table with the following verbatim line:
 
 > | Recovery time | Standard recovery attempt | Faster recovery attempts than simplified automatic recovery |
 
-(linha da tabela em `https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html`, seção "Differences between simplified automatic recovery and CloudWatch action based recovery")
+(table row in `https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html`, section "Differences between simplified automatic recovery and CloudWatch action based recovery")
 
-Adicionalmente, sobre o CloudWatch action based recovery:
+Additionally, on CloudWatch action-based recovery:
 
 > "CloudWatch action based recovery provides to-the-minute recovery response time granularity and Amazon Simple Notification Service (Amazon SNS) notifications of recovery actions and outcomes."
 
-E sobre simplified automatic recovery:
+And on simplified automatic recovery:
 
 > "Simplified automatic recovery is enabled by default on all supported instances during instance launch."
 
-Tanto simplified quanto CloudWatch action based recovery têm a mesma limitação crítica:
+Both simplified and CloudWatch action-based recovery share the same critical limitation:
 
 > "Limitations: Auto Scaling: Instances that are part of an Auto Scaling group"
 
-(ambas as páginas listam explicitamente essa limitação — significa que **nenhuma das duas pode ser usada** em instâncias gerenciadas por um ASG).
+(both pages explicitly list this limitation — it means **neither can be used** on instances managed by an ASG).
 
-**Source:** https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html (tabela "Differences"); https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/cloudwatch-recovery.html (cita CloudWatch action based recovery + Limitations); https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html (cita "Simplified automatic recovery is enabled by default...")
+**Source:** https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html (table "Differences"); https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/cloudwatch-recovery.html (cites CloudWatch action-based recovery + Limitations); https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html (cites "Simplified automatic recovery is enabled by default...")
 
-**Significance:** CloudWatch action based recovery oferece RTO menor que simplified (a documentação não fornece números absolutos, apenas "faster") e adiciona SNS para notificação. Ambas as opções são mutuamente exclusivas com ASG — uma instância em ASG não pode usar nenhum dos dois mecanismos de recovery direto.
+**Significance:** CloudWatch action-based recovery offers a lower RTO than simplified (the docs do not give absolute numbers, only "faster") and adds SNS notification. Both options are mutually exclusive with ASG — an instance in an ASG cannot use either direct recovery mechanism.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-recover.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: tabela "Differences between simplified automatic recovery and CloudWatch action based recovery", linha "Recovery time"
+- Quote substring confirmed at: table "Differences between simplified automatic recovery and CloudWatch action based recovery", row "Recovery time"
 
 ---
 
-### Finding 3: Task definition pgbouncer:1 já existe no ECS — imagem ECR própria, awslogs configurado
+### Finding 3: Task definition pgbouncer:1 already exists in ECS — proprietary ECR image, awslogs configured
 
 **Evidence:**
 
@@ -138,53 +138,53 @@ Tanto simplified quanto CloudWatch action based recovery têm a mesma limitaçã
 }
 ```
 
-A task definition usa `networkMode: bridge` (EC2 mode) e não é compatível com Fargate (que requer `awsvpc`). A imagem `pgbouncer-puma:latest` já está no ECR da conta. O log group `/ecs/pgbouncer` já está configurado com `awslogs-create-group: true`.
+The task definition uses `networkMode: bridge` (EC2 mode) and is not Fargate-compatible (Fargate requires `awsvpc`). The image `pgbouncer-puma:latest` is already in the account's ECR. The log group `/ecs/pgbouncer` is already configured with `awslogs-create-group: true`.
 
-**Source:** `aws ecs describe-task-definition --task-definition pgbouncer:1` (leitura direta da API)
+**Source:** `aws ecs describe-task-definition --task-definition pgbouncer:1` (direct API read)
 
-**Significance:** Uma rota para ECS (opção 5) existe via reutilização parcial: a imagem ECR e o log group já existem. Uma nova revisão da task definition seria necessária para migrar de `bridge`/EC2 para `awsvpc`/Fargate ou para continuar em EC2-mode num ASG. Esse artefato representa trabalho anterior (nov/2025) que nunca foi concluído ou foi abandonado.
+**Significance:** A route to ECS (option 5) exists via partial reuse: the ECR image and the log group already exist. A new task definition revision would be required to migrate from `bridge`/EC2 to `awsvpc`/Fargate, or to continue in EC2-mode under an ASG. This artifact represents earlier work (Nov/2025) that was never completed or was abandoned.
 
 **Verification:**
-- URL fetched: N/A (AWS API direct)
+- URL fetched: N/A (direct AWS API)
 - Verbatim quote checked: N/A (API response JSON)
-- Quote substring confirmed at: Output direto do `describe-task-definition`
+- Quote substring confirmed at: direct output of `describe-task-definition`
 
 ---
 
-### Finding 4: ASG min=max=1 é incompatível com simplified/CloudWatch recovery — mas substitui a instância automaticamente
+### Finding 4: ASG min=max=1 is incompatible with simplified/CloudWatch recovery — but the instance is replaced automatically
 
 **Evidence:**
 
-A documentação de Auto Scaling health checks descreve:
+The Auto Scaling health checks documentation describes:
 
 > "Amazon EC2 Auto Scaling lets the status checks fail occasionally, without taking any action. When a status check fails, Amazon EC2 Auto Scaling waits a few minutes for AWS to fix the issue. It does not immediately mark an instance `Unhealthy` when its status for the status checks becomes `impaired`."
 
-E para falha completa:
+And for full failure:
 
 > "However, if Amazon EC2 Auto Scaling detects that an instance is no longer in the `running` state, this situation is treated as an immediate failure. In this case, it immediately marks the instance as `Unhealthy` and replaces it."
 
-A documentação de simplified automatic recovery lista explicitamente:
+The simplified automatic recovery documentation explicitly lists:
 
 > "Limitations: Auto Scaling: Instances that are part of an Auto Scaling group"
 
-O mesmo vale para CloudWatch action based recovery. Portanto, um ASG min=max=1 **substitui** a instância com uma nova (novo launch), ao contrário do recovery que **migra** a instância existente. O RTO do ASG inclui o tempo de boot da nova instância + systemd start do PgBouncer.
+The same applies to CloudWatch action-based recovery. Therefore, an ASG min=max=1 **replaces** the instance with a new one (new launch), unlike recovery which **migrates** the existing instance. The ASG RTO includes the boot time of the new instance + the PgBouncer systemd start.
 
-**Source:** https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html e https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html
+**Source:** https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html and https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-configuration-recovery.html
 
-**Significance:** ASG min=max=1 não reduz o RTO comparado ao simplified recovery — pode aumentá-lo (boot de nova instância vs migração da instância existente). O ganho principal é persistência de logs (via CloudWatch agent) e operabilidade (launch template versionado, substituição automatizada sem intervenção manual). Uma instância em ASG perde simplified/CloudWatch recovery, mas ganha health check e replace automático.
+**Significance:** ASG min=max=1 does not reduce RTO compared to simplified recovery — it may increase it (booting a new instance vs migrating the existing one). The main gain is log persistence (via CloudWatch agent) and operability (versioned launch template, automated replacement without manual intervention). An instance in an ASG loses simplified/CloudWatch recovery, but gains automatic health-check + replace.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/autoscaling/ec2/userguide/health-checks-overview.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Amazon EC2 health checks", parágrafo "Important"
+- Quote substring confirmed at: section "Amazon EC2 health checks", paragraph "Important"
 
 ---
 
-### Finding 5: RDS Proxy — pinning extensivo para Aurora PostgreSQL reduz eficácia do pooling
+### Finding 5: RDS Proxy — extensive pinning for Aurora PostgreSQL reduces pooling effectiveness
 
 **Evidence:**
 
-A documentação lista as condições que causam pinning para Aurora PostgreSQL:
+The documentation lists the conditions that cause pinning for Aurora PostgreSQL:
 
 > "For PostgreSQL, the following interactions also cause pinning:
 > + Using `SET` commands.
@@ -197,64 +197,64 @@ A documentação lista as condições que causam pinning para Aurora PostgreSQL:
 > + Manipulating sequences using functions such as `nextval` and `setval`.
 > + Interacting with locks using functions such as `pg_advisory_lock` and `pg_try_advisory_lock`."
 
-E adicionalmente:
+Additionally:
 
 > "However, for PostgreSQL setting a variable leads to session pinning."
 
-Além disso, há uma limitação funcional específica para PostgreSQL:
+There is also a specific functional limitation for PostgreSQL:
 
 > "For PostgreSQL, RDS Proxy doesn't currently support canceling a query from a client by issuing a `CancelRequest`. This is the case, for example, when you cancel a long-running query in an interactive psql session by using Ctrl\+C."
 
-E sobre o failover:
+And about failover:
 
 > "RDS Proxy bypasses Domain Name System (DNS) caches to reduce failover times by up to 66% for Aurora Multi-AZ databases."
 
-**Source:** https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html e https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.html
+**Source:** https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html and https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy.html
 
-**Significance:** Rails (ActiveRecord + PG adapter) emite `SET` e `PREPARE` em cada conexão. Isso significa que virtualmente toda conexão Rails via RDS Proxy ficará pinned, tornando a multiplexação ineficaz — o comportamento se aproxima de um pass-through, não de um pool real. O RDS Proxy resolve o problema de failover Aurora (−66% tempo), mas não o problema de resiliência do PgBouncer em si; são problemas ortogonais.
+**Significance:** Rails (ActiveRecord + PG adapter) issues `SET` and `PREPARE` on every connection. That means virtually every Rails connection through RDS Proxy will be pinned, making multiplexing ineffective — the behavior approaches pass-through, not a real pool. RDS Proxy solves the Aurora failover problem (−66% time), but not the PgBouncer resilience problem itself; they are orthogonal problems.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/rds-proxy-pinning.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Conditions that cause pinning for Aurora PostgreSQL"
+- Quote substring confirmed at: section "Conditions that cause pinning for Aurora PostgreSQL"
 
 ---
 
-### Finding 6: ECS Fargate — task definition requer awsvpc e suporta awslogs nativamente
+### Finding 6: ECS Fargate — task definition requires awsvpc and natively supports awslogs
 
 **Evidence:**
 
-A documentação AWS lista as combinações válidas de CPU/memória para Fargate:
+AWS documentation lists the valid CPU/memory combinations for Fargate:
 
 > "| 256 (.25 vCPU) | 512 MiB, 1 GB, 2 GB | Linux |"
 > "| 1024 (1 vCPU) | 2 GB, 3 GB, 4 GB, 5 GB, 6 GB, 7 GB, 8 GB | Linux, Windows |"
 
-E sobre o log driver:
+And about the log driver:
 
 > "The `awslogs` log driver configures your Fargate tasks to send log information to Amazon CloudWatch Logs."
 
-Sobre o modo de rede:
+About the network mode:
 
 > "`networkConfiguration` - Fargate tasks always use the `awsvpc` network mode."
 
-Sobre pricing (Linux/X86, us-east-1):
+About pricing (Linux/X86, us-east-1):
 
 > "Using the Linux/X86 pricing for US East (N. Virginia) Region where CPU cost: $0.000011244 per vCPU second, memory cost: $0.000001235 per GB per second, and ephemeral storage cost: $0.0000000308 per GB per second"
 
-A task definition existente `pgbouncer:1` usa `networkMode: bridge` e `requiresCompatibilities: ["EC2"]` — é incompatível com Fargate como está. Uma nova revisão com `networkMode: awsvpc` e `requiresCompatibilities: ["FARGATE"]` seria necessária.
+The existing task definition `pgbouncer:1` uses `networkMode: bridge` and `requiresCompatibilities: ["EC2"]` — it is not Fargate-compatible as-is. A new revision with `networkMode: awsvpc` and `requiresCompatibilities: ["FARGATE"]` would be required.
 
-**Source:** https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html e https://aws.amazon.com/fargate/pricing/
+**Source:** https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html and https://aws.amazon.com/fargate/pricing/
 
-**Significance:** A migração para Fargate resolve o problema de logs (awslogs nativo, persistente no CloudWatch) e elimina a dependência de um host EC2 fixo. Duas tasks em duas AZs com NLB eliminam o SPOF de AZ. A task definition existente precisa ser recriada com modo de rede diferente — não é um aproveitamento direto. O custo de 1 task Fargate (0.25 vCPU / 512 MiB) por ~730h/mês é aproximadamente $2.95 em CPU + $0.27 em memória = ~$3.22/mês por task.
+**Significance:** Migrating to Fargate solves the log problem (native awslogs, persistent on CloudWatch) and eliminates the dependency on a fixed EC2 host. Two tasks across two AZs with an NLB eliminate the AZ SPOF. The existing task definition needs to be recreated with a different network mode — not a direct reuse. The cost of 1 Fargate task (0.25 vCPU / 512 MiB) running ~730h/month is roughly $2.95 in CPU + $0.27 in memory = ~$3.22/month per task.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/fargate-tasks-services.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Task CPU and memory", tabela de combinações válidas
+- Quote substring confirmed at: section "Task CPU and memory", table of valid combinations
 
 ---
 
-### Finding 7: NLB — Layer 4, health check nativo, suporte TCP para PgBouncer
+### Finding 7: NLB — Layer 4, native health check, TCP support for PgBouncer
 
 **Evidence:**
 
@@ -262,296 +262,296 @@ A task definition existente `pgbouncer:1` usa `networkMode: bridge` e `requiresC
 
 > "For TCP traffic, the load balancer selects a target using a flow hash algorithm based on the protocol, source IP address, source port, destination IP address, destination port, and TCP sequence number. The TCP connections from a client have different source ports and sequence numbers, and can be routed to different targets. Each individual TCP connection is routed to a single target for the life of the connection."
 
-Sobre pricing:
+About pricing:
 
 > "Adding the hourly charge of $0.0225, the total Network Load Balancer costs are:"
 
-**Source:** https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html e https://aws.amazon.com/elasticloadbalancing/pricing/
+**Source:** https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html and https://aws.amazon.com/elasticloadbalancing/pricing/
 
-**Significance:** NLB opera em Layer 4 (TCP), que é o protocolo correto para PgBouncer (porta 6432). Cada conexão TCP é roteada para um único target durante toda a sua vida — isso preserva o comportamento de session mode e transaction mode do PgBouncer. O custo base é ~$16.43/mês para o NLB, independente do número de targets. Um NLB com 2 targets (Fargate tasks em 2 AZs ou 2 instâncias EC2 em 2 AZs) proveria tolerância a falha de AZ.
+**Significance:** NLB operates at Layer 4 (TCP), which is the correct protocol for PgBouncer (port 6432). Each TCP connection is routed to a single target for the lifetime of the connection — that preserves PgBouncer's session-mode and transaction-mode behavior. The base cost is ~$16.43/month for the NLB, independent of the number of targets. An NLB with 2 targets (Fargate tasks in 2 AZs or 2 EC2 instances in 2 AZs) would provide AZ-failure tolerance.
 
 **Verification:**
-- URL fetched: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html e https://aws.amazon.com/elasticloadbalancing/pricing/
+- URL fetched: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/introduction.html and https://aws.amazon.com/elasticloadbalancing/pricing/
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Network Load Balancer overview" (TCP routing) e exemplos de pricing (hourly charge $0.0225)
+- Quote substring confirmed at: section "Network Load Balancer overview" (TCP routing) and pricing examples (hourly charge $0.0225)
 
 ---
 
-### Finding 8: Environment snapshot — infraestrutura atual do app-atento-001
+### Finding 8: Environment snapshot — current app-atento-001 infrastructure
 
 **Evidence (AWS API, read-only):**
 
-| Recurso | Valor |
+| Resource | Value |
 |---|---|
-| Instância pgbouncer | `i-0b6f70bc905727770`, `t3a.micro`, `us-east-1a`, `running` |
-| IP privado | `10.100.13.59` |
+| pgbouncer instance | `i-0b6f70bc905727770`, `t3a.micro`, `us-east-1a`, `running` |
+| Private IP | `10.100.13.59` |
 | VPC | `vpc-030497c296befc066` |
-| Subnets privadas | `subnet-02da8b32b1466bd0e` (us-east-1a, 10.100.13.0/24) e `subnet-0aae9fb5fd47320c0` (us-east-1b, 10.100.14.0/24) |
+| Private subnets | `subnet-02da8b32b1466bd0e` (us-east-1a, 10.100.13.0/24) and `subnet-0aae9fb5fd47320c0` (us-east-1b, 10.100.14.0/24) |
 | Aurora cluster | `app-atento-001-cluster`, PostgreSQL 15.15, MultiAZ: true |
 | Aurora writer | `app-atento-001-db-2`, IP `10.100.14.220` (us-east-1b) |
 | Aurora reader | `app-atento-001-db-1`, IP `10.100.13.15` (us-east-1a) |
-| ECS cluster | `app-atento-001-cluster`, 9 capacity providers (todos EC2), 9 services rodando |
-| RDS Proxy | Nenhum |
-| NLB | Nenhum (existe ALB internet-facing `app-atento-001-lb`) |
-| CloudWatch alarms | Nenhum para `i-0b6f70bc905727770` |
-| Auto Recovery | `default` (simplified ativo) |
-| Task def existente | `pgbouncer:1`, EC2/bridge, 1 vCPU/1 GiB, imagem `pgbouncer-puma:latest` no ECR |
-| ASGs do app | 9 ASGs existentes (todos EC2 mode, nenhum para pgbouncer) |
+| ECS cluster | `app-atento-001-cluster`, 9 capacity providers (all EC2), 9 services running |
+| RDS Proxy | None |
+| NLB | None (an internet-facing ALB `app-atento-001-lb` exists) |
+| CloudWatch alarms | None for `i-0b6f70bc905727770` |
+| Auto Recovery | `default` (simplified active) |
+| Existing task def | `pgbouncer:1`, EC2/bridge, 1 vCPU/1 GiB, image `pgbouncer-puma:latest` in ECR |
+| App ASGs | 9 existing ASGs (all EC2 mode, none for pgbouncer) |
 
 **Source:** AWS API direct (`describe-instances`, `describe-db-clusters`, `describe-clusters`, `describe-db-proxies`, `describe-load-balancers`, `describe-alarms`, `describe-task-definition`, `describe-auto-scaling-groups`)
 
-**Significance:** A infraestrutura dual-AZ já existe (subnets privadas em 1a e 1b). O ECS cluster usa apenas EC2 capacity providers — Fargate pode ser habilitado sem modificar os serviços existentes. A task definition `pgbouncer:1` representa trabalho anterior que indica familiaridade com containerização do PgBouncer neste ambiente.
+**Significance:** The dual-AZ infrastructure already exists (private subnets in 1a and 1b). The ECS cluster uses only EC2 capacity providers — Fargate can be enabled without modifying the existing services. The `pgbouncer:1` task definition represents earlier work that signals familiarity with PgBouncer containerization in this environment.
 
 **Verification:**
-- URL fetched: N/A (AWS API direct)
+- URL fetched: N/A (direct AWS API)
 - Verbatim quote checked: N/A
-- Quote substring confirmed at: Outputs de múltiplos comandos `aws describe-*`
+- Quote substring confirmed at: outputs of multiple `aws describe-*` commands
 
 ---
 
-### Finding 9: Topologia real — 4 pgbouncers em 2 ambientes × 2 tipos (Puma e Sidekiq)
+### Finding 9: Real topology — 4 pgbouncers across 2 environments × 2 types (Puma and Sidekiq)
 
 **Evidence:**
 
-Esclarecimento direto do engenheiro (in-session): existem **4 pgbouncers no total**, distribuídos em dois eixos:
+Direct clarification from the engineer (in-session): there are **4 pgbouncers in total**, distributed along two axes:
 
-- **Eixo de ambiente**: Atento 001 + outro ambiente de produção
-- **Eixo de tipo por ambiente**: Puma (web) e Sidekiq (worker)
+- **Environment axis**: Atento 001 + another production environment
+- **Type axis per environment**: Puma (web) and Sidekiq (worker)
 
-A separação Puma/Sidekiq por ambiente existe porque:
+The Puma/Sidekiq separation per environment exists because:
 
-- Puma e Sidekiq têm `pool_size`, timeouts e estratégia de scaling diferentes
-- Web (Puma) não tem outscaling; Worker (Sidekiq) tem outscaling agressivo
-- Não é possível ter configurações conflitantes em um único pgbouncer
+- Puma and Sidekiq have different `pool_size`, timeouts, and scaling strategy
+- Web (Puma) does not outscale; Worker (Sidekiq) outscales aggressively
+- It is not possible to keep conflicting configurations in a single pgbouncer
 
 **Source:** Engineer clarification (in-session)
 
-**Significance:** Toda estimativa de custo anterior baseada em "1 pgbouncer" precisa ser multiplicada. Para uma solução de HA com 2 tasks/instâncias por pgbouncer: 4 pgbouncers × 2 unidades = 8 tasks/instâncias totais. Se o NLB for compartilhado entre os 4 pgbouncers com listeners em portas distintas, o custo fixo do NLB ($16.43/mês) não se multiplica — é 1 NLB para todos. O custo de compute (Fargate tasks ou EC2) sim se multiplica por 4 ou por 8.
+**Significance:** Every earlier cost estimate based on "1 pgbouncer" needs to be multiplied. For an HA solution with 2 tasks/instances per pgbouncer: 4 pgbouncers × 2 units = 8 tasks/instances total. If the NLB is shared across the 4 pgbouncers with listeners on distinct ports, the NLB's fixed cost ($16.43/month) does not multiply — 1 NLB for all. Compute cost (Fargate tasks or EC2) does multiply by 4 or 8.
 
 ---
 
-### Finding 10: ALB suporta apenas HTTP/HTTPS/gRPC — não é adequado para PgBouncer (TCP)
+### Finding 10: ALB supports only HTTP/HTTPS/gRPC — not suitable for PgBouncer (TCP)
 
 **Evidence:**
 
-A tabela comparativa de tipos de load balancer da AWS documenta os protocolos suportados por tipo:
+The AWS comparison table for load balancer types documents protocols supported per type:
 
 > "Protocol listeners: HTTP, HTTPS, gRPC" (Application Load Balancer)
 
 > "Protocol listeners: TCP, UDP, TLS" (Network Load Balancer)
 
-A documentação descreve o ALB explicitamente como operando na camada de aplicação:
+The documentation explicitly describes the ALB as operating at the application layer:
 
 > "An Application Load Balancer functions at the application layer, the seventh layer of the Open Systems Interconnection (OSI) model."
 
-Enquanto o NLB:
+While the NLB:
 
 > "A Network Load Balancer functions at the fourth layer of the Open Systems Interconnection (OSI) model."
 
-**Source:** https://aws.amazon.com/elasticloadbalancing/features/ (tabela "Product Comparisons", linha "Protocol listeners"); https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html (seção "Application Load Balancer overview")
+**Source:** https://aws.amazon.com/elasticloadbalancing/features/ (table "Product Comparisons", row "Protocol listeners"); https://docs.aws.amazon.com/elasticloadbalancing/latest/application/introduction.html (section "Application Load Balancer overview")
 
-**Significance:** O PgBouncer expõe uma porta TCP (6432 por padrão) e fala o protocolo PostgreSQL wire protocol — não HTTP. O ALB existente no ambiente (`app-atento-001-lb`) é internet-facing e serve o tráfego web da aplicação; ele não pode ser reaproveitado para o PgBouncer. Qualquer opção de load balancer para PgBouncer deve usar NLB (Layer 4 TCP), não ALB.
+**Significance:** PgBouncer exposes a TCP port (6432 by default) and speaks the PostgreSQL wire protocol — not HTTP. The existing ALB in the environment (`app-atento-001-lb`) is internet-facing and serves the application's web traffic; it cannot be reused for PgBouncer. Any load balancer option for PgBouncer must use NLB (Layer 4 TCP), not ALB.
 
 **Verification:**
 - URL fetched: https://aws.amazon.com/elasticloadbalancing/features/
 - Verbatim quote checked: yes
-- Quote substring confirmed at: tabela "Product Comparisons", linha "Protocol listeners" — "HTTP, HTTPS, gRPC" (ALB) e "TCP, UDP, TLS" (NLB)
+- Quote substring confirmed at: table "Product Comparisons", row "Protocol listeners" — "HTTP, HTTPS, gRPC" (ALB) and "TCP, UDP, TLS" (NLB)
 
 ---
 
-### Finding 11: NLB suporta múltiplos listeners em portas distintas (TCP 1–65535)
+### Finding 11: NLB supports multiple listeners on distinct ports (TCP 1–65535)
 
 **Evidence:**
 
-A documentação de listeners do NLB especifica:
+The NLB listener documentation specifies:
 
 > "Listeners support the following protocols and ports:
 > + **Protocols**: TCP, TLS, UDP, TCP\_UDP, QUIC, TCP\_QUIC
 > + **Ports**: 1-65535"
 
-Sobre o roteamento por listener:
+About per-listener routing:
 
 > "A *listener* is a process that checks for connection requests, using the protocol and port that you configure. Before you start using your Network Load Balancer, you must add at least one listener."
 
-**Source:** https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html (seção "Listener configuration")
+**Source:** https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html (section "Listener configuration")
 
-**Significance:** Um único NLB pode hospedar múltiplos listeners TCP em portas distintas, cada listener apontando para um target group diferente. Para 4 pgbouncers (Puma-atento, Sidekiq-atento, Puma-outro-ambiente, Sidekiq-outro-ambiente), seria possível usar 4 listeners em 4 portas distintas (ex.: 6432, 6433, 6434, 6435) em um único NLB. Cada target group teria seus próprios health checks independentes. O custo fixo do NLB não se multiplica — 1 NLB cobre todos os 4 pgbouncers.
+**Significance:** A single NLB can host multiple TCP listeners on distinct ports, each listener pointing at a different target group. For 4 pgbouncers (Puma-atento, Sidekiq-atento, Puma-other-env, Sidekiq-other-env), it would be possible to use 4 listeners on 4 distinct ports (e.g., 6432, 6433, 6434, 6435) on a single NLB. Each target group would have its own independent health checks. The NLB fixed cost does not multiply — 1 NLB covers all 4 pgbouncers.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-listeners.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Listener configuration", bullet "Ports: 1-65535"
+- Quote substring confirmed at: section "Listener configuration", bullet "Ports: 1-65535"
 
 ---
 
-### Finding 12: NLB pricing — custo horário fixo $0.0225/hr + LCU TCP $0.006 por NLCU
+### Finding 12: NLB pricing — fixed hourly cost $0.0225/hr + TCP LCU $0.006 per NLCU
 
 **Evidence:**
 
-Sobre o custo horário:
+About the hourly cost:
 
 > "Adding the hourly charge of $0.0225, the total Network Load Balancer costs are:"
 
-Sobre o LCU para tráfego TCP:
+About the LCU for TCP traffic:
 
 > "In this example for TCP traffic, the processed bytes (0.36 NLCUs) is greater than both the new connections (0.125 NLCUs) and active connections (0.18 NLCUs). Assuming this usage is consistent over 60 minutes, this results in a total charge of $0.00216 per hour for TCP traffic (0.36 NLCUs \* $0.006) or $1.55 per month for TCP Traffic ($0.00216 \* 24 hours \* 30 days)."
 
-A dimensão NLCU para TCP é definida como: 800 new TCP connections/second, 100.000 active TCP connections (sampled per minute), ou 1 GB/hour processado.
+The NLCU dimension for TCP is defined as: 800 new TCP connections/second, 100,000 active TCP connections (sampled per minute), or 1 GB/hour processed.
 
-**Source:** https://aws.amazon.com/elasticloadbalancing/pricing/ (seção "Network Load Balancer", exemplos de custo TCP)
+**Source:** https://aws.amazon.com/elasticloadbalancing/pricing/ (section "Network Load Balancer", TCP cost examples)
 
-**Significance:** O custo do NLB é $0.0225/hr × 730h = **$16.43/mês de custo fixo** + variável por NLCU. Para tráfego típico de PgBouncer em produção (baixo volume de novas conexões, algumas conexões ativas persistentes), o componente LCU é pequeno. Compartilhar 1 NLB entre 4 pgbouncers via 4 listeners mantém o custo fixo em $16.43/mês — contra $65.72/mês se fossem 4 NLBs separados.
+**Significance:** NLB cost is $0.0225/hr × 730h = **$16.43/month of fixed cost** + variable per NLCU. For typical PgBouncer traffic in production (low new-connection volume, a few persistent active connections), the LCU component is small. Sharing 1 NLB across 4 pgbouncers via 4 listeners keeps the fixed cost at $16.43/month — vs $65.72/month if they were 4 separate NLBs.
 
 **Verification:**
 - URL fetched: https://aws.amazon.com/elasticloadbalancing/pricing/
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção "Network Load Balancer", exemplo de cálculo TCP — "0.36 NLCUs \* $0.006" e "hourly charge of $0.0225"
+- Quote substring confirmed at: section "Network Load Balancer", TCP calculation example — "0.36 NLCUs \* $0.006" and "hourly charge of $0.0225"
 
 ---
 
-### Finding 13: Cloud Map / ECS Service Discovery — TTL configurável, padrão 60s nos exemplos da documentação
+### Finding 13: Cloud Map / ECS Service Discovery — configurable TTL, defaults to 60s in the doc examples
 
 **Evidence:**
 
-A documentação de criação de serviço no Cloud Map descreve o campo TTL:
+The Cloud Map service-creation documentation describes the TTL field:
 
 > "For **TTL**, specify a numerical value to define the time to live (TTL) value, in seconds, at the service level. The value of TTL determines how long DNS resolvers cache information for this record before the resolvers forward another DNS query to Amazon Route 53 to get updated settings."
 
-O exemplo de CLI na documentação oficial usa:
+The CLI example in the official doc uses:
 
 ```
 --dns-config "NamespaceId={{ns-xxxxxxxxxxx}},RoutingPolicy=MULTIVALUE,DnsRecords=[{Type={{A}},TTL={{60}}}]"
 ```
 
-Com resposta mostrando `"TTL": 60` como valor padrão nos exemplos.
+With a response showing `"TTL": 60` as the default value in the examples.
 
-A documentação do ECS Service Discovery documenta o seguinte sobre saúde dos registros:
+The ECS Service Discovery documentation says the following about record health:
 
 > "Amazon ECS performs periodic container-level health checks. If an endpoint does not pass the health check, it is removed from DNS routing and marked as unhealthy."
 
-E sobre o comportamento com todos os registros:
+And about the behavior with all records:
 
 > "When all records are unhealthy, Route 53 responds to DNS queries with up to eight unhealthy records."
 
-**Source:** https://docs.aws.amazon.com/cloud-map/latest/dg/creating-services.html (seção "If you choose API and DNS", item TTL; exemplo CLI); https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-discovery.html (seção "Service discovery considerations")
+**Source:** https://docs.aws.amazon.com/cloud-map/latest/dg/creating-services.html (section "If you choose API and DNS", TTL item; CLI example); https://docs.aws.amazon.com/AmazonECS/latest/developerguide/service-discovery.html (section "Service discovery considerations")
 
-**Significance:** Com TTL=60s (valor do exemplo da documentação AWS), clientes que resolveram o DNS antes da remoção de um endpoint de tarefa morta continuarão tentando conectar àquele IP por até 60 segundos após a deregistration. Conexões TCP que tentarem o IP de uma task encerrada receberão `connection refused` ou timeout durante essa janela. O NLB evita esse problema porque o endereço IP do NLB não muda — apenas o health check do target group detecta a task morta e para de rotear tráfego para ela em ~10-30s.
+**Significance:** With TTL=60s (the value used in the AWS doc example), clients that resolved DNS before the removal of a dead task's endpoint will keep trying to connect to that IP for up to 60 seconds after deregistration. TCP connections that hit the IP of a terminated task receive `connection refused` or timeout during that window. The NLB avoids the issue because the NLB IP address does not change — only the target group health check detects the dead task and stops routing traffic to it in ~10-30s.
 
 **Verification:**
 - URL fetched: https://docs.aws.amazon.com/cloud-map/latest/dg/creating-services.html
 - Verbatim quote checked: yes
-- Quote substring confirmed at: seção de configuração de serviço DNS, campo TTL description + exemplo CLI com `TTL={{60}}`
+- Quote substring confirmed at: DNS service configuration section, TTL field description + CLI example with `TTL={{60}}`
 
 ---
 
 ## Trade-offs surfaced
 
-### Tabela comparativa por critério (topologia real: 4 pgbouncers)
+### Comparative table by criterion (real topology: 4 pgbouncers)
 
-Contexto: 4 pgbouncers no total (2 ambientes × 2 tipos: Puma e Sidekiq). Custo calculado para todos os 4 pgbouncers em conjunto.
+Context: 4 pgbouncers total (2 environments × 2 types: Puma and Sidekiq). Cost calculated for the 4 pgbouncers combined.
 
-| Opção | Custo mensal estimado (USD) — 4 pgbouncers | RTO esperado (falha de 1 host/task) | Logs persistentes | Janela de erro no failover | Esforço de migração |
+| Option | Estimated monthly cost (USD) — 4 pgbouncers | Expected RTO (1 host/task failure) | Persistent logs | Failover error window | Migration effort |
 |---|---|---|---|---|---|
-| 1. Status quo + Simplified Auto Recovery (atual) | ~$27.44 (4× t3a.micro) | ~5–15 min (Finding 1, 2) | Não | N/A (recovery in-place) | — |
-| 2. CloudWatch alarm recovery | ~$27.44 + ~$0.40 (4 alarmes) | Menor que opção 1 (Finding 2) | Não | N/A (recovery in-place) | Low |
-| 3. ASG min=max=1 × 4 + CloudWatch agent | ~$27.44 + CW Logs | ~5–15 min + boot (Finding 4) | Sim | N/A (sem LB) | Low–Medium |
-| 4. ASG 2 nodes × 4 pgbouncers + 1 NLB compartilhado | ~$54.88 (8× t3a.micro) + $16.43 NLB + CW | ~10–30s (health check NLB) | Sim | ~10–30s (health check detects) | Medium–High |
-| 5a. ECS Fargate 1 task × 4 pgbouncers + 1 NLB compartilhado | ~$12.88 (4 tasks × ~$3.22) + $16.43 NLB | ~30–60s (ECS replace + NLB) | Sim (awslogs nativo) | ~30–60s (task restart) | Medium |
-| 5b. ECS Fargate 2 tasks × 4 pgbouncers + 1 NLB compartilhado | ~$25.76 (8 tasks × ~$3.22) + $16.43 NLB | ~0s (outra task saudável absorve) | Sim (awslogs nativo) | ~0s (LB redireciona imediatamente) | Medium |
-| 5c. ECS Fargate 2 tasks × 4 pgbouncers + Cloud Map (sem NLB) | ~$25.76 (8 tasks) + Route53/Cloud Map | ~30–60s + TTL DNS cache | Sim (awslogs nativo) | Até 60s de erros TCP (Finding 13) | Medium |
-| 6. RDS Proxy | ~$21.90 mínimo (UNVERIFIED) | N/A para falha do pgbouncer (Finding 5) | N/A | N/A | Medium |
+| 1. Status quo + Simplified Auto Recovery (current) | ~$27.44 (4× t3a.micro) | ~5–15 min (Finding 1, 2) | No | N/A (in-place recovery) | — |
+| 2. CloudWatch alarm recovery | ~$27.44 + ~$0.40 (4 alarms) | Lower than option 1 (Finding 2) | No | N/A (in-place recovery) | Low |
+| 3. ASG min=max=1 × 4 + CloudWatch agent | ~$27.44 + CW Logs | ~5–15 min + boot (Finding 4) | Yes | N/A (no LB) | Low–Medium |
+| 4. ASG 2 nodes × 4 pgbouncers + 1 shared NLB | ~$54.88 (8× t3a.micro) + $16.43 NLB + CW | ~10–30s (NLB health check) | Yes | ~10–30s (health check detects) | Medium–High |
+| 5a. ECS Fargate 1 task × 4 pgbouncers + 1 shared NLB | ~$12.88 (4 tasks × ~$3.22) + $16.43 NLB | ~30–60s (ECS replace + NLB) | Yes (native awslogs) | ~30–60s (task restart) | Medium |
+| 5b. ECS Fargate 2 tasks × 4 pgbouncers + 1 shared NLB | ~$25.76 (8 tasks × ~$3.22) + $16.43 NLB | ~0s (other healthy task absorbs) | Yes (native awslogs) | ~0s (LB redirects immediately) | Medium |
+| 5c. ECS Fargate 2 tasks × 4 pgbouncers + Cloud Map (no NLB) | ~$25.76 (8 tasks) + Route53/Cloud Map | ~30–60s + TTL DNS cache | Yes (native awslogs) | Up to 60s of TCP errors (Finding 13) | Medium |
+| 6. RDS Proxy | ~$21.90 minimum (UNVERIFIED) | N/A for pgbouncer failure (Finding 5) | N/A | N/A | Medium |
 
-**Notas de custo:**
-- t3a.micro us-east-1: $0.0094/hr × 730h = $6.86/mês por instância (Finding 8 + fonte economize.cloud); 4 instâncias = $27.44; 8 instâncias = $54.88
-- Fargate 0.25 vCPU / 512 MiB: ~$3.22/mês por task (Finding 6); 4 tasks = $12.88; 8 tasks = $25.76
-- NLB compartilhado (1 NLB, 4 listeners): $0.0225/hr × 730h = $16.43/mês + LCU (Finding 12) — custo fixo não se multiplica com número de listeners
-- RDS Proxy: $0.015/vCPU-hr × mínimo 2 vCPUs × 730h = $21.90/mês (mínimo; UNVERIFIED — não confirmado com substring verbatim da AWS pricing page diretamente)
+**Cost notes:**
+- t3a.micro us-east-1: $0.0094/hr × 730h = $6.86/month per instance (Finding 8 + economize.cloud source); 4 instances = $27.44; 8 instances = $54.88
+- Fargate 0.25 vCPU / 512 MiB: ~$3.22/month per task (Finding 6); 4 tasks = $12.88; 8 tasks = $25.76
+- Shared NLB (1 NLB, 4 listeners): $0.0225/hr × 730h = $16.43/month + LCU (Finding 12) — fixed cost does not multiply with listener count
+- RDS Proxy: $0.015/vCPU-hr × at least 2 vCPUs × 730h = $21.90/month (minimum; UNVERIFIED — not confirmed with a verbatim substring from the AWS pricing page directly)
 
-### Prós e contras em prosa
+### Prose pros and cons
 
-**Opção 1 (Status quo + simplified recovery)**
+**Option 1 (Status quo + simplified recovery)**
 
-O mecanismo atual funciona para 4 pgbouncers standalone, mas o RTO de ~10 min não é controlável. Não há notificação, os logs somem com a instância e o mecanismo é uma caixa-preta gerenciada pela AWS. Nenhum esforço adicional, nenhum custo extra.
+The current mechanism works for the 4 standalone pgbouncers, but the ~10 min RTO is not controllable. There is no notification, logs disappear with the instance, and the mechanism is an AWS-managed black box. No additional effort, no extra cost.
 
-**Opção 2 (CloudWatch alarm recovery)**
+**Option 2 (CloudWatch alarm recovery)**
 
-Adiciona um alarme na métrica `StatusCheckFailed_System` com action de recovery (Finding 2) em cada uma das 4 instâncias. O RTO cai ("faster recovery attempts"), e SNS pode notificar o time. O custo incremental é mínimo (~$0.10/alarm × 4 = $0.40/mês). Não resolve logs. Não pode ser combinado com ASG (Finding 4). Esforço: configurar 4 alarmes — Low.
+Adds an alarm on the `StatusCheckFailed_System` metric with a recovery action (Finding 2) on each of the 4 instances. RTO drops ("faster recovery attempts") and SNS can notify the team. Incremental cost is minimal (~$0.10/alarm × 4 = $0.40/month). Does not solve logs. Cannot be combined with ASG (Finding 4). Effort: configure 4 alarms — Low.
 
-**Opção 3 (ASG min=max=1 × 4 + CloudWatch agent)**
+**Option 3 (ASG min=max=1 × 4 + CloudWatch agent)**
 
-Transforma cada uma das 4 instâncias standalone em ASG. O CloudWatch agent coleta journald/syslog e envia para CloudWatch Logs — logs passam a ser persistentes. O RTO pode ser maior que opção 1 (boot de nova instância vs migração do host existente — Finding 4). Não elimina o SPOF de AZ. A instância perde simplified/CloudWatch recovery (limitação da ASG — Finding 2 e 4). Esforço: criar 4 launch templates, 4 ASGs, configurar CloudWatch agent em cada — Low–Medium.
+Turns each of the 4 standalone instances into an ASG. The CloudWatch agent collects journald/syslog and ships it to CloudWatch Logs — logs become persistent. RTO can be higher than option 1 (boot a new instance vs migrate the existing host — Finding 4). It does not eliminate the AZ SPOF. The instance loses simplified/CloudWatch recovery (ASG limitation — Finding 2 and 4). Effort: create 4 launch templates, 4 ASGs, configure CloudWatch agent on each — Low–Medium.
 
-**Opção 4 (ASG 2 nodes × 4 pgbouncers + 1 NLB compartilhado com 4 listeners)**
+**Option 4 (ASG 2 nodes × 4 pgbouncers + 1 shared NLB with 4 listeners)**
 
-8 nodes EC2 (2 por pgbouncer em 2 AZs diferentes) atrás de 1 NLB com 4 listeners TCP em portas distintas. Uma falha de host ou de AZ deixa o outro node saudável absorvendo o tráfego. O RTO real é o tempo de health check do NLB detectar o target unhealthy + connection draining. Os logs ficam no CloudWatch. Complexidade operacional alta: 4 pares de pgbouncers precisam ter configuração consistente, 8 instâncias EC2 para gerenciar, 4 target groups no NLB. Esforço: 4 launch templates, 4 ASGs, 1 NLB com 4 listeners + 4 target groups, security groups — Medium–High.
+8 EC2 nodes (2 per pgbouncer across 2 different AZs) behind 1 NLB with 4 TCP listeners on distinct ports. A host or AZ failure leaves the other node healthy absorbing traffic. The real RTO is the time for the NLB health check to detect the target as unhealthy + connection draining. Logs live on CloudWatch. High operational complexity: 4 pairs of pgbouncers need consistent configuration, 8 EC2 instances to manage, 4 NLB target groups. Effort: 4 launch templates, 4 ASGs, 1 NLB with 4 listeners + 4 target groups, security groups — Medium–High.
 
-**Opção 5a/5b (ECS Fargate + 1 NLB compartilhado)**
+**Option 5a/5b (ECS Fargate + 1 shared NLB)**
 
-Nova task definition com `awsvpc`/Fargate necessária (Finding 3 e 6). Fargate nativo usa `awslogs` — logs vão direto para CloudWatch Logs. Com 2 tasks por pgbouncer em 2 AZs (opção 5b), o RTO é ~0s para falha de 1 task. O pgbouncer como container Fargate exige que a configuração (pgbouncer.ini, credenciais) seja injetada via Secrets Manager ou SSM — não há arquivo local editável. A separação Puma/Sidekiq (Finding 9) significa 4 serviços ECS distintos com configurações distintas. 1 NLB com 4 listeners cobre todos os 4 pgbouncers. Esforço: 4 task definitions (awsvpc), 4 serviços ECS, 1 NLB com 4 listeners + 4 target groups, Secrets Manager para configs — Medium.
+A new task definition with `awsvpc`/Fargate is required (Finding 3 and 6). Fargate natively uses `awslogs` — logs go straight to CloudWatch Logs. With 2 tasks per pgbouncer across 2 AZs (option 5b), the RTO is ~0s for a single-task failure. PgBouncer as a Fargate container requires configuration (pgbouncer.ini, credentials) to be injected via Secrets Manager or SSM — there is no editable local file. The Puma/Sidekiq separation (Finding 9) means 4 distinct ECS services with distinct configurations. 1 NLB with 4 listeners covers all 4 pgbouncers. Effort: 4 task definitions (awsvpc), 4 ECS services, 1 NLB with 4 listeners + 4 target groups, Secrets Manager for configs — Medium.
 
-**Opção 5c (ECS Fargate + Cloud Map sem NLB)**
+**Option 5c (ECS Fargate + Cloud Map without NLB)**
 
-Elimina o custo fixo do NLB ($16.43/mês). A descoberta de serviço é feita via DNS com TTL=60s (Finding 13). Quando uma task é substituída, o novo IP é registrado no DNS, mas clientes com o registro cacheado tentarão conectar ao IP antigo por até 60s — durante esse período, conexões TCP falham com `connection refused`. Para connection pools de banco de dados (como o próprio PgBouncer conectado ao Aurora, ou a aplicação conectada ao PgBouncer), essa janela pode causar erros visíveis na aplicação. A janela de erro é determinística e limitada ao TTL, mas existe. Esforço similar ao 5b, sem o NLB.
+Eliminates the NLB fixed cost ($16.43/month). Service discovery uses DNS with TTL=60s (Finding 13). When a task is replaced, the new IP registers in DNS, but clients with the cached record will try to connect to the old IP for up to 60s — during that window, TCP connections fail with `connection refused`. For database connection pools (PgBouncer itself connecting to Aurora, or the application connecting to PgBouncer), that window can cause visible application errors. The error window is deterministic and bounded by TTL, but it exists. Effort similar to 5b, minus the NLB.
 
-**Opção 6 (RDS Proxy)**
+**Option 6 (RDS Proxy)**
 
-O RDS Proxy não substitui o PgBouncer na arquitetura atual — são camadas análogas. O problema de resiliência do host EC2 não é resolvido. O RDS Proxy resolve melhor o failover Aurora (−66% DNS propagation — Finding 5), mas Rails + PG adapter emite `SET` e `PREPARE` em cada conexão, causando pinning extensivo (Finding 5). O custo mínimo (~$21.90/mês, UNVERIFIED) é similar ao custo de Fargate 2 tasks + NLB. Esforço: criar proxy, Secrets Manager para credenciais, ajustar connection strings em todos os serviços — Medium.
+RDS Proxy does not replace PgBouncer in the current architecture — they are analogous layers. The EC2 host resilience problem is not solved. RDS Proxy is better at Aurora failover (−66% DNS propagation — Finding 5), but Rails + PG adapter issues `SET` and `PREPARE` on every connection, causing extensive pinning (Finding 5). The minimum cost (~$21.90/month, UNVERIFIED) is similar to Fargate 2 tasks + NLB. Effort: create the proxy, Secrets Manager for credentials, adjust connection strings on every service — Medium.
 
 ---
 
 ## What remains uncertain
 
-1. **`pool_mode` e `default_pool_size` atuais do pgbouncer.ini** — não foi possível ler o arquivo de configuração sem acesso SSH à instância. É relevante para determinar se `transaction` mode está ativo (que afeta qual opção de substituto é viável) e qual o tamanho do pool configurado.
+1. **Current `pool_mode` and `default_pool_size` of pgbouncer.ini** — could not be read without SSH access to the instance. Relevant to determine whether `transaction` mode is active (which affects which replacement option is viable) and the configured pool size.
 
-2. **Configuração master/follower no pgbouncer.ini** — o cluster Aurora tem writer em us-east-1b e reader em us-east-1a. O pgbouncer está apontado para qual endpoint? O writer endpoint? O reader endpoint? O cluster endpoint? Isso afeta como um eventual NLB + 2 pgbouncers se comportaria: cada instância precisaria ter a mesma configuração de endpoint Aurora, ou há roteamento diferenciado read/write?
+2. **Master/follower configuration in pgbouncer.ini** — the Aurora cluster has the writer in us-east-1b and reader in us-east-1a. Which endpoint is pgbouncer pointing at? The writer endpoint? The reader endpoint? The cluster endpoint? That affects how an eventual NLB + 2 pgbouncers would behave: each instance would need the same Aurora endpoint configuration, or is there differentiated read/write routing?
 
-3. **Preço exato do RDS Proxy para Aurora PostgreSQL em us-east-1** — a página de pricing da AWS não retornou o valor da tabela em formato extraível pelo fetch. O valor $0.015/vCPU-hr foi citado por fontes terceiras (cloudchipr.com, pump.co) mas não foi confirmado com substring verbatim da página AWS. Marcar como UNVERIFIED para a linha de custo do RDS Proxy.
+3. **Exact RDS Proxy price for Aurora PostgreSQL in us-east-1** — the AWS pricing page did not return the table value in a fetchable format. The $0.015/vCPU-hr figure was quoted by third-party sources (cloudchipr.com, pump.co) but not confirmed via verbatim substring on the AWS page. Marking as UNVERIFIED for the RDS Proxy cost row.
 
-4. **RTO medido do simplified auto recovery no incidente** — os logs do incidente sumiram com a instância (Finding 1). O valor de ~10 min é baseado na descrição do incidente, não em métricas CloudWatch. Sem CloudWatch agent rodando, não há timestamp preciso de quando `StatusCheckFailed_System` virou 1 e quando o processo ficou `ok` novamente.
+4. **Measured simplified auto recovery RTO in the incident** — the incident logs disappeared with the instance (Finding 1). The ~10 min value is based on the incident description, not CloudWatch metrics. Without a CloudWatch agent running, there is no precise timestamp for when `StatusCheckFailed_System` went to 1 and when it returned to `ok`.
 
-5. **Benchmarks de throughput do PgBouncer em Fargate 0.25 vCPU vs EC2 t3a.micro** — não foram encontrados benchmarks específicos para Aurora PostgreSQL 15 + PgBouncer em Fargate. A instância atual usa 1 vCPU/1 GiB; o menor Fargate com 1 vCPU/2 GiB custa ~$9.02/mês, marginalmente mais caro que o t3a.micro.
+5. **PgBouncer throughput benchmarks on Fargate 0.25 vCPU vs EC2 t3a.micro** — no benchmarks specific to Aurora PostgreSQL 15 + PgBouncer on Fargate were found. The current instance uses 1 vCPU/1 GiB; the smallest Fargate with 1 vCPU/2 GiB costs ~$9.02/month, marginally more than t3a.micro.
 
-6. **Compatibilidade do Rails 8 connection pool com 2 pgbouncers sem pool compartilhado** — no modo com 2 instâncias PgBouncer (opção 4 ou 5b), cada instância mantém seu próprio pool. Rails não tem visibilidade de qual pgbouncer receberá a conexão. Em `transaction` mode do pgbouncer, isso é geralmente transparente; em `session` mode, sticky connections ao mesmo pgbouncer via NLB flow hash seriam necessárias — mas o NLB distribui por conexão TCP, não por sessão de banco. Não foram encontradas evidências concretas sobre esse comportamento específico com Rails 8.
+6. **Rails 8 connection-pool compatibility with 2 pgbouncers without a shared pool** — in the 2-PgBouncer-instances mode (option 4 or 5b), each instance keeps its own pool. Rails has no visibility into which pgbouncer receives the connection. In pgbouncer's `transaction` mode that is generally transparent; in `session` mode, sticky connections to the same pgbouncer via NLB flow hash would be required — but the NLB distributes per TCP connection, not per database session. No concrete evidence about that specific behavior with Rails 8 was found.
 
-7. **Quanto as configurações dos 4 pgbouncers diferem hoje** — não foi possível ler os `pgbouncer.ini` de cada instância sem acesso SSH. É relevante para dimensionar o esforço de migração: se os 4 pgbouncers têm configurações parecidas, a migração é mais simples; se divergiram ao longo do tempo, cada um pode requerer tratamento individual.
+7. **How different the 4 pgbouncers' configurations are today** — could not read each instance's `pgbouncer.ini` without SSH access. Relevant for sizing migration effort: if the 4 pgbouncers have similar configurations, the migration is simpler; if they have drifted, each one may need individual handling.
 
-8. **Compatibilidade de NLB com múltiplos listeners e health check independente por target group** — a documentação descreve health checks por target group (Finding 11), o que indica que cada listener/target group tem health check independente. Ainda assim, não foi encontrada confirmação verbatim explícita sobre o comportamento de health check independente quando múltiplos listeners apontam para target groups distintos no mesmo NLB.
+8. **NLB compatibility with multiple listeners and independent health checks per target group** — the documentation describes per-target-group health checks (Finding 11), which suggests each listener/target group has independent health checks. Still, no verbatim confirmation was found for the explicit behavior of independent health checks when multiple listeners point at distinct target groups on the same NLB.
 
-9. **Janela de erro precisa do failover Cloud Map vs NLB** — Finding 13 estabelece que o TTL padrão do Cloud Map nos exemplos é 60s, e que durante esse período clientes podem tentar conectar a IPs de tasks encerradas. Não foi encontrada documentação AWS com medições concretas da janela real de erro (entre a task encerrar e o DNS ser atualizado + TTL expirar nos clientes). O NLB evita esse problema por design (Finding 7), mas a magnitude exata do impacto de Cloud Map sem NLB para connection pools de banco de dados não foi encontrada com fonte citável.
+9. **Precise failover error window for Cloud Map vs NLB** — Finding 13 establishes that the Cloud Map default TTL in the examples is 60s, and that during that period clients may try to connect to IPs of terminated tasks. No AWS documentation was found with concrete measurements of the actual error window (between task termination and DNS update + TTL expiration on clients). The NLB avoids the issue by design (Finding 7), but the exact magnitude of impact of Cloud Map without an NLB for database connection pools was not found with a citable source.
 
 ---
 
 ## Suggested options
 
-As opções abaixo são ordenadas por critério objetivo, com topologia real de 4 pgbouncers. O engenheiro escolhe com base na prioridade do projeto.
+The options below are ordered by objective criterion, with the real topology of 4 pgbouncers. The engineer picks based on project priority.
 
-### Ranqueadas por custo mensal estimado (ascendente) — 4 pgbouncers
+### Ranked by estimated monthly cost (ascending) — 4 pgbouncers
 
-1. Opção 2 — CloudWatch alarm recovery (~$27.44 + ~$0.40 alarmes) — mínimo adicional
-2. Opção 3 — ASG min=max=1 × 4 + CloudWatch agent (~$27.44 + CW Logs ingestion)
-3. Opção 5a — Fargate 1 task × 4 + 1 NLB compartilhado (~$29.31)
-4. Opção 5b — Fargate 2 tasks × 4 + 1 NLB compartilhado (~$42.19)
-5. Opção 5c — Fargate 2 tasks × 4 + Cloud Map sem NLB (~$25.76 + Route53/Cloud Map, sem custo NLB)
-6. Opção 4 — ASG 2 nodes × 4 + 1 NLB compartilhado (~$71.31)
+1. Option 2 — CloudWatch alarm recovery (~$27.44 + ~$0.40 alarms) — minimum additional
+2. Option 3 — ASG min=max=1 × 4 + CloudWatch agent (~$27.44 + CW Logs ingestion)
+3. Option 5a — Fargate 1 task × 4 + 1 shared NLB (~$29.31)
+4. Option 5b — Fargate 2 tasks × 4 + 1 shared NLB (~$42.19)
+5. Option 5c — Fargate 2 tasks × 4 + Cloud Map without NLB (~$25.76 + Route53/Cloud Map, no NLB cost)
+6. Option 4 — ASG 2 nodes × 4 + 1 shared NLB (~$71.31)
 
-### Ranqueadas por RTO esperado (ascendente)
+### Ranked by expected RTO (ascending)
 
-1. Opção 5b — Fargate 2 tasks × 4 + NLB (~0s para falha de 1 task, Finding 6 e 7)
-2. Opção 4 — ASG 2 nodes × 4 + NLB (~10–30s health check, Finding 7)
-3. Opção 5a — Fargate 1 task × 4 + NLB (~30–60s ECS replace + NLB, Finding 6 e 7)
-4. Opção 5c — Fargate 2 tasks × 4 + Cloud Map (~30–60s + até 60s de TTL DNS, Finding 13)
-5. Opção 2 — CloudWatch alarm recovery (menor que simplified, sem número absoluto, Finding 2)
-6. Opção 3 — ASG min=max=1 × 4 (boot nova instância, possivelmente maior que opção 2, Finding 4)
+1. Option 5b — Fargate 2 tasks × 4 + NLB (~0s for 1-task failure, Finding 6 and 7)
+2. Option 4 — ASG 2 nodes × 4 + NLB (~10–30s health check, Finding 7)
+3. Option 5a — Fargate 1 task × 4 + NLB (~30–60s ECS replace + NLB, Finding 6 and 7)
+4. Option 5c — Fargate 2 tasks × 4 + Cloud Map (~30–60s + up to 60s of TTL DNS, Finding 13)
+5. Option 2 — CloudWatch alarm recovery (less than simplified, no absolute number, Finding 2)
+6. Option 3 — ASG min=max=1 × 4 (new-instance boot, possibly higher than option 2, Finding 4)
 
-### Ranqueadas por esforço de migração (ascendente)
+### Ranked by migration effort (ascending)
 
-1. Opção 2 — Low (4 alarmes CloudWatch, Finding 2)
-2. Opção 3 — Low–Medium (4 launch templates + 4 ASGs + CloudWatch agent × 4, Finding 4)
-3. Opção 5a/5b/5c — Medium (4 task defs awsvpc + 4 serviços ECS + NLB ou Cloud Map + Secrets Manager, Finding 3 e 6)
-4. Opção 4 — Medium–High (8 launch templates + 4 ASGs + NLB + config sync × 4, Finding 4 e 7)
+1. Option 2 — Low (4 CloudWatch alarms, Finding 2)
+2. Option 3 — Low–Medium (4 launch templates + 4 ASGs + CloudWatch agent × 4, Finding 4)
+3. Option 5a/5b/5c — Medium (4 task defs awsvpc + 4 ECS services + NLB or Cloud Map + Secrets Manager, Finding 3 and 6)
+4. Option 4 — Medium–High (8 launch templates + 4 ASGs + NLB + config sync × 4, Finding 4 and 7)
 
-### Ranqueadas por logs persistentes
+### Ranked by persistent logs
 
-- Opção 2 — Não resolve logs (instância standalone sem CloudWatch agent)
-- Opção 3, 4 — Sim, via CloudWatch agent em cada instância EC2
-- Opção 5a/5b/5c — Sim, via awslogs nativo do ECS (Finding 6, zero configuração adicional)
+- Option 2 — does not solve logs (standalone instance without CloudWatch agent)
+- Option 3, 4 — yes, via CloudWatch agent on each EC2 instance
+- Option 5a/5b/5c — yes, via native ECS awslogs (Finding 6, zero additional configuration)
