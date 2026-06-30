@@ -1,0 +1,70 @@
+SOURCE: https://code.claude.com/docs/en/permissions (fetched 2026-06-26)
+
+=== PERMISSION RULE SYNTAX ===
+
+Rules follow the format: Tool  OR  Tool(specifier)
+
+Allow/Ask/Deny arrays in settings.json:
+  "Read(./.env)"         → matches reading the .env file
+  "Read(./.env.*)"       → matches .env.local, .env.production, etc.
+  "Read(**/.env)"        → matches .env at any depth (equivalent to "Read(.env)")
+  "Read(~/.ssh/**)"      → matches all files under ~/.ssh/
+  "Bash(cat .env*)"      → matches bash cat of any .env file
+
+Rules are evaluated in order: deny → ask → allow.
+A broad deny rule like Bash(aws *) blocks every matching call, including those
+also matched by a narrower allow rule. Deny wins.
+
+=== WHAT READ DENY RULES COVER ===
+
+Official documentation (verbatim):
+"Read and Edit deny rules apply to Claude's built-in file tools and to file commands
+Claude Code recognizes in Bash, such as cat, head, tail, and sed. They do not apply
+to arbitrary subprocesses that read or write files indirectly, like a Python or Node
+script that opens files itself. For OS-level enforcement that blocks all processes from
+accessing a path, enable the sandbox."
+
+Read-only built-in Bash commands that run WITHOUT a permission prompt in every mode:
+  ls, cat, echo, pwd, head, tail, grep, find, wc, which, diff, stat, du, cd,
+  and read-only forms of git.
+
+IMPLICATION: A Read deny rule for .env DOES cover `cat .env` (Bash), `head .env`, etc.
+But it does NOT cover a Python script that opens the file, or indirect reads via
+subprocess spawning.
+
+=== WHAT READ DENY RULES DO NOT COVER ===
+
+From strongly.ai article:
+"Critical limitation: Read deny rules do not prevent `cat .env` in Bash."
+  NOTE: This contradicts the official docs above; the official docs say cat IS covered.
+  The medium.com article from May 2026 reports deny rules failing silently in practice,
+  possibly reflecting a bug or older behavior.
+
+From medium.com/@pankaj_pandey (May 2026):
+"multiple open GitHub issues filed between August 2025 and February 2026 report Claude Code
+reading and modifying denied files with no prompt, no error and no warning"
+
+=== SANDBOXING (complementary layer) ===
+
+OS-level enforcement via settings.json:
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "filesystem": {
+      "denyRead": ["~/.aws/credentials"]
+    }
+  }
+}
+
+This blocks bash subprocesses at kernel level — the reliable defense for indirect reads.
+
+=== MANAGED SETTINGS ===
+
+For organizational enforcement, managed settings cannot be overridden by user/project settings.
+  allowManagedPermissionRulesOnly: true  → prevents user/project deny rules from being weakened
+  allowManagedHooksOnly: true            → only managed hooks are loaded
+
+File locations:
+  macOS: /Library/Application Support/ClaudeCode/managed-settings.json
+  Linux: /etc/claude-code/managed-settings.json

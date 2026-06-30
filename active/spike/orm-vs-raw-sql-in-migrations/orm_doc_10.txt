@@ -1,0 +1,16 @@
+SOURCE: https://www.globalapptesting.com/engineering/database-migration-tips-in-rails-part-1
+FETCHED: 2026-06-23
+
+=== Why stub models ===
+
+"First of all, it guards against the case where a model is removed from the codebase but is still being called in a migration. Secondly, it prevents validations from being run, as well as eliminates the associations overhead."
+
+=== Non-reversibility of execute ===
+
+"Examples of a non-reversible may be #execute, #execute_block, or #transaction."
+
+=== Note ===
+This source explicitly names TWO benefits of the stub-model approach:
+1. Guards against model removal (drift protection)
+2. Prevents validations from running (intentional callback/validation bypass)
+The second benefit is significant: stub models give you ORM ergonomics WITHOUT running the app's validations/callbacks — which is often exactly what a backfill needs.

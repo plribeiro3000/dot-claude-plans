@@ -1,0 +1,93 @@
+SOURCE: github.com/anthropics/claude-code — issues fetched 2026-06-26
+
+=== ISSUE #44868 (OPEN as of research date) ===
+URL: https://github.com/anthropics/claude-code/issues/44868
+Title: "Claude Code exposes secrets from .env / .dev.vars files via grep -n and Read tool,
+        despite CLAUDE.md prohibitions"
+Labels: area:security, area:tools, enhancement, platform:windows
+
+Real-world reproduction documented in the issue:
+  - User asked Claude Code to help populate a .dev.vars file with API tokens
+  - User accidentally pasted a malformed value
+  - Claude Code ran `grep -n curl .dev.vars` to diagnose
+  - grep returned the full matching line containing a real API token
+  - Token was written to chat history before safety detection triggered
+  - Token had to be rotated immediately
+
+Root cause analysis in the issue:
+  1. Safety checks run too late — fires on output already produced, not pre-execution
+  2. Commands echo full content — grep, cat, head return entire lines including secrets
+  3. CLAUDE.md is advisory only — instructions don't block tool execution
+
+Proposed solutions in the issue:
+  1. Path-based pre-execution filter (block commands targeting .env*, *.pem, *.key files)
+  2. Output-side scrubber (redact high-entropy strings before appending to conversation)
+  3. Structured secret file annotations
+  4. "The model should not be trusted to police its own tool calls against secrets. The harness should enforce it."
+
+Status: OPEN, unresolved
+
+=== ISSUE #32523 (CLOSED: NOT PLANNED) ===
+URL: https://github.com/anthropics/claude-code/issues/32523
+Title: "SECURITY: Claude Code reveals secret keys and credentials in terminal output despite
+        explicit prohibitions"
+Labels: area:security (implied)
+
+Specific behavior documented:
+  Claude Code ran grep/cut pipeline to extract credentials:
+    grep '^AWS_ACCESS_KEY_ID=' .env | cut -d= -f2
+  The output printed raw credential values to stdout, exposing them in terminal.
+
+Issue repeated across multiple sessions; CLAUDE.md rules with explicit prohibitions ignored.
+Severity: CRITICAL — credentials required immediate rotation.
+
+Status: CLOSED AS NOT PLANNED (Anthropic declined to implement)
+Note: "Closed as not planned" — no implementation, no official Anthropic response visible.
+
+=== ISSUE #29434 (CLOSED: NOT PLANNED) ===
+URL: https://github.com/anthropics/claude-code/issues/29434
+Title: "[FEATURE] Mechanism to redact secrets/PII from the context window"
+
+Key observation: "The context window in Claude Code is append-only and permanent. Once sensitive
+data enters the context — whether inbound (a tool result echoes a secret) or outbound (a model
+response summarizing that data) — it remains in every subsequent API call for the lifetime of
+the session."
+
+Proposed three options (Option 3 recommended by issue author):
+  Option 1: First-party Anthropic server sanitizes prompts/tool responses
+  Option 2: Third-party hooks for plugins to intercept and sanitize
+  Option 3: Hybrid — default first-party + exposed hooks for customization
+
+Status: CLOSED AS NOT PLANNED + stale label (no implementation, no Anthropic response)
+
+=== ISSUE #21528 (CLOSED: NOT PLANNED) ===
+URL: https://github.com/anthropics/claude-code/issues/21528
+Title: "[FEATURE] Environment Variable Redaction for Hook Security"
+
+Feature requested: environmentVariableRedaction setting in settings.json that auto-redacts
+sensitive env vars from hook output, error messages, debug output, and transcript logs.
+
+Labels: area:core, area:security, enhancement, med-priority, stale
+Status: CLOSED AS NOT PLANNED
+
+=== ISSUE #20966 (CLOSED: DUPLICATE) ===
+URL: https://github.com/anthropics/claude-code/issues/20966
+Title: "[HIGH PRIORITY] Claude exposes secrets/tokens in tool output - no redaction"
+
+Documented problematic behaviors:
+  - Read tool: displays full file contents including API tokens and passwords
+  - Bash tool: shows all environment variables unfiltered
+  - General: no pattern matching or detection of secret formats
+
+Status: CLOSED AS DUPLICATE (of another issue — no resolution)
+
+=== ISSUE #58526 (OPEN) ===
+URL: https://github.com/anthropics/claude-code/issues/58526
+Title: "Feature request: automatically obscure credentials and secrets in terminal output"
+Status: OPEN (as of research date — filed mid-2026)
+
+=== PATTERN ACROSS ALL ISSUES ===
+Anthropic has consistently closed security-related issues about credential echoing as
+"not planned" or "duplicate" without implementing built-in redaction. The community is
+implementing solutions via hooks and deny rules rather than waiting for Anthropic to ship
+native protection.

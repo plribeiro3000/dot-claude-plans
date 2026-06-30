@@ -1,0 +1,46 @@
+SOURCE: https://docs.gitlab.com/development/database/deduplicate_database_records
+FETCHED: 2026-06-17
+
+TITLE: GitLab — Deduplicate database records (adding unique constraints to tables with
+existing duplicates)
+
+VERBATIM QUOTES:
+
+"Duplications are rare and mostly happen due to concurrent record creation."
+(Note: GitLab says duplicates are RARE. In 4Shark's case, there are 8 known collisions
+on email — deliberately created, not accidental.)
+
+"This is a destructive operation with no possibility of rolling back. Make sure that
+the deduplication logic is tested thoroughly."
+
+## Three-Milestone Strategy for Adding a Global Unique Constraint
+
+### Milestone 1: Prevention Infrastructure
+1. Add a non-unique index via post-migration
+2. Implement model-level validation to reduce duplicate likelihood
+3. Add an advisory lock to prevent concurrent duplicate creation
+
+NOTE: "The second step on its own will not prevent duplicate records" because transactions
+cannot see each other's uncommitted changes. The advisory lock addresses this by
+blocking concurrent inserts of identical data.
+
+### Milestone 2: Deduplication & Constraint Addition
+For small tables (under 10 million rows):
+- Batch scanning for duplicate key combinations
+- Applying resolution logic (e.g., keeping the most recent record)
+- Replacing the non-unique index with a unique one
+
+For large tables: move this logic into a batched background migration.
+
+### Milestone 3: Cleanup & Enforcement
+Remove the advisory lock callback after a required deployment stop, finalizing
+the unique constraint enforcement.
+
+## Key Caveats for Option A (Global Unique)
+
+- Requires ALL modifications to flow through ActiveRecord (callback-dependent)
+- Offers NO ROLLBACK capability after deduplication runs
+- Resolution strategy must match business logic for the specific data
+- In 4Shark's case: the 8 collisions are DIFFERENT PEOPLE with the same email —
+  there is no "merge" possible. Each row is a real human employee. Resolution would
+  require email address CHANGES for some of the 8 users.

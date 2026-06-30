@@ -1,0 +1,200 @@
+SOURCE MATERIAL FOR DEEP-DIVE SECTION
+Collected 2026-06-26 for spike: agent-secret-output-leakage
+Topic: MessageDisplay hook existence, behavior, and residual risks
+
+=== A. DOES MessageDisplay EXIST? ===
+
+SOURCE: https://code.claude.com/docs/en/hooks (fetched 2026-06-26)
+
+Verbatim from the lifecycle table:
+  "MessageDisplay | While assistant message text is displayed"
+
+Verbatim from the decision control table:
+  "MessageDisplay | hookSpecificOutput | displayContent replaces the displayed text on screen.
+  Display-only: the transcript and what Claude sees keep the original"
+
+The hook EXISTS. The previous spike section was NOT fabricated. The event name is
+MessageDisplay (not PreResponse, not OutputFilter). It is listed in the official docs.
+
+The output JSON the hook must return:
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "MessageDisplay",
+      "displayContent": "replacement text to show on screen"
+    }
+  }
+
+displayContent is a string. The hook SCRIPT can do any computation (regex, etc.) to
+produce that string — it is not a literal string value passed in settings.json.
+The hook receives the batch text in a field named "delta" and produces the replacement.
+
+SOURCE: Search synthesis from https://code.claude.com/docs/en/hooks (2026-06-26)
+
+MessageDisplay input fields on stdin:
+  - session_id
+  - transcript_path  ← path to the on-disk JSONL session file
+  - cwd
+  - hook_event_name ("MessageDisplay")
+  - turn_id
+  - message_id
+  - index          ← position of this batch within the message
+  - final          ← boolean: true if this is the last batch
+  - delta          ← the new text for this batch/chunk
+
+The hook script reads stdin JSON, extracts "delta", applies regex, and outputs the
+result as "displayContent". This is the correct pattern for a redaction hook.
+
+=== B. TIMING: DOES IT FIRE BEFORE OR AFTER DISPLAY? ===
+
+SOURCE: Web search synthesis confirmed from multiple sources (morphllm.com,
+hidekazu-konishi.com, official docs) - 2026-06-26
+
+INTERACTIVE MODE (standard Claude Code terminal):
+  "Claude Code displays the message in increments: each time a batch of newly
+  completed lines is ready to render, the hook runs once with those lines and
+  Claude Code renders the hook's replacement text in their place."
+
+  The hook fires BEFORE rendering. Claude Code HOLDS the batch until the hook returns.
+  The replacement text (displayContent) is what appears on screen, not the original.
+  A long message produces several hook calls; a short message may produce only one.
+
+NON-INTERACTIVE MODE (claude -p, Agent SDK):
+  "In non-interactive runs, including Agent SDK queries and claude -p, MessageDisplay
+  runs once per assistant message instead of once per batch of lines. The single call
+  arrives after the message completes and carries the full message text: index is 0,
+  final is true, and delta holds the entire message."
+
+  CRITICAL: "arrives after the message completes" — in non-interactive mode, the
+  message text has already been written to stdout BEFORE the hook fires. The
+  displayContent field has no practical effect on what already appeared in stdout.
+
+SOURCE: Claude Code official docs, morphllm.com, hidekazu-konishi.com guides
+QUOTE CONFIRMED: "arrives after the message completes" (non-interactive mode)
+
+=== C. WHAT IS PRESERVED IN THE TRANSCRIPT / JSONL? ===
+
+SOURCE: https://code.claude.com/docs/en/hooks (verbatim):
+  "Display-only: the transcript and what Claude sees keep the original"
+
+SOURCE: https://databunny.medium.com/inside-claude-code-the-session-file-format-and-how-to-inspect-it-b9998e66d56b
+  Session files store "the full message-by-message record" including "The visible reply.
+  Everything Claude writes to you." stored as "text" content blocks.
+
+  File location: ~/.claude/projects/<url-encoded-project-path>/sessions/<session-uuid>.jsonl
+
+The JSONL records the ORIGINAL text — not displayContent. The plaintext credential
+appears verbatim in the on-disk transcript file even when MessageDisplay masks it on screen.
+
+=== D. VERBOSE MODE ===
+
+SOURCE: Web search synthesis from official docs and morphllm.com (2026-06-26):
+  "verbose mode shows the original" — confirmed in multiple sources
+
+  When the engineer runs Claude Code with --verbose flag, the terminal shows the
+  ORIGINAL text (with the unmasked credential), NOT the displayContent replacement.
+  MessageDisplay masking is bypassed by --verbose.
+
+=== E. FAILURE / TIMEOUT BEHAVIOR ===
+
+SOURCE: Web search synthesis (2026-06-26):
+  "If a MessageDisplay hook fails or times out, Claude Code displays the original text,
+  ensuring that the original content is preserved as a fallback mechanism."
+
+  Default timeout for MessageDisplay: 10 seconds (from morphllm.com timeout table).
+  If the hook script crashes or exceeds 10s, the unmasked credential appears on screen.
+
+=== F. DOES displayContent PREVENT FUTURE MODEL ECHOING? ===
+
+SOURCE: https://code.claude.com/docs/en/hooks (verbatim):
+  "the transcript and what Claude sees keep the original"
+
+  The model's CONTEXT retains the original value. In future turns, if the engineer
+  asks "what was the password?", the model will repeat it from context.
+  MessageDisplay masking is a display layer only — it does not change model behavior.
+
+=== G. OTHER HOOKS THAT ACT ON ASSISTANT TEXT — FINDINGS ===
+
+Stop hook:
+  "When Claude finishes responding — can block (exit 2) or inject additionalContext.
+  Cannot modify the assistant's response text."
+  Stop can prevent Claude from STOPPING (forcing more output), but cannot redact text
+  from an already-generated response.
+
+SubagentStop hook:
+  Same shape as Stop. Fires when a subagent finishes. Same limitation — cannot
+  modify generated text.
+
+No other hook intercepts assistant-generated response text. Confirmed by:
+  - Official docs hook capability matrix
+  - thepromptshelf.dev listing 27 events (MessageDisplay listed separately)
+  - claudefa.st listing 12 events (MessageDisplay not in their list, published earlier)
+  - morphllm.com: "Claude Code supports 30 hook events, but none intercept the
+    model's assistant text output before it appears" — except MessageDisplay
+
+=== H. ECOSYSTEM DLP PATTERNS (QUESTION C) ===
+
+PATTERN 1: MessageDisplay hook as output-layer redactor
+  SOURCE: hidekazu-konishi.com (2026-06-26)
+  "MessageDisplay can rewrite assistant text before the user sees it (redaction,
+  for instance)" — using displayContent field, regex-based
+  Works for: interactive terminal display masking
+  Does NOT address: JSONL transcript, verbose mode, non-interactive stdout
+
+PATTERN 2: Claude Code stdout pipe filter (external wrapper)
+  SOURCE: https://clipgate.github.io/blog/pipe-terminal-output-to-claude-cursor-aider/
+  ClipGate and similar tools intercept at the terminal output level by piping stdout
+  through a classifier/redactor. Pattern: `claude-code-binary 2>&1 | redact-filter`
+  The redaction happens at the OS pipe level, external to Claude Code.
+  This addresses: what appears in the terminal buffer and copy-paste
+  Does NOT address: JSONL transcript (already written before pipe), model context
+
+PATTERN 3: CLAUDE.md behavioral rule
+  SOURCE: community consensus, issue #44868, strongly.ai
+  "When you are asked only for a link or subject of an email, return only the link,
+  subject, and sender. Never print credential values you encounter in the email body."
+  Works as: advisory shaping of model behavior
+  Does NOT address: the model may still print it under ambiguous conditions
+  Source of failure documented in issues #44868, #32523
+
+PATTERN 4: Combination (MessageDisplay + CLAUDE.md + Stop hook)
+  Stop hook fires when Claude finishes responding. It can inject additionalContext.
+  One approach: Stop hook checks the transcript_path JSONL for the latest turn,
+  detects if a credential-shaped value appears in the assistant's last response,
+  and injects "Your last response contained a credential value. In future turns,
+  refer to it only by name, never by value." as additionalContext.
+  This does NOT redact what was already displayed but primes the next turn.
+  SOURCE: agentpatterns.ai (Stop hook capability), official docs
+
+=== I. SUMMARY OF RESIDUAL RISKS WITH MessageDisplay MASKING ===
+
+What IS protected:
+  - On-screen display in interactive terminal mode (credential replaced with [REDACTED])
+  - Terminal scrollback: shows the displayContent, not the original (the displayContent
+    is what was rendered, so scrollback captures it)
+
+What is NOT protected:
+  1. JSONL transcript on disk (~/.claude/projects/.../sessions/*.jsonl) — has original
+  2. Claude's context for future turns — model retains the value
+  3. --verbose mode — shows original, bypasses displayContent
+  4. Non-interactive mode (claude -p, Agent SDK) — hook fires after stdout written
+  5. Hook failure or timeout — original displayed as fallback (10s timeout)
+  6. Regex miss — if the credential does not match any pattern in the hook script
+
+=== J. THE VERDICT STATEMENT ===
+
+The engineer's exact requirement: keep full email-body context AND never display
+the raw credential in output.
+
+Verdict: (ii) PARTIALLY ACHIEVABLE
+
+The on-screen display in interactive terminal mode CAN be protected via MessageDisplay
++ displayContent with a regex-based hook script.
+
+The JSONL transcript, model context, verbose mode, non-interactive stdout, and hook
+failure cases all retain the original value. These are structural limitations of the
+current Claude Code architecture that cannot be addressed without either (a) removing
+the secret from context (rejected by engineer) or (b) waiting for native Anthropic
+platform support (no signal this is planned).
+
+The engineer must decide whether the residual risks are acceptable given the
+operational context (team size, JSONL access, --verbose usage, automation usage).

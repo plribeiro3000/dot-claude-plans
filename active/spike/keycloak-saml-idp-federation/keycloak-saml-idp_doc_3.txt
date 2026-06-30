@@ -1,0 +1,72 @@
+SOURCE: https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/add-application-portal-setup-sso-rpsts
+FETCHED: 2026-05-28
+TITLE: "Enable single sign-on for an enterprise application with a relying party security token service"
+
+=== MICROSOFT ENTRA ID — SAML ENTERPRISE APPLICATION SETUP ===
+
+Context: This article covers Keycloak acting as the relying party STS — exactly the 4Shark scenario.
+The diagram description states: "trust relationship between an application, a relying party STS, and
+Microsoft Entra ID as an identity provider."
+
+Prerequisites from the SP (Keycloak):
+1. "the entity identifier (entity ID) of the relying party STS. This must be unique across all
+   relying party STS and applications configured in a Microsoft Entra tenant."
+   Example shape: "http://{hostname.domain}/adfs/services/trust"
+   For Keycloak broker: https://<host>/auth/realms/<realm>/broker/<alias>/endpoint/descriptor
+
+2. "the assertion consumer service URL, or reply URL, of the relying party STS. This URL must be
+   a HTTPS URL to securely transfer SAML tokens from Microsoft Entra to the relying party STS"
+   Example shape: "https://{hostname.domain}/adfs/ls/"
+   For Keycloak broker: https://<host>/auth/realms/<realm>/broker/<alias>/endpoint
+
+Steps to Create Enterprise Application in Entra ID:
+1. Sign in to Microsoft Entra admin center
+2. Browse to Entra ID > Enterprise apps > All applications
+3. Select New application > Create your own application
+4. Type the name, select "Integrate any other application you don't find in the gallery (Non-gallery)"
+5. Single sign-on > SAML
+6. Basic SAML Configuration: enter Identifier (Entity ID) and Reply URL (ACS URL)
+
+What Entra ID Provides to the SP (Keycloak):
+"record the values of the Login URL, Microsoft Entra Identifier, and Logout URL properties"
+
+Federation Metadata download options:
+- "If your relying party STS can download federation metadata from an Internet endpoint,
+  then copy the value next to the App Federation Metadata Url."
+- "If your relying party STS requires a local XML file containing the federation metadata,
+  then select Download next to Federation Metadata XML."
+- "If your relying party STS requires the certificate of the identity provider, then select
+  Download next to either the Certificate (Base64) or Certificate (Raw)."
+- "If your relying party STS does not support federation metadata, then copy the Login URL
+  and Microsoft Entra Identifier to configure your relying party STS."
+
+Configuring Claims (attributes in the SAML assertion):
+"By default, only a few attributes from Microsoft Entra users are included in the SAML token
+Microsoft Entra sends to the relying party STS. You can add additional claims which your
+applications require, and change the attribute provided in the SAML name identifier."
+
+Claims configuration path: Attributes & Claims > Edit
+- "To change which Entra ID attribute is sent as the value of the Name identifier, select
+  the row Unique User Identifier (Name ID)."
+- "To add a new claim, select Add new claim."
+
+Key difference vs OIDC (current flow):
+- NO client secret in SAML — trust is established via certificate-based metadata exchange
+- NO admin consent grant needed for Graph API (if identifier flows via SAML assertion attribute)
+- Metadata URL can be used for automatic trust configuration rather than manual credential entry
+
+Entra ID endpoint for SSO: "https://login.microsoftonline.com/{tenantid}/saml2"
+Claims provider identifier: "https://sts.windows.net/{tenantid}"
+
+=== SOURCE: learn.microsoft.com/en-us/entra/identity/enterprise-apps/add-application-portal-setup-sso ===
+(Standard gallery/non-rp-sts flow — for comparison)
+
+Configuration flow (SP side provides to Entra):
+- Reply URL (ACS URL): "https://samltoolkit.azurewebsites.net/SAML/Consume" (example)
+- Identifier (Entity ID): "typically a URL specific to the application you're integrating with"
+
+Entra provides to SP:
+- Login URL
+- Microsoft Entra Identifier (entityID of Entra as IdP)
+- Logout URL
+- Certificate (Raw) download for SAML signing certificate

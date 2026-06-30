@@ -1,0 +1,62 @@
+SOURCE MATERIAL — monitoring vs observability; product analytics vs infrastructure
+Collected 2026-06-26 for spike: terraform-stack-organization
+
+=== SOURCE 6 ===
+URL: https://aws.amazon.com/compare/the-difference-between-monitoring-and-observability/
+Topic: definitional distinction between monitoring and observability
+
+Verbatim (fetched):
+"Monitoring is the process of collecting data and generating reports on different metrics
+that define system health."
+
+"Observability is a more investigative approach. It looks closely at distributed system
+component interactions and data collected by monitoring to find the root cause of issues."
+
+"Monitoring is the _when_ and _what_ of a system error, and observability is the _why_
+and _how_."
+
+=== SOURCE 7 ===
+URL: https://www.cncf.io/blog/2025/01/27/what-is-observability-2-0/
+Topic: monitoring framing in CNCF observability context
+
+Verbatim (fetched, paraphrased due to no exact block returned):
+- "monitoring often becomes an afterthought" (contrast with observability)
+- "Traditional monitoring relies on predefined metrics and static alerts and focuses on
+  symptoms like high CPU usage or increased error rates"
+- "Observability 2.0 shifts focus to comprehensive insights by integrating metrics, logs,
+  traces, and events"
+
+NOTE: Full verbatim not returned by fetch — quotes above are from WebFetch summary.
+PARTIAL confidence on this source.
+
+=== SOURCE 8 ===
+URL: https://opsmatters.com/posts/observability-action-how-product-analytics-closing-loop-modern-operations
+Topic: product analytics vs infrastructure observability as separate disciplines
+
+Verbatim (fetched):
+"Observability tools are designed to answer technical questions: Is the system healthy?"
+
+"By tracking how users interact with applications, what they click, how they navigate,
+where they drop off"
+
+"operations focus on uptime and latency" versus "product teams focus on engagement
+and retention"
+
+"Without connecting system metrics to user outcomes, teams are often left making
+assumptions about impact."
+
+"Product analytics provides that missing layer" (connecting infrastructure data to user
+behavior)
+
+=== SOURCE 9 ===
+URLs searched for GA4 IaC placement conventions:
+- https://gtm-gear.com/posts/ga4-terraform/ — shows modular Terraform for GA4/GCP
+  but does not address stack placement relative to monitoring
+- https://gist.github.com/salrashid123/e6366a551ce952b603036dbd996b7768 — GCP SA +
+  IAM patterns but no placement guidance
+- Terraform Registry: no `google_analytics_*` provider resources exist — GA4 properties
+  not Terraform-manageable; only generic GCP resources (service account, IAM, API
+  enablement) are available
+
+CONCLUSION: No established community convention found for GA4 access gate placement.
+This is a confirmed negative finding, not an omission.

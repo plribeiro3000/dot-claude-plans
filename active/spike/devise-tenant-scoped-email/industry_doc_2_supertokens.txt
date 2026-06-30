@@ -1,0 +1,32 @@
+SOURCE: https://supertokens.com/docs/multi-tenancy/introduction (404 on fetch)
+  AND: https://supertokens.com/docs/authentication/enterprise/important-concepts (404)
+  AND: Search results from supertokens.com
+FETCHED: 2026-06-17
+STATUS: UNVERIFIED (404 on direct fetch; content derived from search result excerpts)
+
+TITLE: SuperTokens — Multi-tenancy identity model
+
+NOTE: The supertokens.com documentation pages for multi-tenancy returned HTTP 404 on direct
+fetch. The quotes below are from Google search result snippets shown by the search engine
+for those URLs. They appear verbatim in snippet form but CANNOT be independently verified
+by fetching the full page. Treat as UNVERIFIED.
+
+SEARCH SNIPPET QUOTES (from supertokens.com docs search results):
+
+"Each tenant has its own user pool. One user can login using the same email across
+different tenants, and the system treats them as different users."
+
+"The identity of the user is uniquely identified by appId → tenantId → email"
+
+"SuperTokens allows you to assign a user ID to multiple tenants as long as that user's
+email / phone number is unique for that login method, for each of the new tenants."
+
+"Sessions are per tenant (appId → tenantId → session handle) and cannot be shared
+across tenants."
+
+## Interpretation
+
+The SuperTokens architecture explicitly allows the same email to be a valid identity in
+MULTIPLE tenants — the composite key is (appId, tenantId, email), not just (email).
+This is a production-grade open-source auth system (>12k GitHub stars) that treats
+per-tenant email scoping as its primary multi-tenant model.

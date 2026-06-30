@@ -1,0 +1,69 @@
+AUXILIARY: Backstage service catalog + MCP evidence
+Sources:
+  - https://nitin15j.medium.com (Backstage + MCP integration article)
+  - https://gokhan-gokalp.com (Backstage entity catalog patterns for AI agents)
+Fetched: 2026-06-26
+
+=== nitin15j.medium.com — Backstage + MCP integration ===
+
+Plugin: @backstage/plugin-mcp-actions-backend
+  Official Backstage plugin exposing catalog as MCP server.
+
+Tools exposed:
+  ListTemplatesAsync  → list software templates
+  ListSystemsAsync    → list systems in catalog
+
+"A healthy catalog starts with a clear taxonomy"
+  Domain → System → Component → API
+  (each level owned by a team, queryable via MCP)
+
+Deployment constraints noted:
+  "Deliberately limited to dev environments initially due to auth/rate-limit
+   concerns with write access."
+
+The author's team chose to expose catalog read-only first, validating the
+pattern before expanding to production environments. Write operations
+(creating components, triggering deployments) were kept out of the MCP
+surface initially.
+
+=== gokhan-gokalp.com — entity catalog patterns ===
+
+Three patterns identified for AI agent + Backstage integration:
+
+Pattern 1: Structured entity modeling
+  catalog-info.yaml with explicit metadata: owner, system, domain, tags
+  Enables agent to query "which team owns service X" and "what depends on Y"
+
+Pattern 2: MCP server as abstraction layer
+  Agent queries catalog via MCP; catalog is the source of truth
+  Shields agent from needing to know file paths, repo layouts, etc.
+
+Pattern 3: Tool description as semantic contract
+  The MCP tool's description text is what the agent uses to decide relevance
+  "copilots are becoming the primary interface to internal infrastructure knowledge"
+
+Entity taxonomy used:
+  Domain: business capability grouping (e.g., "payments", "auth")
+  System: collection of components that work together
+  Component: individual deployable unit (service, website, library)
+  API: the interface a Component exposes
+
+Multi-tenant note: no documented example in either source of per-client
+catalog entries in the context of CI/CD agent workflows. Entity ownership
+metadata (owner field, tags) is the closest available proxy for
+tenant-scoped routing.
+
+=== Summary for this investigation ===
+
+The Backstage + MCP pattern is live and officially supported as of 2025-2026.
+It answers "what exists in the catalog" and "who owns it" well.
+
+It does NOT natively answer: "given client X, what is the deploy URL, which
+environment, and what command do I run?" — that mapping is absent from both
+sources. The catalog-info.yaml structure supports custom metadata fields
+(annotations), which could carry this information, but the community has not
+published a canonical shape for it.
+
+MCP cost remains the primary obstacle: context consumed by schema injection
+(~28K tokens per the jannikreinhard.com measurement) offsets the benefit of
+live data for teams with large catalogs.

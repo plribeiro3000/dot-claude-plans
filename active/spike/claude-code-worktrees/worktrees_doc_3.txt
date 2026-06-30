@@ -1,0 +1,133 @@
+SOURCE: GitHub Issues — Known bugs and pitfalls
+FETCHED: 2026-06-05
+
+--- ISSUE #27881: EnterWorktree nested worktrees when CWD drifts ---
+URL: https://github.com/anthropics/claude-code/issues/27881
+STATUS: Closed as not planned (labeled stale)
+
+PROBLEM: When orchestrator agents dispatch subagents with isolation: "worktree", context
+compaction can cause CWD to drift into a previous worktree path. Subsequent worktree dispatches
+then nest inside the previous worktree instead of being created at the repo root.
+
+REAL git worktree list output showing nesting:
+  /home/user/projects/myrepo                                                    develop
+  /home/user/projects/myrepo/.claude/worktrees/agent-aba5b87b/.claude/worktrees/agent-a1684db4  (nested level 2)
+  /home/user/projects/myrepo/.claude/worktrees/agent-aba5b87b/.claude/worktrees/agent-a1684db4/.claude/worktrees/agent-a643979b  (nested level 3)
+  /home/user/projects/myrepo/.claude/worktrees/agent-ad348c0b                  (correct level 1)
+
+SAFETY IMPACT (Critical): "When nesting goes deep enough, worktree creation can fail silently,
+causing the agent to fall back to the current CWD — which may be checked out on develop or main."
+
+A junior agent dispatched from a double-nested CWD had worktree creation fail silently. The
+agent fell back to the parent directory (checked out on develop) and committed directly to
+develop, bypassing worktree isolation and the merge-review process entirely.
+
+SUGGESTED FIX (not yet implemented):
+  REPO_ROOT=$(git -C "$(git rev-parse --git-common-dir)" rev-parse --show-toplevel 2>/dev/null || git rev-parse --show-toplevel)
+Then create worktree at $REPO_ROOT/.claude/worktrees/<name> regardless of CWD.
+
+RELATED ISSUES: #12748, #27343, #12885, #10105, #9796, #19471
+
+--- ISSUE #45645: Worktree cleanup leaves stale git config ---
+URL: https://github.com/anthropics/claude-code/issues/45645
+STATUS: Closed as duplicate
+DATE: April 9, 2026
+
+PROBLEM: When Claude Code creates a git worktree for subagent tasks, it modifies .git/config
+but FAILS to restore it after the worktree is deleted.
+
+STALE CONFIG LEFT BEHIND:
+  [core]
+      repositoryformatversion = 1   # Should be 0
+  [extensions]
+      worktreeConfig = true         # Should be removed
+
+IMPACT: "The repositoryformatversion = 1 setting signals a non-standard git format requiring
+explicit tool support. Tools using older git libraries silently fail when reading the
+repository, causing AI agents to completely stop responding while working fine in other
+projects."
+
+MANUAL WORKAROUND:
+  rm -rf .git/worktrees/<worktree-name>
+  git branch -d claude/<worktree-name>
+  git config core.repositoryformatversion 0
+  git config --unset extensions.worktreeConfig
+
+--- ISSUE #46638: --worktree against stale registration silently destroys state ---
+URL: https://github.com/anthropics/claude-code/issues/46638
+STATUS: Closed as not planned (labeled stale)
+
+WHAT STALE MEANS HERE: Git still has a worktree registered under a name, but the directory
+no longer exists at the registered path. git worktree list shows it as "prunable".
+
+COMMON CAUSES OF STALE REGISTRATION:
+  - The worktree directory was manually deleted
+  - The repository was moved
+  - The registered path is on an inaccessible filesystem
+  - OS cleanup removed temporary directories (e.g., /tmp worktree) <- DIRECTLY RELEVANT
+
+ACTUAL BEHAVIOR: Running claude --worktree <name> against a stale registration:
+  Error: "Failed to create worktree: fatal: '<name>' is already used by worktree at '<stale path>'"
+  After exit: the worktree registration is REMOVED WITHOUT WARNING, losing any associated state.
+
+EXPECTED: --worktree <name> should be "enter existing" operation, not create; failed entry
+should be non-destructive.
+
+--- ISSUE #46444: Auto-cleanup permanently deleted 10 days of uncommitted work ---
+URL: https://github.com/anthropics/claude-code/issues/46444
+STATUS: Open, labeled bug + data-loss + stale
+
+TIMELINE: April 2-11, 2026. ~160+ hours of work. 300+ files lost.
+CAUSE: Claude Code autonomously created git worktrees under .claude/worktrees/ during each
+session. At the start of each new session, Claude Code silently cleaned up previous worktrees
+WITHOUT committing or preserving work.
+PLATFORM: Windows 11, Claude Code desktop app.
+
+--- ISSUE #37611: WorktreeCreate hook disables cleanup prompt ---
+URL: https://github.com/anthropics/claude-code/issues/37611
+STATUS: Closed as duplicate
+
+PROBLEM: When a WorktreeCreate hook is defined in .claude/settings.json, the session-exit
+cleanup prompt is COMPLETELY SKIPPED. The worktree remains on disk without any prompt.
+The WorktreeRemove hook is also NEVER called when a WorktreeCreate hook exists.
+
+IMPACT: Worktrees orphaned on disk silently when using custom hooks.
+
+--- ISSUE #51596: isolation:"worktree" silently reuses stale branches ---
+URL: https://github.com/anthropics/claude-code/issues/51596
+STATUS: Open (as of June 2026)
+
+PROBLEM: Claude Code derives worktree branch names from an 8-character hex prefix of
+agentId (format: worktree-agent-<8hex>). If a branch with that name already exists from
+a prior session, the worktree is SILENTLY REUSED with all stale state.
+
+RESULT: Subagents inherit uncommitted file modifications, git stash stack entries (10+
+stashes), outdated base commits from 2 days ago. Silent data corruption that passed
+tests/linting but contained out-of-scope changes.
+
+WORKAROUND: Block Agent calls with isolation: "worktree" via a PreToolUse hook.
+
+--- ISSUE #26725: Stale worktrees never cleaned up ---
+URL: https://github.com/anthropics/claude-code/issues/26725
+STATUS: Open
+
+PROBLEM: Claude Code creates git worktrees under ~/.claude-worktrees/ for parallel task
+execution but has no cleanup mechanism. Stale worktrees from January 2026 persisting across
+dozens of subsequent sessions.
+
+IMPACT:
+  1. Disk space waste
+  2. Git branch blocking — git branch -D fails: "error: cannot delete branch used by worktree"
+  3. Persistent refs in .git/worktrees/ indefinitely
+
+--- ISSUE #31896: Allow disabling automatic worktree creation in Claude Desktop ---
+URL: https://github.com/anthropics/claude-code/issues/31896
+STATUS: Closed as duplicate
+
+PROBLEM: Claude Code Desktop automatically creates a git worktree for every new session.
+No setting to disable this behavior. WorktreeCreate hooks with exit 1 DON'T prevent it.
+
+IMPACT: "Every new session creates a random worktree (e.g., .claude/worktrees/condescending-hodgkin),
+disconnecting from the main branch. Stale worktree directories accumulate."
+
+CURRENT WORKAROUND: Use CLI in terminal (claude without --worktree), losing Desktop UI benefits.

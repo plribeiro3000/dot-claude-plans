@@ -1,0 +1,64 @@
+SOURCE: https://code.claude.com/docs/en/hooks (fetched 2026-06-26)
+
+=== HOOK TYPES AND CAPABILITIES ===
+
+Claude Code supports 5 hook types:
+  - command (shell script receiving JSON on stdin)
+  - http (POST to an endpoint)
+  - mcp_tool (MCP server tool call)
+  - prompt (single-turn LLM evaluation)
+  - agent (experimental subagent)
+
+Lifecycle events:
+  Session-level: SessionStart, SessionEnd, Setup
+  Per-turn: UserPromptSubmit, Stop, StopFailure
+  Per-tool: PreToolUse, PostToolUse, PostToolUseFailure, PermissionRequest, PermissionDenied
+  Other: FileChanged, CwdChanged, ConfigChange, Notification, MessageDisplay
+
+=== WHAT HOOKS CAN DO ===
+
+PreToolUse (before a tool executes):
+  - Block the tool call (exit 2)
+  - Deny/allow permissions
+  - Modify tool input with `updatedInput`
+  - Add context for Claude
+
+PostToolUse (after a tool succeeds):
+  - Replace tool output with `updatedToolOutput`
+  - Add context for Claude
+  - Inject system messages to the user
+
+UserPromptSubmit (before Claude processes user input):
+  - Block the prompt (exit 2)
+  - Inject `additionalContext`
+
+Stop (when Claude finishes responding):
+  - Block Claude from stopping (force continuation)
+  - Inject `additionalContext` for Claude to act on
+
+=== CRITICAL LIMITATIONS (verbatim from documentation) ===
+
+"MessageDisplay — display-only: the transcript and what Claude sees keep the original"
+
+Hook capability table from the official docs:
+  Tool input (Bash command, file path)  → CAN modify  (PreToolUse + updatedInput)
+  Tool output (command result, file content) → CAN modify  (PostToolUse + updatedToolOutput)
+  Assistant response text → CANNOT modify  (no hook event exists)
+  Assistant text displayed on screen → display-only (MessageDisplay cannot block/modify)
+
+"There is no hook event that intercepts Claude's generated response text before it displays."
+
+PostToolUse updatedToolOutput note from agentpatterns.ai:
+  "The modified output is written to the transcript — the original output is not preserved anywhere."
+  "Asking the model to redact post-hoc fails — the secret has already entered context."
+  If secrets were already in earlier conversation, the hook cannot remove them retroactively.
+
+=== SUMMARY FROM morphllm.com ===
+
+"Claude Code supports 30 hook events, but none intercept the model's assistant text output
+before it appears. The documented blocking-capable events are: PreToolUse, UserPromptSubmit,
+Stop, SubagentStop, PostToolBatch, and PreCompact. These target user inputs and tool execution,
+not model-generated response text."
+
+"The Stop hook fires 'when Claude finishes responding' and can force continuation, but it
+cannot filter or prevent specific text from being displayed."

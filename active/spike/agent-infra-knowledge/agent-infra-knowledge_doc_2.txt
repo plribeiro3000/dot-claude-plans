@@ -1,0 +1,79 @@
+AUXILIARY: Practitioner guidance — progressive disclosure and token budget
+Sources:
+  - https://alexop.dev/posts/stop-bloating-your-claude-md-progressive-disclosure-ai-coding-tools/
+  - https://humanlayer.dev/blog/writing-a-good-claude-md
+  - https://www.jannikreinhard.com/2026/02/22/why-cli-tools-are-beating-mcp-for-ai-agents/
+  - https://newsletter.swirlai.com (skills progressive disclosure article)
+  - https://pulumi.com/blog/top-8-claude-skills-devops-2026/
+Fetched: 2026-06-26
+
+=== alexop.dev — progressive disclosure ===
+
+"Universal context only. Everything else lives in docs, agents, or tooling."
+
+Recommended structure:
+  CLAUDE.md (~50 lines): identity + pointers only
+  "IMPORTANT: Read relevant docs below before starting any task."
+  Then pointers to agents/docs for domain-specific knowledge.
+
+The core argument: bloated CLAUDE.md leads to instruction overflow — the model
+can only follow so many rules reliably.
+
+=== humanlayer.dev — instruction budget ===
+
+"Frontier thinking LLMs can follow ~ 150-200 instructions with reasonable
+consistency."
+
+"Claude Code system prompt ≈ 50 instructions already."
+
+Recommendation: keep CLAUDE.md under 300 lines. HumanLayer's own file is
+under 60 lines.
+
+Progressive disclosure implementation: maintain `agent_docs/` directory with
+short descriptions of each document. "Instruct Claude to decide which are
+relevant."
+
+=== jannikreinhard.com — MCP vs CLI token cost ===
+
+Key measurement (same task, two approaches):
+  MCP approach:  145,000 tokens consumed (schema injection alone ~28K)
+  CLI approach:    4,150 tokens consumed
+
+"That's a 35x reduction in token usage"
+
+Context remaining after tooling (128K context window):
+  MCP approach:  ~82,300 tokens remaining
+  CLI approach: ~121,300 tokens remaining
+
+Conclusion from author: "For static knowledge (service names, URLs, procedures),
+CLI/file-based approaches leave significantly more context available for actual work."
+MCP is justified only for live/dynamic data where a file-based approach would
+be stale.
+
+=== newsletter.swirlai.com — skills discovery layer ===
+
+Skills progressive disclosure layers:
+  Layer 1 — Discovery:  description only (~80 tokens per skill)
+  Layer 2 — Activation: full body (275–8,000 tokens on load)
+  Layer 3 — Supporting: files in skill directory (on-demand)
+
+"All 17 skills together cost ~1,700 tokens, meaning an agent can be aware of
+dozens of skills for less context than a single activated skill."
+
+The description layer enables an agent to know ABOUT all available operations
+without paying the cost of loading any of them.
+
+=== pulumi.com — skills as operational wisdom ===
+
+"MCPs give Claude access to things. Skills teach Claude how to think about things."
+
+Skills cited as appropriate for:
+  - Incident runbook templates
+  - Systematic debugging procedures
+  - Deploy checklists
+
+"Claude reads the skill description (~100 tokens) at startup; full procedures
+load only when relevant."
+
+Pulumi's own deploy skills use disable-model-invocation: true for commands
+that touch production, to prevent accidental execution.

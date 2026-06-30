@@ -1,0 +1,37 @@
+SOURCE: https://slack.com/intl/en-gb/help/articles/212681477-sign-in-to-slack
+FETCHED: 2026-06-17
+
+TITLE: Slack — Sign in to Slack (official help article)
+
+VERBATIM QUOTE:
+"Whether you're a member of one Slack workspace or many workspaces, you can use the
+same email address to sign in to all of them."
+
+"If you're a member of more than one workspace, click on the arrow icon next to the
+workspace that you'd like to open."
+
+"request a code that allows you to sign in to any workspaces associated with your
+email address"
+
+## Slack's Design Pattern
+
+Slack uses the SAME EMAIL across MULTIPLE WORKSPACES (tenants), with a workspace selector
+at login. This is the canonical real-world reference for Option B (tenant-aware auth).
+
+Key characteristics:
+- Email is NOT globally unique across workspaces
+- Each workspace = separate account (separate identity per workspace)
+- The Slack app is the "session manager that holds all those sign ins"
+- Password reset sends a code that covers all workspaces for that email — tenant
+  discovery is done AFTER authentication, not before
+
+---
+
+SOURCE: https://www.suptask.com/blog/use-multiple-accounts-workspaces-slack
+FETCHED: 2026-06-17 (via search snippet)
+
+VERBATIM QUOTE (confirmed in search snippet):
+"You create a separate account for every workspace you join, even if you reuse the
+same email."
+
+"profiles, roles, and preferences are not shared across workspaces"

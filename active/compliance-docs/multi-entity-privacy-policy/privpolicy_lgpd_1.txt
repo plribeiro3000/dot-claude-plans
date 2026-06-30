@@ -1,0 +1,112 @@
+# LGPD Article Texts — Raw Source Material
+# Spike: LGPD Privacy Policy Requirements for Multi-Entity Economic Group
+# Fetched: 2026-06-25
+
+=======================================================================
+SOURCE: https://lgpd-brasil.info/capitulo_02/artigo_09
+VERIFIED: yes — fetched 2026-06-25, quote confirmed in fetch response
+=======================================================================
+
+LGPD Art. 9 (Lei 13.709/2018) — full verbatim text:
+
+"O titular tem direito ao acesso facilitado às informações sobre o tratamento
+de seus dados, que deverão ser disponibilizadas de forma clara, adequada e
+ostensiva acerca de, entre outras características previstas em regulamentação
+para o atendimento do princípio do livre acesso:
+I - finalidade específica do tratamento;
+II - forma e duração do tratamento, observados os segredos comercial e industrial;
+III - identificação do controlador;
+IV - informações de contato do controlador;
+V - informações acerca do uso compartilhado de dados pelo controlador e a finalidade;
+VI - responsabilidades dos agentes que realizarão o tratamento; e
+VII - direitos do titular, com menção explícita aos direitos contidos no art. 18 desta Lei."
+
+§ 1º: "Na hipótese em que o consentimento é requerido, esse será considerado nulo
+caso as informações fornecidas ao titular tenham conteúdo enganoso ou abusivo ou
+não tenham sido apresentadas previamente com transparência, de forma clara e inequívoca."
+
+§ 2º: "Na hipótese em que o consentimento é requerido, se houver mudanças da finalidade
+para o tratamento de dados pessoais não compatíveis com o consentimento original, o
+controlador deverá informar previamente o titular sobre as mudanças de finalidade,
+podendo o titular revogar o consentimento, caso discorde das alterações."
+
+§ 3º: "Quando o tratamento de dados pessoais for condição para o fornecimento de
+produto ou de serviço ou para o exercício de direito, o titular será informado com
+destaque sobre esse fato e sobre os meios pelos quais poderá exercer os direitos do
+titular elencados no art. 18 desta Lei."
+
+ANALYSIS NOTE: Art. 9 requires disclosure of "identificação do controlador" (III) and
+"informações de contato do controlador" (IV). It does NOT specify that one document may
+cover only one CNPJ. The statute's silence on group policies is not prohibition.
+
+=======================================================================
+SOURCE: https://lgpd-brasil.info/capitulo_06/artigo_39
+VERIFIED: yes — fetched 2026-06-25, quote confirmed in fetch response
+=======================================================================
+
+LGPD Art. 39 (Lei 13.709/2018) — full verbatim text:
+
+"O operador deverá realizar o tratamento segundo as instruções fornecidas pelo
+controlador, que verificará a observância das próprias instruções e das normas
+sobre a matéria."
+
+ANALYSIS NOTE: Art. 39 places the primary compliance obligation on the OPERADOR to
+follow the controller's instructions. The primary transparency duty (Art. 9) sits with
+the CONTROLADOR. Operators are not expressly required by LGPD to publish independent
+public-facing privacy notices — their obligations flow through DPA contracts with controllers.
+
+=======================================================================
+SOURCE: search results (migalhas.com.br / general LGPD sources)
+VERIFIED: partial — text excerpts appeared in search results; direct fetch confirmed
+partial content but not full article
+=======================================================================
+
+LGPD Art. 42, §1º (Lei 13.709/2018) — solidarity liability:
+
+"I - o operador responde solidariamente pelos danos causados pelo tratamento quando
+descumprir as obrigações da legislação de proteção de dados ou quando não tiver seguido
+as instruções lícitas do controlador, caso em que o operador equipara-se ao controlador,
+salvo nos casos de exclusão previstos no art. 43 desta Lei;
+II - os controladores que estiverem diretamente envolvidos no tratamento do qual decorreram
+danos ao titular dos dados respondem solidariamente, nos termos do art. 42 desta Lei."
+
+ANALYSIS NOTE: Art. 42 §1º II creates joint liability ("solidariamente") when multiple
+controllers are directly involved in processing that causes harm. This is a LIABILITY
+rule, not a POLICY-FORMAT rule. It does not require separate policies; it determines
+who can be sued when data subjects suffer harm.
+
+=======================================================================
+SOURCE: https://lgpd-brasil.info/capitulo_07/artigo_50
+VERIFIED: yes — search result confirmed Art. 50 text; fetch confirmed content
+=======================================================================
+
+LGPD Art. 50 (Lei 13.709/2018) — partial, governance program:
+
+Caput: "Os controladores e operadores, no âmbito de suas competências, pelo tratamento
+de dados pessoais, individualmente ou por meio de associações, poderão formular regras
+de boas práticas e de governança..."
+
+§ 2º (governance program scope): The controller may implement a governance program covering
+"todo o conjunto de dados pessoais que estejam sob seu controle, independentemente do modo
+como se realizou sua coleta" — i.e., covering all personal data under the controller's
+control, regardless of how it was collected.
+
+ANALYSIS NOTE: Art. 50 §2º language ("todo o conjunto de dados") supports the
+interpretation that a single governance/policy framework can cover all processing
+activities of a controller (or group of controllers adopting a common framework).
+
+=======================================================================
+LGPD Art. 5 — Key Definitions (partial)
+SOURCE: lgpd-brasil.info / search results
+VERIFIED: partial
+=======================================================================
+
+Art. 5, VI — Controlador: "pessoa natural ou jurídica, de direito público ou privado,
+a quem competem as decisões referentes ao tratamento de dados pessoais"
+
+Art. 5, VII — Operador: "pessoa natural ou jurídica, de direito público ou privado,
+que realiza o tratamento de dados pessoais em nome do [controlador]"
+
+CRITICAL NOTE: LGPD Art. 5 does NOT define "grupo econômico," "controladores conjuntos,"
+or affiliated entities. These concepts are absent from the statute. Brazilian practitioners
+import the joint-controller concept from GDPR Art. 26 by analogy.

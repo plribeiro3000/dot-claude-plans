@@ -13,7 +13,7 @@ The current loader chain processes all operations of a resource (delete + create
 
 ## Evidence
 
-End-to-end test cycles run against `atento-cl-staging` over 4 rounds (see `~/.claude/plans/active/SimplexPE.Global4Shark/PLAN.md` § "Cycle execution log"):
+End-to-end test cycles run against `atento-cl-staging` over 4 rounds (see `~/.claude/plans/active/simplex-harvester/PLAN.md` § "Cycle execution log"):
 
 | Cycle | Requests | Success | Fail | % | Dominant failure |
 |---|---|---|---|---|---|
@@ -153,7 +153,7 @@ Document the follow-up as a known item in the PR description and in develop's pl
 
 ### End-to-end against `atento-cl-staging` — replay the 4 historic cycles using SQL backups
 
-After the hotfix is deployed to `atento-cl-staging`, replay the 4 cycles already recorded in `~/.claude/plans/active/SimplexPE.Global4Shark/PLAN.md` § "Cycle execution log" against the new integrator code. This gives a direct before/after comparison per failure type.
+After the hotfix is deployed to `atento-cl-staging`, replay the 4 cycles already recorded in `~/.claude/plans/active/simplex-harvester/PLAN.md` § "Cycle execution log" against the new integrator code. This gives a direct before/after comparison per failure type.
 
 #### Why we don't need to re-run `.NET` or change any clock
 
@@ -233,7 +233,7 @@ Restore `ME_4Shark_DB_2026-05-17.bak` (the latest snapshot) so the staging envir
 
 ## References
 
-- Bug evidence: `~/.claude/plans/active/SimplexPE.Global4Shark/PLAN.md` § "Cycle execution log" (cycles 2-4)
+- Bug evidence: `~/.claude/plans/active/simplex-harvester/PLAN.md` § "Cycle execution log" (cycles 2-4)
 - Failure breakdown analysis: same doc, § "Failure analysis (244 failures across cycle 2 + cycle 3)"
 - 4Shark hotfix workflow: `~/.claude/docs/HUBFLOW.md`
 - Current loader code (master): `app/workers/user_field/loader_consumer.rb`, `app/workers/user_identifier/loader_consumer.rb`, both producers

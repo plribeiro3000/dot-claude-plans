@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenSearch app-shared-001 — métricas minuto-a-minuto + deploys (30d)</title>
+<style>
+  :root{
+    --bg:#fafaf9;--surface:#fff;--surface-alt:#f5f5f4;--text:#1c1917;--text-muted:#78716c;
+    --border:#e7e5e4;--accent:#2563eb;--success:#16a34a;--warning:#d97706;--danger:#dc2626;
+    --m1:#7c3aed;--m2:#0891b2;--m3:#16a34a;--ctx:#a8a29e;--radius:10px;
+    --shadow:0 1px 3px rgba(0,0,0,.08);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{--bg:#1c1917;--surface:#292524;--surface-alt:#211f1d;--text:#fafaf9;--text-muted:#a8a29e;
+      --border:#44403c;--accent:#60a5fa;--m1:#a78bfa;--m2:#22d3ee;--m3:#4ade80;--ctx:#78716c;}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.5}
+  .wrap{max-width:1280px;margin:0 auto;padding:24px}
+  h1{font-size:20px;margin:0 0 4px}
+  h2{font-size:15px;margin:28px 0 10px;font-weight:600}
+  .sub{color:var(--text-muted);font-size:13px;margin:0 0 18px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    box-shadow:var(--shadow);padding:18px;margin-bottom:18px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;margin:0 0 14px;font-size:13px}
+  .legend .it{display:flex;align-items:center;gap:7px}
+  .sw{width:26px;height:0;border-top-width:3px;border-top-style:solid;display:inline-block}
+  .dot{width:11px;height:11px;border-radius:50%;display:inline-block}
+  .chart-box{position:relative;height:460px;width:100%}
+  .tabs{display:flex;gap:8px;margin:0 0 16px;flex-wrap:wrap}
+  .tab{border:1px solid var(--border);background:var(--surface-alt);color:var(--text);
+    padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit}
+  .tab:hover{border-color:var(--accent)}
+  .tab.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px}
+  th,td{padding:6px 9px;text-align:right;border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child{text-align:left}
+  th{color:var(--text-muted);font-weight:600;white-space:nowrap}
+  tbody tr:hover{background:var(--surface-alt)}
+  .b0{color:var(--text-muted)}.bL{color:var(--warning);font-weight:600}.bH{color:var(--danger);font-weight:700}
+  .mk{display:inline-block;width:18px;height:18px;border-radius:50%;color:#fff;
+    text-align:center;line-height:18px;font-size:11px;font-weight:700;margin-right:6px}
+  .markers{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin:0 0 4px}
+  .mcard{border:1px solid var(--border);border-radius:8px;padding:12px 14px;background:var(--surface-alt)}
+  .mcard .v{font-size:12px;color:var(--text-muted);margin-top:3px}
+  .note{font-size:12.5px;color:var(--text-muted);background:var(--surface-alt);
+    border-left:3px solid var(--accent);border-radius:0 6px 6px 0;padding:10px 14px;margin:14px 0}
+  .note.ok{border-left-color:var(--success)}
+  code{background:var(--surface-alt);padding:1px 5px;border-radius:4px;font-size:12px}
+  #mnote{font-size:12.5px;color:var(--text-muted);margin:12px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>OpenSearch <code>app-shared-001</code> — métricas minuto-a-minuto, últimos 30 dias</h1>
+  <p class="sub">Domínio us-east-1 · conta 405749097490 · engine OpenSearch 3.5 · <code>t3.medium.search</code> × 2 ·
+  janela 2026-05-09 → 2026-06-08 · fonte CloudWatch <code>AWS/ES</code> (avg + max). Gerado 2026-06-08.</p>
+
+  <div class="markers">
+    <div class="mcard"><span class="mk" style="background:var(--m1)">1</span><b>3.32.0 — worker dedicado de deal indexation</b>
+      <div class="v">deploy shared-001 · 2026-05-26 19:39 UTC · run 26470354634 (sha 8e382aaf) · <i>a "fila dedicada" — causou a regressão</i></div></div>
+    <div class="mcard"><span class="mk" style="background:var(--m2)">2</span><b>3.33.0 — app-managed OpenSearch refresh</b>
+      <div class="v">deploy shared-001 · 2026-05-31 00:39 UTC · run 26698926406 (sha 24400e90)</div></div>
+    <div class="mcard"><span class="mk" style="background:var(--m3)">3</span><b>Scale-up <code>t3.small</code> → <code>t3.medium.search</code></b>
+      <div class="v">apply 2026-06-05 18:02 UTC · Terraform PR #497 · 2 vCPU mantidos, RAM 2→4 GB</div></div>
+  </div>
+
+  <div class="card">
+    <div class="tabs">
+      <button class="tab on" data-k="cpu">CPU %</button>
+      <button class="tab" data-k="jvm">JVM Memory %</button>
+      <button class="tab" data-k="idx">Indexing Latency (ms)</button>
+    </div>
+    <div class="legend">
+      <span class="it"><span class="sw" style="border-top-color:var(--danger)"></span><span id="lgmax">CPU máx</span> (por minuto)</span>
+      <span class="it"><span class="sw" style="border-top-color:var(--accent)"></span><span id="lgavg">CPU média</span> (por minuto)</span>
+      <span class="it"><span class="dot" style="background:var(--m1)"></span>1 · 3.32.0</span>
+      <span class="it"><span class="dot" style="background:var(--m2)"></span>2 · 3.33.0</span>
+      <span class="it"><span class="dot" style="background:var(--m3)"></span>3 · t3.medium</span>
+      <span class="it"><span class="sw" style="border-top-color:var(--ctx);border-top-style:dashed"></span>contexto: bulk 3.31.0 / engine 3.3→3.5</span>
+    </div>
+    <div class="chart-box"><canvas id="chart"></canvas></div>
+    <p id="mnote"></p>
+    <p class="note">⚠️ Resolução: CloudWatch retém <b>1 min por 15 dias</b>. Trecho <b>05-09 → 05-24</b> é 5-min (baseline antigo);
+    <b>05-24 → 06-08</b> é 1-min real, cobrindo os três deploys. A fronteira está marcada no gráfico.</p>
+  </div>
+
+  <h2>Bursts de CPU por dia (série de 1 minuto, 05-24 → 06-08)</h2>
+  <div class="card" style="overflow-x:auto">
+    <table>
+      <thead><tr><th>Dia (UTC)</th><th>p50 %</th><th>p99 %</th><th>máx %</th>
+        <th>min ≥90%</th><th>min ≥80%</th><th>min ≥50%</th><th>marco</th></tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <p class="note ok">A regressão real está nos dias úteis <b>27–29/05</b> (fila dedicada 3.32.0): até <b>9 min/dia ≥90%</b>,
+    picos a 100%. Pós 3.33.0 + engine 3.5 (30–31/05) os bursts extremos somem; repique na segunda <b>01/06</b>; de
+    <b>03/06</b> em diante a série fica plana. O scale-up de <b>05/06</b> entrou com CPU já estável — o ganho dele
+    aparece no <b>JVM Memory</b> (troque a aba): o teto de heap cai quando a RAM dobra de 2→4 GB.</p>
+  </div>
+</div>
+
+<script src="os_chart_data.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<script>
+(function(){
+  if(!window.OSDATA){document.getElementById('chart').replaceWith(Object.assign(document.createElement('p'),{textContent:'os_chart_data.js não carregou (abra o HTML na mesma pasta do .js).'}));return;}
+  Chart.register(window['chartjs-plugin-annotation']);
+
+  var css=getComputedStyle(document.documentElement);
+  function v(n){return css.getPropertyValue(n).trim();}
+  var m1=v('--m1'),m2=v('--m2'),m3=v('--m3'),ctx=v('--ctx'),accent=v('--accent'),
+      danger=v('--danger'),muted=v('--text-muted'),border=v('--border'),warn=v('--warning');
+
+  // deploy markers + context (epoch ms, UTC)
+  var M1=Date.UTC(2026,4,26,19,39), M2=Date.UTC(2026,4,31,0,39), M3=Date.UTC(2026,5,5,18,2),
+      BULK=Date.UTC(2026,4,25,21,45), ENG0=Date.UTC(2026,4,30,17,53), ENG1=Date.UTC(2026,4,30,19,18),
+      RESB=OSDATA.cpu.fine[0][0];
+
+  var METRICS={
+    cpu:{label:'CPU',unit:'%',ymax:100,
+      note:'CPU é a métrica da dor original (auto-refresh + merge pegavam os 2 vCPU). A queda dos picos vem da 3.33.0 + engine 3.5; de 03/06 a série fica plana.'},
+    jvm:{label:'JVM Memory',unit:'%',ymax:100,threshold:80,
+      note:'Pressão de heap. O teto (max) ronda os 80% (linha do circuit-breaker) no t3.small (2 GB). Após o scale-up de 05/06 (③, RAM 2→4 GB) o teto recua — esse é o ganho específico do t3.medium.'},
+    idx:{label:'Indexing Latency',unit:'ms',ymax:null,
+      note:'Latência de indexação. p50≈0 (cluster ocioso a maior parte do tempo); os picos são os lotes de bulk. Sem degradação crônica — picos esporádicos, consistentes com o padrão producer-consumer.'}
+  };
+
+  function fmt(ms){var d=new Date(ms);function p(n){return(n<10?'0':'')+n;}
+    return p(d.getUTCDate())+'/'+p(d.getUTCMonth()+1)+' '+p(d.getUTCHours())+'h';}
+  function vline(x,color,text,dash){return {type:'line',xMin:x,xMax:x,borderColor:color,borderWidth:dash?1.5:2.5,
+    borderDash:dash||[],label:{display:!!text,content:text,position:'start',rotation:90,backgroundColor:color,
+    color:'#fff',font:{size:10,weight:'bold'},padding:{x:4,y:3}}};}
+
+  function series(key){var d=OSDATA[key],avg=[],max=[];
+    function push(rows){for(var i=0;i<rows.length;i++){avg.push({x:rows[i][0],y:rows[i][1]});max.push({x:rows[i][0],y:rows[i][2]});}}
+    push(d.coarse);push(d.fine);return {avg:avg,max:max};}
+
+  function annotations(key){
+    var a={
+      resb:{type:'line',xMin:RESB,xMax:RESB,borderColor:muted,borderWidth:1,borderDash:[2,3],
+        label:{display:true,content:'1-min →',position:'end',rotation:90,color:muted,backgroundColor:'transparent',font:{size:9}}},
+      bulk:vline(BULK,ctx,'bulk 3.31.0',[5,4]),
+      engband:{type:'box',xMin:ENG0,xMax:ENG1,backgroundColor:'rgba(168,162,158,.18)',borderWidth:0,
+        label:{display:true,content:'engine 3.3→3.5',position:{x:'center',y:'end'},color:muted,font:{size:9}}},
+      m1:vline(M1,m1,'1 · 3.32.0'),m2:vline(M2,m2,'2 · 3.33.0'),m3:vline(M3,m3,'3 · t3.medium')
+    };
+    if(METRICS[key].threshold){a.thr={type:'line',yMin:METRICS[key].threshold,yMax:METRICS[key].threshold,
+      borderColor:warn,borderWidth:1.5,borderDash:[6,4],
+      label:{display:true,content:'circuit-breaker 80%',position:'start',color:warn,backgroundColor:'transparent',font:{size:9,weight:'bold'}}};}
+    return a;
+  }
+
+  var chart=new Chart(document.getElementById('chart'),{
+    type:'line',
+    data:{datasets:[
+      {label:'máx',data:[],borderColor:danger,borderWidth:1,pointRadius:0,tension:0,backgroundColor:'rgba(220,38,38,.07)',fill:true},
+      {label:'média',data:[],borderColor:accent,borderWidth:1.2,pointRadius:0,tension:0,fill:false}
+    ]},
+    options:{
+      parsing:false,normalized:true,animation:false,responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'nearest',axis:'x',intersect:false},
+      scales:{
+        x:{type:'linear',min:OSDATA.cpu.coarse[0][0],max:OSDATA.cpu.fine[OSDATA.cpu.fine.length-1][0],
+          ticks:{color:muted,maxRotation:0,autoSkip:true,maxTicksLimit:14,callback:function(val){return fmt(val);}},
+          grid:{color:border}},
+        y:{min:0,title:{display:true,text:'%',color:muted},ticks:{color:muted},grid:{color:border}}
+      },
+      plugins:{
+        legend:{display:false},
+        decimation:{enabled:true,algorithm:'lttb',samples:3500},
+        tooltip:{callbacks:{title:function(it){return fmt(it[0].parsed.x)+' UTC';},
+          label:function(it){return it.dataset.label+': '+it.parsed.y+CURUNIT;}}},
+        annotation:{annotations:{}}
+      }
+    }
+  });
+
+  var CURUNIT='%';
+  function render(key){
+    var s=series(key),M=METRICS[key];CURUNIT=M.unit;
+    chart.data.datasets[0].data=s.max;
+    chart.data.datasets[1].data=s.avg;
+    chart.options.scales.y.max=M.ymax;          // null => auto
+    chart.options.scales.y.title.text=M.unit;
+    chart.options.plugins.annotation.annotations=annotations(key);
+    chart.update();
+    document.getElementById('lgmax').textContent=M.label+' máx';
+    document.getElementById('lgavg').textContent=M.label+' média';
+    document.getElementById('mnote').textContent=M.note;
+  }
+
+  var tabs=document.querySelectorAll('.tab');
+  tabs.forEach(function(t){t.addEventListener('click',function(){
+    tabs.forEach(function(x){x.classList.remove('on');});t.classList.add('on');render(t.dataset.k);});});
+  render('cpu');
+
+  // daily CPU burst table
+  var rows=[
+    ['05-24',8,20.5,39,0,0,0,'(parcial)'],['05-25',8.5,57.5,99,8,13,36,'bulk 3.31.0'],
+    ['05-26',8.5,35,77,0,0,8,'① 3.32.0'],['05-27',9,57,100,9,16,29,'regressão'],
+    ['05-28',8.5,32,99,3,4,13,''],['05-29',8.5,30.5,100,5,6,14,''],
+    ['05-30',10,31,71,0,0,8,'engine 3.5'],['05-31',14,35,69,0,0,6,'② 3.33.0'],
+    ['06-01',12.7,35.5,99,1,5,16,'segunda'],['06-02',9,21.5,99,2,3,3,''],
+    ['06-03',9,20,39,0,0,0,''],['06-04',9,20.5,44,0,0,0,''],
+    ['06-05',9.5,23.5,58,0,0,1,'③ t3.medium'],['06-06',9,20.5,39,0,0,0,''],
+    ['06-07',9,20,39,0,0,0,''],['06-08',9,20,38,0,0,0,'(parcial)']
+  ];
+  function cls(n){return n===0?'b0':(n>=5?'bH':'bL');}
+  document.getElementById('tbody').innerHTML=rows.map(function(r){
+    return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+r[2]+'</td><td>'+r[3]+
+      '</td><td class="'+cls(r[4])+'">'+r[4]+'</td><td class="'+cls(r[5])+'">'+r[5]+
+      '</td><td class="'+cls(r[6])+'">'+r[6]+'</td><td style="text-align:left;color:var(--text-muted)">'+r[7]+'</td></tr>';
+  }).join('');
+})();
+</script>
+</body>
+</html>

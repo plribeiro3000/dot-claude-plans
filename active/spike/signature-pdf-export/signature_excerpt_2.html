@@ -1,0 +1,53 @@
+<!-- SOURCE: app-webclient/src/app/plan-statement/plan-statement-show/plan-statement-show.component.html -->
+<!-- Lines 111–365 — all five collapsible "show-panel" sections. -->
+<!-- Each panel is toggled by (click)="item.expanded = !item.expanded" on the outer .show-panel div. -->
+<!-- Body visibility is controlled by *ngIf="item.expanded". No Angular Material accordion. -->
+<!-- These are the "diabinhas" referenced by the engineer. -->
+
+<!-- DEAL INCENTIVE PANEL (lines 113–154) -->
+<ng-container *ngIf="dealIncentives">
+  <div *ngFor="let dealIncentive of dealIncentives">
+    <div class="show-panel" (click)="dealIncentive.expanded = !dealIncentive.expanded">
+      <div class="show-panel-header blue font-20">{{ dealIncentive.name }}</div>
+      <div class="show-panel-body" *ngIf="dealIncentive.expanded">
+        <!-- ... rules content ... -->
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<!-- INDICATOR INCENTIVE PANEL (lines 155–198) — same shape -->
+<!-- (click)="indicatorIncentive.expanded = !indicatorIncentive.expanded" -->
+<!-- *ngIf="indicatorIncentive.expanded" -->
+
+<!-- RANKING INCENTIVE PANEL (lines 199–277) — same shape -->
+<!-- (click)="rankingIncentive.expanded = !rankingIncentive.expanded" -->
+<!-- *ngIf="rankingIncentive.expanded" -->
+
+<!-- LIMITER INCENTIVE PANEL (lines 278–321) — same shape -->
+<!-- (click)="limiterIncentive.expanded = !limiterIncentive.expanded" -->
+<!-- *ngIf="limiterIncentive.expanded" -->
+
+<!-- REDEMPTION INCENTIVE PANEL (lines 322–365) — same shape -->
+<!-- (click)="redemptionIncentive.expanded = !redemptionIncentive.expanded" -->
+<!-- *ngIf="redemptionIncentive.expanded" -->
+
+<!-- SIGNATURE BLOCK (lines 367–386) — NOT collapsible. -->
+<!-- Always visible when planStatement?.acceptment is present. -->
+<!-- Renders signature PNG from presigned S3 URL fetched via temporarySignature GraphQL query. -->
+<div class="d-flex-ju-end mg-t-30 mg-b-30" *ngIf="planStatement?.acceptment">
+  <div class="description">
+    <div *ngIf="signature" class="signature">
+      <span class="signed-by">{{ 'acceptment.signed_by' | translate }}</span>
+      <img [src]="signature?.url" alt="signature" />
+      <span class="ip">IP: {{ planStatement?.acceptment?.from }}</span>
+    </div>
+    <div class="mg-t-15">
+      <b>{{ planStatement?.acceptment?.user?.name }}</b>
+    </div>
+    <span>{{ 'user.id' | translate }} {{ planStatement?.acceptment?.user?.id }}</span>
+    <div class="font-size-small">
+      {{ planStatement?.acceptment?.createdAt | date: 'full' : '' : translateService.currentLang }}
+    </div>
+  </div>
+</div>

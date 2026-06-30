@@ -1,0 +1,53 @@
+SOURCE: https://testdouble.com/insights/optimizing-activerecord-migrations-for-rails
+FETCHED: 2026-06-23
+
+=== Core rule ===
+
+"never reference your application's ActiveRecord models from your migrations"
+
+=== Why: model drift ===
+
+"ActiveRecord models inherit lots of their behavior by interrogating the state of the database schema when they're first loaded."
+
+"we've inadvertently broken our old migration! If we were to run rake db:drop db:create db:migrate, our data migration would fail because the acts_as_paranoid gem will preclude User from being loaded when a deleted_at column doesn't exist."
+
+=== Stub/local model pattern (with code) ===
+
+"Define a new ActiveRecord::Base subclass that's designed to only be used for the purpose of the migration"
+
+Example code shown:
+  class MigrationUser < ActiveRecord::Base
+    self.table_name = :users
+  end
+
+Full migration example:
+  class SplitUserNameFields < ActiveRecord::Migration
+    class MigrationUser < ActiveRecord::Base
+      self.table_name = :users
+    end
+    def up
+      add_column :users, :first_name, :string
+      add_column :users, :last_name, :string
+      MigrationUser.find_each do |u|
+        u.update!(
+          :first_name => u.name.split(" ").first,
+          :last_name => u.name.split(" ").last,
+        )
+      end
+      remove_column :users, :name
+    end
+  end
+
+"there's nothing preventing us from defining them as well with configuration like has_many :pets, :class_name => 'SplitUserNameFields::Pet'."
+
+=== Raw SQL comparison ===
+
+"writing complex data migrations in raw SQL is terrifically difficult in comparison to accomplishing most other SQL tasks."
+
+=== Testing invariant ===
+
+"At any point in the life of a Rails application, it ought to be possible for a developer to run all of its migrations from a clean database."
+
+=== Note ===
+TestDouble is the canonical source for the "never reference app models" guidance with the stub-model pattern.
+This article strongly argues for stub models OVER raw SQL.

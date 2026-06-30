@@ -1,0 +1,61 @@
+EUROPEAN DPA DECISIONS ON GOOGLE ANALYTICS — VERBATIM EVIDENCE
+Collected from verified sources (fetched and confirmed)
+
+---
+DECISION 1: Austrian DSB — January 13, 2022
+Source URL: https://noyb.eu/en/austrian-dsb-eu-us-data-transfers-google-analytics-illegal
+Fetch verified: YES (re-fetched, both phrases confirmed present)
+noyb article quotes DSB decision pages 38-39:
+
+"With regard to the contractual and organizational measures outlined, it is not apparent, to what extent [the measure] are effective in the sense of the above considerations."
+
+"Insofar as the technical measures are concerned, it is also not recognizable (...) to what extent [the measure] would actually prevent or limit access by U.S. intelligence agencies considering U.S. law."
+
+Finding: Using Google Analytics violates GDPR because it enables US surveillance under FISA 702 and Executive Order 12.333. Standard Contract Clauses and organizational safeguards — including data center security, request review processes, and encryption — cannot adequately protect European user data from US government access.
+
+---
+DECISION 2: French CNIL — February 2022
+Source URL: https://cookie-script.com/blog/google-analytics-4-and-gdpr
+Fetch verified: YES (re-fetched, phrase confirmed present)
+
+"France also rejected Google Analytics IP address anonymization function as an adequate measure for protecting data transfers from Europe to the US."
+
+Context paragraph: "On January 12, 2022, the Austrian DPA ruled Google Analytics violated the Schrems II ruling. Even though the company anonymized IP addresses, the effort was deemed inadequate and insufficient because anonymization likely occurred only after the data reached US servers, so US authorities could legally access the encryption keys. France also rejected Google Analytics IP address anonymization function as an adequate measure for protecting data transfers from Europe to the US."
+
+---
+DECISION 3: Italian Garante — June 23, 2022
+Source URL: https://www.hunton.com/privacy-and-cybersecurity-law-blog/2022/06/30/italian-garante-bans-google-analytics/
+Fetch verified: YES (re-fetched, both phrases confirmed present)
+
+"In the Garante's ruling, website operator Caffeina Media S.r.l. was ordered to bring its processing into compliance with the GDPR within 90 days, but the ruling has wider implications as the Garante commented that it had received many 'alerts and queries' relating to Google Analytics."
+
+"It also stated that it called upon 'all controllers to verify that the use of cookies and other tracking tools on their websites is compliant with data protection law; this applies in particular to Google Analytics and similar services.'"
+
+---
+EU-US DATA PRIVACY FRAMEWORK (DPF) — July 10, 2023 — Current Status
+Source URL: https://trustyourwebsite.com/eu/en/guides/google-analytics-gdpr
+Fetch verified: YES
+
+"Google LLC certified on 10 July 2023" under the DPF.
+
+"Certified US importers can now receive personal data without additional safeguards."
+
+"What has not changed is the consent requirement."
+
+"The current enforcement focus across member states has shifted toward the consent failure, which is more straightforward to inspect."
+
+Key data GA4 still collects per visit:
+"IP address (used at least transiently for geolocation)
+Client ID, a persistent pseudonymous identifier stored in the _ga cookie
+Session ID
+Device characteristics (browser, OS, resolution, language)
+Approximate location derived from IP
+Page-level engagement events
+Traffic source attribution"
+
+---
+ADDITIONAL CONTEXT: Country-level DPA enforcement beyond Austria/France/Italy
+Source URL: https://cookie-script.com/blog/google-analytics-4-and-gdpr
+Fetch verified: YES
+
+"Italy, Netherlands, the UK, Norway, Denmark, and Sweden also noted that Google Analytics had compliance issues and recommended companies to stop using Google Analytics."

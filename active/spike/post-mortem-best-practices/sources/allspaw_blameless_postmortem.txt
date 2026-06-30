@@ -1,0 +1,45 @@
+SOURCE: John Allspaw — "Blameless PostMortems and a Just Culture"
+URL: https://jaytaylor.com/notes/node/1498058768000.html (mirror of original Etsy codeascraft post)
+ORIGINAL URL: https://www.etsy.com/codeascraft/blameless-postmortems (returned HTTP 403)
+FETCHED: 2026-05-27 (via mirror)
+
+NOTE: Original article published May 2012 by John Allspaw on Etsy's Code as Craft blog.
+The Etsy URL returned 403 Forbidden. This content was extracted from a publicly available mirror.
+
+=== VERBATIM EXTRACTS ===
+
+CORE DEFINITION OF JUST CULTURE:
+A "Just Culture" as an organizational approach that "balance[s] safety and accountability"
+by investigating failures through the lens of situational context and decision-making
+processes rather than individual blame.
+
+WHAT BLAMELESS POSTMORTEMS ENABLE (verbatim paraphrase from mirror):
+A blameless postmortem process allows engineers to provide detailed accounts
+"without fear of punishment or retribution." This transparency covers:
+- Actions taken and timing
+- Observed effects
+- Expectations held
+- Assumptions made
+- Understanding of event timeline
+
+KEY QUOTE ON FEAR:
+"an engineer who thinks they're going to be reprimanded are _disincentivized_
+to give the details necessary."
+
+THE SECOND STORY CONCEPT:
+Rather than asking "what should have been done," effective postmortems seek understanding
+of why actions "made sense to them at the time."
+
+BLAME CYCLE:
+Punishment creates a self-reinforcing cycle leading to reduced trust, silent engineers,
+management ignorance, and ultimately more errors — a pattern described as
+"Cover-Your-Ass engineering."
+
+ACCOUNTABILITY NOTE:
+Blameless approaches do not remove accountability. Instead, engineers become actively
+responsible for improving organizational safety through their expertise in failures
+they've experienced.
+
+CULTURAL ORIGIN NOTE:
+Allspaw's contribution was translating safety science from aviation and healthcare and
+making it operational inside a fast-moving engineering team.

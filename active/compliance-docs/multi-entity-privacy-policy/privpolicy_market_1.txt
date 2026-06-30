@@ -1,0 +1,93 @@
+# Market Practice Examples — Raw Source Material
+# Spike: LGPD Privacy Policy Requirements for Multi-Entity Economic Group
+# Fetched: 2026-06-25
+
+=======================================================================
+SOURCE: https://grupotiradentes.com/governancacorporativa/politica-de-privacidade/
+VERIFIED: yes — fetched 2026-06-25, quote confirmed in fetch response
+=======================================================================
+
+Grupo Tiradentes Privacy Policy — Section 2 (Abrangência / Scope):
+
+VERBATIM QUOTE (confirmed in fetch):
+"A presente Política de Privacidade é aplicável a todas as operações desenvolvidas
+no âmbito do Grupo Tiradentes"
+
+Additional notes confirmed in fetch:
+- Policy covers: academic units, administrative divisions, cultural organizations, and
+  all structures integrated within Grupo Tiradentes per the current institutional
+  organizational chart.
+- NO specific CNPJ references appear in the scope section.
+- Controller identified as "Grupo Tiradentes" (the group), not individual legal entities.
+- Data subjects covered include students, employees, suppliers, service users, etc.
+- Policy applies "uniformly across all group operations without carving out subsidiary
+  entities from coverage."
+
+MARKET PRACTICE SIGNIFICANCE: Grupo Tiradentes is a regulated educational group with
+governance compliance obligations. Its use of a single group-level policy without
+per-entity CNPJ breakdown is documented market practice for a Brazilian economic group
+operating under LGPD.
+
+=======================================================================
+SOURCE: https://migalhas.com.br/depeso/356219
+VERIFIED: yes — text confirmed in search results; fetched page confirmed theme
+=======================================================================
+
+Migalhas article on intra-group data sharing under LGPD.
+Topic: whether sharing data between group companies requires new consent/legal basis.
+
+VERBATIM QUOTES (confirmed in search results):
+
+"o compartilhamento de dados entre empresas, ainda que do mesmo grupo econômico,
+necessita de consentimento específico do titular"
+
+"havendo interesse no compartilhamento de dados pessoais de um usuário para outra(s)
+empresa(s) integrante(s) do mesmo grupo econômico, com finalidade substancialmente
+distinta daquela para a qual o indivíduo autorizou inicialmente, deve-se realizar
+um novo pedido de consentimento expresso"
+
+CRITICAL DISTINCTION: This article addresses the legal basis for DATA SHARING between
+group entities (a separate compliance question). It does NOT address whether a group
+policy can name multiple entities. A single group policy does not by itself authorize
+data sharing between those entities — the legal basis for sharing is governed by Art. 7
+and is a distinct issue from policy-format consolidation.
+
+=======================================================================
+SOURCE: General search results (grupoassaf.com and practitioner commentary)
+VERIFIED: PARTIALLY VERIFIED — appeared in search results; direct URL re-fetch not
+confirmed for this spike; treat as corroborating context, not primary citation
+=======================================================================
+
+Co-controllership (controladores conjuntos) — Brazilian practitioner definition:
+
+"Quando duas ou mais empresas têm participação conjunta nas decisões sobre o tratamento,
+seja por meio de decisões comuns ou decisões convergentes, elas formarão a controladoria
+conjunta"
+
+ORIGIN NOTE: "Controladores conjuntos" is NOT defined in LGPD. Brazilian practitioners
+import this concept from GDPR Art. 26 ("where two or more controllers jointly determine
+the purposes and means of processing"). The LGPD does not provide explicit rules on
+joint controllership beyond Art. 42 (joint liability for damages).
+
+CONSEQUENCE FOR 4SHARK: If 4Shark's three entities jointly determine the purposes and
+means of processing client employee data, they may be classified as joint controllers
+(controladores conjuntos), and a single policy should identify all three. If each entity
+independently acts as operador for its own set of clients, each entity is a separate
+operador and the consolidation question is moot (the clients are the controladores).
+
+=======================================================================
+UNVERIFIED sources — DO NOT use as primary citations
+=======================================================================
+
+- Unipar LGPD notice (unipar.com/lgpd/aviso-de-privacidade): 403 Forbidden
+  Could not verify Unipar's approach to multi-entity CNPJ disclosure.
+
+- Yapoli article on LGPD in B2B SaaS (yapoli.com/2021/04/...): 404 Not Found
+  Article on operator obligations in SaaS platforms is unavailable.
+
+- IAPP article on privacy notices under GDPR (iapp.org/resources/article/...): 404 Not Found
+  Could not access comparative GDPR guidance on group notice practices.
+
+- ANPD "Guia orientativo para definições dos agentes de tratamento" (PDF):
+  Page found at gov.br/anpd but PDF content was not fetchable.
+  May contain group-policy guidance not captured in this spike.

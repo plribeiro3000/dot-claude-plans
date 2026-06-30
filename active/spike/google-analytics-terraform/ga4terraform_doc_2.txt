@@ -1,0 +1,87 @@
+SOURCE: GitHub issues on hashicorp/terraform-provider-google
+FETCHED: 2026-06-26
+
+--- ISSUE #16898: Enhancement: Make a Google Analytics Resource ---
+URL: https://github.com/hashicorp/terraform-provider-google/issues/16898
+Opened: January 4, 2024
+Opened by: BenJackGill
+Status: CLOSED (no linked PRs, no maintainer response)
+
+Key quote from issue body:
+"there is no way to create a Google Analytics property under a known Google Analytics account ID"
+
+Proposed resource configuration example:
+  resource "google_analytics_property" "example" {
+    account_id    = "your-google-analytics-account-id"
+    property_name = "example-property"
+    firebase_project_link {
+      project_id = google_firebase_project.example.project_id
+    }
+  }
+
+Resolution: NONE. Issue closed with no implementation, no PRs, no maintainer assignment.
+
+--- ISSUE #12439: support for google_tag_manager_* resources ---
+URL: https://github.com/hashicorp/terraform-provider-google/issues/12439
+Opened: August 31, 2022
+Opened by: maxcbc
+Status: OPEN (labeled "enhancement", medium scope, "Goals" milestone)
+
+Key quote from issue:
+"managing GTM as code currently" lacks viable tooling, creating compliance and consistency challenges
+
+Requested resource types:
+- google_tag_manager_container
+- google_tag_manager_tag
+- google_tag_manager_trigger
+- google_tag_manager_variable
+
+GA4 mention in the issue:
+A proposed tag configuration includes type "google_analytics_ga4_configuration" referencing a measurement ID variable.
+
+Resolution: NONE. No maintainer or community member assigned as of research date.
+
+--- GIST: Terraform-google-analytics ---
+URL: https://gist.github.com/salrashid123/e6366a551ce952b603036dbd996b7768
+Last active: July 27, 2020
+
+This is NOT a Terraform provider for Google Analytics.
+It is a workaround attempting to use Terraform's HTTP data source to emit tracking events via Measurement Protocol.
+It uses: random_id resource for client ID, http data source to POST tracking requests.
+Known issue: HTTP provider accepts only certain content types; GA returns image/jpg (tracking pixel) causing incompatibility.
+Status: Experimental/non-functional. Serves as documentation of a failed approach, not a working solution.
+
+--- AIRBYTE PROVIDER ---
+URL: https://registry.terraform.io/providers/airbytehq/airbyte/latest/docs/resources/source_google_analytics_data_api
+This is an Airbyte connector resource for DATA EXTRACTION (reading GA4 reporting data into Airbyte pipelines).
+It is NOT for GA4 Admin API configuration management.
+It does not create/manage properties, data streams, custom dimensions, or any admin config.
+
+--- GOOGLE ANALYTICS UTILITIES ---
+URL: https://github.com/google/google-analytics-utilities
+Description: "This is not an officially supported Google product."
+Technology: Google Apps Script (runs in Google Sheets)
+Resources managed: Properties, data streams, custom dimensions, custom metrics, key events, audiences, integrations
+What it IS: A spreadsheet-based bulk management tool for GA4, NOT a Terraform provider or IaC tool
+Maintenance: Actively maintained; last release October 28, 2024; 247 stars, 34 forks, 12 releases
+
+--- GA4 MANAGER ---
+URL: https://www.oscargallegoruiz.com/en/blog/ga4-manager-automate-google-analytics/
+Technology: Go CLI tool and MCP server
+API used: Google Analytics Admin API v1alpha
+Approach: YAML-declarative (not Terraform)
+What it manages: GA4 property configuration (conversions, dimensions, metrics, data retention), Search Console
+Limitations:
+- "Cannot migrate historical data; collection starts after setup"
+- "Audience creation requires manual UI completion"
+- "Search Console linking is manual"
+- "BigQuery linking is automated, but parameter names are permanently reserved once created"
+- "Free tier capped at 30 conversions, 50 dimensions, 50 metrics"
+Status: Active open-source project
+
+--- MARKETING ANALYTICS JUMPSTART (GCP) ---
+URL: https://github.com/GoogleCloudPlatform/marketing-analytics-jumpstart
+Technology: Terraform for GCP infrastructure (BigQuery, Vertex AI, Dataform)
+Note: Uses Terraform to deploy GCP infrastructure that RECEIVES GA4 BigQuery export data.
+Does NOT manage GA4 properties or Admin API configuration.
+The Terraform here is about the data pipeline stack, not GA4 admin config.

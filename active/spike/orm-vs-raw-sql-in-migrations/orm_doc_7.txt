@@ -1,0 +1,30 @@
+SOURCE: https://discuss.rubyonrails.org/t/in-the-need-for-separating-data-migration-from-schema-migration/70516
+FETCHED: 2026-06-23
+
+=== DHH's authoritative position ===
+
+"Migrations are meant to be temporary ways of shipping schema changes between developers and production. Not as a bootstrap method."
+
+He emphasized using db:schema:load instead, noting that relying on all historical migrations is "a flawed and unsustainable approach."
+
+=== Jason FB (nonschema_migrations gem author) ===
+
+"if you can write your migration in SQL it is typically many times faster than Ruby, so when I can I prefer writing the migration in raw SQL."
+
+=== Pranas Kiziela ===
+
+Suggested: "define new classes for the models I need inside the migration" rather than referencing application models directly.
+
+=== Original poster's problem ===
+
+"it's always data migration that fail."
+
+"Then you'd remove the User class and the migration is broken."
+
+=== Outcome ===
+
+No separation of data and schema migrations was adopted into Rails core. The community consensus emphasized using db:schema:load for bootstrapping and db/seeds.rb for initial data, with optional migration squashing via tools like Squasher.
+
+=== Note ===
+DHH's statement is the most authoritative Rails core position available. He treats migrations as purely schema-shipping tools. Data migration is explicitly out of scope for the built-in migration system in his view.
+This is the closest thing to an "official" Rails guidance on the topic.

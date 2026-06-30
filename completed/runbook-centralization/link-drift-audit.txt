@@ -1,0 +1,198 @@
+# Link Drift Audit — Terraform Repo Internal References + Cross-Repo References
+# REGENERATED: 2026-06-03 (correction run)
+# Source: origin/develop for ALL repos (terraform working copy was on feature/strip-enrich-and-filter)
+# Method: git -C <repo> grep -n "docs/runbooks" origin/develop -- "*.md" "*.tf" "*.hcl" "*.json" "*.yaml"
+#
+# Format: repo:file:line | verbatim excerpt | classification | action
+# Classification: HARD LINK (markdown hyperlink), SOFT REF (prose path citation), HISTORICAL PROSE (changelog / ADR history, not navigable)
+
+# ============================================================
+# TERRAFORM REPO — 11 references total on origin/develop
+# ============================================================
+
+# --- HARD LINKS (will render as broken links after deletion) ---
+
+terraform:SECURITY.md:31
+  [Break Glass Runbook](docs/runbooks/engineer-access/BREAK-GLASS.md)
+  → HARD LINK — markdown hyperlink. Will become a 404 after deletion.
+  → ACTION: Update to ~/.claude/docs/runbooks/engineer-access/BREAK-GLASS.md
+
+terraform:identity/README.md:27
+  unavailable. See the [Break Glass Runbook](../docs/runbooks/engineer-access/BREAK-GLASS.md) for activation
+  → HARD LINK — markdown hyperlink (relative from identity/ directory). Will become a 404 after deletion.
+  → ACTION: Update to ~/.claude/docs/runbooks/engineer-access/BREAK-GLASS.md
+
+# --- SOFT REFS (prose path citations — not hyperlinks, but reader-visible) ---
+
+terraform:README.md:237
+  See `docs/runbooks/` for operational procedures.
+  → SOFT REF — directory reference.
+  → ACTION: Update to ~/.claude/docs/runbooks/
+
+terraform:identity/README.md:175
+  `docs/runbooks/engineer-access/AWS-ENGINEER-SETUP.md` for details.
+  → SOFT REF — backtick path citation. Not a hyperlink; still misleading if file is gone.
+  → ACTION: Update to ~/.claude/docs/runbooks/engineer-access/AWS-ENGINEER-SETUP.md
+
+terraform:docs/adr/ADR-001-state-backend.md:41
+  - State recovery is possible via S3 versioning (see `docs/runbooks/terraform-operations/STATE-RECOVERY.md`)
+  → SOFT REF — ADR prose citation.
+  → ACTION: Update to ~/.claude/docs/runbooks/terraform-operations/STATE-RECOVERY.md
+
+terraform:docs/adr/ADR-002-terramate.md:43
+  (see `docs/runbooks/terraform-operations/EMERGENCY-SINGLE-STACK-APPLY.md`)
+  → SOFT REF — ADR prose citation.
+  → ACTION: Update to ~/.claude/docs/runbooks/terraform-operations/EMERGENCY-SINGLE-STACK-APPLY.md
+
+terraform:docs/adr/ADR-004-identity-model.md:48
+  Break glass runbook is at `docs/runbooks/engineer-access/BREAK-GLASS.md`
+  → SOFT REF — ADR prose citation.
+  → ACTION: Update to ~/.claude/docs/runbooks/engineer-access/BREAK-GLASS.md
+
+terraform:docs/adr/ADR-005-ecs-multi-cluster-pattern.md:91
+  - `INTEGRATORS` repository variable schema — see `docs/runbooks/client-onboarding/ADD-INTEGRATOR-CLIENT.md`
+  → SOFT REF — ADR prose citation.
+  → ACTION: Update to ~/.claude/docs/runbooks/client-onboarding/ADD-INTEGRATOR-CLIENT.md
+
+terraform:dns/security_locals.tf:2
+  # Pentest IPs — see docs/runbooks/security/PENTEST-ACTIVATION.md for the full activation checklist.
+  → SOFT REF — inline Terraform comment.
+  → ACTION: Update comment to ~/.claude/docs/runbooks/security/PENTEST-ACTIVATION.md
+
+# --- PRE-EXISTING BROKEN REFERENCE (broken before migration, must fix in Phase 2 PR regardless) ---
+
+terraform:modules/ami_versions/README.md:72
+  See `docs/runbooks/ami-version-upgrade.md` for the full runbook with copy-pasteable commands.
+  → SOFT REF — note: uses legacy FLAT path (ami-version-upgrade.md lowercase). Actual file on
+    origin/develop is at docs/runbooks/terraform-operations/AMI-VERSION-UPGRADE.md. Already a broken
+    reference before this migration — the flat path never existed in the categorized structure.
+  → ACTION: Update to ~/.claude/docs/runbooks/terraform-operations/AMI-VERSION-UPGRADE.md
+
+# --- HISTORICAL PROSE (changelog entry — not a navigable link, no fix required) ---
+
+terraform:CHANGELOG.md:152
+  - AWS engineer setup runbook added at `docs/runbooks/AWS-ENGINEER-SETUP.md` with step-by-step profile configuration and daily workflow for all engineers
+  → HISTORICAL PROSE — backtick inside a changelog entry. This is a historical fact record, not a
+    navigable link. The path is historically inaccurate (the file was always under
+    engineer-access/AWS-ENGINEER-SETUP.md, not the flat root), but changelog entries record what was
+    announced at the time. No fix required — do not alter changelog history.
+
+# ============================================================
+# TERRAFORM REPO — INTERNAL CROSS-RUNBOOK RELATIVE LINKS
+# (within docs/runbooks/ itself — safe in preserved-structure options)
+# ============================================================
+
+terraform:docs/runbooks/migrations/VPC-DECOMMISSION-CHECKLIST.md:75
+  [Deposed SG Dependency runbook](VPC-DEPOSED-SG-DEPENDENCY.md)
+  → RELATIVE LINK — both files are in migrations/. After migration both move together into
+    ~/.claude/docs/runbooks/migrations/. Relative path remains valid. Safe in all options
+    that preserve the folder structure (Option A/locked direction).
+
+terraform:docs/runbooks/migrations/VPC-DEPOSED-SG-DEPENDENCY.md:97
+  The `VPC-DECOMMISSION-CHECKLIST.md` runbook
+  → PROSE MENTION — bare filename in prose, not a hyperlink. No breakage.
+
+terraform:docs/runbooks/client-onboarding/ADD-SSO-CLIENT.md:185-188
+  | Microsoft Entra ID | OIDC | [`ENTRA-OIDC.md`](sso-client-instructions/ENTRA-OIDC.md) |
+  | Microsoft Entra ID | SAML | [`ENTRA-SAML.md`](sso-client-instructions/ENTRA-SAML.md) |
+  | Google Workspace | OIDC | [`GOOGLE-OIDC.md`](sso-client-instructions/GOOGLE-OIDC.md) |
+  | Google Workspace | SAML | [`GOOGLE-SAML.md`](sso-client-instructions/GOOGLE-SAML.md) |
+  → RELATIVE LINKS — ADD-SSO-CLIENT.md links to the 4 sso-client-instructions files via
+    relative path. Disposition of these links depends on the engineer's SSO files decision:
+    - If Option (a) migrate with subfolder preserved: relative links remain valid.
+    - If Option (b) exclude from migration (leave in terraform): ADD-SSO-CLIENT.md must be
+      updated in Phase 2 to point to the terraform repo's remaining location (or a note
+      must be added that the files stay in terraform for client distribution).
+    - Requires SSO decision before Phase 2 can be finalized.
+
+# ============================================================
+# APP REPO — 2 references on origin/develop
+# ============================================================
+
+app:README.md:20
+  * [ECS Remote Access](docs/operations/ECS_REMOTE_ACCESS.md) - Connect to production/staging via Rails console or bash
+  → HARD LINK — markdown hyperlink. Will become a 404 after Phase 3 removes the file.
+  → ACTION (Phase 3): Update to ~/.claude/docs/runbooks/engineer-access/ECS-REMOTE-ACCESS.md
+  → NEW finding: NOT present in prior audit (which sourced terraform only).
+
+app:docs/operations/ECS_REMOTE_ACCESS.md:73
+  > **Note**: If the `ECSRemoteAccess` policy does not exist yet, create it first: **IAM** → **Policies** → **Create policy** → **JSON** tab → paste the contents of [`ecs-remote-access-policy.json`](ecs-remote-access-policy.json) → name it `ECSRemoteAccess`.
+  → RELATIVE LINK within the runbook — links to a sibling file ecs-remote-access-policy.json.
+    This file also lives under docs/operations/ and is NOT a markdown runbook. After Phase 3
+    migration, the policy JSON is no longer co-located. The runbook body will need either:
+    (a) the relative link updated to an absolute path, or
+    (b) the policy JSON co-migrated to docs/runbooks/engineer-access/ alongside the runbook.
+  → NEW finding: NOT present in prior audit. Requires decision — see Open Questions.
+
+# ============================================================
+# DOT-CLAUDE REPO — cross-repo references to terraform runbooks (origin/develop)
+# ============================================================
+
+dot-claude:docs/AWS-MFA.md:16
+  Terraform repository (`docs/runbooks/AWS-ENGINEER-SETUP.md`). Both use MFA, but:
+  → SOFT REF — uses old flat path (pre-categorization). Already imprecise before migration.
+  → ACTION (Phase 1): Update to ~/.claude/docs/runbooks/engineer-access/AWS-ENGINEER-SETUP.md
+
+dot-claude:docs/AWS-MFA.md:240
+  outside of Claude Code. See `docs/runbooks/AWS-ENGINEER-SETUP.md` in the Terraform repository.
+  → SOFT REF — cross-repo reference.
+  → ACTION (Phase 1): Update to ~/.claude/docs/runbooks/engineer-access/AWS-ENGINEER-SETUP.md
+
+dot-claude:docs/IDENTITY-STACK.md:5
+  canonical sources in the terraform repo: `identity/README.md`, `docs/adr/ADR-004-identity-model.md`, `docs/runbooks/engineer-access/BREAK-GLASS.md`.
+  → SOFT REF — points to terraform repo.
+  → ACTION (Phase 1): Update to ~/.claude/docs/runbooks/engineer-access/BREAK-GLASS.md
+
+# --- NOT REQUIRING FIX (example prose / template patterns) ---
+
+dot-claude:skills/pr-triage/SKILL.md:41
+  "path": "docs/runbooks/ADD-SSO-CLIENT.md",
+  → EXAMPLE JSON inside skill prose — this appears inside a JSON code block illustrating
+    what a PR thread object looks like (with "repo": "4shark/terraform"). It is static
+    example data, not a navigable link. No fix required.
+
+dot-claude:commands/cleanup-memories.md:156
+  | **Runbook** (`<repo>/docs/runbooks/<area>/<NAME>.md`) | Operational procedure ...
+dot-claude:commands/cleanup-memories.md:280
+  | 4 | <memory-path> | <repo>/docs/runbooks/<area>/<name>.md | feature/cleanup-memory-<slug> | ...
+  → TEMPLATE PATTERN — these are generic placeholder paths in instructional prose, not references
+    to any specific file. No fix required.
+
+# ============================================================
+# SUMMARY
+# ============================================================
+#
+# HARD LINKS that break without redirects:
+#   3 total:
+#   - terraform/SECURITY.md:31                           → Phase 2
+#   - terraform/identity/README.md:27                    → Phase 2
+#   - app/README.md:20                                   → Phase 3 (NEW vs prior audit)
+#
+# SOFT REFS requiring update after migration:
+#   - terraform: 6 soft refs + 1 pre-existing broken ref  → Phase 2
+#   - dot-claude: 3 cross-repo refs                        → Phase 1
+#
+# CHANGELOG historical prose (no fix needed):
+#   - terraform/CHANGELOG.md:152                         → no action
+#
+# Internal relative links (safe if structure preserved):
+#   - terraform/docs/runbooks/migrations/VPC-DECOMMISSION-CHECKLIST.md:75  → safe
+#   - terraform/docs/runbooks/migrations/VPC-DEPOSED-SG-DEPENDENCY.md:97   → safe (prose)
+#   - terraform/docs/runbooks/client-onboarding/ADD-SSO-CLIENT.md:185-188  → conditional on SSO decision
+#
+# NEW findings vs prior audit (sourced from working copy on wrong branch):
+#   1. app/README.md:20 — hard link to ECS_REMOTE_ACCESS.md (was in terraform grep only before)
+#   2. app/docs/operations/ecs-remote-access-policy.json exists and is referenced by ECS_REMOTE_ACCESS.md:73
+#   3. terraform/CHANGELOG.md:152 — historical prose (no action, but identified as present)
+#   4. dot-claude/skills/pr-triage/SKILL.md:41 — example JSON (no action)
+#   5. dot-claude/commands/cleanup-memories.md:156,280 — template patterns (no action)
+#
+# PRIOR AUDIT ACCURACY:
+#   - The 2 terraform hard links were correct (same on origin/develop).
+#   - The 6 terraform soft refs were correct (same on origin/develop).
+#   - The 1 pre-existing broken ref was correct (same on origin/develop).
+#   - The 3 dot-claude cross-repo refs were correct (same on origin/develop).
+#   - The internal cross-runbook relative links were correct.
+#   - Missing: app/README.md:20 hard link, ecs-remote-access-policy.json sibling, CHANGELOG entry.
+#   - File count error: prior audit said 18 terraform runbooks; origin/develop has 22
+#     (18 in categories + 4 in sso-client-instructions/ nested subdirectory).

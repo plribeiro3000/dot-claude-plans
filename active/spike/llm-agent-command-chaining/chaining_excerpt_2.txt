@@ -1,0 +1,36 @@
+# Source: Claude Code Permissions Documentation
+# URL: https://code.claude.com/docs/en/permissions
+# Fetched: 2026-06-08
+
+KEY EXCERPT — COMPOUND COMMANDS SECTION:
+
+"Claude Code is aware of shell operators, so a rule like Bash(safe-cmd *) won't give it
+permission to run the command safe-cmd && other-cmd. The recognized command separators
+are &&, ||, ;, |, |&, &, and newlines. A rule must match each subcommand independently."
+
+"When you approve a compound command with 'Yes, don't ask again', Claude Code saves a
+separate rule for each subcommand that requires approval, rather than a single rule for
+the full compound string. For example, approving git status && npm test saves a rule for
+npm test, so future npm test invocations are recognized regardless of what precedes the &&.
+Subcommands like cd into a subdirectory generate their own Read rule for that path.
+Up to 5 rules may be saved for a single compound command."
+
+HARDCODED READ-ONLY EXEMPTION:
+"Claude Code recognizes a built-in set of Bash commands as read-only and runs them
+without a permission prompt in every mode. These include ls, cat, echo, pwd, head,
+tail, grep, find, wc, which, diff, stat, du, cd, and read-only forms of git."
+
+CD COMPOUND NOTE:
+"A cd into a path inside your working directory or an additional directory is also
+read-only. A compound command like cd packages/api && ls runs without a prompt when
+each part qualifies on its own. Combining cd with git in one compound command always
+prompts, regardless of the target directory."
+
+HOOKS — BLOCKING MECHANISM:
+"A blocking hook also takes precedence over allow rules. A hook that exits with code 2
+stops the tool call before permission rules are evaluated, so the block applies even
+when an allow rule would otherwise let the call proceed."
+
+"Hook decisions do not bypass permission rules. Deny and ask rules are evaluated
+regardless of what a PreToolUse hook returns, so a matching deny rule blocks the call
+and a matching ask rule still prompts even when the hook returned 'allow' or 'ask'."

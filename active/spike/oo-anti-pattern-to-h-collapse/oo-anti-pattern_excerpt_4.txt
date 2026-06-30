@@ -1,0 +1,28 @@
+SOURCE: https://williamdurand.fr/2013/06/03/object-calisthenics/
+FETCHED: 2026-06-19
+ORIGINAL SOURCE: Jeff Bay, "Object Calisthenics" in ThoughtWorks Anthology (Pragmatic Bookshelf, 2008)
+
+KEY QUOTES (verbatim as reported by William Durand's article on Jeff Bay's rules):
+
+Rule 3 - Wrap All Primitives And Strings:
+"Following this rule is pretty easy, you simply have to encapsulate all the primitives within objects, in order to avoid the Primitive Obsession anti-pattern."
+
+Rule 4 - First Class Collections:
+"Any class that contains a collection should contain no other member variables. If you have a set of elements and want to manipulate them, create a class that is dedicated for this set."
+
+Rule 9 - No Getters/Setters/Properties:
+"It could be rephrased as Tell, don't ask. It is okay to use accessors to get the state of an object, as long as you don't use the result to make decisions outside the object."
+
+ALL NINE RULES (from search results confirming Jeff Bay's 9 rules):
+1. Use only one level of indentation per method
+2. Don't use the else keyword
+3. Wrap all primitives and strings
+4. Use only one dot per line
+5. Don't abbreviate
+6. Keep all entities small
+7. Don't use any classes with more than two instance variables
+8. Use first-class collections
+9. Don't use any getters/setters/properties
+
+NOTE: The ThoughtWorks Anthology (2008) is the authoritative source; this article and others reproduce the rules.
+PDF of original rules also found at: https://bolcom.github.io/student-dojo/legacy-code/DevelopersAnonymous-ObjectCalisthenics.pdf (binary/unreadable via WebFetch)

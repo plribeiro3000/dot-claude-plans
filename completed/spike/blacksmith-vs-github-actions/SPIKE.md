@@ -54,7 +54,7 @@ All CI/CD workflows run on `ubuntu-latest` (GitHub-hosted, no self-hosted runner
 | app-sdk-advpl | 3 (ci, dco, single-commit) | — | Very light |
 | app-sdk-dotnet | 3 (ci, dco, single-commit) | — | Very light |
 | ansible | 0 | yes | Renovate only |
-| SimplexPE.Global4Shark, dot-claude, app-mobileclient, keycloak | 0 | — | No workflows directory |
+| simplex-harvester, dot-claude, app-mobileclient, keycloak | 0 | — | No workflows directory |
 
 **Total: 27 workflow files, ~50–70 `runs-on:` directives across the org.**
 

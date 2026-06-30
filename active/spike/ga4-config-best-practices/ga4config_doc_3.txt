@@ -1,0 +1,67 @@
+GA4 CONFIG BEST PRACTICES — CONSENT MODE / LGPD SOURCES
+Raw output captured from WebFetch calls on 2026-06-26
+
+=============================================================
+SOURCE 1: https://secureprivacy.ai/blog/google-consent-mode-v2
+TITLE: Google Consent Mode v2 — A Complete Guide (SecurePrivacy)
+=============================================================
+
+Four Consent Signals:
+1. analytics_storage: "Controls whether Analytics can store data and collect user behavior"
+2. ad_storage: "Manages advertising-related data collection including conversion tracking"
+3. ad_user_data: "governs the use of personal data for advertising purposes" [NEW in v2]
+4. ad_personalization: "specifically controls remarketing and personalized advertising" [NEW in v2]
+
+Key timing requirement:
+"Consent signals must reach Google Tag Manager immediately when users make choices"
+
+Most common implementation error:
+"tags firing before consent represents the most common and dangerous implementation error"
+
+Default state best practice (for GDPR/LGPD strict environments):
+Set all four signals to 'denied' by default before the consent banner loads.
+Update to 'granted' on user accept.
+
+CMP Integration:
+Consent Mode v2 works through GTM (dataLayer events) or via a Google-certified CMP partner (e.g. Cookiebot, OneTrust, Usercentrics).
+For LGPD environments, a CMP must display a consent banner in Portuguese and provide granular accept/reject controls.
+
+Behavioral Modeling (Advanced Consent Mode):
+When analytics_storage is denied, GA4 can model conversions using aggregated data from consenting users. Requires at least 1,000 daily events from consenting users to activate modeling.
+
+=============================================================
+SOURCE 2: https://cookieinformation.com/lgpd-analytics/
+TITLE: LGPD Requirements for Analytics Tracking (Cookie Information)
+=============================================================
+
+Legal basis for analytics under LGPD:
+Non-essential analytics tracking requires explicit consent under LGPD. Legitimate interests are not a recognized legal basis under LGPD for analytics the way they are under GDPR.
+
+Required elements:
+"Consent banners or cookie notifications must allow users to opt-out of non-essential tracking"
+
+Consent must be:
+- Free (not bundled with service access)
+- Specific (granular per purpose)
+- Informed (clear explanation of what will be tracked)
+- Unambiguous (affirmative action — pre-ticked boxes are not valid)
+
+Implication for analytics_storage:
+Default must be 'denied'. User must take an affirmative action (Accept) before analytics data is collected. Continued browsing or implied consent is not valid under LGPD.
+
+LGPD vs GDPR alignment:
+Many requirements mirror GDPR. A CMP that is GDPR-certified and handles Portuguese-language consent flows can typically be adapted for LGPD compliance.
+
+DPA in Brazil: ANPD (Autoridade Nacional de Proteção de Dados) — has not issued binding guidance specifically on analytics cookies as of 2024, but LGPD Articles 7 and 8 are clear on consent requirements.
+
+=============================================================
+SOURCE 3 (secondary, search result summary):
+URL: https://adswerve.com/blog/cross-domain-tracking-ga4/
+TITLE: Cross-Domain Tracking in GA4 (Adswerve)
+NOTE: This source was not directly fetched — summarized from search result snippet only. Not confirmed verbatim. UNVERIFIED.
+=============================================================
+
+UNVERIFIED claim from search result summary:
+"You cannot track a single session across two different GA4 properties" — this appears in the context of explaining why cross-domain tracking requires a single property. Cannot verify exact wording without fetching the page.
+
+What is confirmed (from other verified sources): cross-domain tracking is a within-property feature that marks outbound links so the client_id persists across root domains within the same property. It does NOT merge data across two separate properties.

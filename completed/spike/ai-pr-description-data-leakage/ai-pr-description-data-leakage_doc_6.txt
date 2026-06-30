@@ -1,0 +1,43 @@
+SOURCE: Nightfall DLP Action GitHub README
+URL: https://github.com/nightfallai/nightfall_dlp_action/blob/master/README.md
+FETCHED: 2026-06-25
+
+=== NIGHTFALL DLP SCAN SCOPE — VERBATIM ===
+
+From the README:
+"The Nightfall DLP Action scans your code commits upon Pull Request for sensitive information."
+
+SECONDARY DESCRIPTION (from GitHub Marketplace listing):
+"The Nightfall DLP Action scans your code commits upon Pull Request for sensitive information - like credentials & secrets, PII, credit card numbers & more - and posts review comments to your code hosting service automatically."
+
+SCOPE ANALYSIS:
+The phrase "code commits" is the operative scope definition. The action scans file diffs (staged changes in commits) — NOT PR body text, PR titles, or PR descriptions.
+
+The README does not mention any capability to scan PR body/description text. The action creates "review comments" on the code (diff annotations), not body-level annotations.
+
+CUSTOM DETECTOR CAPABILITY:
+"The .nightfalldlp/config.json file is used as a centralized config file to control which detectors to scan with and what content you want to scan for in your pull requests."
+
+Note: "what content you want to scan for" refers to custom detection rules applied to code diffs — not to the PR body text. The config controls which detector types activate, not which text surfaces to scan.
+
+DETECTOR TYPES COVERED:
+- Credentials and secrets
+- PII (SSNs, credit card numbers)
+- Custom word lists and regex patterns
+- 200+ pre-built detectors
+
+WHAT IS NOT COVERED:
+- PR body/description text
+- PR title text
+- PR comment text (reply comments)
+- Infrastructure hostnames not matching credential patterns
+- Customer names
+- Database names (without accompanying passwords)
+- Business volume figures
+
+CONCLUSION: Nightfall GitHub Action scans code diffs (file changes in commits), not PR body prose.
+
+=== VERIFICATION ===
+URL fetched: https://github.com/nightfallai/nightfall_dlp_action/blob/master/README.md
+Verbatim quote: "The Nightfall DLP Action scans your code commits upon Pull Request for sensitive information."
+Quote location: README opening description

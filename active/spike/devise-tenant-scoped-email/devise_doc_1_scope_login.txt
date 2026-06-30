@@ -1,0 +1,82 @@
+SOURCE: https://github.com/plataformatec/devise/wiki/How-to:-Scope-login-to-subdomain
+FETCHED: 2026-06-17
+
+TITLE: How to: Scope login to subdomain — Devise Wiki
+
+FULL CONTENT (as extracted by WebFetch):
+
+# Devise Subdomain Scoping Guide
+
+## Overview
+This guide explains how to scope Devise authentication to subdomains, allowing the same email address
+to be used across different subdomains.
+
+## Key Configuration Steps
+
+### 1. Database Migration
+Modify the email index to scope by subdomain:
+
+  # For new migrations
+  add_index :users, [:email, :subdomain], :unique => true
+
+  # For existing projects, remove old constraint first
+  remove_index :users, :email
+  add_index :users, [:email, :subdomain], :unique => true
+
+### 2. Request Keys Configuration
+Add subdomain to request_keys in your User model:
+
+  class User
+    devise :database_authenticatable, :registerable,
+           :recoverable, :rememberable, :trackable,
+           request_keys: [:subdomain]
+  end
+
+VERBATIM QUOTE:
+"If you have multiple Devise models and you would like all of them to have the same
+`:request_keys` configuration, you can set that globally in `config/initializers/devise.rb`"
+
+Optional hash syntax for non-required subdomains:
+  config.request_keys = { subdomain: false }
+
+### 3. Remove Validatable Module
+VERBATIM QUOTE:
+"If you do, :validatable will prevent more than one record having the same email"
+across subdomains. Either remove it or copy specific validations you need.
+
+### 4. Override Authentication Finder
+
+  def self.find_for_authentication(warden_conditions)
+    where(:email => warden_conditions[:email],
+          :subdomain => warden_conditions[:subdomain]).first
+  end
+
+### 5. Password Recovery Configuration
+
+Override the reset password instructions method:
+
+  def self.send_reset_password_instructions(attributes = {})
+    recoverable = where(:email => attributes[:email],
+                        :subdomain => attributes[:subdomain])
+    recoverable = recoverable.find_or_initialize_with_errors(
+      reset_password_keys, attributes, :not_found)
+    recoverable.send_reset_password_instructions if recoverable.persisted?
+    recoverable
+  end
+
+Create custom password controller:
+
+  class Users::PasswordsController < Devise::PasswordsController
+    def create
+      params[:user][:subdomain] = request.subdomain
+      super
+    end
+  end
+
+Update routes:
+  devise_for :users, controllers: { passwords: "users/passwords" }
+
+### Alternative: Using authentication_keys
+For column names other than `subdomain`, use `authentication_keys` instead of
+`request_keys`. Example: "if you have `subdomains` table and are using `subdomain_id`"
+on your model, add `authentication_keys: [:email, :subdomain_id]`

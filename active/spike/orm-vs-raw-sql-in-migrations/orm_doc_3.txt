@@ -1,0 +1,23 @@
+SOURCE: https://jakeyesbeck.com/2021/04/10/avoid-models-in-migrations/
+FETCHED: 2026-06-23
+
+=== Core argument ===
+
+"The application code moves from commit to commit but database structure (should) only change with migrations. Therefore, even if the Book class is now Novel, the database table books still exists at the time of the AddCountryToBooks migration."
+
+=== Drift scenario ===
+
+"While Developer 1 was away, the Developer 2 was busy. They wrote the above migration, updated existing data and then a new feature request was completed: A model rename."
+
+Result: "Book was renamed to Novel breaking the previous migration" with error "uninitialized constant AddCountryToBooks::Book"
+
+=== Stub model as fix ===
+
+"If writing SQL isn't ideal, a temporary model can be used within the migration. Here, a new Book model is defined to manipulate the books table. Even if app/models/book.rb has been changed to app/models/novel.rb, this definition of Book will be valid within the scope of this migration."
+
+=== Raw SQL as fix ===
+
+"Instead of Book.update_all, writing an update query in SQL and using the base ActiveRecord connection ensures this migration survives model changes like a rename."
+
+=== Note ===
+This article presents BOTH stub models and raw SQL as valid alternatives. Does not declare one superior.

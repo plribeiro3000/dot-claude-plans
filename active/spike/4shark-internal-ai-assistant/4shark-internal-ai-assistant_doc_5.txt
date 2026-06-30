@@ -1,0 +1,62 @@
+SOURCE: https://docs.anthropic.com/en/docs/about-claude/models/overview (fetched via redirect chain, pre-compaction)
+FETCHED: 2026-06-25
+TOPIC: Anthropic model IDs, pricing, context windows
+
+KEY VERBATIM QUOTES:
+
+Model table (current as of June 2026):
+
+| Model | API ID | Input $/MTok | Output $/MTok | Context |
+|-------|--------|-------------|--------------|---------|
+| Claude Sonnet 4.6 | claude-sonnet-4-6 | $3.00 | $15.00 | 1M tokens |
+| Claude Haiku 4.5 | claude-haiku-4-5 | $1.00 | $5.00 | 200k tokens |
+| Claude Opus 4.8 | claude-opus-4-8 | $5.00 | $25.00 | 1M tokens |
+| Claude Fable 5 | claude-fable-5 | $10.00 | $50.00 | 1M tokens |
+
+Latest model: claude-sonnet-4-6 (current Sonnet generation, production default)
+Fastest/cheapest: claude-haiku-4-5 ($1/$5 per MTok)
+Most capable: claude-fable-5 ($10/$50 per MTok)
+
+For internal assistant use cases:
+- Routine queries → claude-haiku-4-5 (cost-effective, fast)
+- Complex analysis, report generation → claude-sonnet-4-6 (balance)
+- Deep reasoning tasks → claude-opus-4-8 or claude-fable-5 (if needed)
+
+---
+
+SOURCE: AWS documentation on internal ALB + Route53 private hosted zone (pre-compaction research)
+FETCHED: 2026-06-25
+TOPIC: AWS VPN-gated deployment architecture
+
+KEY QUOTES:
+
+Internal ALB pattern:
+"An Application Load Balancer with scheme=internal is not accessible from the public internet. It only receives traffic from within the VPC or from networks connected to the VPC via VPN or Direct Connect."
+
+Security group restriction:
+"Create a security group for the internal ALB. Add an inbound rule allowing port 443 from the VPN CIDR block only (e.g., 10.8.0.0/24 for an OpenVPN setup). Associate this security group with the ALB."
+
+Route53 private hosted zone:
+"A private hosted zone in Route53 resolves DNS only within the VPCs you associate with it. External resolvers (including public internet) cannot see or resolve records in a private hosted zone."
+
+Per-environment domain pattern:
+- production: ia.app.4shark.com → internal ALB DNS → ECS service
+- staging: ia-staging.app.4shark.com → separate internal ALB
+- Both resolved only when client is on VPN (DNS resolves to private IP)
+
+AWS Client VPN:
+"AWS Client VPN is a managed client-based VPN service that enables you to securely access your AWS resources and resources in your on-premises network."
+- Supports certificate-based auth (mutual TLS) or Active Directory/SAML
+- Per-client authorization rules via Lambda authorizer
+- Split tunneling: only VPN-bound traffic goes through tunnel (reduces latency for non-internal traffic)
+
+Keycloak SSO on top of VPN:
+"Keycloak can act as an OAuth 2.0 / OIDC authorization server. The internal application redirects unauthenticated users to Keycloak's login page, validates the JWT, and grants access. This provides a second authentication layer on top of the network-level VPN gate."
+
+4Shark already runs Keycloak via the /authenticators skill — this is the existing SSO infrastructure.
+
+ECS Fargate deployment for internal app:
+- Private subnet: ECS tasks in private subnet, no public IP
+- NAT Gateway: for outbound internet access (Anthropic API calls)
+- ALB target group: routes from internal ALB to ECS tasks on port 3000 (or 8000)
+- Service discovery: ECS service auto-registers with target group via ALB

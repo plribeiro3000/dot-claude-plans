@@ -1,0 +1,17 @@
+SOURCE: https://martinfowler.com/bliki/AnemicDomainModel.html
+FETCHED: 2026-06-19
+
+KEY QUOTES (verbatim, confirmed by re-fetch):
+
+"making them little more than bags of getters and setters."
+
+"it's so contrary to the basic idea of object-oriented design; which is to combine data and process together."
+
+"the problem with anemic domain models is that they incur all of the costs of a domain model, without yielding any of the benefits."
+
+"The anemic domain model is really just a procedural style design, exactly the kind of thing that object bigots like me (and Eric) have been fighting since our early days in Smalltalk."
+
+Additional context:
+- Fowler credits Eric Evans (Domain-Driven Design) for also condemning this pattern
+- The article notes all business logic ends up in a "service layer"
+- Eric Evans distinguishes thin application layers that only "coordinate tasks and delegates work" from rich domain layers containing business rules

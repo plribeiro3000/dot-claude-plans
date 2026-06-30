@@ -1,0 +1,36 @@
+SOURCE: https://community.auth0.com/t/same-email-for-multiple-users-needed/157993
+FETCHED: 2026-06-17
+
+TITLE: Auth0 Community — "Same email for multiple users needed"
+
+VERBATIM QUOTE (Auth0 community moderator Rueben Tiow):
+"If you had Database A and Database B configured, you could have a user with the same
+email address in each of those database connections."
+
+## Auth0 Position on Email Uniqueness
+
+Auth0 enforces email uniqueness at the CONNECTION level (analogous to a tenant's user pool),
+not globally across all connections. The same email CAN exist in multiple connections.
+
+When a question asked about the same email for multiple users, the Auth0 moderator's
+confirmed answer was: create separate database connections per data source.
+
+---
+
+SOURCE: https://auth0.com/docs/get-started/architecture-scenarios/multiple-organization-architecture
+FETCHED: 2026-06-17
+
+TITLE: Auth0 — Multiple Organization Architecture
+
+VERBATIM QUOTE (from the page):
+"If they attempt to do so, they should be rejected as unauthorized."
+(referring to cross-org access — users tied to one org cannot access another)
+
+"a user is no longer tied directly to the organization to which they belong or have access"
+(describing the shared-user model)
+
+## Summary
+
+Auth0's organizational model enforces isolation per organization. The same email can exist
+in different Auth0 connections (the database-level unit of isolation). Auth0 does not enforce
+global email uniqueness across all its tenants.

@@ -1,0 +1,65 @@
+SOURCE: Microsoft Learn — sqlcmd Utility (ODBC variant)
+URL: https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility?view=sql-server-ver17
+Retrieved: 2026-06-26
+
+--- KEY QUOTES ---
+
+### -I flag (QUOTED_IDENTIFIER)
+
+Section "Query execution options", flag -I:
+
+"Applies to: sqlcmd (ODBC) only.
+Sets the SET QUOTED_IDENTIFIER connection option to ON. The default setting is OFF."
+
+NOTE: The sqlcmd (Go) variant note on -I states:
+"The -I switch is ignored. Quoted identifiers are always enabled."
+
+### -W flag (trailing spaces) and incompatibility with -y / -Y
+
+Section "Format options", flag -W (line 970 of saved file):
+
+"-W
+Removes trailing spaces from a column. Use this option together with the -s option
+when preparing data that you want to export to another application. Can't be used
+with the -y or -Y options."
+
+### -y flag (variable-length display width)
+
+"-y variable_length_type_display_width
+Sets the sqlcmd scripting variable SQLCMDMAXVARTYPEWIDTH. The default value is 256.
+It limits the number of characters that are returned for the large variable length
+data types:
+- varchar(max)
+- nvarchar(max)
+- varbinary(max)
+- xml
+- user-defined data types (UDTs)
+- text
+- ntext
+- image"
+
+### -Y flag (fixed-length display width)
+
+"-Y fixed_length_type_display_width
+Sets the sqlcmd scripting variable SQLCMDMAXFIXEDTYPEWIDTH. The default value is 0
+(unlimited). Limits the number of characters that are returned for the following
+data types: char(n), nchar(n), varchar(n), nvarchar(n), varbinary(n), sql_variant"
+
+### -h flag (headers)
+
+"-h headers
+Specifies the number of rows to print between the column headings. The default
+setting prints the headings once for each set of query results."
+
+--- CONCLUSION ---
+
+The incompatibility documented in the Microsoft ODBC sqlcmd docs is specifically:
+  -W cannot be used with -y or -Y
+
+The -h flag (header row frequency) has no documented mutual exclusivity with -W or -y.
+
+The engineer's session claim was that "sqlcmd formatting flags -W / -y / -h are
+mutually exclusive in combinations you need, so driving generation through sqlcmd
+formatting failed". The vendor doc confirms -W vs -y/-Y incompatibility.
+The -h incompatibility is not vendor-documented; the practical failure was
+likely the -W/-y combination specifically.

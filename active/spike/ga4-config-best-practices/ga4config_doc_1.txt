@@ -1,0 +1,197 @@
+GA4 CONFIG BEST PRACTICES — OFFICIAL GOOGLE SOURCES
+Raw output captured from WebFetch calls on 2026-06-26
+
+=============================================================
+SOURCE 1: https://support.google.com/analytics/answer/7686480
+TITLE: Understanding PII in Google's contracts and policies
+=============================================================
+
+What Google Considers PII:
+"could be used on its own to directly identify, contact, or precisely locate an individual"
+
+Prohibited PII includes:
+- Email addresses
+- Mailing addresses
+- Phone numbers
+- Precise locations (GPS coordinates)
+- Full names or usernames
+
+What Is NOT Considered PII (Google's interpretation):
+- Pseudonymous cookie IDs
+- Pseudonymous advertising IDs
+- IP addresses
+- Other pseudonymous end user identifiers
+
+Important caveat quoted:
+"data excluded from Google's interpretation of PII may still be considered personal data...under the GDPR...and may therefore be subject to these laws."
+
+The document does not discuss a specific user_id policy in the fetched portion.
+
+=============================================================
+SOURCE 2: https://support.google.com/analytics/answer/7667196
+TITLE: Data retention — Analytics Help
+=============================================================
+
+Available Options for User-Level Data:
+- "2 months"
+- "14 months"
+
+What the Setting Controls:
+"user-level and event-level data associated with cookies, user-identifiers, such as User-ID, and advertising identifiers"
+"the data retention setting does not affect standard aggregated reports (including primary and secondary dimensions)"
+"only affects explorations and funnel reports"
+
+Key passages:
+"when you increase the retention period it is applied to data that you have already collected"
+"whenever you modify the retention period, Analytics waits 24 hours before implementing the change. During this 24-hour period, you can revert your change and your data will be unaffected."
+
+Reset option:
+"reset the retention period of the user identifier with each new event from that user (thus setting the expiration date to current time plus retention period)"
+
+=============================================================
+SOURCE 3: https://support.google.com/analytics/answer/9213390
+TITLE: Measure activity across platforms with User-ID
+=============================================================
+
+Purpose:
+"associate your own identifiers with individual users so you can connect their behavior across different sessions and on various devices and platforms"
+
+Reporting identity options:
+- "Blended": "evaluates user ID, device ID, modeled data"
+- "Observed": "evaluates user ID, device ID"
+
+User ID must be "256 characters or less" and must remain unique per user.
+
+"If a user triggers events before a User-ID is set, Analytics will associate those initial events with that User-ID."
+
+=============================================================
+SOURCE 4: https://developers.google.com/analytics/devguides/collection/ga4/user-id
+TITLE: Send user IDs — Google for Developers
+=============================================================
+
+Implementation:
+"add the user_id parameter to the config command on each page of your website"
+"To set or update the user_id after the initial page load, use the gtag('set') command."
+
+Three states:
+- Never signed in: Don't send the parameter
+- Currently signed in: Send their user ID
+- Previously signed in, now signed out: Send null (not empty string or "null" text)
+
+"Don't set custom dimensions based on user IDs...too many unique values causes issues with Google Analytics data"
+
+user_id is "a reserved system parameter used specifically to identify authenticated users" and must only be configured as a configuration parameter, never as a custom dimension or event parameter.
+
+=============================================================
+SOURCE 5: https://support.google.com/analytics/answer/12675187
+TITLE: [GA4] Best practices for User-ID
+=============================================================
+
+"It is recommended that you do not register a user ID as a custom dimension."
+"with User-ID in the reporting identity, User ID de-duplication is present across all reports"
+
+=============================================================
+SOURCE 6: https://support.google.com/analytics/answer/9445345
+TITLE: [GA4] Activate Google signals for Google Analytics properties
+=============================================================
+
+What Google Signals enables:
+1. "Create remarketing audiences from your Google Analytics data, and share those audiences with your linked advertising accounts."
+2. Advertising reporting/advertising cookies
+3. "from device identifiers and from users who are signed in to their Google accounts" [demographics]
+
+Data collection:
+"session data from sites and apps that Google associates with users who have signed in to their Google accounts, and who have turned on Ads Personalization"
+
+Signed-in data expires after 26 months by default.
+
+Privacy:
+"Data collected under Google signals is not used or shared for any purpose other than to provide the Google Analytics service" unless explicit data sharing/product linking.
+
+Regional activation: available per-region via Admin > Data Collection.
+
+No deprecation mentioned in the fetched content of this page.
+
+=============================================================
+SOURCE 7: https://support.google.com/analytics/answer/9019185
+TITLE: Privacy controls in Google Analytics
+=============================================================
+
+IP Handling:
+"In Google Analytics, IP addresses are not logged or stored."
+"IP masking is available...but noted as 'not necessary' for GA4 properties specifically."
+
+Granular Location & Device — when disabled, stops collecting:
+"city, latitude/longitude, browser minor version, user-agent string, device brand/model/name, OS minor version, platform minor version, and screen resolution"
+
+Tradeoff: "modeled-key events volume is significantly reduced for that region."
+
+Google Signals:
+"If you disable collection of Google-signals data, you will not have access to remarketing lists based on third-party advertising identifiers."
+
+=============================================================
+SOURCE 8: https://support.google.com/analytics/answer/12002752
+TITLE: [GA4] Collect granular location and device data
+=============================================================
+
+Default: "Analytics collects this data by default."
+
+Data Disabled When Feature is Turned Off:
+"City," "Browser minor version," "Browser User-Agent string," "Device brand," "Device model," "Device name," "Operating system minor version," "Platform minor version," and "Screen resolution."
+
+Per-Region Configuration: Admin > Data Collection > toggle granular data switch > choose regions.
+
+"Disabling this feature for a region significantly reduces 'modeled key events volume' and impacts downstream reporting in linked Google Ads and Search Ads 360 accounts."
+
+=============================================================
+SOURCE 9: https://support.google.com/analytics/answer/12017362
+TITLE: EU, Switzerland, or UK-focused data and privacy
+=============================================================
+
+IP logging:
+"Google Analytics does not log or store individual IP addresses from EU, Switzerland, or UK users."
+
+Geo derivation process:
+"For EU, Switzerland, or UK-based traffic, IP-address data is used solely for geo-location data derivation before being immediately discarded."
+
+Geographic data retained: "City (and the derived latitude, and longitude of the city), Continent, Country, Region, Subcontinent."
+
+=============================================================
+SOURCE 10: https://support.google.com/analytics/answer/2763052
+TITLE: Anonymize IP addresses — Analytics Help
+=============================================================
+
+"In Google Analytics 4, IP masking is not necessary since IP addresses are not logged or stored."
+
+Note: UA geographic dimensions were "derived from truncated IP addresses" — GA4 does not provide equivalent detail.
+
+=============================================================
+SOURCE 11: https://support.google.com/analytics/answer/9216061
+TITLE: Enhanced measurement events
+=============================================================
+
+1. page_view: "each time the page loads or the browser history state is changed"
+2. scroll: "the bottom of each page (i.e., when a 90% vertical depth becomes visible)"
+3. click (outbound): "each time a user clicks a link that leads away from the current domain and to another website"
+4. view_search_results: "each time a user is presented with a search results page, as indicated by the presence of a URL query parameter"
+5. video_start, video_progress, video_complete: YouTube embeds at start, 10/25/50/75% progress, completion
+6. file_download: "when a user clicks a link leading to a file" (PDF, Word, Excel, etc.)
+7. form_start, form_submit: "first user interaction with a form" and "upon form submission"
+
+Note: "no personally identifiable information is collected" must be ensured before enabling.
+
+=============================================================
+SOURCE 12: https://developers.google.com/analytics/devguides/collection/ga4/reference/events
+TITLE: Recommended events — Google for Developers
+=============================================================
+
+Logged-in Apps & SaaS Events:
+- login: "Send this event to signify that a user has logged in to your website or app." Optional parameter: method
+- sign_up: "This event indicates that a user has signed up for an account. Use this event to understand the different behaviors of logged in and logged out users." Optional parameter: method
+- join_group: "Log this event when a user joins a group such as a guild, team, or family. Use this event to analyze how popular certain groups or social features are."
+
+E-Commerce specific (NOT applicable to 4Shark):
+add_to_cart, remove_from_cart, begin_checkout, add_payment_info, add_shipping_info, purchase, refund, add_to_wishlist, select_item — all require currency + value + items array
+
+General engagement:
+search, select_content, share, spend_virtual_currency, earn_virtual_currency, tutorial_begin, tutorial_complete

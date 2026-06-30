@@ -1,0 +1,66 @@
+SOURCE: Multiple AGENTS.md specification and guidance documents
+URL: https://www.morphllm.com/agents-md-guide — MorphLLM AGENTS.md spec guide
+URL: https://developers.openai.com/codex/guides/agents-md — OpenAI Codex official AGENTS.md guide
+URL: https://www.freecodecamp.org/news/how-to-write-a-pull-request-description/ — FreeCodeCamp PR description guide
+FETCHED: 2026-06-25
+
+=== AGENTS.md SPECIFICATION — PR DESCRIPTION CONTENT GUIDANCE ===
+
+FROM MorphLLM AGENTS.md guide (https://www.morphllm.com/agents-md-guide):
+
+RECOMMENDED SECTIONS for AGENTS.md that relate to pull requests:
+"Commit and PR guidelines" section: covers "branch naming, commit format, merge strategy"
+
+PRACTICAL EXAMPLE shown:
+"Squash merge only. Conventional commits: feat:, fix:, chore:, docs:."
+
+SECURITY BOUNDARIES section example shown:
+"Never commit .env files."
+
+CONTENT RESTRICTIONS FOR PR BODY:
+The MorphLLM guide DOES NOT contain any guidance about what content should NOT appear in PR description prose — no mention of:
+- Customer names
+- Infrastructure hostnames
+- Database names or usernames
+- Volume/count figures
+- Internal topology details
+
+The spec "prioritizes project context for agents rather than detailed PR etiquette standards." No JSON schema, no YAML, no required fields — just Markdown.
+
+FROM OpenAI Codex AGENTS.md guide (https://developers.openai.com/codex/guides/agents-md):
+
+PR GUIDANCE PRESENT:
+"pull requests should never introduce new runtime dependencies without explanation in the PR description"
+
+PR REVIEWABILITY CRITERIA:
+"A pull request is reviewable when it includes: all tests passing, lint and type checks passing, diffs confined to agreed paths, proof artifacts (such as a bug fix with a failing test added first that now passes), and a one-paragraph commit or PR description covering intent."
+
+NOTE: "covering intent" — the intent is the what/why of the code change, not the data values involved.
+
+CONTENT RESTRICTIONS FOR PR BODY:
+No guidance about sensitive data, customer names, infrastructure details, or data minimization in PR descriptions. Focus is on completeness of testing artifacts, not on what information should be excluded.
+
+FROM FreeCodeCamp PR description guide (https://www.freecodecamp.org/news/how-to-write-a-pull-request-description/):
+
+ONLY SECURITY MENTION:
+"(Don't put the secret keys there, just include the key names and how to get the secrets.)"
+
+This is the ONLY guidance about what not to include. It is credential-specific (secret keys) — not a general data-minimization principle. No mention of customer names, hostnames, DB names, or volume figures.
+
+=== CONVERGENCE ASSESSMENT ===
+
+All AGENTS.md guides, PR best practice guides, and coding agent documentation reviewed share a common pattern:
+- They focus on WHAT TO INCLUDE (intent, testing evidence, change scope)
+- The only "what NOT to include" guidance is credential-specific (no .env files, no secret key values)
+- Zero guidance about non-credential sensitive data in PR prose (customer names, infra hostnames, business metrics)
+
+The gap is not accidental — no community source acknowledges this problem category exists.
+
+=== VERIFICATION ===
+URL fetched: https://www.morphllm.com/agents-md-guide
+Verbatim quote (from PR guidelines example): "Squash merge only. Conventional commits: feat:, fix:, chore:, docs:."
+Verbatim quote (from Security Boundaries): "Never commit .env files."
+
+URL fetched: https://www.freecodecamp.org/news/how-to-write-a-pull-request-description/
+Verbatim quote: "(Don't put the secret keys there, just include the key names and how to get the secrets.)"
+Quote location: Configuration Changes section

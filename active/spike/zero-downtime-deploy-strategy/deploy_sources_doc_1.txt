@@ -1,0 +1,305 @@
+AUXILIARY SOURCE FILE — deploy_sources_doc_1.txt
+Spike: zero-downtime-deploy-strategy
+Fetched: 2026-06-24
+Purpose: Verbatim excerpts from primary sources for citation verification
+
+=============================================================
+SOURCE 1: martinfowler.com/bliki/ParallelChange.html
+CANONICAL TERM: Parallel Change (also: Expand and Contract)
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"Parallel change, also known as expand and contract, is a pattern to implement
+backward-incompatible changes to an interface in a safe manner, by breaking the
+change into three distinct phases: expand, migrate, and contract."
+
+"During the migrate phase you update all clients using the old version to the new
+version. This can be done incrementally and, in the case of external clients,
+this will be the longest phase."
+
+"Once all usages have been migrated to the new version, you perform the contract
+phase to remove the old version and change the interface so that it only supports
+the new version."
+
+"Most database refactorings follow the parallel change pattern, where the migrate
+phase is the transition period between the original and the new schema, until all
+database access code has been updated to work with the new schema."
+
+=============================================================
+SOURCE 2: martinfowler.com/articles/feature-toggles.html
+CANONICAL TERM: Feature Toggles (Feature Flags)
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"Feature Toggles (often also refered to as Feature Flags) are a powerful technique,
+allowing teams to modify system behavior without changing code."
+
+"Release Toggles allow incomplete and un-tested codepaths to be shipped to production
+as latent code which may never be turned on."
+
+"Using Release Toggles in this way is the most common way to implement the Continuous
+Delivery principle of 'separating [feature] release from [code] deployment.'"
+
+PERMISSIONING TOGGLES (verbatim — three confirmed substrings from fetched page):
+"These flags are used to change the features or product experience that certain users receive."
+
+"For example we may have a set of 'premium' features which we only toggle on for our paying customers."
+
+"I refer to this technique of turning on new features for a set of internal or beta users
+as a Champagne Brunch."
+
+NOTE: The composite "Permissioning Toggles: Restrict features to specific user groups
+(premium users, beta testers, internal staff). Also called 'Champagne Brunch' toggles—an
+early tasting opportunity for internal teams." does NOT appear verbatim in the source.
+The three real substrings above are confirmed present.
+
+NOTE: The FeatureToggle bliki page also exists (martinfowler.com/bliki/FeatureToggle.html)
+and notes that "Release flags are the last thing you should do," recommending instead
+small releases or the Keystone Interface approach — but does NOT use the term "dark launching."
+
+=============================================================
+SOURCE 3: launchdarkly.com/blog/guide-to-dark-launching/
+CANONICAL TERM: Dark Launching
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"a process that allows you to release production-ready software features to a small group
+of users while hiding them from the rest of the user base prior to a full release."
+
+"A dark launch can also include deploying code to a production environment but without
+exposing it to any production traffic."
+
+"Feature flags are if-then logic statements in your code that allow you to decouple code
+deployments from feature release."
+
+=============================================================
+SOURCE 4: charity.wtf/2023/03/08/deploys-are-the-wrong-way-to-change-user-experience/
+CANONICAL TERM: Deploy vs Release distinction
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"Deploy: the process of building, testing, and rolling out changes to your production
+software. Deploying should happen very often, ideally several times a day."
+
+"Release: the process of changing user experience in a meaningful way. This might mean
+anything from adding functionality to adding entire product lines."
+
+"Feature flags are a scalpel, where deploys are a chainsaw. Both complement each other,
+and both have their place."
+
+"Deploying software is a terrible, horrible, no good, very bad way to go about the process
+of changing user-facing code."
+
+"you should wrap any large, user-visible behavior changes behind a feature flag, so you can
+release that code by flipping a flag."
+
+=============================================================
+SOURCE 5: martinfowler.com/bliki/CanaryRelease.html
+CANONICAL TERM: Canary Release
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"a technique to reduce the risk of introducing a new software version in production by
+slowly rolling out the change to a small subset of users before rolling it out to the
+entire infrastructure."
+
+"As you gain more confidence in the new version, you can start releasing it to more
+servers in your infrastructure and routing more users to it."
+
+"it is preferable to avoid conflating these two concerns: while canary releases are a
+good way to detect problems and regressions, A/B testing is a way to test a hypothesis
+using variant implementations."
+
+"[canary release is] an application of ParallelChange, where the migrate phase lasts
+until all the users have been routed to the new version."
+
+=============================================================
+SOURCE 6: harness.io/harness-devops-academy/progressive-delivery-explained
+CANONICAL TERM: Progressive Delivery
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"Progressive Delivery is a modern software release strategy that enables teams to deploy
+changes safely, incrementally, and with minimal risk."
+
+"targeting small groups of users before expanding to the wider population."
+
+"Canary releases and blue-green deployments are component techniques within progressive
+delivery, not synonymous with it. Progressive delivery represents the broader strategic
+framework encompassing these tactical tools, feature flags, experimentation, and real-time
+monitoring to enable safer, data-driven software releases."
+
+=============================================================
+SOURCE 7: github.com/ankane/strong_migrations (README)
+TOOL: strong_migrations gem (Rails)
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+Mission: "Catch unsafe migrations in development"
+
+"An operation is classified as dangerous if it either 'Blocks reads or writes for more
+than a few seconds (after a lock is acquired)' or 'Has a good chance of causing application
+errors.'"
+
+Multi-step approach for rename:
+"Create a new column, Write to both columns, Backfill data from the old column to the
+new column, Move reads from the old column to the new column, Stop writing to the old
+column, Drop the old column."
+
+For zero-downtime column removal:
+"Active Record caches attributes, which causes problems when removing columns. Be sure
+to ignore the column" by adding `self.ignored_columns += ["name"]` before removing.
+
+=============================================================
+SOURCE 8: docs.aws.amazon.com/AmazonECS/latest/developerguide/deployment-type-ecs.html
+CANONICAL TERM: ECS Rolling Update
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"When you create a service which uses the rolling update (ECS) deployment type, the
+Amazon ECS service scheduler replaces the currently running tasks with new tasks."
+
+"The minimumHealthyPercent represents the lower limit on the number of tasks that should
+be running and healthy for a service during a rolling deployment or when a container
+instance is draining, as a percent of the desired number of tasks for the service."
+
+"The maximumPercent represents the upper limit on the number of tasks that should be
+running for a service during a rolling deployment or when a container instance is draining,
+as a percent of the desired number of tasks for a service."
+
+Circuit breaker (verbatim):
+Rolling deployments have 2 methods for detecting failure:
+- "How the Amazon ECS deployment circuit breaker detects failures"
+- "How CloudWatch alarms detect Amazon ECS deployment failures"
+
+=============================================================
+SOURCE 9: github.com/sidekiq/sidekiq/wiki/Deployment
+TOOL: Sidekiq Deployment
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"send it the TSTP signal as early as possible in your deploy process and the TERM signal
+as late as possible."
+
+"Your deploy scripts must give Sidekiq N+5 seconds to shutdown cleanly after the TERM
+signal."
+
+"Sidekiq will push those jobs back to Redis so they can be rerun later"
+
+For long-running jobs:
+"use the Sidekiq::Job#interrupted? method or the Iteration pattern (both available in 7.3+)"
+
+=============================================================
+SOURCE 10: sre.google/sre-book/embracing-risk/
+CANONICAL TERM: User-Perceived Availability / SLO framing
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"You might expect Google to try to build 100% reliable services—ones that never fail.
+It turns out that past a certain point, however, increasing reliability is worse for a
+service (and its users) rather than better!"
+
+"Extreme reliability comes at a cost: maximizing stability limits how fast new features
+can be developed and how quickly products can be delivered to users."
+
+"a user on a 99% reliable smartphone cannot tell the difference between 99.99% and
+99.999% service reliability!"
+
+"balance the risk of unavailability with the goals of rapid innovation and efficient
+service operations, so that users' overall happiness—with features, service, and
+performance—is optimized."
+
+=============================================================
+SOURCE 11: arxiv.org/html/2604.14228v1
+PAPER: Dive into Claude Code (Design Space of AI Agent Systems)
+AI AGENT CONTEXT LIMITATIONS
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"only about 1.6% of Claude Code's codebase constitutes AI decision logic, with the
+remaining 98.4% being operational infrastructure."
+
+"the system 'trades search completeness for simplicity and latency: each turn commits
+to one action sequence without backtracking.'"
+
+"users approve approximately 93% of permission prompts" [Anthropic internal data]
+
+"while the Claude Code agent system substantially amplifies the short-term capabilities
+of programmers and end users, it offers limited mechanisms that explicitly support
+long-term human improvement, deeper understanding, and sustained codebase coherence."
+
+Conservative permission design:
+"deny-first rule evaluation" where "deny rules always take precedence over allow rules,
+even when the allow rule is more specific."
+
+=============================================================
+SOURCE 12: getunleash.io/blog/claude-code-unleash-agentic-ai-release-governance
+TOPIC: Claude Code + Feature Flag Governance via MCP
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"But autonomy without governance is a recipe for instability."
+
+"You can encode your FeatureOps policies in a CLAUDE.md file at the project root.
+Claude Code reads this file automatically and applies its guidance."
+
+NOTE: The sentence "Teams define rules in a CLAUDE.md file that Claude Code reads
+automatically, specifying which domains require flags and naming conventions." does NOT
+appear verbatim in the source. The confirmed verbatim is the sentence above.
+
+The MCP server provides five key functions:
+1. evaluate_change - Analyzes code modifications to determine flag necessity
+2. detect_flag - Checks for existing flags to prevent duplication
+3. create_flag - Generates new flags with proper naming conventions
+4. wrap_change - Produces framework-specific flag guard code
+5. cleanup_flag - Guides safe flag removal after rollout completion
+
+=============================================================
+SOURCE 13: developertoolkit.ai/en/claude-code/lessons/migrations/
+TOPIC: Claude Code migration handling
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+For zero-downtime column operations, Claude Code implements expand-contract in three phases:
+1. Pre-deploy: "add the new column as nullable, add a database trigger to keep both
+   columns in sync, backfill existing data"
+2. Deploy: Update application code to write to both columns while reading from the new one
+3. Post-deploy: Remove the trigger, enforce NOT NULL constraints, drop the legacy column
+
+"Without it [the trigger], rows written by old-code instances would have an empty first_name."
+
+For large tables:
+"tracks progress (the last processed ID) so it can resume from where it left off if
+interrupted, rather than starting over."
+
+=============================================================
+SOURCE 14: kirshatrov.com/posts/background-jobs-and-deploys
+TOPIC: In-flight background jobs during deployment
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+"when the worker receives SIGTERM (graceful shutdown signal), it lets the job to finish
+with a certain timeout (8s by default). If the job didn't finish within the timeout,
+it's killed and re-enqueued to be retried in the future."
+
+"if you deploy every hour and the job that takes few hours won't ever finish"
+
+"don't let your developers write non-idempotent jobs that are unsafe to interrupt"
+"Always prefer many smaller jobs to one large job."
+
+=============================================================
+SOURCE 15: martinfowler.com/articles/evodb.html
+CANONICAL TERM: Evolutionary Database Design
+=============================================================
+
+Verbatim (fetched 2026-06-24):
+Publication: May 2016 (complete rewrite; original 2003)
+
+"a database design to evolve as an application develops" [core concept]
+
+For backward-compatible schema changes, non-destructive:
+"Adding nullable columns exemplifies this—new schema elements remain unused by existing
+code until the application is updated."
+
+For transition period / dual write:
+"it's important that it gets removed once downstream systems have had time to migrate."

@@ -1,0 +1,19 @@
+SOURCE: https://guides.rubyonrails.org/active_record_migrations.html
+FETCHED: 2026-06-23
+
+=== Raw SQL / execute ===
+
+"If the helpers provided by Active Record aren't enough, you can use the execute method to execute SQL commands."
+
+"Modifying data directly in migrations should be approached with caution. Consider if this is the best approach for your use case, and be aware of potential drawbacks such as increased complexity and maintenance overhead, risks to data integrity and database portability."
+
+"In Rails, it is generally not advised to perform data migrations using migration files."
+
+"Instead, consider using the maintenance_tasks gem. This gem provides a framework for creating and managing data migrations and other maintenance tasks in a way that is safe and easy to manage without interfering with schema migrations."
+
+"bin/rails db:reset rebuilds the database using the current schema. On the other hand, bin/rails db:migrate:reset replays all migrations from the beginning, which can lead to schema drift if, for example, migrations have been altered, reordered, or removed."
+
+=== Note ===
+The official Rails Guides do NOT contain explicit text saying "do not reference application models in migrations."
+The data-migration caution is present but the guide does not mandate raw SQL or stub models specifically.
+The guide does recommend maintenance_tasks (Shopify) for data migrations.

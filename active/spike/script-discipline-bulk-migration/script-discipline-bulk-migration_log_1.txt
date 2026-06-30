@@ -1,0 +1,75 @@
+SOURCE: GitHub Issues — Debian 13 (trixie) mssql-tools18 GPG Key Problem
+ISSUE 1: https://github.com/microsoft/linux-package-repositories/issues/305
+ISSUE 2: https://github.com/microsoft/mdatp-xplat/issues/198
+Retrieved: 2026-06-26
+
+--- SUMMARY ---
+
+Microsoft's mssql-tools18 package for Linux fails to install on Debian 13
+(trixie) because the GPG key EE4D7792F748182B is missing from the Microsoft
+keyring distributed for Debian 13.
+
+The package installation flow (following Microsoft's own documentation for
+Debian) fails at the `apt-get install` step with an error similar to:
+
+  The following signatures couldn't be verified because the public key is not
+  available: NO_PUBKEY EE4D7792F748182B
+
+--- REPORTED SYMPTOMS ---
+
+- Microsoft's "packages-microsoft-prod" repo for Debian 13 (trixie) does not
+  include the key needed to verify mssql-tools18 packages
+- The same key EE4D7792F748182B is missing from the Microsoft package
+  repository for MDATP (Microsoft Defender ATP) on Debian 13 as well
+  (mdatp-xplat#198), confirming the issue is in Microsoft's key distribution
+  for Debian 13 across multiple packages, not isolated to mssql-tools18
+
+--- WORKAROUNDS KNOWN AS OF EARLY 2026 ---
+
+1. Download packages-microsoft-prod.deb directly for the OS version and install:
+   The .deb file for the relevant Debian release is available at:
+   https://packages.microsoft.com/config/debian/<version>/packages-microsoft-prod.deb
+   Installing this .deb adds the repo + GPG key. For Debian 13 this may
+   reference the Debian 12 (bookworm) package if a trixie-specific one is
+   not yet available.
+
+2. Use an older Debian release's repository (e.g. Debian 12 bookworm):
+   Point apt at the bookworm Microsoft repository to get mssql-tools18;
+   packages typically install successfully on Debian 13 despite the version
+   label difference, but compatibility is not guaranteed.
+
+3. Use a Docker image with mssql-tools18 pre-installed (e.g.
+   mcr.microsoft.com/mssql-tools or ubuntu-based Microsoft images).
+
+--- IPv4 FORCING ---
+
+Separate but related issue encountered in CI/CD runners without IPv6:
+Azure-hosted apt repositories respond differently on IPv4 vs IPv6, and some
+runners fail with network errors when IPv6 resolution is attempted first.
+
+Known apt workaround:
+  apt-get -o Acquire::ForceIPv4=true install <package>
+
+This is a general apt flag, not specific to Microsoft packages. It forces
+apt to use IPv4 for all downloads, bypassing IPv6 resolution failures.
+
+Microsoft documentation does not document this flag; it is community-known.
+
+--- STATUS ---
+
+As of 2026-06-26:
+- Microsoft has NOT published a fix in the linux-package-repositories#305 issue
+- The issue has been open since at least 2024
+- The mdatp-xplat#198 issue notes Microsoft is "aware and investigating"
+- No official ETA for a Debian 13 key package from Microsoft
+
+--- ENGINEERING IMPLICATION ---
+
+For 4Shark CI/CD pipelines (GitHub Actions, AWS CodeBuild) running mssql-tools18
+on Debian 13 images: do not rely on the standard Microsoft installation guide.
+Use one of the workarounds above, or pin to a Debian 12 base image.
+
+The standard Microsoft Linux installation instructions:
+https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-setup-tools?tabs=ubuntu-install%2Credhat-offline
+are documented for specific OS versions and do not include Debian 13 trixie
+as of this retrieval date.

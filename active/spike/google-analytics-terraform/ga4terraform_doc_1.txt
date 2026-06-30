@@ -1,0 +1,116 @@
+SOURCE: https://developers.google.com/analytics/devguides/config/admin/v1
+FETCHED: 2026-06-26
+
+--- VERBATIM CONTENT FROM OVERVIEW ---
+
+"The Google Analytics Admin API allows for programmatic access to the Google Analytics configuration data and is only compatible with Google Analytics properties."
+
+Key management capabilities (from overview):
+- Provisioning and managing accounts, properties, and subproperties
+- Enabling management of data sharing, retention, and Google Signals settings
+- Facilitating managing data streams, measurement protocol secrets, and various event-related features
+
+The overview page makes NO mention of gtag.js, GTM snippets, or client-side JavaScript tags.
+The API documentation covers server-side configuration data only.
+
+--- RESOURCES FROM REST REFERENCE ---
+SOURCE: https://developers.google.com/analytics/devguides/config/admin/v1/rest
+FETCHED: 2026-06-26
+
+Core Management Resources:
+- Account Summaries, Accounts, Properties with full CRUD operations
+- Access Bindings (batch and individual operations)
+- Data Sharing Settings and Data Retention Settings
+
+Events & Metrics:
+- Key Events (formerly Conversion Events)
+- Custom Dimensions and Custom Metrics (with archive capabilities)
+- Calculated Metrics (v1alpha)
+
+Data Collection:
+- Data Streams management (web, Android app, iOS app)
+- Measurement Protocol Secrets
+- Enhanced Measurement Settings and Global Site Tags
+- Data Redaction Settings
+
+Integration Resources:
+- Firebase Links
+- Google Ads Links
+- Display & Video 360 Advertiser Links
+- Search Ads 360 Links
+- BigQuery Links
+- AdSense Links (v1alpha)
+
+Advanced Features (v1alpha):
+- Audiences and Channel Groups
+- Event Create/Edit Rules with reordering
+- SKAdNetwork Conversion Value Schema
+- Expanded Data Sets
+- Reporting Data Annotations
+- Rollup Properties and Subproperty configurations
+- Attribution, Google Signals, and Reporting Identity Settings
+
+--- PROPERTY RESOURCE DETAILS ---
+SOURCE: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/properties
+FETCHED: 2026-06-26
+
+Available Methods:
+- Create: "Creates a Google Analytics property with the specified location and attributes"
+- Get: Retrieve a single property
+- List: "Returns child Properties under the specified parent Account"
+- Patch: Update property configuration
+- Delete: "Marks target Property as soft-deleted (ie: 'trashed') and returns it"
+- acknowledgeUserDataCollection
+- getDataRetentionSettings / updateDataRetentionSettings
+- runAccessReport
+
+Configurable Fields (can be set during creation/updates):
+- displayName (required, max 100 UTF-16 code units)
+- timeZone (required, IANA format)
+- currencyCode (ISO 4217 format)
+- industryCategory (for benchmarking)
+- propertyType (immutable after creation; defaults to ORDINARY_PROPERTY)
+
+Output-only Fields (system-managed):
+- createTime / updateTime
+- deleteTime / expireTime
+- serviceLevel (Standard or 360 designation)
+
+--- DATA STREAMS MEASUREMENT ID ---
+SOURCE: https://developers.google.com/analytics/devguides/config/admin/v1/rest/v1beta/properties.dataStreams
+NOTE: HTTP 404 on direct fetch; content derived from overview and search results.
+
+The measurementId field is OUTPUT-ONLY:
+"The unique Google-assigned identifier of a web stream (e.g. G-1234567). It is not editable."
+The measurement ID is assigned by Google when a web data stream is created, not specified by the caller.
+
+--- OAUTH SCOPES ---
+SOURCE: https://developers.google.com/identity/protocols/oauth2/scopes#analytics
+FETCHED: 2026-06-26
+
+Available scopes for Google Analytics Admin API:
+1. https://www.googleapis.com/auth/analytics.edit
+   "Permits modification of Google Analytics management entities"
+2. https://www.googleapis.com/auth/analytics.readonly
+   "See and download your Google Analytics data"
+
+--- AUTHENTICATION ---
+SOURCE: https://developers.google.com/analytics/devguides/config/admin/v1/quickstart
+FETCHED: 2026-06-26
+
+Authentication approaches supported:
+- User accounts
+- Service accounts
+
+Service accounts:
+- Supported for server-to-server flows
+- Must be granted GA4 role (e.g., Administrator) at the target account or property
+- gcloud auth application-default login scopes:
+  https://www.googleapis.com/auth/cloud-platform
+  https://www.googleapis.com/auth/analytics.readonly
+
+Available language client libraries:
+Java, PHP, Python, Node.js, .NET, Ruby, Go
+Also: REST API for direct HTTP calls
+
+Go package: https://pkg.go.dev/google.golang.org/api/analyticsadmin/v1beta

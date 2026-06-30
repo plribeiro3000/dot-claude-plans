@@ -1,0 +1,51 @@
+SOURCE: https://github.com/heartcombo/devise/wiki/How-To:-Scope-email-validation
+  (mirrored at: https://github-wiki-see.page/m/heartcombo/devise/wiki/How-To:-Scope-email-validation)
+FETCHED: 2026-06-17
+
+TITLE: How To: Scope email validation — Devise Wiki
+
+FULL CONTENT (as extracted by WebFetch):
+
+## The `email_scope` Option
+
+The feature enables developers to define scope parameters for email validation.
+For example, if users belong to multiple accounts and you want to allow duplicate
+emails across different accounts:
+
+  Devise.setup do |config|
+    config.email_scope = [:account_id]
+  end
+
+This configuration restricts email uniqueness validation to the specified scope keys.
+
+## Required Additional Work
+
+### Database Index Changes
+The default Devise setup creates a global unique index on the email column. When using
+`email_scope`, you must manually:
+- Remove the original email unique index
+- Create a new composite unique index including the scope fields
+
+Example migration:
+  class ChangesUniqueIndexOfUsers < ActiveRecord::Migration
+    def up
+      remove_index :users, :email
+      add_index :users, [:email, :account_id], unique: true
+    end
+  end
+
+## CRITICAL CAVEAT — Recoverable Module Incompatibility
+
+VERBATIM QUOTE (from the wiki page):
+"By adding a scope to the email key, you may end up with multiple users with the same
+email address, which will cause the 'recoverable' module not to work well, as it will
+only include a link in the password reset e-mail to the first account for which it
+finds a matching e-mail."
+
+## Status Note
+
+VERBATIM QUOTE (from the wiki):
+"This feature is not merged"
+
+The feature was proposed in PR #5094 but remains unmerged in the main Devise codebase.
+The wiki exists as documentation for a proposed, unmerged feature.

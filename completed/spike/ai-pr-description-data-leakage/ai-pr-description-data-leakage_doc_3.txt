@@ -1,0 +1,104 @@
+SOURCE: https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/store-information-in-variables
+         + general research on pre-commit hooks and gitleaks
+FETCHED: 2026-06-25
+TITLE: Pre-commit hooks and DLP tools — scope analysis for AI PR body leakage
+NOTE: This is an analysis document synthesizing multiple sources about tooling scope
+
+---
+
+## Pre-commit Hooks (gitleaks, trufflehog, detect-secrets, git-secrets)
+
+### How Pre-commit Hooks Work
+
+Pre-commit hooks operate on staged file changes — the local diff before a commit is made. They intercept `git commit` and scan the content of files being added or modified.
+
+### What They Cannot Scan
+
+PR body/description text is NEVER a staged file change. A PR description:
+- Is created only when `gh pr create` (or the GitHub web UI) is invoked
+- Is not a file in the repository — it is metadata stored in the GitHub API
+- Never passes through `git commit` or any local git hook
+- Is only accessible after the PR is created on the remote
+
+This means gitleaks, trufflehog, detect-secrets, and git-secrets have ZERO coverage for PR body prose. They are the right tool for the wrong problem when the goal is to prevent data leakage in PR descriptions.
+
+### TruffleHog PR Scanning Mode
+
+TruffleHog does have `--issue-comments` and `--pr-comments` flags that can scan existing PR text AFTER the PR is created. However:
+- This is a post-creation scan, not a pre-creation gate
+- It still targets credential patterns, not free-form business/infra data
+- It would need to be run as a GitHub Actions workflow, not a pre-commit hook
+- Even then, it would not detect: customer names, bare hostnames, DB names without passwords, user counts
+
+## GitHub Actions Body Validator Pattern
+
+A GitHub Actions workflow can implement a body-regex-validator:
+- Triggers on `pull_request` events with `types: [opened, edited, synchronize]`
+- Reads `github.event.pull_request.body`
+- Can check for presence/absence of patterns using regex
+- Can fail the workflow (making the status check fail) if patterns match
+
+Example use: block merges if PR body contains known sensitive hostname patterns.
+
+Limitations:
+- Server-side (runs after PR is created, not before)
+- Regex-based: effective for known patterns (hostnames, known customer names) but cannot generalize to "any sensitive data"
+- Cannot block the PR creation itself — only block merge via required status check
+- False positive risk is high with broad regex patterns
+- Requires per-team curation of what hostnames/patterns to ban — maintenance burden
+
+## Claude Code PreToolUse Hooks — The 4Shark-Native Path
+
+Claude Code's hook system (documented at https://docs.anthropic.com/en/docs/claude-code/hooks) provides PreToolUse events that fire before any tool invocation.
+
+The `if` field enables per-command matching:
+  "if": "Bash(gh pr create *)"
+
+This matches specifically when `gh pr create` is about to be invoked. The hook receives JSON on stdin with `tool_input.command` containing the full command string, including the `--body '...'` argument.
+
+A hook can:
+1. EXIT 2 — blocks the command and prints error to stderr for model to self-correct
+2. Emit JSON with `permissionDecision: "deny"` — same block effect
+3. Emit JSON with `additionalContext: "..."` — inject a warning without blocking
+4. Emit JSON with `updatedInput: {...}` — rewrite the command before execution (i.e., redact the body)
+
+The `updatedInput` path is the only approach that:
+- Intercepts BEFORE the data reaches GitHub (unlike GitHub Actions)
+- Can modify the body content rather than just blocking
+- Fits the existing 4Shark hook infrastructure without any new external dependency
+
+### Existing 4Shark Hook Pattern (from validate-bash-command.sh)
+
+```bash
+hook_input="$(cat)"
+tool_name="$(printf '%s' "$hook_input" | jq -r '.tool_name // empty')"
+command="$(printf '%s' "$hook_input" | jq -r '.tool_input.command // empty')"
+```
+
+A new `validate-pr-body.sh` hook could:
+1. Extract the `--body` value from the command string
+2. Check against a list of forbidden patterns (known hostnames, customer name patterns, connection string shapes)
+3. Either block (exit 2) or inject a warning (additionalContext) prompting the model to sanitize
+
+### The updatedInput Limitation
+
+`updatedInput` rewrites the entire `tool_input` JSON. For a Bash command, this means rewriting `command`. The hook would need to:
+1. Parse the command to extract and modify the `--body` content
+2. Re-inject the sanitized body back into the command string
+3. Return the modified `command` in the `updatedInput.command` field
+
+This is technically feasible in bash via jq string manipulation, but the parsing of `--body '...'` (which may contain single quotes, newlines, special chars) is fragile. A Python or Node.js helper script would be more robust.
+
+## Nightfall DLP
+
+Nightfall is a commercial DLP (Data Loss Prevention) platform that offers a GitHub integration (via GitHub Actions or webhooks). It can scan PR bodies and comments.
+
+It detects 200+ credential types + PII categories (SSNs, credit card numbers, etc.) using ML models.
+
+Limitations for the 4Shark problem:
+- It is designed for credential/PII patterns — infrastructure hostnames and customer names are not PII by standard DLP definitions unless custom detectors are configured
+- Custom detector configuration is required for 4Shark-specific sensitive patterns
+- This adds an external SaaS dependency with its own cost and privacy concerns (PR body content leaves 4Shark infrastructure)
+- Even with custom detectors, a system that flags arbitrary hostnames will have high false positive rates
+
+Source: https://www.nightfall.ai/products/github-dlp (general product page)

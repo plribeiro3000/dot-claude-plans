@@ -1,0 +1,95 @@
+# Auxiliary: Key verbatim quotes from external sources
+# Used by: SPIKE.md Finding 1, 2, 3, 4, 5
+# Retrieved: 2026-06-19
+
+---
+SOURCE A: http://www.righto.com/2019/11/ibm-sonic-delay-lines-and-history-of.html
+Title: "IBM, sonic delay lines, and the history of the 80×24 display"
+
+Quote A1 (punch card origin):
+"The source of 80-column lines is clearly punch cards, as commonly claimed."
+
+Quote A2 (compatibility purpose):
+"The 80-character width allowed the terminals to take the place of 80-column punch cards for data entry."
+
+Quote A3 (lasting impact):
+"The impact of these systems remains decades later: 80-character lines are still a standard, along with both 80×24 and 80×25 terminal windows."
+
+---
+SOURCE B: https://www.arp242.net/email-wrapping.html
+Title: "The problems with hard wrapping email body text"
+
+Quote B1 (intermingled newlines):
+"The forced linebreaks are intermingled with the wrapping linebreaks, and there is no way the client can figure out if a hard wrap is meaningful and can be safely omitted; the result is not great and rather annoying to read."
+
+Quote B2 (proportional fonts):
+"Wrapping by character count is incorrect with proportional (non-monospace) fonts anyway, which is what the overwhelming majority of people use."
+
+Quote B3 (RFC misreading):
+"It seems to me that 'hard-wrap all text at 78 characters' is a misreading of the standard and a confusion between 'how things should be sent on the wire' and 'how things should be displayed'."
+
+Quote B4 (Hacker Conservatism):
+"This is part of a certain mindset that I've come to call _Hacker Conservatism_. Things like email were invented in the 70s, and refined in the 80s, but since then a lot of things have changed."
+
+---
+SOURCE C: https://datatracker.ietf.org/doc/html/rfc5322#section-2.1.1
+Title: RFC 5322, Section 2.1.1 — Line Length Limits
+
+Quote C1:
+"Each line of characters MUST be no more than 998 characters, and SHOULD be no more than 78 characters, excluding the CRLF."
+
+Quote C2 (rationale for 78-char recommendation):
+"The more conservative 78 character recommendation is to accommodate the many implementations of user interfaces that display these messages which may truncate, or disastrously wrap, the display of more than 78 characters per line."
+
+---
+SOURCE D: https://github.com/anthropics/claude-code/issues/13378
+Title: "[Bug] 2-space indent and hard wrap at 80 breaks copy-paste"
+
+Quote D1 (issue reporter):
+"Claude Code adds a 2-space indent to all code block content and hard-wraps at ~80 characters. When copying commands from the terminal, these artifacts get included, breaking pasted commands."
+
+Quote D2 (bug demonstrating itself):
+"posting this bug report verbatim as Claude Code output it - complete with the 2-space indent and 80-char wrap. The bug demonstrates itself."
+
+---
+SOURCE E: https://github.com/anthropics/claude-code/issues/43113
+Title: "[FEATURE] Add a flag that tells Claude Code to emit long lines for prose/markdown content"
+
+Quote E1 (technical explanation):
+"Currently, Claude Code uses Ink's word wrapping to insert \n characters at word boundaries based on process.stdout.columns. These hard newlines create issues: Hard newlines are stored in the terminal's scrollback buffer and treated as intentional paragraph breaks."
+
+Quote E2 (proposed solution):
+"Only paragraph word wrapping would change: Prose output as long unwrapped lines (soft-wrapped by terminal). Structural line breaks preserved (\n for: list items, headings, code fences, blank lines)."
+
+---
+SOURCE F: https://github.com/anthropics/claude-code/issues/6827
+Title: "[BUG] Hard line breaks at ~80 characters in VS Code extension, breaking copy/paste"
+
+Quote F1 (Claude Code's own acknowledgment):
+"That's exactly right - and I can see it happening in my responses too. When I try to write naturally flowing text, something on the server side is inserting hard line breaks at around 80 characters, which breaks copy-paste functionality for things like markdown files or release notes. This seems like a bug or overly aggressive formatting rule in Claude Code that should definitely be configurable or removed entirely."
+
+---
+SOURCE G: https://github.com/anthropics/claude-code/issues/24224
+Title: "Feature request: Config option to control text wrapping in terminal output"
+
+Quote G1 (use case description):
+"Drafting social media posts, emails, Slack messages, or any prose content in Claude Code that needs to be pasted elsewhere cleanly. This is increasingly common as Claude Code becomes a general-purpose assistant, not just a code editor."
+
+---
+SOURCE H: https://mathiasbynens.be/notes/gmail-plain-text
+Title: "Dear Google, please fix plain text emails in Gmail"
+
+Quote H1 (Gmail RFC justification):
+"The 78 characters per line is not a limitation implemented by Google, but rather an internet standard for plain text messages" [Google's support team response]
+
+Quote H2 (author's rebuttal):
+"Gmail's Android app sends plain text without hard line breaks, undermining the company's RFC-based justification."
+
+---
+SOURCE I: https://github.com/anthropics/claude-code/issues/33666
+Title: "[BUG] Model ignores configured line width in CLAUDE.md, wraps at ~80 instead of configured limit"
+
+Quote I1 (observed behavior):
+"The model acknowledges the rules when asked but fails to apply them in practice. Repeated corrections within a session sometimes help temporarily but don't persist across context compactions."
+
+Status: Closed as not planned.

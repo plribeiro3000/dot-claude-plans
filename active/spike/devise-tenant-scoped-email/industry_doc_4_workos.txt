@@ -1,0 +1,25 @@
+SOURCE: https://workos.com/docs/user-management/users-organizations
+FETCHED: 2026-06-17
+
+TITLE: WorkOS — Users and Organizations
+
+VERBATIM QUOTE:
+"What uniquely identifies a user is their email address, since having access to that
+email inbox ultimately gives access to all accounts based on that address."
+
+"Because a user is uniquely identified by their email address, you won't have users
+with duplicate email addresses. WorkOS handles [identity linking] automatically."
+
+"A self-serve productivity app, like Figma, where each user can be in any number of
+organizations, can create their own workspace and join any number of other workspaces"
+
+## WorkOS Position — GLOBAL UNIQUE EMAIL
+
+WorkOS is the COUNTER-EXAMPLE: it enforces globally unique email and uses identity linking
+to associate one user identity with multiple organization memberships. This is the
+opposite of per-tenant scoping — same person, same email, can be a member of N orgs,
+but only ONE user record exists.
+
+This is architecturally different from 4Shark's scenario, where the same numeric
+employee ID at Mexico company ≠ same person at Brazil company. WorkOS assumes the same
+email = the same human. 4Shark's requirement is that the same email = DIFFERENT humans.

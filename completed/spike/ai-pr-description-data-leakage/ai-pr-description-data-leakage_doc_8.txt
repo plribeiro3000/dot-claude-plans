@@ -1,0 +1,56 @@
+SOURCE: TruffleHog GitHub Scanner + Truffle Security Documentation
+URL: https://trufflesecurity.com/the-kitchen/scanning-github-with-trufflehog-v3
+URL: https://github.com/trufflesecurity/trufflehog (README)
+FETCHED: 2026-06-25
+
+=== TRUFFLEHOG --pr-comments FLAG — VERBATIM ===
+
+From the Truffle Security documentation (Scanning GitHub with TruffleHog v3):
+"--[no-]pr-comments         Include pull request descriptions and comments in scan."
+
+COMPANION FLAG:
+"--[no-]issue-comments      Include issue descriptions and comments in scan."
+
+EXAMPLE COMMAND from documentation:
+"trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments"
+
+SCOPE CLARIFICATION:
+The flag documentation groups "pull request descriptions and comments" together — it does not distinguish between PR body text and reply comments.
+
+=== TRUFFLEHOG CUSTOM DETECTORS — VERBATIM ===
+
+From TruffleHog README (https://github.com/trufflesecurity/trufflehog):
+"TruffleHog supports detection and verification of custom regular expressions."
+
+Custom detector configuration requires:
+- A "keyword" that must appear nearby the match
+- A regex pattern
+Custom detectors are not limited to credential-type patterns architecturally — they can match arbitrary text.
+
+=== SCOPE AND LIMITATIONS ===
+
+WHAT --pr-comments COVERS:
+- PR body/description text
+- PR review comments (reply threads)
+- Issue body text (with --issue-comments)
+
+WHAT --pr-comments DOES NOT CHANGE:
+- The tool runs POST-CREATION: the PR body is already stored in GitHub when the scan runs
+- Built-in detector library (800+ detectors) is entirely credential-focused
+- Custom detectors require explicit configuration
+- No built-in detection for: customer names, bare hostnames, database names without passwords, user counts, business volume figures
+
+INTEGRATION PATTERN:
+TruffleHog with --pr-comments runs as a GitHub Actions workflow triggered on PR events — it posts findings as PR comments or annotations. It is a post-creation gate (can block merge via required status check, cannot block PR creation or prevent GitHub storage).
+
+COMMUNITY CONTEXT FOR --pr-comments:
+The --pr-comments flag was introduced to address credential leakage in PR comment threads — engineers accidentally pasting API tokens or database passwords in PR review discussions. The use case is credential detection in conversational text, not free-form business/infra data governance.
+
+=== VERIFICATION ===
+URL fetched: https://trufflesecurity.com/the-kitchen/scanning-github-with-trufflehog-v3
+Verbatim quote: "--[no-]pr-comments         Include pull request descriptions and comments in scan."
+Quote location: GitHub scanner flags reference section
+
+URL fetched: https://github.com/trufflesecurity/trufflehog
+Verbatim quote: "TruffleHog supports detection and verification of custom regular expressions."
+Quote location: Custom detectors section of README

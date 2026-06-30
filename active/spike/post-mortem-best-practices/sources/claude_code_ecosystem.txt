@@ -1,0 +1,154 @@
+SOURCE COLLECTION: Claude Code Ecosystem — Post-Mortem Skills Survey
+FETCHED: 2026-05-27
+REVISED: 2026-05-27 (corrected thananon Tone section — replaced synthesized label with actual verbatim bullet excerpts)
+
+=== FINDING: Two distinct Claude Code skill implementations exist ===
+
+--- SKILL 1: wilsto/claude-code-starter-kit incident-response ---
+URL: https://github.com/wilsto/claude-code-starter-kit/blob/main/.claude/skills/incident-response/SKILL.md
+
+TYPE: Workflow skill (5-phase sequential)
+TRIGGERS: "incident", "outage", "postmortem", "on-call", "SEV-1", "SEV-2"
+
+FIVE-PHASE WORKFLOW:
+1. Detection & Triage → 01-triage.md
+2. Investigation & Root Cause → 02-investigation.md
+3. Resolution & Recovery → 03-resolution.md
+4. Communication → 04-communication.md
+5. Postmortem → 05-postmortem.md
+
+POST-MORTEM TEMPLATE (verbatim from GitHub):
+```
+## Postmortem: [Incident Title]
+**Date**: YYYY-MM-DD
+**Duration**: X hours Y minutes
+**Severity**: SEV-X
+**Authors**: [names]
+
+### Summary
+[2-3 sentences describing what happened, impact, resolution]
+
+### Timeline
+- HH:MM — First alert fired
+- HH:MM — On-call acknowledged
+- HH:MM — Root cause identified
+- HH:MM — Fix deployed
+- HH:MM — All clear confirmed
+
+### Root Cause
+[Technical explanation without blame]
+
+### Impact
+- Users affected: N
+- Revenue impact: $X (if applicable)
+- Error budget consumed: X%
+
+### What Went Well
+- [items]
+
+### What Went Wrong
+- [items]
+
+### Action Items
+| Action | Owner | Due Date | Priority |
+| --- | --- | --- | --- |
+| [action] | @name | YYYY-MM-DD | P1/P2/P3 |
+```
+
+BEHAVIORAL RULE (verbatim): "Execute phases in order — never skip a phase."
+Documentation is mandatory after each phase. Checkpoint pauses await user confirmation.
+
+--- SKILL 2: thananon/9arm-skills post-mortem ---
+URL: https://github.com/thananon/9arm-skills/blob/main/skills/engineering/post-mortem/SKILL.md
+RAW FETCH: https://raw.githubusercontent.com/thananon/9arm-skills/main/skills/engineering/post-mortem/SKILL.md
+
+TYPE: Bug-fix documentation skill (engineer-to-engineer focus)
+TRIGGER: "/post-mortem", "write the RCA", "document this fix", "close out this bug with a writeup"
+
+SCOPE: Engineer-centric bug post-mortems (NOT incident/outage reports)
+REFUSES to run when: bug remains unfixed, fix lacks validation, trivial fixes (one-liners, typos)
+
+REQUIRED INPUTS (all four must be confirmed):
+1. Reliable, deterministic repro exists
+2. Root cause identified (not hypothetical)
+3. Fix identified with PR/commit pointer
+4. Fix validated against original repro
+
+MANDATORY TEMPLATE SECTIONS:
+- Summary: One paragraph with what broke, the fix, JIRA key, PR number, owner
+- Root Cause: Mechanism with code identifiers, function names, file paths, branch conditions
+- Fix: Changes made and why they address the cause
+- Validation: Concrete evidence fix works (tests passing, workloads completing, performance metrics)
+
+OPTIONAL SECTIONS:
+- Symptom (observed behavior, error messages, logs)
+- Why it produced the symptom (cause-to-symptom chain)
+- How it was found (debugging path, tools, rejected hypotheses)
+- Why it slipped through (CI gap, latent code, review miss)
+- Action items (regression tests, refactors, CI improvements)
+
+TONE SECTION — VERBATIM BULLET EXCERPTS (raw fetch confirmed 2026-05-27):
+The Tone section header reads: "This is engineer-to-engineer. Different from `management-talk`:"
+Individual directives (each is a separate bullet in the source):
+  - "Code identifiers are first-class. `tadaLaunchPrepare`, `tada/prim.h::syncWaitPeer`, `scratchBuf`, commit SHAs, line numbers — keep them. The whole point is that future engineers can grep their way back to the change."
+  - "Mechanism over narrative. Walk the actual cause chain. Don't soften it into "a synchronization issue" — say which function skipped which event under which gate."
+  - "Active voice, concrete subjects, short paragraphs. Same rule as everywhere else."
+  - "No hedging. "We believe" / "appears to" / "may have" — drop. State it or don't write it."
+  - "Blameless. Describe the bug, the gap, and the fix. Never "X should have caught this." The CI gap is the failure mode, not the person."
+  - "No advocacy. A post-mortem records what happened and what's next. If you want to argue for a refactor, that's a separate proposal — link to it from the action items."
+
+NOTE: A previous version of this file carried a "TONE VERBATIM" label with a synthesized single sentence:
+  "Engineer-centric: preserve code identifiers, walk actual mechanisms, use active voice, avoid hedging ('appears to,' 'may have'), remain blameless, skip advocacy."
+  That sentence does NOT appear verbatim in the source. It was a synthesis of the six bullets above.
+  The synthesized label has been removed and replaced with the actual verbatim bullet text.
+
+--- SKILL 3: alirezarezvani/claude-skills executive postmortem ---
+URL: https://github.com/alirezarezvani/claude-skills/blob/main/c-level-advisor/executive-mentor/skills/postmortem/SKILL.md
+
+TYPE: Executive/leadership-level failure analysis (not incident-specific)
+FOCUS: Organizational learning, 5 Whys, change registers
+
+CORE FRAMEWORK (7 steps):
+1. Define the Event Precisely
+2. The 5 Whys (Done Properly)
+3. Contributing Factors vs. Root Cause
+4. Identify Warning Signs Ignored
+5. Control vs. Out-of-Control Factors
+6. Build the Change Register (owned, dated commitments)
+7. Verification Date (follow-up to confirm changes worked)
+
+KEY DISTINCTION VERBATIM: "Blame is cheap. Understanding is hard."
+
+OUTPUT FORMAT:
+- EVENT, EXPECTED, ACTUAL, IMPACT
+- TIMELINE of visible events
+- 5 WHYS chain
+- ROOT CAUSE statement
+- CONTRIBUTING FACTORS list
+- WARNING SIGNS MISSED
+- Control vs. non-control categorization
+- CHANGE REGISTER (table: action, owner, due date, verification)
+- VERIFICATION DATE
+
+=== SUMMARY FINDING ===
+Three distinct skill shapes exist in the Claude Code community:
+1. End-to-end incident response workflow (wilsto) — covers triage through postmortem
+2. Engineer-scoped bug post-mortem writer (thananon) — code-level RCA after a fix is confirmed
+3. Executive-level organizational failure analysis (alirezarezvani) — strategic 5 Whys
+
+No MCP servers specifically for post-mortems were found in the registry search.
+The LFI (Learning from Incidents) community has not produced a Claude Code skill.
+
+=== NOTE ON MARTIN FOWLER ===
+Martin Fowler does not appear to have a dedicated post-mortem article on martinfowler.com.
+A 2013 tweet from @martinfowler (https://x.com/martinfowler/status/385766726970781696) reportedly
+endorsed Allspaw's Etsy article. That URL returns HTTP 402 Payment Required — content is behind
+a paywall/auth wall and cannot be fetched or verified. The tweet text is UNVERIFIED.
+No alternative fetchable Fowler URL on post-mortems was found.
+
+=== NOTE ON UNCLE BOB ===
+No substantive writing from Robert C. Martin (Uncle Bob) on post-mortems or incident
+response was found via web search. His focus is code-level practice (SOLID, Clean Code).
+The community does not associate him with post-mortem methodology. This absence is itself
+a data point: the post-mortem literature is dominated by SRE/operations practitioners,
+not clean-code theorists.

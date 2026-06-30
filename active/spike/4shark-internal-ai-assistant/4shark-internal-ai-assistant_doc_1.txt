@@ -1,0 +1,80 @@
+SOURCE: https://code.claude.com/docs/en/agent-sdk/mcp
+FETCHED: 2026-06-25
+TOPIC: Claude Agent SDK — MCP integration
+
+KEY VERBATIM QUOTES:
+
+"The Model Context Protocol (MCP) is an open standard for connecting AI agents to external tools and data sources. With MCP, your agent can query databases, integrate with APIs like Slack and GitHub, and connect to other services without writing custom tool implementations."
+
+MCP server types:
+- stdio: local processes via stdin/stdout — "Use this for MCP servers you run on the same machine"
+- HTTP/SSE: "Use HTTP or SSE for cloud-hosted MCP servers and remote APIs"
+- SDK MCP servers: "Define custom tools directly in your application code instead of running a separate server process."
+
+Tool naming convention:
+"MCP tools follow the naming pattern mcp__<server-name>__<tool-name>. For example, a GitHub server named 'github' with a list_issues tool becomes mcp__github__list_issues."
+
+allowedTools wildcard:
+"allowedTools: ['mcp__github__*'] // All tools from the github server"
+
+Security note on permissions:
+"Prefer allowedTools over permission modes for MCP access. permissionMode: 'acceptEdits' does not auto-approve MCP tools (only file edits and filesystem Bash commands). permissionMode: 'bypassPermissions' does auto-approve MCP tools but also disables other safety prompts... A wildcard in allowedTools grants exactly the MCP server you want and nothing more."
+
+Database query example (Python):
+"""
+options = ClaudeAgentOptions(
+    mcp_servers={
+        "postgres": {
+            "command": "npx",
+            # Pass connection string as argument to the server
+            "args": [
+                "-y",
+                "@modelcontextprotocol/server-postgres",
+                connection_string,
+            ],
+        }
+    },
+    # Allow only read queries, not writes
+    allowed_tools=["mcp__postgres__query"],
+)
+# Natural language query - Claude writes the SQL
+async for message in query(
+    prompt="How many users signed up last week? Break it down by day.",
+    options=options,
+):
+"""
+
+Auth via env vars:
+"""
+options = ClaudeAgentOptions(
+    mcp_servers={
+        "github": {
+            "command": "npx",
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": {"GITHUB_TOKEN": os.environ["GITHUB_TOKEN"]},
+        }
+    },
+)
+"""
+
+Auth via HTTP headers (for remote MCP servers):
+"""
+options = ClaudeAgentOptions(
+    mcp_servers={
+        "secure-api": {
+            "type": "http",
+            "url": "https://api.example.com/mcp",
+            "headers": {"Authorization": f"Bearer {os.environ['API_TOKEN']}"},
+        }
+    },
+)
+"""
+
+Error handling:
+"The SDK emits a system message with subtype init at the start of each query. This message includes the connection status for each MCP server. Check the status field to detect connection failures before the agent starts working"
+
+Tool search (context window management):
+"When you have many MCP tools configured, tool definitions can consume a significant portion of your context window. Tool search solves this by withholding tool definitions from context and loading only the ones Claude needs for each turn. Tool search is enabled by default."
+
+Connection timeout:
+"The MCP SDK has a default timeout of 60 seconds for server connections."

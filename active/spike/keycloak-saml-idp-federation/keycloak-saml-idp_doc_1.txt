@@ -1,0 +1,67 @@
+SOURCE: https://wjw465150.gitbooks.io/keycloak-documentation/content/server_admin/topics/identity-broker/saml.html
+FETCHED: 2026-05-28
+
+=== SAML IDENTITY PROVIDER CONFIGURATION (Keycloak Documentation) ===
+
+SP Descriptor access:
+"http[s]://{host:port}/auth/realms/{realm-name}/broker/{broker-alias}/endpoint/descriptor"
+  - An EXPORT button displays the SAML SP entity descriptor for external provider integration.
+
+Import Capabilities:
+"Configuration can be imported via 'URL or file that points to the SAML IDP entity descriptor.'
+  For Keycloak IDPs, use: <root>/auth/realms/{realm-name}/protocol/saml/descriptor"
+
+Required Fields:
+- "Single Sign-On Service URL" - "specifies the SAML endpoint to start the authentication process"
+
+Optional Fields:
+- "Single Logout Service URL" - endpoint for logout operations
+- NameID Policy Format (defaults to urn:oasis:names:tc:SAML:2.0:nameid-format:persistent)
+
+Binding & Request Configuration:
+- HTTP-POST Binding Response (authentication realm responses)
+- HTTP-POST Binding for AuthnRequest (realm requests to external IDP)
+- "Want AuthnRequests Signed" - uses realm keypair for signing
+- Signature Algorithm selection
+- SAML Signature Key Name (KEY_ID, CERT_SUBJECT, or NONE options)
+
+Security & Validation:
+- Force Authentication option
+- "Validate Signature" - determines if the realm expects digitally signed requests/responses
+- "Validating X509 Certificate" - public certificate for signature validation
+
+=== SP METADATA URL (from WebSearch via skycloak.io confirmation) ===
+
+Broker endpoint URL (Keycloak acting as SP):
+"http[s]://{host:port}/auth/realms/{realm-name}/broker/{broker-alias}/endpoint"
+
+SP descriptor (metadata for external IdP):
+"http[s]://{host:port}/auth/realms/{realm-name}/broker/{broker-alias}/endpoint/descriptor"
+
+The descriptor defines services with HTTP-Redirect binding, including SingleLogoutService and
+AssertionConsumerService endpoints, such as:
+  Location="http://127.0.0.1:8080/auth/realms/apiman/broker/SurfConext/endpoint"
+
+Realm IdP metadata (Keycloak as IdP, different use):
+"<root>/auth/realms/{realm-name}/protocol/saml/descriptor"
+
+=== SOURCE: skycloak.io/blog/saml-as-an-sp-in-keycloak/ ===
+
+Metadata URL Patterns:
+- Keycloak 17+ (Quarkus): https://{KEYCLOAK-URL}/realms/{REALM-NAME}/protocol/saml/descriptor
+- Keycloak 16 and earlier (WildFly): https://{KEYCLOAK-URL}/auth/realms/{REALM-NAME}/protocol/saml/descriptor
+
+Signature and Encryption Settings (recommended):
+| Setting                  | Configuration |
+| Sign Documents           | ON            |
+| Sign Assertions          | ON            |
+| Encrypt Assertions       | ON            |
+| Client Signature Required| OFF           |
+| Force POST Binding       | ON            |
+
+NameID Format: "Set Name ID format to 'email' and enable Force Name ID format."
+
+Attribute Mapper Types for SAML:
+- Standard attributes: X500 email, X500 givenName, X500 surname
+- Custom attributes: User Attribute mapper type
+- Role-based access: Role list mapper with "Single Role Attribute" enabled

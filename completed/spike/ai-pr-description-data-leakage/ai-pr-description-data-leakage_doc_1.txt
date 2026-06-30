@@ -1,0 +1,53 @@
+SOURCE: https://github.blog/ai-and-ml/generative-ai/agent-pull-requests-are-everywhere-heres-how-to-review-them/
+FETCHED: 2026-06-25
+TITLE: "Agent pull requests are everywhere. Here's how to review them."
+AUTHOR: Andrea Griffiths
+PUBLISHED: May 7, 2026
+
+---
+
+## Overview
+
+Agent-generated code is now ubiquitous in development workflows. A January 2026 study titled "More Code, Less Reuse" found that such code introduces greater redundancy and technical debt than human-written alternatives, yet reviewers paradoxically feel more confident approving it. GitHub Copilot's code review has processed over 60 million reviews, growing tenfold in under a year, with more than one in five code reviews now involving agents.
+
+## Understanding the Challenge
+
+The core tension is clear: automation has dramatically increased throughput, but human review capacity hasn't kept pace. Coding agents are productive, literal, and pattern-following contributors that lack contextual knowledge about incident history, team practices, or operational constraints. This gap creates a dangerous failure mode—code that appears complete but carries hidden technical debt.
+
+Key insight: "Reviewing your own pull request isn't optional when agents are involved. It's basic respect for your reviewer's time."
+
+## Critical Red Flags
+
+### 1. CI Integrity Compromise
+### 2. Code Duplication Blindness
+### 3. Subtle Logical Errors
+### 4. Abandoned Pull Requests
+
+### 5. Workflow Security Vulnerabilities
+
+Prompt injection via CI agents poses real risks. When reviewing workflows calling LLMs, block these patterns:
+
+- Untrusted input (pull request bodies, issues, commits) interpolated into prompts without sanitization
+- Write-scoped tokens when read-only access suffices
+- Model output executed as shell commands without validation
+- Secrets accessible to agent steps or logged
+
+Requirements: Apply least-privilege permissions (permissions: read-all as reasonable default), sanitize untrusted content before prompts, separate analysis from execution with human approval gates for production changes, never execute model output directly.
+
+## Key Quote on Agent Verbosity
+
+The article recognizes that "Coding agents are productive, literal, and pattern-following contributors that lack contextual knowledge about incident history, team practices, or operational constraints."
+
+This is contextually relevant to the data-leakage problem: agents that lack the contextual knowledge of what is sensitive will include sensitive details in PR prose because they are being thorough and literal.
+
+## Leveraging Automated Review
+
+Use Copilot code review as a prerequisite, not replacement. It handles mechanical checks—style inconsistencies, obvious logic errors, missing error handling, type mismatches—freeing human reviewers for judgment work requiring contextual knowledge.
+
+Tune automated review with team-specific instructions: flagging CI threshold changes, surfacing new utilities for deduplication, enforcing external input validation. Some reviewers codify personal checklists using the Copilot SDK, automating security checks (admin endpoint authentication, actual test execution, safe environment variable handling) and blocking merges on critical issues.
+
+## Core Takeaways
+
+The volume of code and pull requests continues accelerating. What shouldn't accelerate is the depth of human judgment applied to critical decisions. Context—knowledge of systems not captured in repositories—remains irreplaceable and is where reviewer value concentrates.
+
+Three essential principles: First, any CI weakening represents a hard stop. Second, allow agents to scan first; humans trace critical paths. Third, apply red flag checklists as defaults on complex agent-generated pull requests.

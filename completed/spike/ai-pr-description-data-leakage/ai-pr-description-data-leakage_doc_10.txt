@@ -1,0 +1,36 @@
+SOURCE: Stripe Dev Blog — Minions Part 2
+URL: https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2
+FETCHED: 2026-06-25
+
+=== STRIPE MINIONS — PR DESCRIPTION CONTENT ===
+
+SCALE FIGURE (from multiple search results / blog):
+Stripe merges over 1,300 pull requests per week containing zero human-written code via "Minions" — Stripe's internal coding agents.
+
+WORKFLOW (from blog):
+An engineer sends a message in Slack (or emoji reaction), a Minion is created in a cloud devbox, orchestrates work using "blueprints" (deterministic code + flexible agent loops), produces code, tests, and documentation, then creates a pull request for human review.
+
+PR DESCRIPTION FINDING:
+The Part 2 blog post focuses on infrastructure (devboxes), agent orchestration (blueprints), context gathering (rule files and MCP), and iteration processes. The blog post does NOT contain:
+- Any description of what content Minions include in PR descriptions
+- Any content restrictions on PR body prose
+- Any guidance about excluding customer data, infrastructure details, or internal hostnames
+- The phrase "PR description is auto-generated" (Note: this phrasing was in the context summary but was NOT confirmed with a verbatim quote from the blog — see VERIFICATION NOTE below)
+
+WHAT IS KNOWN FROM SEARCH RESULT SUMMARIES:
+From chatprd.ai summary: "The PR description is auto-generated with context about what the agent did and why" — this phrase appears in third-party summaries of the Minions system, not confirmed as a verbatim quote from the original Stripe blog post.
+
+VERIFICATION NOTE:
+The verbatim phrase "The PR description is auto-generated with context about what the agent did and why" appears in THIRD-PARTY SUMMARIES (chatprd.ai, blog.bytebytego.com) rather than in the original Stripe blog post. The original Stripe blog post (Part 2) does not contain PR description content discussion. The phrase cannot be attributed to Stripe with citation discipline — it cannot be verified as a direct Stripe quote.
+
+CONFIRMED FROM STRIPE BLOG:
+- Minions produce "code, tests, and documentation" before creating the PR
+- The workflow ends with "a pull request submitted for human review"
+- No content restriction guidelines for PR body prose are documented
+
+CONCLUSION: At Stripe's scale (1,300+ weekly AI PRs), there is no publicly documented practice of restricting AI-generated PR description content to prevent infrastructure or customer data from appearing in PR prose.
+
+=== VERIFICATION ===
+URL fetched: https://stripe.dev/blog/minions-stripes-one-shot-end-to-end-coding-agents-part-2
+Result: Blog focuses on infrastructure/architecture; no PR description content guidance found.
+The phrase "auto-generated with context about what the agent did and why" is from third-party summaries, NOT from the original Stripe blog post — cannot be cited with quote-or-drop discipline.

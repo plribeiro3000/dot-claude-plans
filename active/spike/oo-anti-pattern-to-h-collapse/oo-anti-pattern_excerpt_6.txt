@@ -1,0 +1,32 @@
+SOURCE: https://alchemists.io/articles/ruby_structs
+FETCHED: 2026-06-19
+
+KEY QUOTES on Ruby Structs vs Hashes (verbatim):
+
+"Both are whole value objects but a `Struct` is a step up from a `Hash` because you have getters and setters for all attributes."
+
+"Another superpower of structs is that they are whole value objects by default."
+
+"With the `Hash`, the methods are more readable but you have to message `#[]` with the key of the value you want to obtain which isn't ideal when having to type the brackets each time you send a message."
+
+"When we move away from the `Array` and `Hash` by switching to the `Struct`, you can see the elegance of messaging our `point` instance via the `#x` or `#y` methods to get the desired values."
+
+SOURCE: https://madeintandem.com/blog/creating-value-objects-in-ruby/
+FETCHED: 2026-06-19
+
+"The simplest way to create a value object in ruby is by using a Struct"
+"you need to give this blob of data a name. Just having a name for it can make the concept of what you are doing with it more understandable and easier to deal with."
+"define methods" within Structs to encapsulate logic, moving beyond passive data containers
+
+NOTE: The article quotes Martin Fowler's definition of Value Object:
+"A Value Object bases its notion of equality on field values within the class."
+
+SOURCE: https://dev.to/aleksikauppila/dont-return-associative-arrays-28il
+FETCHED: 2026-06-19
+
+"The problem with arrays is that there is no context. There is no special knowledge."
+"The array cannot promise us anything about it's structure."
+"In OOP we should not be concerned about implementation details of other classes."
+"We care only about the interfaces."
+"Arrays may work as an internal representation of data for some class, but that is the way it should stay - internal."
+"Don't return associative arrays from the public API...return something that has an interface that you and users of your code can rely on."

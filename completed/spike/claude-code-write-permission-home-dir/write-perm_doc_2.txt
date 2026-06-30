@@ -1,0 +1,60 @@
+SOURCE: https://code.claude.com/docs/en/hooks
+FETCHED: 2026-06-30
+PURPOSE: PreToolUse hook permissionDecision format, exit code semantics, allow behavior
+
+=== permissionDecision JSON OUTPUT FORMAT ===
+
+A PreToolUse hook returns a JSON object on stdout with this structure
+to control whether the tool call is allowed, denied, or deferred:
+
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "allow",
+    "permissionDecisionReason": "<human-readable reason string>"
+  }
+}
+
+Values for permissionDecision:
+  "allow"   Bypass permission system and allow the tool call
+  "deny"    Block the tool call (hook provides the block reason)
+  "ask"     Force a user prompt regardless of other settings
+  "defer"   Defer to normal permission flow (same as exit 0 with no output)
+
+=== EXIT CODE SEMANTICS ===
+
+From "How a hook resolves" section (verbatim):
+"If the command had been a safer rm variant like rm file.txt, the script
+would hit exit 0 instead. Exit code 0 with no output means the hook has
+no decision to report, so the tool call continues through the normal
+permission flow. The hook can deny the call, but staying silent doesn't
+approve it."
+
+Exit code 0 + no stdout output = defer (no decision, normal flow continues)
+Exit code 0 + valid JSON on stdout = act on permissionDecision value
+Exit code 2 = hard deny (tool call blocked immediately)
+Exit code non-0 (not 2) = hook error, treated as defer
+
+=== TOOL INPUT FIELD FOR WRITE/EDIT ===
+
+For Write and Edit tools, the relevant field in the hook input JSON is:
+  .tool_input.file_path   — the absolute path of the file being written/edited
+
+For MultiEdit:
+  .tool_input.file_path   — same field, single file path
+
+For Bash:
+  .tool_input.command     — the command string
+
+=== IMPORTANT CAVEAT (from docs) ===
+
+The documentation does NOT include the phrase "Hook decisions don't
+bypass permission rules" verbatim. The closest statement is the
+"staying silent doesn't approve it" quote above — implying hooks
+operate within the permission flow. However, permissionDecision: "allow"
+is explicitly documented to bypass the permission check for that call.
+
+The distinction observed in practice (per GitHub issue #52822):
+permissionDecision: "allow" bypasses allow/deny RULE matching but in
+v2.1.119 a regression was introduced that kept the native interactive
+prompt showing despite the hook returning allow.

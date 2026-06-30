@@ -1,0 +1,118 @@
+SOURCE: Multiple sources compiled 2026-06-26
+
+=== PATTERN 1: PreToolUse deny-file hooks ===
+
+Source: cc-redact (https://github.com/ShindouMihou/cc-redact/)
+Mechanism: PreToolUse hook intercepts Read tool calls, rewrites file content with redacted values
+  before Claude sees them, preserves file structure (keys visible, values as {{REDACTED}}).
+  Format-aware: ENV files, JSON/JSONC, YAML, TOML, and opaque files (.pem, .key → block entirely)
+
+Configuration shape (.claude/settings.json):
+  {
+    "hooks": {
+      "PreToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": "cc-redact"}]}],
+      "PostToolUse": [{"matcher": "Read", "hooks": [{"type": "command", "command": "cc-redact-cleanup"}]}]
+    }
+  }
+
+Limitation noted by author: Cannot intercept @file references — when user explicitly attaches
+  a file via "@.env" syntax, content bypasses hook and is inlined directly into context.
+
+=== PATTERN 2: PostToolUse output scrubber ===
+
+Source: gist.github.com/ruvnet/332336ad5e0516daa810d98f8f0ddca9
+Mechanism: PostToolUse hook scrubs stdout, stderr, body, and content fields of tool results.
+  Replaces matches with placeholder (e.g., "★★★REDACTED★★★"). Also truncates outputs over 50KB.
+
+Patterns detected:
+  - Generic long tokens (20+ alphanumeric chars with separators)
+  - API/secret/token/key/password assignments
+  - Common key prefixes (sk-, authorization headers, etc.)
+  - Connection strings
+
+Hook returns:
+  {
+    "hookSpecificOutput": {
+      "hookEventName": "PostToolUse",
+      "updatedToolOutput": { "stdout": "[REDACTED: secrets removed]" }
+    }
+  }
+
+Important: This ONLY affects what Claude sees — the tool has already executed.
+  The actual command ran, files were read, network requests were made.
+  Only the result presented to the model is redacted.
+
+Source: aitmpl.com/blog/security-hooks-secrets/ — PreToolUse hook on Write/Edit:
+  Detects secrets in content being written (AWS: AKIA[0-9A-Z]{16}, GitHub: ghp_, Stripe: sk_live_,
+  DB connection strings: mongodb://, postgresql://). Exits with code 2 to block the write.
+  This prevents hardcoded secrets in files, not echoing in output.
+
+=== PATTERN 3: permissions.deny rules ===
+
+Source: code.claude.com/docs/en/permissions + strongly.ai article
+Configuration in ~/.claude/settings.json:
+  {
+    "permissions": {
+      "deny": [
+        "Read(./.env)",
+        "Read(./.env.*)",
+        "Read(**/*.pem)",
+        "Read(**/*.key)",
+        "Read(~/.aws/**)",
+        "Read(~/.ssh/**)",
+        "Read(**/secrets/**)"
+      ]
+    }
+  }
+
+Coverage per official docs: Blocks Read tool AND recognizes Bash commands like cat, head, tail, sed.
+Does NOT cover: arbitrary subprocesses (Python/Node scripts opening files directly).
+For subprocess coverage: enable sandbox.
+
+=== PATTERN 4: CLAUDE.md instructions ===
+
+Source: Multiple — strongly.ai, issue #44868, issue #32523
+Common instruction forms:
+  "Never print the contents of credential files. Reference them by path only."
+  "When asked to locate an email, return only the message ID, link, or subject. Never print body content containing credentials."
+  "Never echo environment variable values. Only reference variable names."
+
+Effectiveness: LOW for security-critical enforcement.
+  Issues #32523 and #44868 specifically document CLAUDE.md rules being ignored.
+  Official docs: "Instructions in your prompt or CLAUDE.md shape what Claude tries to do,
+  but they don't change what Claude Code allows."
+  The strongly.ai article: "CLAUDE.md alone fails — instructions are 'soft', they lose priority
+  under ambiguous prompts."
+  Role: behavioral nudge, not enforcement. Useful as last-resort for cases not caught by hooks.
+
+=== PATTERN 5: secrets vault reference pattern ===
+
+Source: chriscole.substack.com, dev.to/demojacob, 1password.com/blog
+Architecture: .env files contain references (op://vault/item/field), not plaintext values.
+  At runtime, secrets manager substitutes real values without ever writing them to disk or context.
+  Claude Code sees only the reference string, never the actual value.
+  Even if Claude reads the .env file, it gets "op://homelab/db/password" not the password itself.
+
+Tools: 1Password CLI (op run), Doppler, Hashicorp Vault, AWS Secrets Manager
+Strength: strongest defense — the secret value never enters agent context at all.
+Weakness: requires migration of secrets management infrastructure.
+
+=== PATTERN 6: OS-level permissions / sandboxing ===
+
+Source: patrickmccanna.net, code.claude.com/docs/en/sandboxing
+  OS file permissions (chmod 600, dedicated user account) provide kernel-level enforcement.
+  Claude Code's sandbox feature restricts Bash subprocess filesystem access at OS level.
+  "Unix permissions have guarded secrets for a long time" — the author's principle: Claude
+  "always had access to the file! It's just being polite." OS permissions make it mechanical.
+
+=== THE CRITICAL DISTINCTION ===
+
+"The model should not be trusted to police its own tool calls against secrets. The harness should enforce it."
+  — Issue #44868 (anthropics/claude-code)
+
+(A) Preventing READ: deny rules + PreToolUse hooks (mechanical, reliable — agent never sees value)
+(B) Preventing ECHO: once a secret is in context, NO hook can remove it from model memory.
+    The PostToolUse hook can redact the tool result before it reaches the model (prevents initial ingestion).
+    But if the model already has the value from a previous turn or an unhooked path, it may echo it.
+    CLAUDE.md rules reduce this risk but are advisory.
+    No Claude Code hook intercepts the model's own assistant text output.

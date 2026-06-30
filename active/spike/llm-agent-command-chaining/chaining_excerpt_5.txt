@@ -1,0 +1,57 @@
+# Source: OTC Research + Token Optimization + Other Agent Harnesses
+# Fetched: 2026-06-08
+
+--- OTC: Optimal Tool Calls via Reinforcement Learning ---
+URL: https://arxiv.org/html/2504.14870v1 (April 2025)
+"The research identifies a critical phenomenon called cognitive offloading, where larger
+language models increasingly rely on external tools unnecessarily. The authors note that
+'as model size increases' models tend to over-rely on tools, limiting their internal
+reasoning development. This occurs because standard RL approaches optimize solely for
+answer correctness without penalizing inefficient tool consumption."
+
+OTC-PO result: "up to 73.1% reduction in tool calls while maintaining comparable accuracy.
+Larger models showed greater scalability benefits. Most notably, approximately 90% of
+test cases achieved correct answers using fewer tools."
+
+Implication for chaining: This research addresses EXCESS tool calls, not chaining.
+The model chaining problem is the INVERSE — chaining reduces tool-call count by
+cramming multiple operations into one call.
+
+--- GitHub Blog — Token Efficiency in Agentic Workflows ---
+URL: https://github.blog/ai-and-ml/github-copilot/improving-token-efficiency-in-github-agentic-workflows/
+"Using bash scripting eliminates tool-call overhead and allows agents to take advantage
+of their extensive training in bash to efficiently process data."
+(Note: this is from a GitHub Copilot perspective, framing bash chaining positively
+for token efficiency)
+
+--- OpenHands: No Per-Command Approval Model ---
+URL: https://docs.openhands.dev/sdk/guides/agent-server/docker-sandbox
+"OpenHands puts the agent in an isolated environment and lets it run anything, with
+no per-command approval and no permission prompts. The boundary is the container or
+VM wall."
+
+"This approach is low-friction but coarse — you can't allow some commands while
+blocking others, because the agent has root inside its sandbox."
+
+--- Cline: Human-in-the-Loop for Every Command ---
+(Referenced via: https://pinggy.io/blog/best_open_source_cli_coding_agents/)
+"Cline uses a human-in-the-loop GUI for approving file changes and terminal commands.
+Every action requires explicit user approval — file edits, command execution, browser
+actions. This makes it slower but auditable."
+
+--- Aider: Git-Based Safety Model ---
+(Referenced via: https://crabtalk.ai/blog/agent-sandbox-permissions)
+"Aider runs entirely in your terminal with direct filesystem access. No container,
+no VM, no OS-level isolation. The safety model is git: all changes go through git,
+so git diff and git checkout are the undo mechanism."
+
+--- addyosmani.com Agent Harness Engineering ---
+URL: https://addyosmani.com/blog/agent-harness-engineering/
+"Ten focused tools outperform fifty overlapping ones because the model can hold the
+menu in its head."
+"A hook is a script that runs at a specific lifecycle point. Hooks should run typecheck
+and lint and tests after every edit and surface failures, and block destructive bash
+commands like rm -rf, git push --force, and DROP TABLE."
+"context rot from large tool outputs: The prescribed solution is 'tool-call offloading'
+— the harness captures voluminous outputs and stores them on the filesystem, preventing
+context bloat while keeping data accessible."

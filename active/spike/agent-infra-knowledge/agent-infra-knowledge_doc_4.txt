@@ -1,0 +1,105 @@
+AUXILIARY: Multi-tool comparison evidence (CLAUDE.md / AGENTS.md / .cursorrules)
+Sources:
+  - https://www.deployhq.com/blog/ai-coding-config-files-guide
+  - https://www.morphllm.com/agents-md-guide
+  - https://github.blog (GitHub Copilot custom instructions)
+Fetched: 2026-06-26
+
+=== deployhq.com — multi-tool configuration guide ===
+
+Six major AI coding tools with distinct configuration formats:
+  Claude Code   → CLAUDE.md
+  Codex CLI     → AGENTS.md (64 KiB default limit; silently truncates beyond)
+  Gemini CLI    → GEMINI.md
+  Cursor        → .cursorrules or .cursor/rules/ (MDC format, globs)
+  GitHub Copilot → copilot-instructions.md
+  Windsurf      → .windsurfrules or .windsurf/rules/
+
+Key difference in hierarchy:
+  CLAUDE.md: Global → project → subdirectory (all active simultaneously)
+  AGENTS.md: Root → subdirectory (nearer wins; only one active)
+  Copilot:   Single file + glob-scoped additional files
+
+Deploy knowledge example from the article:
+  "Tech stack documentation: Framework: Next.js 15, Deployment: DeployHQ → Ubuntu 22.04 VPS"
+  "Deployment rules: All database migrations must be reversible"
+
+Cross-tool recommendation:
+  AGENTS.md     ← Universal instructions (60,000+ projects adopted)
+  CLAUDE.md     ← Claude-specific additions
+  copilot-instructions.md ← Copilot-specific
+
+"Maintain a single source of truth rather than duplicating rules across formats."
+
+Constraint: "Frontier LLMs can reliably follow around 150-200 instructions.
+Claude Code's system prompt already uses about 50 of those, so keep your
+CLAUDE.md concise."
+
+Codex truncation: "Codex CLI will silently truncate anything past project_doc_max_bytes,
+potentially breaking configurations entirely."
+
+=== morphllm.com — AGENTS.md spec and Princeton study ===
+
+Recommended AGENTS.md sections (priority order):
+  1. Project overview (technology stack with versions)
+  2. Build and test commands (exact flags)
+  3. Code style guidelines
+  4. Testing instructions
+  5. Security considerations
+  6. Commit and PR guidelines
+
+"Exact commands with flags. 'uv run pytest tests/unit/ -v', not 'run the tests'.
+Include environment setup, migration scripts, and dev server startup."
+
+Starting size guidance: "Start with 20 to 30 lines covering the information
+agents most often get wrong."
+
+Princeton study results (AGENTS.md presence vs absence):
+  28.6% median runtime reduction
+  16.6% median token reduction
+
+BUT: "LLM-generated AGENTS.md files slightly reduced task success while
+increasing cost by 23%."
+
+Critical finding: "Redundancy hurts performance. Information already available
+in code, package manifests, or READMEs should not be duplicated."
+
+Human-written, project-specific files yielded the best results.
+
+Agent Skills open standard (agentskills.io):
+  Adopted December 2025 by OpenAI, Google, GitHub, Cursor
+  400K+ skills indexed within weeks of launch
+  Claude Code skills follow this standard
+
+=== github.blog — GitHub Copilot custom instructions ===
+
+File: .github/copilot-instructions.md
+Loaded: on every chat and agent request
+Limit: "Instructions must be no longer than 2 pages"
+Scope: "broadly applicable to the entire project"
+
+Recommended five sections:
+  1. Project overview
+  2. Tech stack
+  3. Coding guidelines
+  4. Project structure
+  5. Available resources
+
+Important constraint: no per-file or per-directory scoping for the main
+instructions file. Copilot supports additional instruction files via glob
+patterns in settings, but the core file is project-wide.
+
+=== Summary for this investigation ===
+
+The multi-tool comparison confirms:
+  - All tools converge on the same core problem: instruction budget is finite
+  - All tools implement some form of tiered loading (always-on vs conditional)
+  - AGENTS.md is the community standard for cross-tool portability
+  - Cursor has the most flexible conditional loading (globs, auto-attach)
+  - Copilot is the most constrained (single file, 2-page limit, no hierarchy)
+  - Claude Code is the most powerful (hierarchy + Skills body-on-demand + dynamic injection)
+
+For deploy/environment knowledge specifically:
+  All tools agree: put exact commands, not descriptions. "deploy to staging"
+  tells the agent nothing; "/integrators --client X --env staging --scale up"
+  gives it what it needs to act.

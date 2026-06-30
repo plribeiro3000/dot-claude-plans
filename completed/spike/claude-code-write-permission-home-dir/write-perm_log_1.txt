@@ -1,0 +1,63 @@
+GITHUB ISSUES — PATH MATCHING BUG FAMILY AND HOOK REGRESSION
+Fetched: 2026-06-30
+Scope: Issues relevant to Write/Edit permission prompts for ~/.claude/ paths
+
+=== ISSUE #25137 — Path matcher uses relative display path, not canonical absolute path ===
+URL: https://github.com/anthropics/claude-code/issues/25137
+Status: CLOSED (as duplicate)
+Resolution: No fix shipped — closed as duplicate of an existing issue
+
+Core problem (verbatim from issue):
+"The permission matcher appears to check against this relative display path
+rather than the canonical absolute path /Users/username/.claude/mydata/data.json.
+Since ../../../../../../../.claude/mydata/data.json doesn't match any of
+[the defined rules]...the rule never triggers and the user is prompted every time."
+
+Reporter's allow rules that DID NOT WORK:
+  Edit(/Users/username/.claude/mydata/*)
+  Edit(~/.claude/mydata/*)
+  Edit(**/.claude/mydata/data.json)
+
+The path shown in the prompt: ../../../../../../../.claude/mydata/data.json
+
+Additional symptom: "Allow for session" approval does not persist within the session.
+
+Related closed duplicates: #16800, #15499, #21397
+
+=== ISSUE #52822 — permissionDecision: "allow" regression in v2.1.119 ===
+URL: https://github.com/anthropics/claude-code/issues/52822
+Status: CLOSED (no resolution details visible)
+Regression: Introduced in v2.1.119; last confirmed working in v2.1.59
+
+Core problem (verbatim from issue):
+"A PreToolUse hook (type: 'command') that exits with code 0 and emits a
+well-formed hookSpecificOutput with permissionDecision: 'allow' on stdout
+does not suppress the native 'Do you want to X?' permission prompt in
+interactive mode."
+
+Debug log excerpt showing the symptom:
+  [DEBUG] Successfully parsed and validated hook JSON output
+  [INFO] [Stall] tool_dispatch_start tool=Write toolUseId=toolu_...
+         permissionDecisionMs=<N>  ← corresponds to manual prompt wait, not hook
+
+The reporter notes:
+"Not filing this separately since it may be the same root cause — the hook
+system and the permission prompt suppression appear to be decoupled in 2.1.119."
+
+Behavior that STILL WORKS in v2.1.119:
+  - Exit code 2 (deny) still correctly blocks tool calls
+  - The hook executes and its JSON is parsed — only the allow suppression is broken
+
+Related: #28812 (resolved in v2.1.59), #41615 (sensitive paths), #13339 (VS Code)
+
+=== OBSERVATION — Skills hook still working ===
+Source: ~/.claude/CLAUDE.md § "Git Safety"
+"Auto-approval for /merge-cleanup invocation: the auto-approve-local-skills.sh
+PreToolUse hook recognizes every skill/command defined under ~/.claude/commands/
+and ~/.claude/skills/ (including merge-cleanup) and emits permissionDecision: 'allow'
+so the 'Use skill X?' prompt never fires for our own tooling."
+
+This suggests the v2.1.119 regression (#52822) either:
+  (a) has been fixed in a subsequent release, OR
+  (b) only affected Write/Edit/Bash tool types (not Skill), OR
+  (c) was version-specific and the current installed version is different

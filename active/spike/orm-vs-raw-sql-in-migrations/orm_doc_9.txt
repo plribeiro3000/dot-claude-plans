@@ -1,0 +1,31 @@
+SOURCE: https://github.com/ankane/strong_migrations
+FETCHED: 2026-06-23
+
+=== Backfilling safely ===
+
+"There are three keys to backfilling safely: batching, throttling, and running it outside a transaction."
+
+Recommended shape:
+  User.unscoped.in_batches(of: 10000) do |relation|
+    relation.where(some_column: nil).update_all some_column: "default_value"
+    sleep(0.01)
+  end
+
+=== reset_column_information ===
+
+"If backfilling with a method other than update_all, use User.reset_column_information to ensure the model has up-to-date column information."
+
+=== safety_assured ===
+
+"To mark a step in the migration as safe, despite using a method that might otherwise be dangerous, wrap it in a safety_assured block."
+
+Example: safety_assured { remove_column :users, :some_column }
+
+=== Raw SQL limitation ===
+
+"Strong Migrations can't ensure safety for raw SQL statements."
+
+=== Note ===
+strong_migrations itself uses ActiveRecord (update_all) for the safe backfill example — not raw SQL.
+But it acknowledges raw SQL is used and provides the safety_assured escape hatch.
+The reset_column_information guidance confirms that models CAN be used in migrations — with the caveat that column info must be refreshed after DDL.

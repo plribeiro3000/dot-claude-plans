@@ -1,0 +1,45 @@
+SOURCE: https://github.com/mongodb-js/mongodb-mcp-server
+FETCHED: 2026-06-25
+TOPIC: MongoDB MCP Server — license, transport, env vars, read-only mode
+
+KEY VERBATIM QUOTES (from WebFetch of GitHub repo page):
+
+License: Apache-2.0
+
+Transport types:
+- stdio (default): Standard input/output for MCP client integration
+- http: Optional HTTP server with configurable host and port
+
+Connection environment variables:
+- MDB_MCP_CONNECTION_STRING: Direct MongoDB connection string
+- MDB_MCP_API_CLIENT_ID: Atlas API service account credentials
+- MDB_MCP_API_CLIENT_SECRET: Atlas API authentication secret
+
+Tools exposed: "50+ tools across three categories"
+
+Database tools (23): find, aggregate, insert-many, update-many, delete-many,
+  create-collection, drop-collection, list-databases, list-collections, and others
+
+Read-only mode:
+"When --readOnly flag is enabled, only these operation types are permitted:
+- 'read' operations (queries)
+- 'connect' operations (connection management)
+- 'metadata' operations (schema inspection)
+All 'create,' 'update,' and 'delete' operations are disabled, preventing
+data or infrastructure modifications."
+
+Integration with Agent SDK (via stdio transport):
+options = ClaudeAgentOptions(
+    mcp_servers={
+        "mongodb": {
+            "command": "npx",
+            "args": ["-y", "@mongodb-js/mongodb-mcp-server", "--readOnly"],
+            "env": {"MDB_MCP_CONNECTION_STRING": connection_string},
+        }
+    },
+    allowed_tools=["mcp__mongodb__find", "mcp__mongodb__aggregate",
+                   "mcp__mongodb__list-databases", "mcp__mongodb__list-collections"],
+)
+Note: the integration snippet above is an illustrative composition from the SDK docs
+pattern (doc_1.txt) applied to this server's env var and --readOnly flag. It is NOT
+verbatim from the GitHub page.

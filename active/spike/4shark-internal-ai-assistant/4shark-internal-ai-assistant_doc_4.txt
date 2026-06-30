@@ -1,0 +1,106 @@
+SOURCE: https://livekit.io/agents-playground (redirected to livekit.com) + https://github.com/livekit/agents-js (README)
+FETCHED: 2026-06-25
+TOPIC: LiveKit Agents UI — voice visualizer components
+
+KEY VERBATIM QUOTES (from pre-compaction research on livekit-agents-ui):
+
+Package: @livekit/agents-ui
+License: MIT
+Description: "Open-source UI components for building voice-first AI applications using LiveKit Agents"
+
+Five visualizer variants:
+1. Aura — "Smooth organic blob that pulses with audio amplitude"
+2. Wave — "Oscilloscope-style waveform; classic voice-assistant line"
+3. Radial — "Circular bars expanding outward from center"
+4. Grid — "Dense dot-grid where each dot responds to FFT band"
+5. Bar — "Traditional equalizer bars"
+
+Dual-input animation: components accept both (a) audio track volume and (b) agent state enum:
+- idle / listening / thinking / speaking
+
+React usage:
+"""
+import { AgentVisualizer, useAgentState } from "@livekit/agents-ui";
+
+function App() {
+  const { state, audioTrack } = useAgentState();
+
+  return (
+    <AgentVisualizer
+      variant="wave"
+      state={state}
+      audioTrack={audioTrack}
+    />
+  );
+}
+"""
+
+Tech stack: React + shadcn/ui + WebGL (Three.js for Aura/Grid variants)
+Install: npm install @livekit/agents-ui
+
+Transport: Uses LiveKit WebRTC room underneath — agent backend must also use LiveKit (or Pipecat with LiveKit transport)
+
+---
+
+SOURCE: https://vercel.com/changelog (Vercel AI Voice Elements announcement January 14 2026)
+FETCHED: 2026-06-25 (pre-compaction)
+TOPIC: Vercel AI Voice Elements — Persona component
+
+KEY VERBATIM QUOTES:
+"Introducing AI Voice Elements — a set of animated voice UI components for building voice-first AI applications"
+"The Persona component is a WebGL2-powered animation built with Rive that transitions between five states: idle, listening, thinking, speaking, asleep"
+"Designed to convey conversational state visually — the animation reacts to voice activity detection and streaming model state"
+
+Package: @ai-sdk/voice-elements (part of Vercel AI SDK ecosystem)
+License: Apache 2.0 (inferred from AI SDK license)
+States: idle → listening → thinking → speaking → asleep
+Tech: Rive WebGL2 animation runtime
+Does NOT require LiveKit — works with any WebRTC or WebSocket transport
+
+---
+
+SOURCE: https://github.com/react-ai-voice-visualizer (npm: react-ai-voice-visualizer)
+FETCHED: 2026-06-25 (pre-compaction)
+TOPIC: react-ai-voice-visualizer — standalone waveform components
+
+KEY VERBATIM QUOTES:
+"12 audio visualization components from simple bars to complex neural network patterns"
+"Uses Web Audio API FFT analysis for real-time frequency visualization"
+"Built-in microphone capture hook: useVoiceVisualizer"
+"No backend dependency — pure frontend library"
+
+License: MIT
+Install: npm install react-ai-voice-visualizer
+Does NOT require LiveKit, Vercel AI SDK, or any specific backend
+
+---
+
+SOURCE: https://pipecat.ai / https://github.com/pipecat-ai/pipecat
+FETCHED: 2026-06-25 (pre-compaction)
+TOPIC: Pipecat — voice agent framework
+
+KEY VERBATIM QUOTES (from README):
+"Pipecat is an open source Python framework for building voice and multimodal conversational agents"
+License: BSD-2-Clause
+"20+ STT providers, 30+ TTS providers, 25+ LLM providers"
+"Transports: WebRTC (via LiveKit, Daily), WebSocket, HTTP"
+
+Client SDKs:
+- pipecat-client-js (TypeScript/React)
+- pipecat-client-react (React hooks)
+
+Voice UI Kit:
+- @pipecat-ai/voice-ui-kit — pre-built waveform and state components for React
+
+Latency optimization quote (from LiveKit blog, pre-compaction research):
+"A voice pipeline latency breakdown: STT first transcript (100–200ms) + LLM first token (200–400ms) + TTS first audio (100–300ms) = target under 1 second total with streaming. Streaming STT → streaming LLM → streaming TTS cuts perceived latency dramatically."
+
+STT options:
+- Deepgram Flux: "voice-agent-optimized, sub-200ms end-to-turn detection"
+- OpenAI Realtime API: end-to-end audio, lowest latency, no separate STT/TTS
+- ElevenLabs Scribe v2 Realtime: ~150ms, 90+ languages
+
+TTS options:
+- ElevenLabs (highest quality, ~200ms)
+- OpenAI TTS (good quality, streaming)
+- Deepgram Aura (fast, lower cost)

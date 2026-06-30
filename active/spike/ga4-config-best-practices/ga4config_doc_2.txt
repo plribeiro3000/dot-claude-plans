@@ -1,0 +1,122 @@
+GA4 CONFIG BEST PRACTICES — EXPERT COMMUNITY SOURCES
+Raw output captured from WebFetch calls on 2026-06-26
+
+=============================================================
+SOURCE 1: https://www.bounteous.com/insights/2020/01/23/implementing-user-id-google-analytics
+TITLE: Implementing User ID in Google Analytics (Bounteous)
+=============================================================
+
+PII Prohibition:
+"User IDs must never contain personally identifiable information (PII), such as email addresses or phone numbers."
+
+Logout handling:
+"When using tags to track events that the user completes after signing out of your website, you must disable the User ID field"
+"A User ID value of 'null' is interpreted as 'not set.'"
+"all users sharing that User ID will appear as a single user" [about the literal string "null"]
+
+Implementation recommendation:
+"The User ID should be a unique, persistent identifier that cannot be used to identify the user outside of the analytics context."
+
+=============================================================
+SOURCE 2: https://www.bounteous.com/insights/2021/07/12/ip-address-handling-google-analytics-4
+TITLE: IP Address Handling in Google Analytics 4 (Bounteous)
+=============================================================
+
+Geo accuracy figures from Bounteous:
+"A device's country is correct 95–99 percent of time; region...55–80 percent of the time; and cities are correct 50–75 percent"
+
+Context: GA4 derives geolocation from IP address at ingestion time, then discards the IP. The accuracy percentages reflect the derived geo dimensions.
+
+=============================================================
+SOURCE 3: https://analyticsmania.com/post/google-analytics-user-id/
+TITLE: What Is User ID in Google Analytics? (Analytics Mania)
+=============================================================
+
+PII prohibition:
+"Google Analytics' Terms of Services do not allow tracking PII (Personally Identifiable Information), such as Email Addresses, Social Security Numbers, etc."
+
+Acceptable vs. prohibited examples:
+- "john.doe@gmail.com – CANNOT be used as a User ID in Google Analytics"
+- "5239asbd923fade923da – CAN be used as a User ID in Google Analytics"
+
+Why hashed IDs work:
+"A hashed email is a long string of seemingly random characters that represents a specific person. But looking at it alone you cannot identify who this person is."
+
+Common implementation note: hash function (SHA-256 or similar) applied server-side, then the resulting hex string passed as user_id. This ensures even if GA4 data is exposed, no PII can be recovered without the hash function + original input.
+
+=============================================================
+SOURCE 4: https://www.gunnargriese.com/posts/ga4-reporting-identity/
+TITLE: GA4 Reporting Identity: The Hidden Impact on Your Data (Gunnar Griese)
+=============================================================
+
+Reporting Identity Modes — verbatim definitions:
+- Blended: "Uses the User-ID, Device ID, then Modelling, in that order of preference"
+- Observed: "It uses the User-ID, Google Signals, and then Device ID, ignoring Modelling"
+- Device-based: "Only the device ID is used, and all other collected IDs are ignored"
+
+Recommendation for User-ID implementations:
+"Once you have successfully implemented User-ID, the Blended reporting identity mode is probably your best option"
+
+PII Prohibition (author's framing):
+"the ID you assign should not encompass information that could potentially enable a third party to ascertain the identity of an individual user, such as an email address"
+
+Identity Space tiers (four, in GA4):
+1. User-ID — set explicitly, highest fidelity
+2. Google Signals — cross-device via signed-in Google accounts (deprecated as reporting identity Feb 2024)
+3. Device ID — client_id cookie
+4. Behavioral Modeling — ML fill-in for unconsenting users (Consent Mode only)
+
+Google Signals deprecation note:
+"Google stopped using Google Signals as an identity space in February 2024"
+
+=============================================================
+SOURCE 5: https://analyticodigital.com/blog/google-signals-ga4
+TITLE: Google Signals Removed from GA4 Reporting Identity (Analytico Digital)
+=============================================================
+
+Removal event:
+"Google Signals will be removed as a reporting identity from February 12, 2024"
+
+Data still collected:
+"GA4 will still collect the Google Signals data even after it ceases to be a reporting identity"
+
+Thresholding relief:
+"business analysts will no longer have to deal with thresholding in GA4"
+
+Remaining value of Signals:
+Demographics, interests, audience lists — still available for remarketing and demographic reports.
+
+B2B applicability note from author: For B2B apps where users are not consumer Google account holders, Google Signals provides negligible cross-device enrichment — the user base generally does not share consumer Google logins between personal and work devices in the way consumer analytics relies on.
+
+=============================================================
+SOURCE 6: https://www.measurelab.co.uk/blog/ga4-web-data-streams/
+TITLE: GA4 Data Streams: How Many Should You Create? (Measurelab)
+=============================================================
+
+Core recommendation:
+"the best advice we can give is to only have one web data stream if you can — especially if your website users navigate between them in a single browsing session"
+
+When multiple streams are appropriate:
+- When sites serve "completely different purposes (not interconnected)"
+- When "sites can completely separate tracking and are run by different entities"
+- "When it's impossible to create a cross-domain setup"
+
+Cross-domain measurement note:
+Cross-domain tracking joins the same property across multiple root domains. It does NOT apply when each domain has its own separate property.
+
+Whitelabel topology comment: One domain per property means cross-domain tracking is not applicable; the question shifts to how to handle client-specific Measurement ID injection.
+
+=============================================================
+SOURCE 7: https://www.analyzify.com/blog/ga4-ecommerce-saas-metrics
+TITLE: SaaS Metrics and GA4 — Key Events to Track (Analyzify)
+=============================================================
+
+SaaS-specific retention events:
+"Login events, Subscription renewals or cancellations, Last Activity"
+
+SaaS activation/usage events:
+"First use of a key feature, Feature engagement, Report export or download, Settings update"
+
+Note: Analyzify frames these as custom events (non-recommended standard events), since GA4's recommended events list is eCommerce-oriented. The actual event names (login, sign_up) for session tracking ARE in the recommended events spec.
+
+Revenue SaaS note: SaaS doesn't track per-transaction revenue in GA4 the way eCommerce does. Subscription state tracking is better done server-side (MRR, churn, NPS) than through GA4 events.

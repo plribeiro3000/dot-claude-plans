@@ -1,0 +1,37 @@
+SOURCE: TruffleHog GitHub repository README + Truffle Security blog
+URL: https://github.com/trufflesecurity/trufflehog
+URL: https://trufflesecurity.com/the-kitchen/scanning-github-with-trufflehog-v3
+FETCHED: 2026-06-25
+
+=== TRUFFLEHOG PR/ISSUE SCANNING SCOPE ===
+
+From the TruffleHog README (trufflesecurity/trufflehog):
+
+COMMAND: "trufflehog github --repo=https://github.com/trufflesecurity/test_keys --issue-comments --pr-comments"
+
+FLAG DOCUMENTATION (from Scanning GitHub with TruffleHog v3 article):
+"--[no-]pr-comments  Include pull request descriptions and comments in scan."
+"--[no-]issue-comments  Include issue descriptions and comments in scan."
+
+SCOPE NOTE: The flags scan "pull request descriptions and comments" — the tool's own documentation groups PR body and PR review comments together under --pr-comments. The exact boundary between "PR body/description" and "PR reply comments" is not further distinguished in the documentation.
+
+CUSTOM DETECTOR SCOPE:
+From the TruffleHog README:
+"TruffleHog supports detection and verification of custom regular expressions."
+Custom detectors require a keyword and regex pattern. The README does not limit custom detectors to credential-type patterns — they can target arbitrary text matches.
+
+KEY IMPLICATION: TruffleHog with --pr-comments CAN scan PR description text (not only code diffs). However:
+1. The tool's built-in detector library (800+ detectors) is entirely credential-focused (API keys, tokens, certificates, passwords)
+2. Custom detectors using regex can match non-credential patterns, but require explicit configuration
+3. The tool runs as a post-creation scanner (after the PR body is already stored in GitHub) — it does NOT intercept before creation
+4. The scan would run on demand or in CI, not as a real-time gate
+
+COMMUNITY CONTEXT:
+From Truffle Security's own blog post on GitHub comments:
+"There are thousands of live API credentials and passwords in public GitHub comments."
+The motivation for --pr-comments was discovering credentials leaked in GitHub comments/PR bodies — the use case is credential detection, not general business/infra data detection.
+
+=== VERIFICATION ===
+URL fetched: https://trufflesecurity.com/the-kitchen/scanning-github-with-trufflehog-v3
+Verbatim quote: "--[no-]pr-comments  Include pull request descriptions and comments in scan."
+Quote location: flags reference section

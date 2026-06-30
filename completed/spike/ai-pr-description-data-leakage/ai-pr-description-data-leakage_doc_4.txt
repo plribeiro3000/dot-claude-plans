@@ -1,0 +1,107 @@
+SOURCE: https://docs.anthropic.com/en/docs/claude-code/hooks
+FETCHED: 2026-06-25
+TITLE: Claude Code Hooks — PreToolUse documentation
+PUBLISHER: Anthropic
+
+---
+
+## Hook Event Types
+
+Claude Code supports these hook events:
+- PreToolUse — fires before a tool is invoked; can block or modify
+- PostToolUse — fires after a tool completes; read-only
+- UserPromptSubmit — fires when the user submits a prompt
+- SessionStart, SubagentStart, Notification
+
+## PreToolUse Event Structure
+
+Hook receives JSON on stdin:
+```json
+{
+  "session_id": "...",
+  "tool_name": "Bash",
+  "tool_input": {
+    "command": "gh pr create --title '...' --body '...'"
+  }
+}
+```
+
+## Hook Output — Block and Redirect
+
+Exit code 2 = block the tool call, print stderr to the model.
+Exit code 0 with JSON stdout = special behavior.
+
+JSON output shape for blocking:
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "permissionDecision": "deny",
+    "permissionDecisionReason": "Explanation sent to model"
+  }
+}
+```
+
+JSON output shape for injecting context without blocking:
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "additionalContext": "Warning: message injected into model context"
+  }
+}
+```
+
+JSON output shape for rewriting the tool input (updatedInput):
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PreToolUse",
+    "updatedInput": {
+      "command": "gh pr create --title '...' --body '<sanitized content>'"
+    }
+  }
+}
+```
+
+## The `if` Field for Precise Matching
+
+Hooks support an `if` field for conditional execution:
+```json
+{
+  "if": "Bash(gh pr create *)",
+  "type": "command",
+  "command": "$HOME/.claude/scripts/validate-pr-body.sh"
+}
+```
+
+This fires ONLY when the Bash command starts with `gh pr create`.
+
+## Confirmed from settings.json (existing 4Shark usage)
+
+From `/Users/plribeiro3000/.claude/settings.json` lines 181-200:
+```json
+{
+  "matcher": "Bash",
+  "hooks": [
+    {
+      "if": "Bash(terraform *)",
+      "type": "command",
+      "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
+      "timeout": 10
+    }
+  ]
+}
+```
+
+This is the established pattern for per-command hooks. A new hook with `"if": "Bash(gh pr create *)"` follows this exact shape.
+
+## The updatedInput Mechanism
+
+When a hook returns `updatedInput`, Claude Code replaces the tool's input with the provided value before execution. For a Bash hook:
+- `tool_input.command` is the string that will be executed
+- `updatedInput.command` would replace it with a sanitized version
+
+This enables pre-creation redaction: intercept `gh pr create --body 'sensitive text'`, extract and sanitize the body, return `updatedInput` with the sanitized command. GitHub never sees the original body.
+
+This is the ONLY solution path that intercepts data before it reaches GitHub. All other approaches (GitHub Actions, GitHub Secret Scanning, TruffleHog) are post-creation.

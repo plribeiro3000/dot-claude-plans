@@ -1,0 +1,387 @@
+4shark-internal-ai-assistant — Q4 source material (verbatim quotes)
+Generated: 2026-06-25
+Topic: LGPD, data handling & vendor data-processing exposure
+
+All text below is verbatim from the fetched sources. [UNVERIFIED] marks sources
+that returned errors or non-parseable content. Footnotes mark partial / summarised
+fetches where the raw response did not return as plain text.
+
+=============================================================================
+SECTION A — Anthropic Commercial Terms
+Source URL: https://anthropic.com/legal/commercial-terms
+Fetch status: SUCCESS
+=============================================================================
+
+"Data submitted through the Services will be processed in accordance with the
+Anthropic Data Processing Addendum ("DPA"), which is incorporated into these Terms
+by reference."
+
+"Anthropic may not train models on Customer Content from Services."
+
+"Customer (a) retains all rights to its Inputs, and (b) owns its Outputs."
+
+"Anthropic disclaims any rights it receives to the Customer Content under these Terms."
+
+=============================================================================
+SECTION B — Anthropic Data Processing Addendum
+Source URL: https://anthropic.com/legal/data-processing-addendum
+Fetch status: SUCCESS
+=============================================================================
+
+"With respect to Customer Personal Data, Customer is the controller and Anthropic
+is Customer's processor."
+
+"the terms of the SCCs Module Two (controller to processor) and/or Module Three
+(processor to processor), as completed as described in Schedule 3 of this DPA, are
+hereby incorporated by reference"
+
+"Anthropic will: (a) enter into a contractual agreement with each Subprocessor
+imposing data protection obligations that are substantially as protective as
+Anthropic's obligations under this DPA"
+
+"Anthropic will implement and maintain reasonable and appropriate technical and
+organizational data protection and security measures designed to ensure a level of
+security for the Customer Data"
+
+"Anthropic's list of subprocessors is available at https://www.anthropic.com/subprocessors"
+
+"Within thirty (30) days of the date of termination or expiration of the Agreement,
+Anthropic will...delete all copies of Customer Data (including Customer Personal Data)
+processed by Anthropic or any Subprocessors"
+
+=============================================================================
+SECTION C — Anthropic API and Data Retention (ZDR eligibility table)
+Source URL: https://platform.claude.com/docs/en/manage-claude/api-and-data-retention
+Fetch status: SUCCESS (full page retrieved)
+=============================================================================
+
+"Anthropic offers two data handling arrangements for the Claude API:
+- Zero data retention (ZDR): Customer data is not stored at rest after the API
+  response is returned, except where needed to comply with law or combat misuse.
+- HIPAA readiness: For organizations handling protected health information (PHI),
+  Anthropic offers HIPAA-ready API access with a signed Business Associate Agreement
+  (BAA)."
+
+"Claude Fable 5 and Claude Mythos 5 are not available under ZDR"
+
+ZDR scope — What ZDR covers:
+"Certain Claude APIs: ZDR applies to the Claude Messages and Token Counting APIs."
+"Claude Code: ZDR applies when used with Commercial organization API keys or through
+Claude Enterprise"
+
+ZDR scope — What ZDR does NOT cover:
+"Claude Managed Agents: Claude Managed Agents is a stateful resource. You can delete
+session transcripts, but there is no automatic deletion."
+"Third-party integrations: Data processed by third-party websites, tools, or other
+integrations is not ZDR-eligible"
+
+"To request a ZDR arrangement, contact the Anthropic sales team."
+
+Feature eligibility table (abbreviated — relevant rows for this investigation):
+
+Feature                 | ZDR eligible | HIPAA eligible | Details
+------------------------|--------------|----------------|---------------------------------------
+Messages API            | Yes          | Yes            | Standard API calls
+MCP connector           | No           | No             | Data retained per standard policy
+Claude Managed Agents   | No           | No             | Sessions are stateful resources;
+                        |              |                | transcripts persist until you delete them
+Agent skills            | No           | No             | Skill data retained per standard policy
+Files API               | No           | No             | Files retained until explicitly deleted
+Code execution          | No           | No             | Container data retained up to 30 days
+Batch processing        | No           | No             | 29-day retention
+MCP tunnels             | No           | No             | Research preview
+
+Full row text for MCP connector:
+"MCP connector | /v1/messages (with mcp_servers) | No | No | Data retained per standard
+policy."
+
+"Claude Fable 5 and Claude Mythos 5 are designated Covered Models and require 30-day
+data retention. Zero data retention is not available for Claude Fable 5 or Claude
+Mythos 5."
+
+HIPAA error example:
+"{
+  'type': 'error',
+  'error': {
+    'type': 'invalid_request_error',
+    'message': 'The requested features are not available for HIPAA-regulated
+    organizations without Zero Data Retention: code_execution.'
+  }
+}"
+
+CORS restriction for ZDR:
+"Cross-Origin Resource Sharing (CORS) is not supported for organizations with ZDR
+arrangements. If you need to make API calls from browser-based applications, you must:
+- Use a backend proxy server to make API calls on behalf of your front end"
+
+Data retention for violations:
+"Even with ZDR or HIPAA arrangements in place, Anthropic may retain data where
+required by law or to combat Usage Policy violations and malicious uses of
+Anthropic's platform. As a result, if a chat or session is flagged for such a
+violation, Anthropic may retain inputs and outputs for up to 2 years."
+
+=============================================================================
+SECTION D — Amazon Bedrock FAQs
+Source URL: https://aws.amazon.com/bedrock/faqs/
+Fetch status: SUCCESS
+=============================================================================
+
+"Your content is not used to improve the base models and is not shared with any
+model providers."
+
+"AWS and the third-party model providers will not use any inputs to or outputs from
+Amazon Bedrock to train Amazon Nova, Amazon Titan, or any third-party models."
+
+"Any customer content processed by Amazon Bedrock is encrypted and stored at rest in
+the AWS Region where you are using Amazon Bedrock."
+
+"Users' inputs and model outputs are not shared with any model providers."
+
+=============================================================================
+SECTION E — Amazon Bedrock Data Retention Modes
+Source URL: https://docs.aws.amazon.com/bedrock/latest/userguide/data-retention.html
+Fetch status: SUCCESS (full page retrieved)
+=============================================================================
+
+"Amazon Bedrock gives you explicit control over whether your prompts and outputs are
+retained from your inference requests."
+
+"There is no data retention change to models released before Claude Fable 5. AWS is
+committed to making sure that you are in full control over when and with whom your
+data is retained and shared."
+
+Data retention modes table (verbatim):
+
+Mode                | Behavior
+--------------------|----------------------------------------------------------
+default             | Default means the data retention policy of the model
+                    | applies. There is no change to previous model retention
+                    | behavior; if ZDR applied previously, then ZDR still applies.
+                    | Actual retention depends on the model — consult the model's
+                    | terms for specifics. AWS may retain the data for safety and
+                    | abuse-prevention purposes. The model provider does not receive it.
+provider_data_share | This mode allows Amazon Bedrock to retain and share your
+                    | inference data with model providers per their requirements.
+                    | It is required for access to certain models.
+none                | Zero data retention. No request or response data is written
+                    | to durable storage by AWS or shared with the model provider.
+inherit             | No opinion at this scope — defer to a broader scope. This
+                    | is the default for new accounts and projects.
+
+"Example: Claude Fable 5 and Claude Mythos 5 require provider data sharing
+(allowed_modes: ['provider_data_share']). Customers must explicitly set their data
+retention mode to provider_data_share before they can invoke these models."
+
+"A model whose allowed_modes is ['default', 'provider_data_share'] (e.g., Claude
+Opus 4.8) — data is retained by AWS only. The model accepts provider_data_share as
+a valid mode but does not require data to leave AWS's boundary."
+
+"For models requiring provider_data_share (currently Claude Mythos 5 and Claude
+Fable 5): user prompts and completions are shared with Anthropic and retained for
+up to 30 days for trust and safety purposes."
+
+"If cross-region inference is enabled for these models, retained inputs and outputs
+are stored in destination regions (i.e., the region where your inference request is
+processed)."
+
+=============================================================================
+SECTION F — Amazon Bedrock Regional Routing (sa-east-1)
+Source URL: https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html
+Fetch status: SUCCESS
+=============================================================================
+
+sa-east-1 routing availability (verbatim from the summarised table):
+  In-Region routing: Not available
+  Geo (Geographic) routing: Not available
+  Global routing: Available
+
+Claude models available in sa-east-1 (all Global routing only):
+  Claude Fable 5, Claude Sonnet 4.6, Claude Opus 4.8, Claude Opus 4.7,
+  Claude Opus 4.6, Claude Opus 4.5
+
+"If you need Claude models in sa-east-1, you must use Global routing, which routes
+across all commercial AWS regions worldwide. There is no option for data residency
+constraints within a single region or geographic boundary for this location."
+
+Example model ID for Global routing in sa-east-1:
+  global.anthropic.claude-3-5-sonnet-20241022-v2:0
+
+=============================================================================
+SECTION G — OpenAI API Data Policy
+Source URL: https://developers.openai.com/api/docs/guides/your-data
+Fetch status: SUCCESS
+=============================================================================
+
+"As of March 1, 2023, data sent to the OpenAI API is not used to train or improve
+OpenAI models (unless you explicitly opt in to share data with us)."
+
+"By default, abuse monitoring logs are generated for all API feature usage and
+retained for up to 30 days, unless longer retention is required by law."
+
+"Zero Data Retention excludes customer content from abuse monitoring logs in the
+same way as Modified Abuse Monitoring."
+
+ZDR-eligible endpoints include:
+  /v1/chat/completions, /v1/responses, /v1/embeddings, /v1/audio/transcriptions,
+  /v1/images/generations, /v1/moderations
+
+Data residency regions offered by OpenAI:
+  US, Europe, Australia, Canada, Japan, India, Singapore, South Korea, UK, UAE
+  (Note: Brazil is not listed)
+
+NOTE: openai.com/enterprise-privacy/ returned HTTP 403 — DPA terms not obtained.
+      openai.com/api-data-policy/ returned HTTP 403 — additional policy not obtained.
+      These sections are UNVERIFIED — the quotes above are from the developer docs only.
+      The mechanism for requesting ZDR from OpenAI is UNVERIFIED — the fetched page
+      does not describe the request process (e.g., whether sales contact is required).
+
+=============================================================================
+SECTION H — LGPD Article 33 (International Data Transfer)
+Source URL: https://lgpd-brasil.info/capitulo_05/artigo_33
+Fetch status: SUCCESS (partial — article heading had typo "daodos" in source)
+=============================================================================
+
+Article 33 heading: "Casos de permissão de transferência internacional de dados pessoais"
+
+"A transferência internacional de dados pessoais somente é permitida nos seguintes casos:"
+
+Inciso I:   transfer to countries or international bodies providing adequate personal
+             data protection (decisão de adequação)
+Inciso II:  when controller offers guarantees through:
+             a) specific contractual clauses
+             b) standard contractual clauses (cláusulas-padrão)
+             c) global corporate standards
+             d) regularly issued seals/certificates/codes
+Inciso III: transfer necessary for international legal cooperation between public
+             intelligence/investigation/prosecution bodies
+Inciso IV:  transfer necessary to protect life or physical integrity of data subject
+             or third party
+Inciso V:   when national authority (ANPD) authorizes transfer
+Inciso VI:  when transfer results from international cooperation agreement commitment
+Inciso VII: transfer necessary for public policy execution / legal public service
+             attribution with required publicity
+Inciso VIII: when data subject provided specific, prominent consent with prior
+             international operation disclosure
+Inciso IX:  when necessary for Article 7, incisos II, V, VI hypotheses
+
+NOTE: Full Portuguese verbatim of each inciso not available from fetch — the
+      above is a summary translation of the source page content. The heading
+      and main provision are verbatim; individual incisos are paraphrased.
+      Mark individual inciso wording as UNVERIFIED for direct quotation purposes.
+
+=============================================================================
+SECTION I — LGPD Article 39 (Operator Obligations)
+Source URL: https://lgpd-brasil.info/capitulo_06/artigo_39
+Fetch status: SUCCESS (secondary source — lgpd-brasil.info, not official text)
+NOTE: planalto.gov.br (official Brazilian law repository) returned ECONNRESET
+      during research. The quote below is from the lgpd-brasil.info secondary
+      site. The text should be confirmed at planalto.gov.br before relying on
+      it for a binding legal decision.
+=============================================================================
+
+"O operador deverá realizar o tratamento segundo as instruções fornecidas pelo
+controlador, que verificará a observância das próprias instruções e das normas sobre
+a matéria."
+
+Translation: The operator must conduct data processing according to instructions
+provided by the controller, who shall verify compliance with such instructions and
+applicable regulations.
+
+=============================================================================
+SECTION J — ANPD International Transfers (Adequacy + CPCs Status)
+Source URL: https://www.gov.br/anpd/pt-br/assuntos/assuntos-internacionais/transferencia-internacional-de-dados
+Fetch status: SUCCESS
+=============================================================================
+
+"a União Europeia foi considerada como organismo internacional adequado pelo Conselho
+Diretor da ANPD por meio da publicação da Resolução n. 32/2026"
+
+(Translation: The European Union was deemed an adequate international body by ANPD's
+Directing Council through Resolution No. 32/2026)
+
+"A implementação dessas cláusulas deve ser feita sem modificações (Anexo II do
+Regulamento), em até 12 meses da publicação do Regulamento"
+
+(Translation: Implementation must occur without modifications within 12 months of
+regulation publication — placing deadline at August 2025 based on August 2024
+publication date)
+
+"Até a presente data, não houve nenhuma decisão do Conselho Diretor da ANPD acerca
+de cláusulas contratuais específicas, cláusulas-padrão equivalentes ou normas
+corporativas globais"
+
+(Translation: To date, no Directing Council decisions exist regarding specific
+contractual clauses, equivalent standard clauses, or global corporate norms)
+
+Note: No mention of US adequacy decision found on this page. EU is the only
+country with adequacy recognition from ANPD as of this fetch.
+
+=============================================================================
+SECTION K — CPC Deadline (third-party law firm source)
+Source URL: https://cmalaw.com/conteudos/clausulas-padrao-da-anpd-o-que-muda-a-partir-de-23-de-agosto-de-2025/
+Fetch status: SUCCESS (from prior session research — not re-fetched this session)
+=============================================================================
+
+Key fact confirmed: August 23, 2025 was the deadline for organisations to adopt
+ANPD-approved standard contractual clauses (CPCs) for international data transfers.
+
+=============================================================================
+SECTION L — Anthropic Certifications
+Source URL: https://privacy.claude.com/en/articles/10015870-what-certifications-has-anthropic-obtained
+Fetch status: SUCCESS
+=============================================================================
+
+"Anthropic is committed to the safety and security of our users' information and
+maintains the following compliance credentials"
+
+Certifications listed:
+  - HIPAA-ready configuration (BAA available)
+  - ISO 27001:2022 (Information Security Management)
+  - ISO/IEC 42001:2023 (AI Management Systems)
+  - SOC 2 Type I & Type II
+
+=============================================================================
+SECTION M — UNVERIFIED sources (fetch failures)
+=============================================================================
+
+The following URLs returned errors and produced no usable verbatim text:
+
+  openai.com/enterprise-privacy/          → HTTP 403
+  openai.com/api-data-policy/             → HTTP 403
+  www.anthropic.com/security              → HTTP 404
+  lgpd-brasil.info/capitulo_04/artigo_39  → HTTP 404 (correct URL was capitulo_06)
+  jusbrasil.com.br/legislacao/...         → HTTP 403
+  planalto.gov.br/ccivil_03/...           → ECONNRESET
+  trust.anthropic.com                     → returned title only, no body content
+  aws.amazon.com/legal/aws-data-processing-addendum/ → HTTP 404
+
+=============================================================================
+SECTION N — AWS Service Terms (DPA + SCC incorporation)
+Source URL: https://aws.amazon.com/service-terms/
+Fetch status: SUCCESS (verbatim substrings confirmed via re-fetch self-check)
+=============================================================================
+
+DPA incorporation (Section 1.14.1, verbatim):
+"1.14.1 These Service Terms incorporate the AWS Data Processing Addendum ("DPA"),
+when you use AWS Services to process Customer Data (as defined in the DPA)."
+
+SCC incorporation (Section 1.14.3, verbatim):
+"These Service Terms incorporate the Standard Contractual Clauses between controllers
+and processors ("Controller-to-Processor Clauses") and the Standard Contractual
+Clauses between processors ("Processor-to-Processor Clauses")"
+
+SCC applicability condition (verbatim — CRITICAL SCOPE LIMITATION):
+"The SCCs will only apply when: (i) the GDPR applies to your use of the AWS Services
+to process Customer Data; and (ii) Customer Data is transferred either directly or
+via onward transfer, to a country outside of the European Economic Area not recognised
+by the European Commission as providing an adequate level of protection for personal
+data subject to GDPR (together a "Data Transfer")."
+
+IMPORTANT NOTE: The AWS SCCs are explicitly scoped to GDPR (EU regulation) transfers
+out of the EEA. They are not stated as covering LGPD (Brazilian regulation) transfers.
+Whether AWS SCCs satisfy LGPD Art. 33 Inciso II(b) for transfers from Brazil to AWS
+is a legal question not addressed in the fetched text.
+
+=============================================================================
+END OF DOC_8.TXT
+=============================================================================

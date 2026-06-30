@@ -1,0 +1,40 @@
+SOURCE: https://abp.io/community/articles/shared-user-accounts-in-abp-multitenancy-mf3bkg79
+FETCHED: 2026-06-17
+
+TITLE: ABP.IO — Shared User Accounts in ABP Multi-Tenancy
+
+VERBATIM QUOTES:
+
+"the most important behavior change after switching to Shared: username and email
+uniqueness become global instead of per-tenant."
+
+"if the same account needs to be recognized across tenants, its identifiers must be
+unique across the entire system."
+
+"global uniqueness is enforced at the application level, not through database unique
+indexes" (rationale: "in database-per-tenant setups, cross-database indexes are
+impossible, and soft-delete complicates composite indexes")
+
+"a user's username can't match another user's email, and vice versa"
+(cross-field uniqueness protection)
+
+## ABP Multi-Tenant Design (Isolated vs Shared)
+
+ABP's framework distinguishes two modes:
+- ISOLATED (per-tenant): email uniqueness is per-tenant. Default in ABP.
+- SHARED: email uniqueness becomes GLOBAL. Requires switching to the shared model
+  explicitly.
+
+Post-login, users with multiple tenant memberships see "a tenant selection screen after
+credentials are verified." Then a "tenant switcher" allows jumping between contexts
+without signing out.
+
+## Significance for 4Shark
+
+ABP's ISOLATED mode (per-tenant email uniqueness) is the DEFAULT — this is the industry
+norm for multi-tenant isolation. The SHARED mode is the opt-in exception for when you
+need the same human to span multiple orgs.
+
+In 4Shark's case, the same email = DIFFERENT HUMANS (different country, different
+company), so the ISOLATED (per-tenant) model is the correct match for the business
+requirement.

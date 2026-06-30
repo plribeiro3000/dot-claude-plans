@@ -1,0 +1,30 @@
+SOURCE: https://www.visuality.pl/posts/rails-migrations-best-practices
+FETCHED: 2026-06-23
+
+=== Data belongs elsewhere ===
+
+"The trouble begins when the underlying assumptions behind migrations are misunderstood. It is true that migrations are meant for database manipulation — specifically, for introducing changes to the database structure. Some developers, however, interpret them as a convenient place to handle data changes as well, and this is where the ground starts to become dangerous."
+
+=== Model drift ===
+
+"One of the most naive mistakes developers make is relying on the Rails ORM inside migrations — for example, by directly calling application models. The ORM always reflects the current version of the code: relationships, validations, callbacks, and many other behaviors are defined at the model level."
+
+"Although the email column does not yet exist at that point in the migration history, the model validation is already in place."
+
+=== Data goes elsewhere ===
+
+"Keeping migrations small and strictly limited to schema changes is the safest and most sustainable approach. Data manipulations belong elsewhere, where they can be executed deliberately."
+
+=== Raw SQL valid but not primary ===
+
+"There are valid reasons for performing uncommon operations in migrations — sometimes for performance reasons, sometimes to leverage database-specific features. One such example is executing raw SQL inside a migration."
+
+=== after_party gem ===
+
+"One approach that has proven solid in practice is using the after_party gem. It is simple, yet it addresses most of the issues described above. Each after-party task is generated via the terminal and receives a timestamp."
+
+"creates a dedicated database table to track which tasks have already been executed, ensuring that no code is run more than once."
+
+=== Note ===
+Visuality argues data manipulation does not belong in migrations AT ALL — neither ORM nor SQL.
+Their recommendation is a separate tooling tier (after_party).

@@ -1,0 +1,37 @@
+SOURCE: arXiv paper 2604.19965
+URL: https://arxiv.org/abs/2604.19965
+FETCHED: 2026-06-25
+
+=== PAPER: Insights into Security-Related AI-Generated Pull Requests ===
+Authors: Md Fazle Rabbi, Asif K. Turzo, Arifa I. Champa, Minhaz F. Zibran
+Published: April 21, 2026
+
+ABSTRACT (verbatim):
+"Recent years have experienced growing contributions of AI coding agents that assist human developers in various software engineering tasks. However, this growing AI-assisted autonomy raises questions about security and trust. In this paper, we analyze more than 33,000 AI-generated pull requests (PRs) and identify 675 security-related submissions made by agentic AIs. Then we examine the security-related PRs with a focus on recurring security weaknesses, review outcomes and latency, commit message quality, and rejection reasons. The results show that security-related AI PRs introduce a small set of recurring weaknesses such as regex inefficiencies, injection flaws, and path traversal. Many flawed contributions are still merged, while rejections often arise from social or process factors such as inactivity or missing test coverage. The commit message quality of AI PRs has a limited effect on acceptance or latency, in contrast to human PRs reported in previous studies."
+
+SAMPLE SIZES:
+- 33,000+ AI-generated PRs total
+- 675 security-related AI-generated PRs identified
+
+KEY FINDINGS:
+1. "security-related AI PRs introduce a small set of recurring weaknesses such as regex inefficiencies, injection flaws, and path traversal"
+2. "many flawed contributions are still merged"
+3. "rejections often arise from social or process factors such as inactivity or missing test coverage"
+4. "commit message quality of AI PRs has a limited effect on acceptance or latency" (different from human PRs)
+5. Hashtags finding: "A higher number of hashtags in the PR description increases review time, and PR descriptions with more hashtags are less likely to be accepted"
+
+SENSITIVE DATA FINDING: None. The paper studies security WEAKNESSES IN CODE (regex inefficiencies, injection flaws, path traversal) — not sensitive data in PR DESCRIPTIONS. The "security" studied is code vulnerability types, not data governance for PR prose content.
+
+RELEVANCE TO THIS SPIKE:
+This paper confirms academic research on agentic PRs is focused on: code quality metrics, review latency, acceptance rates, and code vulnerability patterns. The question of over-sharing infrastructure/customer data in PR prose body is entirely outside the scope of current academic literature on this topic.
+
+=== VERIFICATION ===
+URL fetched: https://arxiv.org/abs/2604.19965
+Verbatim quote (abstract): "we analyze more than 33,000 AI-generated pull requests (PRs) and identify 675 security-related submissions made by agentic AIs"
+Quote location: Abstract
+
+Verbatim quote: "The commit message quality of AI PRs has a limited effect on acceptance or latency"
+Quote location: Abstract / results
+
+Verbatim quote (from search result): "A higher number of hashtags in the PR description increases review time, and PR descriptions with more hashtags are less likely to be accepted"
+Quote location: paper findings (from search result)

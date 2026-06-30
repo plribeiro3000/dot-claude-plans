@@ -1,0 +1,137 @@
+SOURCE: https://code.claude.com/docs/en/worktrees
+FETCHED: 2026-06-05
+
+--- FULL CONTENT ---
+
+A git worktree is a separate working directory with its own files and branch, sharing the
+same repository history and remote as your main checkout. Running each Claude Code session in
+its own worktree means edits in one session never touch files in another, so you can have
+Claude building a feature in one terminal while fixing a bug in a second.
+
+This page covers worktree isolation in the CLI. Everything below assumes a git repository. For
+other version control systems, see Non-git version control. The desktop app creates a worktree
+for every new session automatically.
+
+== Start Claude in a worktree ==
+
+Pass --worktree or -w to create an isolated worktree and start Claude in it. By default, the
+worktree is created under .claude/worktrees/<value>/ at your repository root, on a new branch
+named worktree-<value>:
+
+  claude --worktree feature-auth
+
+To put worktrees somewhere else, configure a WorktreeCreate hook. Run the command again with a
+different name in another terminal to start a second isolated session:
+
+  claude --worktree bugfix-123
+
+If you omit the name, Claude generates one such as bright-running-fox:
+
+  claude --worktree
+
+You can also ask Claude to "work in a worktree" during a session, and it will create one with
+the EnterWorktree tool. Once in a worktree, Claude can switch directly to another one under
+.claude/worktrees/ by calling EnterWorktree with the target path.
+
+Before using --worktree in a directory for the first time, accept the workspace trust dialog by
+running claude once in that directory. If trust has not yet been accepted, --worktree exits with
+an error.
+
+TIP: Add .claude/worktrees/ to your .gitignore so worktree contents don't appear as untracked
+files in your main checkout.
+
+== Choose the base branch ==
+
+Worktrees branch from your repository's default branch, origin/HEAD, so they start from a
+clean tree matching the remote. If no remote is configured or the fetch fails, the worktree
+falls back to your current local HEAD. To always branch from local HEAD instead, set
+worktree.baseRef to "head" in settings:
+
+  {
+    "worktree": {
+      "baseRef": "head"
+    }
+  }
+
+Setting baseRef to "head" makes new worktrees carry your unpushed commits and feature-branch
+state. Accepts only "fresh" or "head", not arbitrary git refs.
+
+To branch from a specific pull request:
+
+  claude --worktree "#1234"
+
+== Copy gitignored files into worktrees ==
+
+A worktree is a fresh checkout, so untracked files like .env or .env.local from your main
+repository are not present. To copy them automatically when Claude creates a worktree, add a
+.worktreeinclude file to your project root. The file uses .gitignore syntax. Only files that
+match a pattern and are also gitignored are copied, so tracked files are never duplicated.
+
+Example .worktreeinclude:
+  .env
+  .env.local
+  config/secrets.json
+
+NOTE: The --worktree flag was added in Claude Code v2.1.49. The .worktreeinclude file is
+supported by the desktop app natively; CLI support via the flag was added later. There is a
+known gap where CLI versions below a certain build do not process .worktreeinclude automatically
+without a WorktreeCreate hook (see issue #15327).
+
+== Isolate subagents with worktrees ==
+
+Subagents can run in their own worktrees so parallel edits don't conflict. Ask Claude to "use
+worktrees for your agents", or set it permanently on a custom subagent by adding
+isolation: worktree to the frontmatter. Each subagent gets a temporary worktree that is removed
+automatically when the subagent finishes without changes.
+
+== Clean up worktrees ==
+
+When you exit a worktree session, cleanup depends on whether you made changes:
+
+- No uncommitted changes, no untracked files, and no new commits: the worktree and its branch
+  are removed automatically. If the session has a name, Claude prompts instead.
+- Uncommitted changes, untracked files, or new commits exist: Claude prompts you to keep or
+  remove the worktree.
+- Non-interactive runs: worktrees created with --worktree alongside -p are not cleaned up
+  automatically. Remove them with git worktree remove.
+
+Worktrees that Claude created for subagents and background sessions are removed automatically
+once they are older than your cleanupPeriodDays setting, provided they have no uncommitted
+changes, no untracked files, and no unpushed commits.
+
+Worktrees you create with --worktree are NEVER removed by this sweep.
+
+== Manage worktrees manually ==
+
+  git worktree add ../project-feature-a -b feature-a
+  git worktree add ../project-bugfix bugfix-123
+  cd ../project-feature-a && claude
+  git worktree list
+  git worktree remove ../project-feature-a
+
+REMINDER: "Remember to initialize your development environment in each new worktree: install
+dependencies, set up virtual environments, or run whatever your project's setup requires."
+
+== WorktreeCreate hook ==
+
+WorktreeCreate replaces Claude Code's default git worktree creation behavior entirely.
+Input (stdin JSON) fields: session_id, transcript_path, cwd, hook_event_name, worktree_name,
+worktree_path, base_commit, git_dir.
+
+CRITICAL stdout contract: The hook MUST print the created worktree's path to stdout on success.
+Any non-zero exit code causes the entire worktree creation to fail.
+
+The hook receives worktree_path with the DEFAULT path (.claude/worktrees/<name>) — the hook
+can override this by creating the worktree at a DIFFERENT location and printing THAT path.
+This is the mechanism for placing worktrees in /tmp or any custom directory.
+
+== WorktreeRemove hook ==
+
+Fires when a worktree is being removed. Has NO decision control — exit codes and output are
+ignored. Claude Code's default git worktree remove runs AFTER the hook completes regardless.
+
+== Known bug: WorktreeCreate hook disables cleanup prompt ==
+
+Issue #37611 (closed as duplicate): When a WorktreeCreate hook is defined, the session-exit
+cleanup prompt is skipped entirely. Worktrees are left on disk. The WorktreeRemove hook is
+also never called. Marked as duplicate, unresolved as of June 2026.

@@ -1,0 +1,57 @@
+SOURCE: Richard Cook — "How Complex Systems Fail"
+URL: https://how.complexsystems.fail/
+FETCHED: 2026-05-27
+Original paper: Copyright 1998, 1999, 2000 by R.I. Cook, MD
+
+=== ALL 18 PRINCIPLES (verbatim from https://how.complexsystems.fail/) ===
+
+1. "Complex systems are intrinsically hazardous systems."
+2. "Complex systems are heavily and successfully defended against failure"
+3. "Catastrophe requires multiple failures – single point failures are not enough."
+4. "Complex systems contain changing mixtures of failures latent within them."
+5. "Complex systems run in degraded mode."
+6. "Catastrophe is always just around the corner."
+7. "Post-accident attribution to a 'root cause' is fundamentally wrong."
+8. "Hindsight biases post-accident assessments of human performance."
+9. "Human operators have dual roles: as producers & as defenders against failure."
+10. "All practitioner actions are gambles."
+11. "Actions at the sharp end resolve all ambiguity."
+12. "Human practitioners are the adaptable element of complex systems."
+13. "Human expertise in complex systems is constantly changing"
+14. "Change introduces new forms of failure."
+15. "Views of 'cause' limit the effectiveness of defenses against future events."
+16. "Safety is a characteristic of systems and not of their components"
+17. "People continuously create safety."
+18. "Failure free operations require experience with failure."
+
+=== KEY EXTENDED EXPLANATIONS (from https://how.complexsystems.fail/) ===
+
+ON PRINCIPLE 7 (post-accident attribution):
+"Because overt failure requires multiple faults, there is no isolated 'cause' of an accident."
+Cook argues the search for single causes reflects "social, cultural need to blame specific,
+localized forces" rather than technical understanding.
+
+ON PRINCIPLE 8 (hindsight bias):
+"Hindsight bias remains the primary obstacle to accident investigation, especially when
+expert human performance is involved."
+
+ON PRINCIPLE 10 (practitioner gambles):
+"all practitioner actions are actually gambles, that is, acts that take place in the face
+of uncertain outcomes."
+Post-accident analysis misinterprets successful gambles as poor decisions due to hindsight bias.
+
+ON PRINCIPLE 15 (views of cause):
+"Post-accident remedies for 'human error'...usually increase the coupling and complexity
+of the system."
+
+ON PRINCIPLE 17 (people create safety):
+Safety emerges through practitioner adaptations to changing conditions during normal operations.
+
+=== SIGNIFICANCE FOR POST-MORTEMS ===
+Cook's framework directly challenges the standard "root cause analysis" approach by arguing
+that single root causes are a social construction, not a technical reality. This grounds
+the theoretical case for blameless post-mortems: if failures are multi-causal and latent,
+blame assigned to any one person is necessarily reductive and counterproductive.
+
+The paper is brief (~6 pages), freely accessible, and cited as foundational reading in the
+Learning From Incidents community and by Allspaw, Dekker, and Woods.

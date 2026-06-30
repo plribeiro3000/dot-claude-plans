@@ -1,0 +1,52 @@
+SOURCE: https://code.claude.com/docs/en/permissions
+FETCHED: 2026-06-30
+PURPOSE: Path pattern semantics, acceptEdits definition, additionalDirectories behavior
+
+=== PATH PATTERN TYPES (from "File and directory permissions" section) ===
+
+Four path pattern types exist in permissions.allow / deny / ask:
+
+  //path       Absolute from filesystem root
+               Example: Read(//Users/alice/secrets/**)
+
+  ~/path       Relative to home directory
+               Example: Read(~/Documents/*.pdf)
+
+  /path        Relative to project root
+               Example: Edit(/src/**/*.ts)
+
+  path         Relative to current directory (bare, no prefix)
+  ./path       Same as bare — relative to cwd
+               Example: Read(src/**)
+
+WARNING (verbatim from docs):
+"A pattern like `/Users/alice/file` isn't an absolute path.
+It's relative to the project root. Use `//Users/alice/file`
+for absolute paths."
+
+=== acceptEdits defaultMode (from "Permission modes" section) ===
+
+Available modes:
+  default         Standard permission prompts
+  acceptEdits     Automatically accepts file edits and common
+                  filesystem commands such as mkdir, touch, mv,
+                  and cp for paths in the working directory or
+                  additionalDirectories
+  bypassPermissions  Skip all permission checks (use with caution)
+
+=== additionalDirectories (from settings docs) ===
+
+In settings.json:
+  "permissions": {
+    "additionalDirectories": ["~/Projects", "~/.claude", "~/Downloads", "/tmp"]
+  }
+
+Purpose described as: "grant file access only" (does NOT auto-approve writes)
+Distinct from the --add-dir CLI flag which may use a different code path.
+
+=== GLOBBING SEMANTICS ===
+
+  *    Matches within a single path segment (no /)
+  **   Matches across directories (gitignore-style)
+
+"Edit(**)" with no prefix = "Edit(./**)" = matches only under cwd

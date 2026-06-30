@@ -1,0 +1,66 @@
+SOURCE: https://docs.netlify.com/api/get-started/
+FETCHED: 2026-06-26
+
+--- AUTHENTICATION ---
+"Authorization: Bearer <YOUR_PERSONAL_ACCESS_TOKEN>"
+Token created at: Applications > Personal access tokens > New access token
+Base URL: https://api.netlify.com/api/v1/
+"All URLs start with this prefix"
+"SSL only"
+PAT scope note: "If your team requires single sign-on (SSO), personal access tokens will be denied access to the team by default"
+"You must generate new tokens and update any services or scripts that rely on them" (after password reset)
+
+--- SITE IDENTIFICATION ---
+"Interchangeable identifiers: Use either site_id or domain name (e.g., mysite.netlify.app or www.example.com)"
+Rate limits note: "Up to 3 deploys per minute, 100 per day"
+
+--- LISTING SITES ---
+GET /sites — "List all sites" — query params: name (string), filter (all|owner|guest), page, per_page
+GET /{account_slug}/sites — list sites for a specific account — query params: name, page, per_page
+GET /sites/{site_id} — "Retrieve site configuration details"
+
+--- ENV VARS (account-scoped, modern API) ---
+POST   /accounts/{account_id}/env            — "Creates new environment variables"
+GET    /accounts/{account_id}/env            — retrieve all env vars (filters: context, scope)
+GET    /accounts/{account_id}/env/{key}      — fetch individual env var by key
+PUT    /accounts/{account_id}/env/{key}      — "Updates an existing environment variable and all of its values"
+PATCH  /accounts/{account_id}/env/{key}      — create/update specific value for existing env var
+DELETE /accounts/{account_id}/env/{key}      — remove entire environment variable
+DELETE /accounts/{account_id}/env/{key}/value/{id} — delete specific env var value by ID
+GET    /sites/{site_id}/env                  — convenience endpoint for site-level env vars
+
+site_id query param: "If provided, create an environment variable on the site level, not the account level."
+
+Values array shape:
+{
+  "id": "string",
+  "value": "string",
+  "context": "all|dev|dev-server|branch-deploy|deploy-preview|production|branch",
+  "context_parameter": "string"
+}
+
+--- ENV VARS DO NOT AUTO-DEPLOY ---
+"Environment variable changes require a build and deploy to take effect."
+(from both docs.netlify.com/api-and-cli-guides/api-guides/get-started-with-api/ and docs.netlify.com/environment-variables/get-started/)
+"To apply environment variable changes, build and deploy."
+
+--- BUILD HOOKS ---
+SOURCE: https://docs.netlify.com/configure-builds/build-hooks/
+URL shape: https://api.netlify.com/build_hooks/{id}
+"To trigger this hook, you need to send a POST request to that URL."
+curl example: curl -X POST -d '{}' https://api.netlify.com/build_hooks/5c23354f454e1350f8543e78
+clear_cache param: "this parameter triggers a build with a cleared cache."
+"Builds must be active for build hooks to trigger builds of your site."
+Optional query params: trigger_branch, trigger_title, clear_cache=true
+
+--- BUILDS REST ENDPOINT ---
+SOURCE: https://docs.netlify.com/configure-builds/stop-or-activate-builds/
+"POST requests to /api/v1/sites/{site_id}/builds will return an error message." (when builds are stopped)
+Implied endpoint: POST /api/v1/sites/{site_id}/builds
+"You will not be able to trigger a build of your site with the Netlify API. Any POST requests to /api/v1/sites/{site_id}/builds will return an error message."
+
+--- BUILDS (open-api.netlify.com) ---
+POST /sites/{site_id}/builds  — createSiteBuild
+GET  /sites/{site_id}/builds  — "List all builds"
+GET  /sites/{site_id}/builds/{build_id}
+GET  /accounts/{account_id}/builds/status

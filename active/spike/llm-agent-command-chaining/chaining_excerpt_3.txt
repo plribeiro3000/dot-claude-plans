@@ -1,0 +1,73 @@
+# Source: Multiple anthropics/claude-code GitHub issues
+# Fetched: 2026-06-08
+
+--- ISSUE #16561 (Feature: Parse compound Bash commands) ---
+URL: https://github.com/anthropics/claude-code/issues/16561
+Status: OPEN with labels: area:security, area:tools, enhancement, has repro
+Opened: January 7, 2026
+"No response has been recorded yet. The issue was opened on January 7, 2026, and remains
+open with labels: area:security, area:tools, enhancement, and has repro — but shows no
+assignees, pull requests, or implementation activity."
+
+--- ISSUE #20085 (BUG: Permission system treats command chains as single patterns) ---
+URL: https://github.com/anthropics/claude-code/issues/20085
+Status: Closed as duplicate
+"After a fix for issue #18605 (command chaining permission bypass), the permission system
+now requires the entire chained command to match an allowlist pattern, rather than
+validating each individual command in the chain separately."
+"Makes granular allowlists unusable for normal development workflows. Forces users to
+either use wildcard allowlists ('Bash: *') or manually approve every chained command."
+
+--- ISSUE #20985 (Feature: Smart permission matching for compound shell commands) ---
+URL: https://github.com/anthropics/claude-code/issues/20985
+Status: Closed as duplicate
+"Claude frequently chains commands for efficiency. Current workaround (Bash(*)) defeats
+granular permission control."
+
+--- ISSUE #28183 (Compound commands of individually-allowed safe commands prompt incorrectly) ---
+URL: https://github.com/anthropics/claude-code/issues/28183
+Status: Closed, labels: area:bash, area:permissions, bug, platform:macos
+"This stems from a v2.1.7 security fix that prevents 'wildcard permission rules matching
+compound commands containing shell operators' — a legitimate fix that had the unintended
+side effect of blocking entirely safe compound commands."
+
+--- ISSUE #28784 (Bash(cd:*) allows arbitrary command execution via && chaining) ---
+URL: https://github.com/anthropics/claude-code/issues/28784
+Status: Closed, labels: bug, security, area:permissions
+"Despite documentation stating that prefix match rules won't permit chained commands like
+safe-cmd && other-cmd, the implementation fails to properly validate compound commands.
+When Claude constructs a compound command like: cd /some/path && python3 script.py
+The entire command matches the Bash(cd:*) pattern and executes without permission prompts."
+
+--- ISSUE #31523 (Permission system UX: compound command blocking, rule accumulation) ---
+URL: https://github.com/anthropics/claude-code/issues/31523
+Key finding: "A 3-month daily user accumulated 150+ narrow permission rules in
+settings.local.json... Despite this accumulation, compound commands still prompted for
+approval."
+Undiscovered solution: Bash(*) in allow + targeted deny list — replacing 150+ rules
+with 8 rules, making compound commands work.
+Community requested: Surface Bash(*) in UI; evaluate compound segments independently.
+
+--- ISSUE #36637 (Chained bash commands silently bypass tool permission allowlist) ---
+URL: https://github.com/anthropics/claude-code/issues/36637
+Status: Closed with stale label (opened Mar 20, 2026)
+"The permission system checks only the initial command in a chain:
+git status && rm -rf /important/dir → Only git status is evaluated"
+"Impact: Agents using chained commands (a common pattern) can unintentionally or
+maliciously escape permission boundaries. No indication to users that subsequent
+chain segments were unevaluated."
+
+--- ISSUE #48762 (Hardcoded Bash safety checks fire on legitimate workflows) ---
+URL: https://github.com/anthropics/claude-code/issues/48762
+"Claude Code contains two categories of hardcoded Bash safety checks that cannot be
+scoped or disabled granularly:
+1. Expansion Obfuscation Classifier — triggers on brace+quote pattern
+2. Compound-Command Guardrails — three variants that fire on cd && [command] patterns"
+"CRITICAL: These checks fire BEFORE the permissions.allow list is consulted. Even if
+python3 * is in the allow list, the approval prompt still fires."
+
+--- PR #36645 (Community compound command parsing fix) ---
+Referenced in: dev.to/gentic_news article
+"A community-submitted fix (PR #36645) adds proper compound command parsing to
+Claude Code's PreToolUse hooks, with a 573-line implementation and 34 test cases."
+Note: PR referenced by community sources; direct PR URL not fetched.

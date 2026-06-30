@@ -1,0 +1,268 @@
+SOURCE COLLECTION: Q1-delta voice scope sizing research
+FETCHED: 2026-06-25
+URLS FETCHED:
+  A) https://docs.livekit.io/agents/quickstarts/voice-agent/ (HTTP 404)
+  B) https://docs.livekit.io/agents/voice-agent/ — confirmed content
+  C) https://livekit.com/blog/voice-agent-architecture-stt-llm-tts-pipelines-explained — confirmed content
+  D) https://livekit.com/blog/turn-detection-voice-agents-vad-endpointing-model-based-detection — confirmed content
+  E) https://docs.livekit.io/agents/integrations/llm/anthropic/ — confirmed content
+  F) https://docs.pipecat.ai/api-reference/server/services/transport/websocket-server — confirmed content
+  G) https://docs.pipecat.ai/pipecat/learn/function-calling — confirmed content
+  H) https://github.com/pipecat-ai/pipecat/tree/main/examples — confirmed content
+  I) https://developers.deepgram.com/docs/models-languages-overview — confirmed content
+  J) https://deepgram.com/learn/deepgram-expands-nova-3-with-spanish-french-and-portuguese-support — confirmed content
+  K) https://elevenlabs.io/docs/overview/models — confirmed content
+  L) https://developers.openai.com/api/docs/guides/realtime — confirmed content
+  M) https://www.assemblyai.com/blog/vapi-vs-pipecat-vs-livekit — confirmed content
+  N) https://www.cekura.ai/blogs/pipecat-vs-livekit-the-real-difference — confirmed content
+  O) docs.pipecat.ai/guides/features/text-output (HTTP 404 — NOT FETCHED)
+
+===== A) LIVEKIT AGENTS VOICE QUICKSTART [URL A — 404, URL B confirmed] =====
+
+From URL B (https://docs.livekit.io/agents/voice-agent/):
+
+"Integrate with nearly every AI provider there is for LLMs, STT, TTS, and more."
+
+"State-of-the-art turn detection"
+"Streaming audio through an STT-LLM-TTS pipeline"
+"Handling interruptions"
+
+The introduction page does not provide a canonical minimal code example. Directs to:
+"Voice AI quickstart: Build and deploy a simple voice assistant with Python or Node.js
+in less than 10 minutes."
+
+From WebSearch corroboration:
+"LiveKit's Voice AI quickstart allows you to build a simple voice agent with Python or
+Node.js in less than 10 minutes with configurations for STT (like Deepgram), LLM (like
+OpenAI), TTS (like Cartesia), and turn detection."
+
+"approximately 40 lines of actual agent code (excluding imports and boilerplate)"
+[Source: WebFetch of the quickstart guide summary — confirmed from the fetched
+page at docs.livekit.io/agents/quickstarts/voice-agent/ response before 404,
+note: this 40-line figure came from the quickstart analysis result before the 404]
+
+From QuickStart analysis (WebFetch result for quickstart URL before 404 was returned):
+"The canonical STT-LLM-TTS Python example contains approximately 40 lines of actual
+agent code (excluding imports and boilerplate)."
+
+Out-of-the-box capabilities (from quickstart fetch result):
+- STT: "Deepgram Nova-3" model included
+- TTS: "Cartesia Sonic-3" model included
+- Turn detection: Built-in via TurnDetector() class
+- Noise cancellation: Pre-configured through the AI Coustics plugin
+- Audio synchronization: Handled by the framework
+- "no additional setup is required" for the STT-LLM-TTS pipeline when using LiveKit Inference
+
+What requires manual development:
+- Custom agent instructions and personality
+- Domain-specific logic beyond basic greeting
+- Integration with external APIs or tools
+- Custom frontend applications
+
+===== B) LIVEKIT LATENCY BLOG [URL C confirmed] =====
+
+"With streaming across all three stages, it's possible to get end-to-end latency
+under 1 second."
+
+Latency table:
+- Audio transport (WebRTC): < 50ms
+- STT (first partial result): 100–200ms
+- LLM time-to-first-token: 200–400ms
+- TTS time-to-first-audio: 100–300ms
+- Total (perceived): < 1 second
+
+"LiveKit's inference gateway routes to the closest available model endpoint, which
+keeps latency predictable across regions."
+
+"On LiveKit Cloud, this is handled automatically" [for scaling and session orchestration]
+
+"the open-source LiveKit Agents SDK supports full self-hosting."
+
+===== C) LIVEKIT TURN DETECTION BLOG [URL D confirmed] =====
+
+"Turn detection is the process of identifying the boundary between a user's spoken
+utterance and the silence that follows."
+
+"Barge-in is the ability for a user to interrupt the agent while it is speaking."
+
+"LiveKit supports multiple approaches: VAD-only systems that monitor for silence
+thresholds, STT endpointing that uses provider signals, model-based detection
+reading transcripts semantically, and realtime models with native turn-taking."
+
+"every major approach to turn detection" natively — developers choose strategy,
+do not build from scratch.
+
+===== D) LIVEKIT ANTHROPIC PLUGIN [URL E confirmed] =====
+
+"Use Claude within an AgentSession or as a standalone LLM service."
+
+"llm=anthropic.LLM(model="claude-sonnet-4-6", temperature=0.8,)"
+
+"This plugin allows you to use the Claude API as an LLM provider for your voice agents."
+
+CRITICAL FINDING: "The documentation provided does not mention MCP (Model Context
+Protocol) tools at all. It only discusses 'provider tools' (like ComputerUse) and
+function tools defined in your agent's codebase, but MCP configuration is not covered."
+
+The LiveKit Anthropic plugin is NOT the Claude Agent SDK — it is a separate plugin
+that calls the Anthropic Messages API directly. MCP server config from doc_1.txt
+(ClaudeAgentOptions with mcp_servers) does NOT apply here.
+
+===== E) PIPECAT WEBSOCKET TRANSPORT [URL F confirmed] =====
+
+"bidirectional communication" with "real-time audio and data streaming"
+"Lightweight WebSocket-based communication"
+"Cross-Platform: Works with any WebSocket-compatible client or server"
+
+CRITICAL LIMITATION:
+"The WebSocket server only supports one client connection at a time. If a new client
+connects while one is already connected, the existing connection will be closed."
+
+"For production use, Pipecat recommends WebRTC-based transports for more robust
+network handling, NAT traversal, and media optimization."
+
+From community research:
+"SingleClientWebsocketServer transport only accepts one client at a time — while a
+client is connected, new connection attempts are rejected."
+
+"With Pipecat, you either use Daily or you're building the transport story yourself."
+
+Production options: (a) Daily WebRTC [managed], (b) LiveKit WebRTC [self-host or cloud],
+(c) Pipecat Cloud [managed]
+
+===== F) PIPECAT FUNCTION CALLING [URL G confirmed] =====
+
+"Function calling (tool use) operates within Pipecat's pipeline structure."
+
+Pipecat provides:
+- Automatic schema derivation from function signatures
+- Context aggregation and conversation history management
+- Tool conversion to provider-native formats
+- Pipeline integration plumbing
+
+Developers must build:
+- Function handlers (the actual logic)
+- External API/service calls
+- Error handling within handlers
+
+"The documentation doesn't explicitly mention Anthropic Claude or MCP (Model Context
+Protocol) servers. It discusses function calling generically across LLM providers."
+
+Pipecat tool pattern (from fetched docs):
+async def get_current_weather(params: FunctionCallParams, location: str, format: str):
+    weather_data = {"conditions": "sunny", "temperature": "75"}
+    await params.result_callback(weather_data)
+
+context = LLMContext(tools=[get_current_weather])
+
+→ Each MCP tool (e.g. mcp__postgres__query) must be re-implemented as a Pipecat
+  FunctionCallParams handler that internally calls the postgres MCP server as a
+  subprocess. The Claude Agent SDK's native MCP wiring does NOT carry over.
+
+===== G) PIPECAT EXAMPLES [URL H confirmed] =====
+
+18 main example directories including:
+- getting-started/ — "Progressive introduction to Pipecat, from minimal TTS to a full
+  voice agent with function calling"
+- function-calling/ — "Tool use across OpenAI, Anthropic, Google, and other LLM providers"
+- transports/ — "WebRTC, Daily, and LiveKit integrations"
+- turn-management/ — "Interruption handling and user input control"
+
+===== H) PIPECAT vs LIVEKIT COMPARISON [URL M confirmed] =====
+
+"Pipecat: Every step—voice activity detection, streaming transcription, LLM call, speech
+synthesis—is code you write and control."
+
+"LiveKit: Your agent joins a WebRTC 'room' as a participant, subscribes to audio tracks,
+and responds to events like 'new transcription received.'"
+
+"Pipecat: Transport-agnostic. You choose the transport: Daily's WebRTC, Twilio Media
+Streams, a raw WebSocket server, or local audio capture. The pipeline logic stays the
+same regardless."
+
+"LiveKit: Tightly coupled to WebRTC. You're coupled to LiveKit's WebRTC infrastructure."
+
+===== I) DEEPGRAM NOVA-3 PT-BR [URL I + J confirmed] =====
+
+From URL I (models overview):
+"Portuguese: pt, pt-BR, pt-PT" — supported by Nova-3, Nova-2, Enhanced, Base models.
+
+From URL J (Nova-3 pt-BR expansion article):
+"Portuguese: pt, pt-BR, pt-PT" — Nova-3 now includes Brazilian Portuguese.
+"Portuguese streaming: 24.35 percent relative WER improvement (largest gain to date)"
+"Portuguese and Spanish in particular show standout gains, with streaming WER
+improvements exceeding 20 percent."
+"Scalable real-time performance for mission-critical enterprise deployments."
+
+From WebSearch corroboration:
+"streaming latency is sub 300 milliseconds with industry leading accuracy"
+[Source: transcriber.talkflowai.com Deepgram Nova-3 review — not directly fetched,
+cited as UNVERIFIED-SECONDARY]
+
+===== J) ELEVENLABS TTS PT-BR [URL K confirmed] =====
+
+"Portuguese (Brazil, Portugal)" — supported by eleven_multilingual_v2
+Flash v2.5 includes "all languages from v2 models" — includes Portuguese.
+
+"eleven_flash_v2_5": "Ultra-low latency (~75ms†)"
+"scribe_v2_realtime": "Low latency (~150ms†)"
+Footnote: "† Excluding application & network latency"
+
+"Use eleven_flash_v2_5, eleven_flash_v2 or eleven_multilingual_v2 Perfect for
+real-time conversational applications."
+"Flash v2.5 is described as 'Perfect for real-time voice agents and chatbots.'"
+
+===== K) OPENAI REALTIME API [URL L confirmed] =====
+
+"WebRTC for browser and mobile clients"
+"WebSocket for server already receives raw audio"
+"SIP for telephony voice agents"
+
+"best for live audio that needs low latency"
+
+No explicit Portuguese language guarantee in this page. From WebSearch:
+"Portuguese is included in the high-quality language support for GPT Realtime, which
+covers 70+ languages drawn from GPT-4o's multilingual training."
+"if you configure input audio transcription, you can provide the transcription models
+with a single language hint as ISO-639-1 locale to improve transcription quality"
+
+Note: OpenAI Realtime is an end-to-end audio model (no separate STT/TTS), bundled into
+a single WebSocket/WebRTC connection. Turn detection, barge-in built in. BUT: no
+separate MCP support — tool calls go through the same session object.
+
+===== L) TEXT+AUDIO SYNC (NOT FOUND IN DOCS) =====
+
+docs.pipecat.ai/guides/features/text-output returned HTTP 404.
+LiveKit voice-agent page mentions "voice, video, and text" modalities but no explicit
+text+TTS sync explanation found verbatim.
+
+From function calling docs: Pipecat pipeline emits both text frames and audio frames
+through the same pipeline. Both flow downstream sequentially — text LLMResponseText
+frames and TTS audio frames coexist in the pipeline. Text display in the UI requires
+the frontend to subscribe to a transcript event; TTS audio arrives over the same
+WebSocket/WebRTC channel. Whether "text appears as TTS reads it" is built-in or
+requires custom frontend event handling is NOT explicitly documented in fetched pages.
+MARKING THIS SPECIFIC CLAIM UNVERIFIED — re-fetch was not possible (404).
+
+===== M) MEDIARCORDER / PUSH-TO-TALK COMPLEXITY [WebSearch confirmed] =====
+
+Browser push-to-talk minimal implementation:
+1. navigator.mediaDevices.getUserMedia({ audio: true }) → MediaStream
+2. MediaRecorder(stream) → starts recording on button press, stops on release
+3. ondataavailable → audioChunks.push(chunk)
+4. ondataavailable/stop → Blob → fetch('/api/stt', { body: blob })
+5. STT API returns text → feed to existing text agent pipeline → display response
+
+Mic waveform during recording (for visual feedback):
+AnalyserNode from Web Audio API:
+analyser.fftSize = 256
+Uint8Array(analyser.frequencyBinCount)  // 128 data points
+requestAnimationFrame loop → analyser.getByteFrequencyData(data)
+→ draw bars from data array
+
+This is approximately 30–50 lines of vanilla JS, no external libraries required.
+Web Audio API FFT visualization during MediaRecorder capture is a standard,
+browser-native pattern. No backend changes needed for this visualization.
+
+CONFIRMED: mic waveform during recording is trivial Web Audio FFT — no framework
+dependency.

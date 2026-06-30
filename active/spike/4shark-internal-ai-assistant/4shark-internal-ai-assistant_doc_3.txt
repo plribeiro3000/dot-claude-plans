@@ -1,0 +1,79 @@
+SOURCE: https://code.claude.com/docs/en/agent-sdk/overview (fetched via redirect chain from docs.anthropic.com)
+FETCHED: 2026-06-25
+TOPIC: Claude Agent SDK — overview, installation, session management
+
+KEY VERBATIM QUOTES (reconstructed from pre-compaction research):
+
+Name clarification: The Claude Agent SDK is the programmatic runtime previously documented as "Claude Code SDK". It exposes the same agent loop that powers Claude Code as a library.
+
+Python package: claude_agent_sdk
+TypeScript package: @anthropic-ai/claude-agent-sdk
+
+Minimal Python usage:
+"""
+import asyncio
+from claude_agent_sdk import query, ClaudeAgentOptions
+
+async def main():
+    async for message in query(
+        prompt="Find and fix the bug in auth.py",
+        options=ClaudeAgentOptions(allowed_tools=["Read", "Edit", "Bash"]),
+    ):
+        print(message)
+
+asyncio.run(main())
+"""
+
+Message types emitted by query():
+- SystemMessage (subtype: "init") — session metadata, MCP server status
+- AssistantMessage — Claude's text and tool calls
+- ResultMessage (subtype: "success" | "error_during_execution") — final result
+
+Built-in tools available (no extra config):
+- Read, Edit, MultiEdit — file read/write
+- Bash — shell execution (sandboxed)
+- WebFetch, WebSearch — web access
+- NotebookRead, NotebookEdit — Jupyter notebooks
+- All MCP tools via allowedTools wildcard
+
+Sessions:
+- Each query() call is a stateless single conversation turn by default
+- Persistent sessions require passing a session_id for multi-turn continuity
+
+System prompt customization:
+"""
+options = ClaudeAgentOptions(
+    system_prompt="You are an internal assistant for 4Shark's support team...",
+    model="claude-sonnet-4-6",
+)
+"""
+
+Model selection default:
+- Defaults to claude-sonnet-4-6 (the current production model)
+- Can be overridden with ClaudeAgentOptions(model="claude-haiku-4-5") for faster/cheaper queries
+
+---
+
+SOURCE: https://code.claude.com/docs/en/agent-sdk/overview (TypeScript side)
+TOPIC: TypeScript usage
+
+"""
+import { query } from "@anthropic-ai/claude-agent-sdk";
+
+for await (const message of query({
+  prompt: "How many users signed up last week?",
+  options: {
+    mcpServers: {
+      postgres: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-postgres", process.env.DATABASE_URL]
+      }
+    },
+    allowedTools: ["mcp__postgres__query"]
+  }
+})) {
+  if (message.type === "result" && message.subtype === "success") {
+    console.log(message.result);
+  }
+}
+"""

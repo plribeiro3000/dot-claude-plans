@@ -1,0 +1,41 @@
+SOURCE: https://learn.microsoft.com/en-us/azure/architecture/guide/multitenant/considerations/identity
+FETCHED: 2026-06-17
+
+TITLE: Microsoft Azure — Architectural Considerations for Identity in a Multitenant Solution
+
+VERBATIM QUOTES:
+
+"Decide whether to create a single user identity for each person or to create separate
+identities for each tenant-user combination."
+
+"Use a single identity for each person when possible. It simplifies account management
+for both the solution provider and users. Also, many of the intelligent threat
+protections that modern IdPs provide rely on each person having a single user account."
+
+"Use multiple distinct identities in some scenarios. For example, if people use your
+system both for work and personal purposes, they might want to separate their user
+accounts. Or if your tenants have strict regulatory or geographical data storage
+requirements, they might require a person to have multiple identities so that they
+can comply with regulations or laws."
+
+"Avoid storing credentials multiple times if you use per-tenant identities."
+
+"The user principal name (UPN) used for identifying local identities must be clearly
+established. Common UPNs include email addresses, usernames, phone numbers, or
+membership identifiers. Because UPNs can change, it's advisable to reference the
+underlying immutable unique identifier for authorization and auditing."
+
+"A clear mechanism should allow users to switch between tenants."
+
+"Workload identities, if you use them, must specify which tenant they're trying to access."
+
+## Microsoft's Position
+
+Microsoft acknowledges BOTH models are valid and identifies specific cases where multiple
+distinct identities (per-tenant) is the right choice:
+- Strict regulatory or geographical data storage requirements
+- Work vs personal separation needs
+
+4Shark's scenario (same numeric ID → same email, but different country/company =
+DIFFERENT PEOPLE) maps directly to the "multiple distinct identities" case, especially
+given the Brazilian vs Mexican data residency context.

@@ -1,0 +1,48 @@
+# Auxiliary: Verbatim quotes from ~/.claude/CLAUDE.md Output Policy section
+# Used by: SPIKE.md Findings 6 and 7 (policy gap analysis)
+# Source file: /Users/plribeiro3000/.claude/CLAUDE.md
+# Retrieved: 2026-06-19
+
+---
+LINE 550 — Section heading:
+"### Output Policy"
+
+LINE 552 — Policy purpose statement:
+"Every output obeys the same question: **what kind of output is this, who consumes it, where will they use it?** The engineer should not have to clean up the output before using it — fences to strip, lines to dewrap, characters to escape, files to move out of `/tmp/`. If they would, the output is in the wrong shape."
+
+LINE 556 — Layer 1 heading:
+"#### Layer 1 — Format by destination"
+
+LINES 558-565 — Layer 1 table:
+"| Email client (Outlook, Gmail) | Plain text — `###` / `**` / backticks render as literal characters |"
+"| Slack / external chat | Plain text (Slack's own `*bold*` / `_italic_` only if explicitly requested); Markdown headers and code fences render poorly |"
+
+LINE 568 — Layer 2 heading:
+"#### Layer 2 — Channel: chat vs file"
+
+LINE 574 — Layer 2 table row (short drafts):
+"| Short answer the engineer reads inline — direct Q&A reply up to a few lines, single-line command, ≤10-line email draft, single short diff, walk-through item that is already small on its own | **In-chat** with the format from Layer 1 |"
+
+LINE 576 — Layer 2 table row (email drafts >10 lines):
+"| Long code blocks, multi-line command sequences (multi-line curl, AWS CLI with many flags), configuration files, email drafts > 10 lines, any external tool output (terraform plan, aws describe, db query, HTTP response) | **File** as plain text in `/tmp/`, opened with `open` |"
+
+LINE 582 — Layer 3 /tmp/ description:
+"| `/tmp/` | **Default for any file output** — working scripts, intermediate code, tool output dumps, HTML reports for local review, email drafts the engineer will copy-paste into a mail client, code blocks the engineer will run once, logs, anything the engineer consumes and discards on their own machine |"
+
+---
+OBSERVATION: The phrases "lines to dewrap" at line 552 is the closest the policy comes to addressing line wrapping.
+It appears in the purpose statement as something the engineer should NOT have to do. However, no rule in the
+five layers explicitly forbids the agent from inserting hard line breaks in prose content destined for
+email/chat. The policy covers FORMAT (plain text vs markdown vs html) and CHANNEL (chat vs file) and
+DESTINATION (/tmp vs Downloads), but does NOT address LINE WRAPPING WITHIN a plaintext prose output.
+
+---
+Grep results for wrap/column/80/72/newline/hard/soft in /Users/plribeiro3000/.claude/docs/OUTPUT-EDGE-CASES.md:
+(from Bash grep executed 2026-06-19)
+
+Line 52: "| Headers (`#`, `##`) | Render as headers | Do not render — use bold + line break instead |"
+Line 87: "- Provide the code without any wrapper. For more than ~10 lines, write to `/tmp/<file>.{ext}` and `open` it for the engineer to copy"
+
+CONCLUSION: OUTPUT-EDGE-CASES.md contains zero mentions of "wrap", "column", "80", "72", "hard wrap",
+"soft wrap", "line width", or any instruction about prose wrapping. The document covers Markdown syntax
+rendering in email/chat clients but is entirely silent on line length / column wrapping of prose content.

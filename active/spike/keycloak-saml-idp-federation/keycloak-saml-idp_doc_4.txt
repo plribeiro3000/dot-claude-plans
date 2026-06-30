@@ -1,0 +1,68 @@
+SOURCE: https://knowledge.workspace.google.com/admin/apps/set-up-your-own-custom-saml-app
+(redirected from https://support.google.com/a/answer/6087519?hl=en)
+FETCHED: 2026-05-28
+TITLE: "Set up your own custom SAML app"
+
+=== GOOGLE WORKSPACE — CUSTOM SAML APP SETUP ===
+
+Navigation: Apps > Web and mobile apps > Add App > Add custom SAML app
+
+Step 1 — Enter app name and optional icon.
+
+Step 2 — Google Identity Provider details page provides:
+Option A (metadata): Download the IDP metadata
+Option B (manual):
+  - Copy the SSO URL
+  - Copy the Entity ID
+  - Download the Certificate (or SHA-256 fingerprint)
+
+Step 3 — Service Provider Details (what Google needs FROM Keycloak):
+"ACS URL—The service provider's Assertion Consumer Service URL receives the SAML response.
+  It must start with https://."
+  → For Keycloak: https://<host>/auth/realms/<realm>/broker/<alias>/endpoint
+
+"Entity ID—The globally unique name"
+  → For Keycloak: https://<host>/auth/realms/<realm> (realm entity ID)
+  OR the broker-specific entity ID from the SP descriptor
+
+"Start URL (optional)—Sets the RelayState parameter for post-authentication redirection"
+
+Additional options:
+- "Signed Response (optional): Check if the entire SAML response must be signed"
+- "Name ID Format and Value: Default is primary email"
+  Note: "Check the setup articles in our SAML apps catalog for any Name ID mappings required"
+
+Step 4 — Attribute Mapping:
+"Click Add mapping to map user attributes based on the service provider's requirements."
+- Maximum 10,000 attributes across all apps
+- Select Google Directory attributes and enter corresponding app attribute names
+- Example: map "Primary email" → "email", or "Employee ID" → custom attribute name
+
+Step 5 — Turn on the SAML app (User access settings, org-wide or per-OU)
+
+Step 6 — Verify via "Test SAML login" button (both IdP-initiated and SP-initiated flows)
+
+=== KEY DIFFERENCES vs CURRENT OIDC (Google Workspace) ===
+
+Current OIDC flow (runbook Step 3):
+- Admin creates OAuth 2.0 Client ID in Google Cloud Console
+- Provides: Client ID + Client Secret
+- Stored in: identity_provider_client_id + identity_provider_client_secret
+- Consent screen scopes: userinfo.email, userinfo.profile, openid
+
+SAML flow:
+- Admin creates custom SAML app in Google Admin Console (not Cloud Console)
+- No client secret — certificate-based trust
+- Google provides: SSO URL, Entity ID, Certificate (downloaded or metadata URL)
+- Keycloak provides to Google: ACS URL (broker endpoint), Entity ID
+- Attribute mapping configured on Google side (not just OAuth scopes)
+- NameID format choice determines what identifier is sent in assertion
+
+Important: Google Workspace custom SAML apps are configured in the Admin Console
+(admin.google.com), NOT in the Google Cloud Console (console.cloud.google.com).
+This is a completely different product surface than the current OAuth 2.0 flow.
+
+=== SOURCE: WebSearch summary ===
+The Google Admin Console custom SAML app path:
+  Menu > Apps > Web and mobile apps > Add App > Add custom SAML app
+(requires super administrator account)

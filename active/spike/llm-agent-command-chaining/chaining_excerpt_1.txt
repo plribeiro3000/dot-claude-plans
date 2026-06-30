@@ -1,0 +1,24 @@
+# Source: Kiro Blog — "The hidden inefficiencies in AI coding"
+# URL: https://kiro.dev/blog/hidden-inefficiencies-ai-coding/
+# Fetched: 2026-06-08
+
+KEY FINDINGS (verbatim from fetch):
+
+"Agents were using `cd src && npm test` style commands that consistently failed.
+Kiro's `executeBash` tool rejects `cd` usage and provides a `cwd` parameter instead,
+but models defaulted to familiar shell patterns."
+
+Root cause explanation:
+"LLMs have seen it millions of times" in training data, causing the model to rely on
+conventional shell scripting patterns rather than following the tool's documented specification.
+
+Impact Statistics:
+- 3.46% of all shell calls used this problematic pattern
+- 18% of sessions were affected
+- 100% failure rate for commands using this approach
+
+Kiro's Solution:
+Rather than stricter prompting, the system implements automatic transformation: it silently
+converts the `cd` pattern to use the correct `cwd` parameter, then provides feedback
+reinforcing the proper approach. This prevents cascading errors while keeping the agent
+oriented to its working directory.

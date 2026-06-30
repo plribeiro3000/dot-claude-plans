@@ -1,0 +1,24 @@
+SOURCE: https://alexey-shepelev.medium.com/data-migrations-in-ruby-on-rails-8ddf22f9c800
+FETCHED: 2026-06-23
+
+=== ORM vs SQL trade-off ===
+
+"For data migration logic, it is very convenient to use the code from models and the tools of the ORM ActiveRecord language instead of SQL."
+
+"The logic is more complex than the model code logic. It is more complex since it is less concise, at a lower level of abstraction, in a different language (SQL)"
+
+=== Model drift ===
+
+"The model class may be renamed or deleted. Then a non-existent constant error will be received."
+
+=== Callbacks as unexpected side effects ===
+
+"The model may contain callbacks with side effects that the author of the migration code does not expect."
+
+=== Stub model as partial fix ===
+
+"For these situations, there is a temporary solution that helps override the model class right in the migration. This is a duplication of knowledge and cannot be considered an exemplary solution."
+
+=== Note ===
+This article is a comparative survey — it presents multiple approaches with a comparison matrix (mixing schemas, zero downtime deployment, test-first development, continuous delivery, codebase belonging, locality of code).
+The callback side-effects finding is particularly relevant: even with a stub model, callbacks from the overridden class won't run, which may be desirable (backfill should skip callbacks) or undesirable (backfill should honor them).

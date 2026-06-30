@@ -1,0 +1,41 @@
+SOURCE: GitGuardian Agent Skills blog post
+URL: https://blog.gitguardian.com/introducing-gitguardian-agent-skills/
+FETCHED: 2026-06-25
+
+=== GITGUARDIAN AGENT SKILLS — SCOPE AND COMMANDS ===
+
+FIVE SLASH COMMANDS (verbatim from blog post):
+
+1. /gitguardian:scan-secrets
+"instructs agents to use the GitGuardian CLI, ggshield, to perform the scan for secrets in paths, staged changes, and commits."
+Core principle stated: "scan first, then remediate from structured findings."
+
+2. /gitguardian:create-honeytokens
+"helps agents generate and place decoy AWS credentials."
+Guidance stated: "plant where attackers look, not where engineers import."
+
+3. /gitguardian:scan-machine
+"expands the scope from a repository or folder to the whole developer machine,"
+Covers: "local repositories, dotfiles, and cloud CLI configs" plus "shell history, AI agent caches."
+
+4. /gitguardian:check-hmsl
+"tells agents how to use HasMySecretLeaked checks without exposing plaintext secrets to the platform."
+
+5. /gitguardian:install-git-hooks
+"helps agents install ggshield as a git pre-commit or pre-push hook," blocking secrets before entering repository history.
+
+SCAN SCOPE:
+The blog post specifies scanning occurs in "paths, staged changes, and commits." There is no mention of PR descriptions or PR body text being scanned by any of the five commands.
+
+SUPPORTED AGENTS (from blog):
+"Claude Code, Codex, Cursor, VS Code (GitHub Copilot), and Kiro"
+
+CREDENTIAL FOCUS:
+All five commands are credential/secret focused. No command addresses free-form business data, infrastructure hostnames, customer names, or database names in PR prose.
+
+CONCLUSION: GitGuardian agent skills scan code commits and staged changes for credential/secret types. No PR body/description scanning capability documented.
+
+=== VERIFICATION ===
+URL fetched: https://blog.gitguardian.com/introducing-gitguardian-agent-skills/
+Verbatim quote: "instructs agents to use the GitGuardian CLI, ggshield, to perform the scan for secrets in paths, staged changes, and commits."
+Quote location: /gitguardian:scan-secrets command description

@@ -1,0 +1,70 @@
+AUXILIARY: Anthropic Claude Code — Memory and Skills documentation key excerpts
+Source URLs:
+  - https://code.claude.com/docs/en/memory
+  - https://code.claude.com/docs/en/skills
+Fetched: 2026-06-26
+
+=== MEMORY DOCUMENTATION ===
+
+"Claude Code loads CLAUDE.md files into context when starting sessions, when
+exploring project directories, and when context is compacted. Files in
+subdirectories load on demand when Claude reads files in those directories."
+
+"Target under 200 lines per CLAUDE.md file. Longer files consume more context
+and reduce adherence."
+
+"Auto memory: the first 200 lines of MEMORY.md are loaded at every session
+start. Topic memory files in ~/.claude/memory/ are not loaded at startup —
+Claude reads them on demand."
+
+CLAUDE.md loading hierarchy (from documentation):
+  1. ~/.claude/CLAUDE.md (global, every session)
+  2. Project root CLAUDE.md (when working in that project)
+  3. Subdirectory CLAUDE.md (when working in that subdirectory)
+  Subdirectory files "load on demand when Claude reads files in those directories"
+
+=== SKILLS DOCUMENTATION (key excerpts) ===
+
+"Create a skill when you keep pasting the same instructions, checklist, or
+multi-step procedure into chat, or when a section of CLAUDE.md has grown into
+a procedure rather than a fact. Unlike CLAUDE.md content, a skill's body loads
+only when it's used, so long reference material costs almost nothing until you
+need it."
+
+"Custom commands have been merged into skills. A file at .claude/commands/deploy.md
+and a skill at .claude/skills/deploy/SKILL.md both create /deploy and work the
+same way."
+
+"Claude Code skills follow the Agent Skills (https://agentskills.io) open standard,
+which works across multiple AI tools."
+
+INVOCATION CONTROL:
+  disable-model-invocation: true
+    → Claude will not auto-load this skill
+    → User must type /skill-name explicitly
+    → "Prevents Claude from invoking the skill on its own"
+  user-invocable: false
+    → Hides skill from the / menu
+    → "Claude can still load it automatically when relevant"
+    → "Use for background knowledge you want Claude to load automatically
+       when appropriate, but not something you invoke yourself"
+
+DYNAMIC CONTEXT INJECTION (!`command`):
+  The backtick-exclamation syntax runs a shell command and replaces the line
+  with the command output before Claude sees the skill content.
+  Example from docs:
+    !`git diff HEAD`
+  Used to inject live environment state (e.g., !`cat .env.local | grep URL`)
+  into the skill before Claude processes it.
+
+SKILL LOCATION HIERARCHY:
+  Enterprise  → applies to all users in organization
+  Personal    → ~/.claude/skills/<skill-name>/SKILL.md (all projects)
+  Project     → .claude/skills/<skill-name>/SKILL.md (this project only)
+  Nested      → .claude/skills/ inside subdirectory (applies when working there)
+  "When Claude reads or edits a file in a subdirectory, skills from that
+   subdirectory's .claude/skills/ become available."
+
+"/run-skill-generator records the recipe instead. It gets your app running from
+a clean environment, captures what worked (the install commands, the env vars,
+the launch script), and commits it as a per-project skill at .claude/skills/run-<name>/."

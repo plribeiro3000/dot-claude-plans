@@ -1,0 +1,181 @@
+SOURCE: Community patterns — worktree placement, direnv, hooks, enforcement
+FETCHED: 2026-06-05
+
+--- PLACEMENT: Default (.claude/worktrees/ inside repo) ---
+Source: https://code.claude.com/docs/en/worktrees
+"By default, the worktree is created under .claude/worktrees/<value>/ at your repository root"
+Used by: tfriedel/claude-worktree-hooks, mattbrailsford.dev, damiangalarza.com
+
+PROS:
+  - .git file in worktree correctly resolves back to main .git directory
+  - Tools that resolve git root work predictably
+  - .gitignore add of .claude/worktrees/ prevents accidental commit
+  - No /tmp stale-registration problem on reboot
+  - Sibling worktrees share same parent dir as main checkout (git rev-parse --show-toplevel works)
+
+CONS:
+  - Worktrees live inside the main checkout tree, confusing file watchers (VS Code, Watchman)
+  - Nested .git files can confuse some tools that walk upward looking for .git/
+  - Issue #27881: context compaction can cause CWD drift, leading to NESTED worktrees
+    inside .claude/worktrees/<parent>/.claude/worktrees/<child>/...
+  - Issue #45645: stale repositoryformatversion=1 + extensions.worktreeConfig=true left in
+    .git/config after Claude Code worktree use, breaking other AI agents
+
+--- PLACEMENT: Sibling directories (../repo-worktrees/<branch>) ---
+Source: https://dev.to/datadeer/part-2-running-multiple-claude-code-sessions-in-parallel-with-git-worktree-165i
+"The ../ puts the worktree directory as a sibling of your main project folder, which keeps things tidy."
+Also: https://www.sabatino.dev/creating-worktrees-with-claude-code-in-a-custom-directory/
+Pattern: {parent}/{project}-{name} — allows tools like Laravel Valet to discover the project
+
+PROS:
+  - No nested .git confusion
+  - Tools like Laravel Valet, VS Code Remote, Watchman discover sibling naturally
+  - git worktree list resolves cleanly — all paths at same filesystem level
+  - No issue with CWD drift nesting (drift stays at sibling level, not recursive)
+
+CONS:
+  - Requires WorktreeCreate hook to override default path
+  - Parent directory must exist (script must create ../worktrees/ if needed)
+  - If project has relative paths (e.g., Terramate stack.tm.hcl referencing ../), those paths
+    change if worktree is moved
+  - Path to worktree not predictable from repo root alone
+
+--- PLACEMENT: /tmp ---
+Source: https://git-scm.com/docs/git-worktree and https://github.com/anthropics/claude-code/issues/46638
+
+PROS:
+  - Total physical separation from project tree — NO file watcher noise
+  - Claude Code already has filesystem permission to /tmp on this machine
+  - No accidental git add of worktree contents
+  - No nested .git confusion in project tree
+  - Clean slate: each session starts fresh (if properly cleaned up)
+
+CONS (CRITICAL):
+  1. REBOOT KILLS WORKTREES: macOS clears /tmp on reboot (and periodically via launchd).
+     The git registration in .git/worktrees/<name>/ PERSISTS in the main repo's .git.
+     Result: git worktree list shows "prunable gitdir file points to non-existent location"
+     The branch stays LOCKED: git branch -D fails with "already used by worktree at <deleted path>"
+
+  2. STALE REGISTRATION BLOCKS NEW WORK: Issue #46638 confirms: running claude --worktree <name>
+     against a stale registration errors AND destroys state without warning. Mitigation requires
+     git worktree prune --expire now before each session (or a SessionStart hook that runs it).
+
+  3. NO AUTOMATIC PRUNE: git worktree prune has a default expiry window (gc.worktreePruneExpire,
+     default 3 months). Branches from /tmp worktrees do not auto-expire promptly.
+     Must use: git worktree prune --expire now
+
+  4. /tmp IS NOT GUARANTEED PERSISTENT BETWEEN SESSIONS: Even without a reboot, macOS's
+     periodic cleanup (launchd tmpwatch-equivalent) can remove old /tmp entries.
+
+  5. DIRENV / .ENVRC DOES NOT RESOLVE FROM /tmp PATH:
+     "In git worktrees the .envrc lives in the main repo root, which isn't a parent directory
+     of the worktree path."
+     Source: https://waldencui.com/post/direnv_is_all_you_need_to_parallelize_claude_code_with_git_worktrees/
+     A /tmp/project-worktree/ directory has NO parent-directory chain back to the original
+     .envrc. direnv's lookup (walk parents until .envrc found) terminates at /tmp, not the
+     project root. ALL environment variables from .envrc (AWS_PROFILE, AWS_DEFAULT_REGION,
+     TF_VAR_*, TERRAMATE_*, etc.) are ABSENT in /tmp worktrees unless explicitly handled.
+
+  6. RVM .RUBY-VERSION/.RUBY-GEMSET DO NOT AUTO-ACTIVATE in non-interactive shells (already
+     documented in CLAUDE.md § Ruby Version Manager in Bash). In /tmp, the cd hook that RVM
+     hooks into the shell does not fire at all in Claude Code's bash tool. The .ruby-version
+     and .ruby-gemset files copied to the /tmp worktree are present but inert.
+     Resolution: explicit wrapper path ~/.rvm/wrappers/<ruby>@<gemset>/<binary> or
+     BUNDLE_GEMFILE= prefix — same pattern already documented in 4Shark CLAUDE.md.
+
+  7. BUNDLE INSTALL MUST BE RE-RUN PER /tmp WORKTREE: Bundler's bundle_path is resolved
+     relative to the worktree root by default (unless BUNDLE_PATH is set globally or
+     vendor/bundle is shared). Each /tmp worktree needs its own bundle install unless
+     BUNDLE_PATH points to a shared location outside /tmp.
+
+  8. TERRAFORM: terraform init creates .terraform/ in the working directory. A /tmp worktree
+     with a fresh checkout has no .terraform/. init must be re-run. Terraform provider cache
+     can be shared via TF_PLUGIN_CACHE_DIR (set in .envrc, but see point 5 above).
+     Terramate stack.tm.hcl with relative path references may break if the worktree is
+     outside the project tree (stacks reference each other via relative filesystem paths).
+
+--- DIRENV / .ENVRC RESOLUTION IN WORKTREES ---
+Source: https://waldencui.com/post/direnv_is_all_you_need_to_parallelize_claude_code_with_git_worktrees/
+Source: https://gist.github.com/eshaham/8e3b63fb077530dffc2964b648145ec9
+
+PROBLEM: Claude Code runs each Bash command in a fresh shell, so direnv hooks don't apply.
+In worktrees, the .envrc is not in any parent directory of the worktree path (worst case: /tmp).
+
+THREE SOLUTIONS DOCUMENTED IN COMMUNITY:
+
+1. .worktreeinclude to COPY .envrc into the worktree at creation time:
+   Add ".envrc" to .worktreeinclude. The file lands in the worktree root.
+   But: direnv still won't auto-load in Claude's non-interactive shell.
+   A SessionStart hook is still needed to source it.
+
+2. SYMLINK .envrc from main checkout into worktree:
+   ln -s /path/to/main/.envrc /tmp/worktree/.envrc
+   Then run direnv allow in worktree.
+   Source: multiple community posts.
+   Works for .claude/worktrees and sibling placements; for /tmp, symlink target must be absolute.
+
+3. SessionStart hook that walks parent dirs then falls back to git common-dir:
+   Source: https://gist.github.com/eshaham/8e3b63fb077530dffc2964b648145ec9
+   Script: searches upward from project dir for .envrc, falls back to git root and git
+   common-dir. Captures newly exported variables and writes them to $CLAUDE_ENV_FILE.
+   Works for all placements INCLUDING /tmp, provided the hook can find the main repo root.
+   (git rev-parse --git-common-dir resolves to main .git even from a linked worktree.)
+
+--- ENFORCEMENT: "ALWAYS USE WORKTREE" PATTERNS ---
+Source: https://mattbrailsford.dev/replacing-my-custom-git-worktree-skill-with-claude-code-hooks
+
+1. NATIVE: claude --worktree <name> (v2.1.49+)
+   The --worktree flag is the canonical "always worktree for this session" invocation.
+   The engineer types it explicitly. There is no "force worktree on every plain claude invocation"
+   native setting in Claude Code CLI as of June 2026.
+
+2. SHELL ALIAS: alias claude='claude --worktree'
+   Simplest enforcement: every plain "claude" call becomes "claude --worktree".
+   Claude generates a random name when no name given (e.g., bright-running-fox).
+   CAVEAT: If the engineer uses the alias but also has sessions in the main checkout,
+   the alias only enforces for new sessions started this way.
+
+3. WorktreeCreate HOOK (replaces default, creates at custom location):
+   Configured in .claude/settings.json:
+     "hooks": { "WorktreeCreate": [{ "hooks": [{ "type": "command", "command": "..." }] }] }
+   The hook creates the worktree wherever desired (including /tmp) and prints the path.
+   KNOWN BUG (Issue #37611): When WorktreeCreate hook is defined, the session-exit cleanup
+   prompt is SKIPPED. The WorktreeRemove hook is also NEVER called. Worktrees orphan silently.
+   STATUS: Closed as duplicate, unresolved as of June 2026.
+
+4. SessionStart HOOK (bootstrap per-worktree environment):
+   Source: https://www.snopoke.com/2026/02/27/worktrees/
+   Hook detects if running in a worktree, copies config from root worktree, runs bootstrap.
+   Does NOT force worktree creation — it handles setup AFTER creation.
+
+5. worktree-cli EXTERNAL TOOL:
+   Source: https://www.snopoke.com/2026/02/27/worktrees/
+   "wt setup <branch name> --trust" handles complete worktree initialization.
+   Copies .env, .envrc, .python-version; enables direnv; runs bootstrap.sh.
+   A worktrees.json config file drives the setup.
+
+--- CLEANUP STORY ---
+Source: https://git-scm.com/docs/git-worktree (official docs)
+
+PREFERRED: git worktree remove <path>
+  Removes both the directory AND the administrative files in .git/worktrees/<name>/
+
+RECOVERY when directory already gone (e.g., /tmp was wiped):
+  git worktree prune             # removes stale entries older than gc.worktreePruneExpire (3 months default)
+  git worktree prune --expire now  # forces immediate removal of all stale entries
+
+GIT AUTOMATIC CLEANUP: gc.worktreePruneExpire (default 3 months)
+  "If a working tree is deleted without using git worktree remove, then its associated
+  administrative files will eventually be removed automatically (see gc.worktreePruneExpire
+  in git-config)"
+  For /tmp worktrees, 3 months is far too long — branches stay locked for 3 months.
+
+CLAUDE CODE AUTOMATIC CLEANUP (cleanupPeriodDays, default 30-60 days):
+  "Worktrees that Claude created for subagents and background sessions are removed automatically
+  once they are older than your cleanupPeriodDays setting, provided they have no uncommitted
+  changes, no untracked files, and no unpushed commits."
+  Source: https://code.claude.com/docs/en/worktrees
+  NOTE: "Worktrees you create with --worktree are NEVER removed by this sweep."
+  FOR /tmp: if /tmp is wiped before cleanupPeriodDays, Claude's sweep sees the worktree as
+  already gone but the .git/worktrees/ entry remains (stale). Claude's sweep may not run
+  git worktree prune in that case.

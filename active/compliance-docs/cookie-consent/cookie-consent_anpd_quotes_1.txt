@@ -1,0 +1,67 @@
+ANPD GUIA ORIENTATIVO — COOKIES E PROTEÇÃO DE DADOS PESSOAIS
+Verbatim excerpts collected from secondary sources (original PDF not publicly fetchable)
+Published: October 18, 2022 | Last updated: January 23, 2025
+Official URL: https://www.gov.br/anpd/pt-br/centrais-de-conteudo/materiais-educativos-e-publicacoes/guia-orientativo-cookies-e-protecao-de-dados-pessoais.pdf
+
+---
+SOURCE A: Souto Correa Advogados law firm article
+URL: https://www.soutocorrea.com.br/client-alerts/anpd-lanca-guia-orientativo-sobre-cookies-e-protecao-de-dados-pessoais/
+Fetch verified: YES (re-fetched, phrase confirmed present)
+
+Quote attributed to ANPD guide (strictly necessary cookies):
+"Cookies estritamente necessários – já que nesses casos a coleta das informações é essencial para o funcionamento da página eletrônica ou do serviço, e, portanto, não há condição efetiva para a manifestação livre do titular"
+
+Translation: "Strictly necessary cookies — since in these cases the collection of information is essential for the functioning of the web page or service, and therefore there is no effective condition for the free expression of the data subject [i.e., the user has no meaningful choice]."
+
+---
+SOURCE B: GoAdopt article — summarising ANPD guide sections
+URL: https://goadopt.io/blog/anpd-cookies-guia-orientativo-cookies-protecao-dados-pessoais/
+Fetch verified: YES (re-fetched, all three phrases confirmed present)
+
+Quote 1 (Hipótese Legal – Consentimento section):
+"Assim, embora inexista hierarquia ou preferência entre as hipóteses legais previstas na LGPD, o recurso ao consentimento será mais apropriado quando a coleta de informações for realizada por cookies não necessários."
+
+Translation: "Thus, although there is no hierarchy or preference among the legal bases provided in the LGPD, the use of consent will be more appropriate when data collection is carried out by non-necessary cookies."
+
+Quote 2 (Hipótese Legal – Legítimo Interesse section):
+"De forma geral, o legítimo interesse poderá ser a hipótese legal apropriada nos casos de utilização de cookies estritamente necessários."
+
+Translation: "In general, legitimate interest may be the appropriate legal basis in cases of use of strictly necessary cookies."
+
+Quote 3 (analytics cookies):
+"A utilização de cookies para fins de medição de audiência pode ser amparada na hipótese legal do legítimo interesse em determinados contextos, observados, em qualquer hipótese, os requisitos previstos na LGPD."
+
+Translation: "The use of cookies for audience measurement purposes may be supported by the legal basis of legitimate interest in certain contexts, observing, in any case, the requirements set out in the LGPD."
+
+---
+SOURCE C: Lefosse Advogados article (English summary of ANPD guide)
+URL: https://lefosse.com/noticias/alerta/anpd-publishes-guidelines-on-the-use-of-cookies/
+Fetch verified: YES (fetched, phrase confirmed present)
+
+Quote (consent and necessary cookies):
+"ANPD recommends that consent (art. 7, I, of the LGPD) will not be the appropriate legal basis for the use of strictly necessary cookies as these are essential for the functioning of the electronic page."
+
+---
+SOURCE D: GoAdopt article — consent must be free
+URL: https://goadopt.io/blog/anpd-cookies-guia-orientativo-cookies-protecao-dados-pessoais/
+Fetch verified: YES
+
+Quote (condicionamento do consentimento):
+"não é compatível com a LGPD a obtenção 'forçada' do consentimento, isto é, de forma condicionada."
+
+Translation: "It is not compatible with the LGPD to obtain 'forced' consent, i.e., in a conditional form."
+
+---
+SOURCE E: LEC article — definition of cookies (direct quote from ANPD guide)
+URL: https://www.lec.com.br/guia-orientativo-da-anpd/
+Fetch verified: YES
+
+Quote (definition of cookies):
+"arquivos instalados no dispositivo de um usuário que permitem a coleta de determinadas informações, inclusive de dados pessoais em algumas situações, visando ao atendimento de finalidades diversas."
+
+Translation: "files installed on a user's device that allow the collection of certain information, including personal data in some situations, aiming to serve diverse purposes."
+
+Quote (definition of necessary cookies):
+"Os tipos de cookies denominados necessários são aqueles utilizados para que o site ou aplicação realize funções básicas e opere corretamente."
+
+Translation: "The types of cookies called necessary are those used for the website or application to perform basic functions and operate correctly."

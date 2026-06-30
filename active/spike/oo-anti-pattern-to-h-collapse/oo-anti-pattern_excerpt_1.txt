@@ -1,0 +1,15 @@
+SOURCE: https://martinfowler.com/bliki/TellDontAsk.html
+FETCHED: 2026-06-19
+
+KEY QUOTES (verbatim, confirmed by re-fetch):
+
+"Tell-Don't-Ask is a principle that helps people remember that object-orientation is about bundling data with the functions that operate on that data."
+
+"This principle is most often associated with Andy Hunt and "Prag" Dave Thomas (The Pragmatic Programmers)."
+
+Additional context from page:
+- They described the principle in an IEEE Software column and a post on their website
+- IEEE column URL: http://media.pragprog.com/articles/jan_03_enbug.pdf
+- Pragmatic Programmers post: http://pragprog.com/articles/tell-dont-ask
+- Fowler describes it as "a stepping stone towards co-locating behavior and data"
+- Fowler's caveat: does not strictly adhere to the principle; notes concerns about eliminating all query methods

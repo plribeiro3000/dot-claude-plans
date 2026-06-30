@@ -1,0 +1,32 @@
+SOURCE: https://github.com/Shopify/maintenance_tasks
+FETCHED: 2026-06-23
+
+=== What it is ===
+
+"By 'maintenance task', this project means a data migration, i.e. code that changes data in the database, often to support schema migrations."
+
+"If your task updates your database schema instead of data, use a migration instead of a maintenance task."
+
+=== How it runs ===
+
+"Maintenance tasks are collection-based tasks, usually using Active Record, that update the data in your database."
+
+"The Maintenance Tasks framework relies on Active Job behind the scenes to run Tasks."
+
+=== Interruptibility ===
+
+"Maintenance tasks can be interrupted, re-enqueued and resumed without any intervention at the end of an iteration, which makes it easy to continue running tasks through deploys and infrastructure changes."
+
+=== ActiveRecord usage ===
+
+Examples show .update!(), .create!(), and .update_all() patterns rather than raw SQL.
+
+"If you need to iterate over individual records, you should define a collection that returns an ActiveRecord::Relation, which uses batching internally but loads the records with one SQL query."
+
+=== Callbacks ===
+
+Lifecycle callbacks available: "after_start", "after_pause", "after_interrupt", "after_cancel", "after_complete", "after_error"
+
+=== Note ===
+Maintenance_tasks (Shopify) is the approach Rails Guides officially recommends.
+It uses ActiveRecord models — not raw SQL. It is designed to run AS a task/job outside the schema migration transaction, which resolves the timing/locking problem but NOT the model drift problem (models used in a maintenance task will also be the current-code models, so the same drift concern applies unless the task is deleted after use).

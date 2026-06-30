@@ -1,0 +1,64 @@
+SOURCE: https://github.com/heartcombo/devise/blob/main/lib/devise/models/recoverable.rb
+FETCHED: 2026-06-17
+
+TITLE: Devise recoverable.rb — send_reset_password_instructions analysis
+
+CONTENT (as extracted by WebFetch — relevant methods):
+
+## Problematic Method
+
+The `send_reset_password_instructions` class method performs an email lookup WITHOUT
+tenant isolation:
+
+  def send_reset_password_instructions(attributes = {})
+    recoverable = find_or_initialize_with_errors(
+      reset_password_keys, attributes, :not_found
+    )
+    recoverable.send_reset_password_instructions if recoverable.persisted?
+    recoverable
+  end
+
+## The Problem in a Multi-Tenant Context
+
+This implementation uses `reset_password_keys` (defaults to [:email]) to find users.
+If multiple users across different tenants share the same email, the method will:
+
+1. Match the FIRST user record with that email (tenant-agnostic)
+2. Send password reset instructions to the wrong tenant's user
+3. Allow password reset tokens from one tenant to potentially work for another
+   tenant's account
+
+## reset_password_by_token — also vulnerable
+
+  reset_password_token = Devise.token_generator.digest(
+    self, :reset_password_token, original_token
+  )
+  recoverable = find_or_initialize_with_error_by(
+    :reset_password_token, reset_password_token
+  )
+
+This method does not scope by tenant when looking up the token.
+
+## Official Solution (from the Devise wiki for subdomain scoping)
+
+You must override BOTH the class method AND add a custom passwords controller:
+
+  # In User model:
+  def self.send_reset_password_instructions(attributes = {})
+    recoverable = where(:email => attributes[:email],
+                        :subdomain => attributes[:subdomain])
+    recoverable = recoverable.find_or_initialize_with_errors(
+      reset_password_keys, attributes, :not_found)
+    recoverable.send_reset_password_instructions if recoverable.persisted?
+    recoverable
+  end
+
+  # In Users::PasswordsController:
+  def create
+    params[:user][:subdomain] = request.subdomain
+    super
+  end
+
+NOTE: In the 4Shark scenario, the tenant key is `company_id` (not a subdomain from the
+request), which means the client (web frontend and mobile app) MUST send company_id at
+password reset time as well — not just at login time.

@@ -1,0 +1,24 @@
+SOURCE: https://c2.com/ppr/checks.html (Ward Cunningham, CHECKS Pattern Language, 1994)
+FETCHED: 2026-06-19
+
+KEY QUOTES on Whole Value (verbatim, confirmed by fetch):
+
+"Because bits, strings and numbers can be used to represent almost anything, any one in isolation means almost nothing."
+
+"Construct specialized values to quantify your domain model and use these values as the arguments of their messages and as the units of input and output."
+
+"Make sure these objects capture the whole quantity with all its implications beyond merely magnitude, but, keep them independent of any particular domain."
+
+"Do not expect your domain model to handle string or numeric representations of the same information."
+
+"Both of these messages use wordy protocol and answer quantities devoid of meaning once returned."
+
+The page also shows the example:
+"the message: contractDuration answers: [Weeks(3)]"
+(illustrating how a whole value object carries meaning that a raw number does not)
+
+PATTERN: Whole Value
+AUTHOR: Ward Cunningham
+DATE: 1994 (PLOP conference proceedings)
+PUBLICATION: Pattern Languages of Program Design (CHECKS Pattern Language of Information Integrity)
+ACM reference: https://dl.acm.org/doi/10.5555/218662.218674

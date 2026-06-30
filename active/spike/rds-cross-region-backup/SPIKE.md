@@ -207,6 +207,27 @@ These decisions were made with the engineer during the investigation and are rec
 
 ---
 
+## Community practices & destination-region selection (2026-06-28)
+
+Follow-up research to answer "where does the community store these backups, and which region is cheapest?"
+
+**Approach — the community/AWS consensus matches ours.** AWS's own guidance: *"If RTO and RPO requirements are less stringent, using a cross-Region snapshot and restore is a cost-effective cross-Region DR strategy"* — and reserve Aurora Global Database for *"strict RTO and RPO requirements"* ([AWS Database Blog — Cost-effective DR for Aurora using AWS Backup](https://aws.amazon.com/blogs/database/cost-effective-disaster-recovery-for-amazon-aurora-databases-using-aws-backup/)). AWS Backup cross-region copy is the standard managed pattern across the community write-ups (CloudThat, oneuptime, SUDO Consultants, tylerrussell.dev).
+
+**Recurring best practices** (across the community sources):
+- **Separate region for blast-radius** — the destination MUST differ from the source region; *"Cross-Region replication is particularly valuable if you have business continuity or compliance requirements to store backups a minimum distance away from your production data."*
+- **Tag-based resource assignment** to the backup plan (so new DBs are auto-covered) — matches the spike's design.
+- **Test restores in the DR region periodically** — *"Don't just assume your backups will work. Periodically perform restore tests in the destination region."* (This is the annual-test commitment the BCP will carry.)
+- **Vault Lock** (WORM) on the DR vault to prevent accidental/malicious deletion — optional, revisit per compliance.
+- **DR-copy retention** is often set differently from source (longer for protection, or shorter to save cost) — a per-org choice.
+
+**Cheapest destination region — the cost driver is transfer, not storage.**
+- **Backup storage** is the same lowest tier in us-east-1, **us-east-2 (Ohio)**, and us-west-2 (~$0.095/GB-month for AWS Backup warm storage). us-west-1 (N. California) runs ~15–20% higher — avoid. ([AWS Backup pricing](https://aws.amazon.com/backup/pricing/))
+- **Inter-region transfer** is the differentiator: **us-east-1 → us-east-2 = $0.01/GB**, while **us-east-1 → us-west-2 = $0.02/GB** (per pricing aggregators Amnic / usage.ai / bacancytechnology — not quoted from a primary AWS page, which routes to the EC2 pricing calculator). So **us-east-2 is the cheapest valid DR destination for the us-east-1 source DBs** — half the transfer, identical storage, still a fully independent failure domain.
+- **Trade-off:** us-west-2 (Oregon) maximizes geographic separation from us-east-1 (Virginia); us-east-2 (Ohio) is closer (cheaper transfer + lower latency) but is still an independent AWS region — adequate against a region-wide outage. Cheapest-adequate = **us-east-2**; maximum-separation = us-west-2.
+- **`auth-001` (sa-east-1, Brazil):** only one AWS region exists in South America, so any cross-region copy necessarily leaves Brazil for a US region (sovereignty note). Transfers out of sa-east-1 cost more per GB than US↔US, but `auth-001` is ~5 GB, so the absolute cost is trivial regardless of destination.
+
+**Sources:** [AWS Database Blog — Cost-effective DR for Aurora using AWS Backup](https://aws.amazon.com/blogs/database/cost-effective-disaster-recovery-for-amazon-aurora-databases-using-aws-backup/) · [Creating backup copies across AWS Regions — AWS Backup docs](https://docs.aws.amazon.com/aws-backup/latest/devguide/cross-region-backup.html) · [AWS Backup pricing](https://aws.amazon.com/backup/pricing/) · [A Guide for Amazon RDS Cross-Region Backups with AWS Backup — CloudThat](https://www.cloudthat.com/resources/blog/a-guide-for-amazon-rds-cross-region-backups-with-aws-backup)
+
 ## Next Steps
 
 When resuming, call `@agent-plan-researcher` with the following scope:

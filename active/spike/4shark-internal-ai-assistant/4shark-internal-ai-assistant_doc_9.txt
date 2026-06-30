@@ -1,0 +1,271 @@
+Q4-DELTA RESEARCH — Market practice: how companies actually use LLMs on PII under LGPD
+Auxiliary file for 4shark-internal-ai-assistant SPIKE.md
+Sources fetched during Q4-delta research phase (June 2025)
+
+===========================================================================
+SECTION A — ANPD action against Meta: training-data-only scope
+Source: https://fpf.org/blog/processing-of-personal-data-for-ai-training-in-brazil-takeaways-from-anpds-preliminary-decisions-in-the-meta-case/
+===========================================================================
+
+What ANPD targeted:
+"immediate suspension" of the processing of personal data by Meta "for the purpose of training its generative AI model."
+
+Legal basis cited by ANPD:
+"ineffective use of 'legitimate interest' as a legal basis for processing personal data for AI training purposes"
+
+Scope:
+"temporary suspension of the processing activity" concerned "processing of personal data...for the training of AI models."
+
+The document contains zero discussion of inference, API processors, or downstream use of trained models on personal data. Scope was limited exclusively to the training phase.
+
+===========================================================================
+SECTION B — ANPD investigation of OpenAI/ChatGPT: data breach notification, not inference
+Source: https://www.aosfatos.org/noticias/anpd-chatgpt-vazamento-dados-pessoais/
+===========================================================================
+
+What is being investigated:
+"violou o artigo 48 da LGPD (Lei Geral de Proteção de Dados), que obriga controladoras de sistemas de coleta e armazenamento de dados a comunicar 'a ocorrência de incidente de segurança que possa acarretar risco ou dano relevante aos titulares'"
+
+Investigation subject: whether OpenAI failed to notify users about a June 2023 data breach affecting approximately 100,000 Brazilian ChatGPT users. This is a security incident notification issue, not an API inference or training data issue.
+
+Outcome:
+"não é certo se resultará em sanção, como multa, conforme a lei prevê em caso de descumprimento"
+(Translation: "it is not certain whether it will result in a sanction, such as a fine, as provided by law in the event of non-compliance")
+
+Investigation remains ongoing. No sanction issued.
+
+===========================================================================
+SECTION C — ANPD 2024 retrospective: enforcement pattern
+Source: https://www.tauilchequer.com.br/pt/insights/publications/2025/01/um-olhar-retrospectivo-sobre-a-anpd-e-a-protecao-de-dados-no-brasil-em-2024
+===========================================================================
+
+Overall enforcement volume:
+"O ano de 2024 manteve um ritmo semelhante ao de 2023 no que diz respeito à aplicação de sanções pela ANPD."
+(Five sanctioning processes in 2024 vs. four in 2023, predominantly public bodies without pecuniary fines.)
+
+AI enforcement scope:
+"A Autarquia entrou em rota de colisão com dois gigantes da tecnologia sobre a utilização de perfis brasileiros em redes sociais para treinamento de inteligência artificial."
+(Translation: "The Authority entered into collision with two tech giants over the use of Brazilian profiles on social networks for training artificial intelligence.")
+
+These companies were required to clarify the details of the data treatment and align it with LGPD requirements. Focus: data scraping for model TRAINING, not inference applications. No enforcement action found targeting companies using AI APIs on PII for inference.
+
+===========================================================================
+SECTION D — ANPD preliminary study on generative AI: inference addressed
+Source: https://fpf.org/blog/brazils-anpd-preliminary-study-on-generative-ai-highlights-the-dual-nature-of-data-protection-law-balancing-rights-with-technological-innovation/
+Published: November 29, 2024 (ANPD Technology and Research Unit)
+===========================================================================
+
+On inference-time data processing:
+"Depending on the prompt, context, and information provided by the user, these interactions may generate outputs containing personal data about the user or other individuals."
+
+On user/company obligations when using generative AI:
+"Users sharing the personal data of other individuals through prompts may be considered processing agents under the LGPD and consequently be subject to its obligations and sanctioning regime."
+
+But:
+"transferring responsibility exclusively to users is not enough to safeguard personal data protection or privacy in the context of generative AI."
+
+On lawful processing basis for inference:
+"Scraping operations that capture personal data must be based on one of the LGPD's lawful bases for processing (Articles 7 and 11) and comply with data protection principles of good faith, purpose limitation, adequacy, and necessity."
+
+NOTE: The study addresses inference-time scenarios but does not clearly separate training-time from inference-time obligations. It uses unified LGPD principles across "multiple stages in the life cycle of generative AI systems, from development to refinement of models." It does not name specific LLM API providers or address B2B inference API compliance as a distinct category.
+
+===========================================================================
+SECTION E — Italy Garante €15M ChatGPT fine and Court of Rome annulment
+Source: https://www.crossborderdataforum.org/generative-ai-and-gdpr-enforcement-in-europe-a-lot-of-noise-one-fine-zero-survivors/
+===========================================================================
+
+What enforcement found:
+"Since then, not a single other European DPA has published a final enforcement decision concerning GDPR violations linked to the launch period of ChatGPT (November 2022 to March 2023)."
+
+What the Garante alleged (training data + breach + transparency):
+"OpenAI processed personal data for training ChatGPT without an adequate legal basis, violated GDPR transparency and information obligations, failed to properly notify the authority of a March 2023 data breach, and lacked age verification mechanisms for minors."
+Also: "the use of EU users' public posts for training xAI's Grok chatbot"
+
+The sole GDPR enforcement action:
+"Europe's regulatory response to the most consequential AI deployment in its history produced a single enforcement decision. And that decision has now been annulled."
+"This was not just any enforcement decision. It was the only final GDPR enforcement action ever adopted in Europe concerning the period of the launch of generative AI to the public."
+
+NOTE: No GDPR enforcement found for using LLM APIs as inference processors. All enforcement targets training data acquisition and breach notification. The "zero survivors" in the title means the only final decision was annulled.
+
+===========================================================================
+SECTION F — Court of Rome annulment: jurisdictional grounds, not substantive
+Sources:
+- https://barlamantoday.com/2026/03/19/italian-court-reverses-regulators-e15-million-fine-against-openai-over-chatgpt-privacy-breach/
+- https://www.wsgr.com/en/insights/openai-prevails-in-landmark-italian-ai-and-gdpr-enforcement-case.html
+Search result summary (March 18, 2026 ruling)
+===========================================================================
+
+The Court of Rome annulment grounds (from search result summary):
+"the annulment rests entirely on a finding that the Italian Garante lacked jurisdiction after the Irish Data Protection Commission became OpenAI's lead supervisory authority on February 15, 2024 - months before the Garante issued its final decision."
+
+What the Court DID NOT rule on:
+"The court's reasoning does not reach the substantive GDPR violations alleged by the Italian authority. It does not assess whether OpenAI failed to notify the Garante of the March 20, 2023 data breach. It does not determine whether ChatGPT's training data processing lacked a valid legal basis under Articles 5 and 6."
+
+Original fine: €15 million (November 2, 2024, Garante Decision No. 755)
+Annulment date: March 18, 2026, Court of Rome
+Full reasoning published: May 28, 2026
+
+The annulment was jurisdictional (one-stop-shop mechanism), not a finding that the conduct was lawful. The substantive GDPR question (whether training data processing was legal) remains unanswered by any court.
+
+===========================================================================
+SECTION G — LGPD Art. 33 mechanisms: contractual clauses as independent basis
+Source: https://www.mayerbrown.com/pt/insights/publications/2024/08/new-anpd-regulation-international-data-transfers
+Source: https://legale.com.br/blog/lgpd-transferencia-internacional-de-dados-e-compliance/
+===========================================================================
+
+Available mechanisms under CD/ANPD No. 19/2024:
+"decisão de adequação, cláusulas contratuais específicas, cláusulas-padrão contratuais e normas corporativas globais"
+(Translation: "adequacy decision, specific contractual clauses, standard contractual clauses, and global corporate rules")
+
+Standard contractual clauses implementation requirement:
+"As cláusulas-padrão contratuais se encontram anexa a essa atualização. Elas devem ser adotadas em sua integralidade, sem qualquer modificação"
+(Translation: "The standard contractual clauses are attached to this update. They must be adopted in their entirety, without any modification.")
+
+Deadline for existing contracts:
+"12 (doze) meses para que os agentes de tratamento (controladores ou operadores) alterem os contratos vigentes"
+(Translation: "12 [twelve] months for processing agents [controllers or operators] to amend existing contracts")
+— deadline was August 23, 2025.
+
+Processors must also comply:
+"cabe tanto ao controlador como ao operador comprovar o cumprimento do Regulamento"
+(Translation: "it is the responsibility of both the controller and the processor to demonstrate compliance with the Regulation")
+"cabe a ele também documentar a transferência e a sua conformidade com a LGPD"
+(Translation: "[the processor] must also document the transfer and its compliance with the LGPD")
+
+Transfer-as-extension-of-jurisdiction principle:
+"Elas funcionam como uma extensão da jurisdição brasileira em território estrangeiro por via obrigacional"
+(Translation: "They function as an extension of Brazilian jurisdiction in foreign territory through contractual obligation")
+
+Liability note:
+"a elaboração e revisão desses instrumentos contratuais exigem precisão técnica cirúrgica, pois a responsabilidade em caso de incidente pode recair solidariamente"
+(Translation: "the drafting and review of these contractual instruments require surgical technical precision, since liability in case of an incident may be shared")
+
+No US adequacy decision:
+"não houve reconhecimento formal de qualquer país como adequado."
+(Translation: "no formal recognition of any country as adequate [has been issued].")
+— The US has no adequacy decision from ANPD. Contractual clauses (Art. 33 Inciso II) are therefore the operative mechanism for US-based processors.
+
+===========================================================================
+SECTION H — Cloud = international transfer: LGPD confirmed
+Source: https://legale.com.br/blog/lgpd-transferencia-internacional-de-dados-e-compliance/
+===========================================================================
+
+Cloud hosting abroad constitutes international transfer:
+"O armazenamento de dados em nuvem (cloud computing) com servidores no exterior é considerado transferência internacional"
+(Translation: "The storage of data in the cloud [cloud computing] with servers abroad is considered an international transfer.")
+
+This means: 4Shark using AWS us-east-1 for the `app` backend already triggers LGPD Art. 33 requirements. Adding an LLM API provider (e.g., Anthropic with DPA + SCCs) is the SAME legal category — both are international transfers to US-based processors. The operative question is whether the DPA + contractual clause mechanism (Art. 33 Inciso II) is in place, not whether the provider is "cloud" or "AI."
+
+NOTE: The legale.com.br article does not specifically address AI API providers or LLM vendors as operadores. The cloud-parity inference is drawn from the stated principle (cloud storage abroad = international transfer) applied to the LLM API case.
+
+===========================================================================
+SECTION I — Enterprise LLM API spend and self-hosting reality
+Source: https://finance.yahoo.com/news/enterprise-llm-spend-reaches-8-130000140.html
+(Menlo Ventures Report, mid-2025)
+===========================================================================
+
+Market size:
+"Enterprise spending on large language models (LLM) has more than doubled in just six months, rising from $3.5 billion in late 2024, to $8.4 billion"
+
+Market share by provider (spending):
+"Anthropic now earns 40% of enterprise LLM spend, up from 12% in 2023. OpenAI's share fell from 50% to 27%, while Google increased from 7% to 21%."
+
+Market share by usage:
+"Anthropic has emerged as the new market leader, capturing 32% of enterprise usage across production workloads. Google has also gained significant ground, climbing to 20%...Meta's Llama holds 9%, while DeepSeek accounts for just 1%"
+"OpenAI dominated the enterprise LLM market through 2023, accounting for 50% of usage. But the latest data reveals that its share has now fallen to 25%"
+
+Closed-source dominance:
+"Closed-source models now dominate, powering 87% of enterprise workloads. Open-source usage fell from 19% to 13% over the past six months"
+
+The top three providers (Anthropic + OpenAI + Google) account for 77% of enterprise spending and 77% of enterprise usage. Open-source/self-hosted models represent 13% of enterprise usage. This is the evidence base for the "market practice" question.
+
+===========================================================================
+SECTION J — Self-hosting cost analysis
+Source: https://www.braincuber.com/blog/self-hosted-llms-vs-api-based-llms-cost-performance-analysis
+===========================================================================
+
+Break-even point:
+"The practical break-even sits near $4,200/month of API spend."
+"The breakeven threshold is approximately 11 billion tokens per month."
+
+Operational cost multiplier:
+"Self-hosting costs 3–5× more than the raw GPU price alone when you include DevOps, audit, updates, and downtime"
+
+Engineering example:
+A fintech client "spend 6 weeks and $38,000 in engineering time scaling their self-hosted Mistral deployment from 2M to 15M daily tokens."
+
+Who self-hosts:
+"If you are building [AI for US healthcare] (HIPAA), financial services (SOC 2, SEC regulations), or government contracts, your data cannot touch OpenAI's or Anthropic's cloud infrastructure."
+"API wins for 87% of use cases — only regulated data (HIPAA/SOC 2) and ultra-high-volume justify self-hosting"
+
+LGPD is NOT in this list of named regulations requiring self-hosting. The US-specific regulations cited (HIPAA, SOC 2, SEC) do not map directly to LGPD's Art. 33 mechanism-based transfer approach.
+
+===========================================================================
+SECTION K — Prediction Guard self-hosting guide: regulated-sector framing
+Source: https://predictionguard.com/blog/self-hosted-vs-cloud-llm-deployment-guide
+===========================================================================
+
+Where self-hosting is framed as non-negotiable:
+"Workloads processing 'controlled defense data (CUI, ITAR), regulated financial data'"
+"Air-gapped or restricted-network environments"
+"Data sovereignty requirements prohibiting 'any data egress outside a defined geographic or organizational boundary'"
+"Board-level risk posture requires auditable, internally-held evidence"
+
+Governance framing:
+"the choice 'isn't primarily a performance decision. It's a governance decision,' emphasizing that 'where the control plane runs determines where your audit logs live, who controls your policy enforcement.'"
+
+Engineering overhead:
+"Building governance infrastructure 'from scratch...takes months of dedicated engineering work with no product delivery output during that period.'"
+Hardware investment: "Significant capex (Gaudi 2 8-card kit ~$65k starting point)"
+
+LGPD is NOT mentioned as a regulation driving self-hosting in this source. The regulatory drivers named are US/EU-specific (CUI, ITAR, HIPAA, NIST AI RMF).
+
+===========================================================================
+SECTION L — Mosello.com.br article on cloud and LGPD limits
+Source: https://www.mosello.com.br/noticias/blog/2026/02/09/entre-a-nuvem-e-a-lei-os-limites-da-transferencia-internacional-de-dados-no-brasil.html
+FETCH RESULT: HTTP 404 — UNVERIFIED
+===========================================================================
+
+This URL returned HTTP 404 Not Found. No verbatim quotes available. Do NOT cite this source. Marked UNVERIFIED.
+
+===========================================================================
+SECTION M — Search result: ANPD Mayer Brown SCC grace period analysis
+Source: Mayer Brown, "New ANPD Regulation: International Data Transfers" (August 2024)
+URL: https://www.mayerbrown.com/pt/insights/publications/2024/08/new-anpd-regulation-international-data-transfers
+(Successfully fetched — see Section G above for verbatim quotes)
+===========================================================================
+
+Key additional finding from this source:
+Resolution CD/ANPD No. 19/2024 established "greater legal certainty to processing agents and interpretive uniformity to Article 33 of the LGPD."
+
+Art. 33 Inciso II is an INDEPENDENT mechanism from adequacy — it does not require a country adequacy decision. The fact that the US has no ANPD adequacy decision does not block transfers to US-based processors if contractual clauses are in place. This is confirmed by the Mayer Brown analysis of CD/ANPD No. 19/2024.
+
+===========================================================================
+SECTION N — Migalhas article on LGPD international transfer framework
+Source: https://www.migalhas.com.br/coluna/migalhas-de-protecao-de-dados/414287/breve-analise-sobre-a-transferencia-internacional-de-dados
+===========================================================================
+
+On alternative mechanisms when no adequacy decision exists:
+"Alternativamente, o fluxo de informações pessoais para fora do território nacional só é permitido caso..."
+(Translation: "Alternatively, the flow of personal information outside the national territory is only permitted if...")
+— followed by listing nine conditions, including Art. 33 Inciso II contractual clauses.
+
+No specific language found on cloud vs. AI API parity, or on LLM providers as operadores. This source confirms the general framework but does not add new specificity for AI API use cases.
+
+===========================================================================
+SECTION O — beanstech.com.br LGPD cloud compliance analysis
+Source: https://beanstech.com.br/blog/lgpd-cloud-computing-compliance
+(Fetched in prior research session before context compaction)
+===========================================================================
+
+Key verbatim quotes (captured in prior research session):
+"O documento estabelece que usar servidores fora do Brasil 'configura uma transferência internacional de dados.'"
+(Translation: "The document establishes that using servers outside Brazil 'constitutes an international data transfer.'")
+
+"Garantir que os contratos com os provedores de nuvem (Data Processing Agreements - DPAs) estejam em conformidade com a LGPD."
+(Translation: "Ensure that contracts with cloud providers [Data Processing Agreements - DPAs] are in compliance with LGPD.")
+
+This source confirms: (1) cloud = international transfer, (2) the mechanism is DPA-based. It does not distinguish AI API providers from generic cloud providers.
+
+NOTE: Re-fetch was not performed in this session. Quotes from prior session context. Marked as pending re-verification if output-verifier requests it.
+

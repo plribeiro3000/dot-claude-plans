@@ -1,0 +1,123 @@
+# Skill Structure Findings
+# Generated: 2026-06-03
+# Purpose: Documents the exact shape of existing skills so /runbook mirrors conventions.
+
+# ============================================================
+# SKILL FORMAT — SHARED CONVENTIONS
+# ============================================================
+
+# Source: ~/Projects/4Shark/dot-claude/skills/post-mortem/SKILL.md:1-4
+# and ~/Projects/4Shark/dot-claude/skills/integration-debug/SKILL.md:1-4
+
+# Every SKILL.md starts with YAML frontmatter:
+#
+#   ---
+#   name: <slug>
+#   description: <one-line trigger description>
+#   ---
+#
+# The `name` field MUST match the directory name exactly.
+# The `description` is what Claude Code shows in the skills list.
+# The description is designed to be a trigger matcher — it lists the
+# natural-language phrases the engineer might say that should invoke the skill.
+
+# ============================================================
+# FOLDER STRUCTURE
+# ============================================================
+# skills/<name>/SKILL.md       — required: the skill definition
+# skills/<name>/scripts/       — optional: bundled helper scripts
+#
+# Example with scripts:
+#   skills/integration-debug/SKILL.md
+#   skills/integration-debug/scripts/ecs-runner-profile.sh
+#   skills/integration-debug/scripts/integration-audit-snapshot-ec2.sh
+#   skills/integration-debug/scripts/integration-audit-snapshot-fargate.sh
+#
+# Example without scripts (pure text workflow):
+#   skills/post-mortem/SKILL.md
+#
+# /runbook would be a pure-text workflow skill (no scripts needed).
+
+# ============================================================
+# AUTO-APPROVAL MECHANISM
+# ============================================================
+# Source: ~/Projects/4Shark/dot-claude/scripts/auto-approve-local-skills.sh:53-56
+#
+#   if [ -f "${claude_root}/commands/${skill_name}.md" ] \
+#      || [ -f "${claude_root}/skills/${skill_name}/SKILL.md" ]; then
+#     printf '{"hookSpecificOutput":...permissionDecision":"allow"...}\n'
+#
+# The auto-approve-local-skills.sh hook fires on the `Skill` PreToolUse event.
+# It reads ~/.claude/skills/<name>/SKILL.md to check existence.
+# NO registration in settings.json is needed — the filesystem check is the
+# only gate. Creating skills/runbook/SKILL.md is sufficient for auto-approval.
+
+# ============================================================
+# SKILL TIP INJECTION (inject-skill-tip.sh)
+# ============================================================
+# Source: ~/Projects/4Shark/dot-claude/scripts/inject-skill-tip.sh:71-86
+#
+# The skill tip hook fires on UserPromptSubmit and SubagentStart.
+# It matches the engineer's prompt against a hard-coded trigger map.
+# New skills are NOT automatically added to the tip map — the engineer
+# must add a check_trigger() call in inject-skill-tip.sh.
+#
+# Existing triggers:
+#   check_trigger "pr-triage"       → review-thread / false-positive language
+#   check_trigger "spike"           → research / investigate language
+#   check_trigger "pr-review"       → review the PR / code-review language
+#   check_trigger "integration-debug" → integração / drift / reconcilia language
+#
+# For /runbook, a new check_trigger would be added with patterns like:
+#   runbook|operational procedure|how do I|passo a passo|how to.*\b(activate|setup|recover|migrate|onboard)
+#
+# Rate-limit: one tip per skill per session (marker file in /tmp/).
+# Not required for skill to function — only for proactive surfacing.
+
+# ============================================================
+# SETTINGS.JSON — NO SKILL REGISTRATION NEEDED
+# ============================================================
+# Source: ~/Projects/4Shark/dot-claude/settings.json:221-228
+#
+#   "PreToolUse": [
+#     {
+#       "matcher": "Skill",
+#       "hooks": [{ "type": "command", "command": "...auto-approve-local-skills.sh" }]
+#     }
+#   ]
+#
+# The Skill matcher is already wired. Any skill placed at
+# ~/.claude/skills/<name>/SKILL.md is automatically:
+#   1. Invocable as /<name> slash command
+#   2. Auto-approved (no permission prompt) via auto-approve-local-skills.sh
+#   3. Listed in the skills catalog if description is set
+#
+# The ONLY required change to settings.json for /runbook is NONE.
+# The only files that need to be created are:
+#   - dot-claude/skills/runbook/SKILL.md
+
+# ============================================================
+# SKILL CONTENT PATTERN — WHAT SKILL.MD DOES
+# ============================================================
+# Both post-mortem and integration-debug follow the same structure:
+#
+# 1. YAML frontmatter (name + description)
+# 2. Role declaration ("You are the engineer's pair for X")
+# 3. Mandatory context loading ("Before doing anything else — read these files")
+# 4. Pre-condition questions ("Before generating content — ask for the basics")
+# 5. Step-by-step flow with concrete instructions per phase/section
+# 6. Output destination (where to write the result)
+# 7. Refusal list (what to not produce)
+# 8. Communication style reminder
+#
+# For /runbook, the pattern is simpler — no output file, no multi-step flow.
+# The skill loads the INDEX.md, matches against the engineer's query, reads
+# the matched runbook file, and walks the engineer through its steps.
+
+# ============================================================
+# CLAUDE.MD MENTION
+# ============================================================
+# Skills listed in CLAUDE.md "Available Commands" section for documentation.
+# Source: ~/Projects/4Shark/dot-claude/CLAUDE.md lines describing each skill.
+# /runbook would need to be added to the "Available Commands" section of CLAUDE.md.
+# This requires a PR to dot-claude (Configuration Changes Policy).

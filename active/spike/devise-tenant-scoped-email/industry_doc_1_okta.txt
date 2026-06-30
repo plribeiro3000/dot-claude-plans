@@ -1,0 +1,29 @@
+SOURCE: https://developer.okta.com/docs/concepts/multi-tenancy/
+FETCHED: 2026-06-17
+
+TITLE: Okta — Multi-tenant solutions (official developer documentation)
+
+VERBATIM QUOTES:
+
+"the same email address can exist as separate users in multiple orgs. For example,
+`alice.doe@example.com` can be a registered user in both `https://company1.okta.com` and
+`https://company2.okta.com` with different profile data in each."
+
+"Identity in Okta is scoped to the org, not globally unique across all of Okta."
+
+"When building an app that serves multiple tenants, track which org authenticated a given
+user. You can't assume that profile data is consistent across orgs."
+
+## Design Pattern: Hub-and-Spoke
+
+Configuration 2 (separate orgs in hub-and-spoke architecture) natively supports duplicate
+usernames because different orgs maintain independent identity systems. This design pattern
+provides strong isolation while allowing organizations to manage customers, partners, and
+employees in separate tenant containers.
+
+## Summary of Okta's Position
+
+Okta's own architecture explicitly supports the same email across multiple orgs (tenants).
+Identity is ORG-SCOPED, not globally unique. Apps that use Okta must track which org
+authenticated a user. This directly validates the tenant-scoped email pattern as a
+legitimate, production-grade identity design.

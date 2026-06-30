@@ -1,0 +1,54 @@
+SOURCE: Atlassian — Postmortem Template (via Slab library)
+URL: https://slab.com/library/templates/atlassian-postmortem-template/
+FETCHED: 2026-05-27
+
+=== VERBATIM SECTION STRUCTURE ===
+
+SECTION 1 — Incident Summary:
+Concise overview covering what occurred, triggering factors, severity level, and duration of impact.
+
+SECTION 2 — Leadup:
+Chronological events preceding the incident, including prior changes that introduced latent bugs.
+
+SECTION 3 — Fault:
+Explanation of how the implemented change failed to function as designed, with supporting visualizations.
+
+SECTION 4 — Impact:
+Effects on both internal and external users, including support ticket volume.
+
+SECTION 5 — Detection:
+When and how the team identified the problem, plus opportunities to accelerate discovery.
+
+SECTION 6 — Response:
+Who responded, timing, actions taken, and any response obstacles.
+
+SECTION 7 — Recovery:
+Methods restoring service and determining resolution completion.
+
+SECTION 8 — Timeline:
+Detailed UTC-normalized chronology of leadup events, impacts, escalations, and decisions.
+
+ROOT CAUSE ANALYSIS SECTION:
+The template employs The Five Whys technique: "Begin with a description of the impact and ask why it occurred"
+— iteratively questioning until reaching underlying causes rather than symptoms.
+
+SECTION 9 — Root Cause:
+The fundamental issue requiring change to prevent recurrence.
+
+SECTION 10 — Backlog Check:
+Assessment of prior unaddressed work items.
+
+SECTION 11 — Recurrence:
+Identification of related past incidents.
+
+SECTION 12 — Lessons Learned:
+Response effectiveness and improvement opportunities.
+
+SECTION 13 — Corrective Actions:
+Preventive measures with ownership and completion targets.
+
+=== NOTES ===
+- Atlassian also publishes a full "Incident Management Handbook" as a free PDF
+  (https://pages.eml.atlassian.com/rs/594-ATC-127/images/Atlassian-incident-management-handbook-.pdf)
+- The Atlassian template explicitly uses the Five Whys for root cause analysis
+  (contrast with Allspaw/Pragmatic Engineer who critique Five Whys as too narrow)

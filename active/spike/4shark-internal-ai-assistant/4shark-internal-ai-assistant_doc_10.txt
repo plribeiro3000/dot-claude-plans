@@ -1,0 +1,237 @@
+=== Q5 LGPD PAPERWORK RESEARCH ===
+
+Topic: What LGPD documents does 4Shark need to create or update when adding AI vendors
+(Anthropic, ElevenLabs, Deepgram) as sub-processors for the internal AI assistant?
+
+Critical context: 4Shark is OPERADOR of clients' employee PII. Clients are CONTROLADORES.
+AI vendors are SUB-OPERADORES. Chain: CLIENT (controlador) → 4SHARK (operador) → AI VENDOR (sub-operador).
+
+This dual role affects which obligations fall on 4Shark directly and which fall primarily on
+the client.
+
+Sources fetched in this session:
+- lgpd-brasil.info/capitulo_06/artigo_37 (Art. 37 — ROPA)
+- lgpd-brasil.info/capitulo_06/artigo_39 (Art. 39 — operador obligations)
+- lgpd-brasil.info/capitulo_02/artigo_09 (Art. 9 — data subject information; paraphrase returned)
+- lgpd-brasil.info/capitulo_06/artigo_38 (Art. 38 — RIPD trigger; verbatim fragment)
+- elevenlabs.io/dpa (ElevenLabs DPA — last updated April 8, 2026; fetched prior session)
+- developers.deepgram.com/trust-security/data-privacy-compliance (Deepgram compliance page; fetched this session)
+
+---
+
+SECTION A — LGPD Art. 37 (ROPA / Registro das Operações de Tratamento)
+Source: https://lgpd-brasil.info/capitulo_06/artigo_37 — FETCHED THIS SESSION
+
+Verbatim text (confirmed from fetched content):
+"O controlador e o operador devem manter registro das operações de tratamento de dados
+pessoais que realizarem, especialmente quando baseado no legítimo interesse."
+
+Translation: "The controller and the operator must maintain records of the personal data
+processing operations they conduct, particularly those based on legitimate interest."
+
+Title on page: "Artigo 37 - RPA's ou Registro de Operação de Tratamento"
+
+Key point: Art. 37 explicitly binds BOTH the controlador AND the operador. As operador,
+4Shark must maintain its own ROPA entry for each new processing activity. Adding an AI
+assistant that sends employee PII to an LLM vendor is a new processing activity.
+
+New ROPA entry must cover: purpose (internal support assistant querying operational data),
+categories of data subjects (clients' employees), categories of personal data (names,
+CPF/identifiers, HR indicators — whatever the internal assistant can query), recipients
+(AI vendor sub-operadores: Anthropic; ElevenLabs if voice is used; Deepgram if voice is used),
+international transfer basis (Art. 33 Inciso II / contractual clauses under CD/ANPD 19/2024),
+and security measures (VPN-gating, Keycloak SSO, PII minimization system prompt).
+
+URL fetched: https://lgpd-brasil.info/capitulo_06/artigo_37
+Verbatim quote: Confirmed from fetched content this session.
+
+---
+
+SECTION B — LGPD Art. 39 (Operador obligations / controller-operator relationship)
+Source: https://lgpd-brasil.info/capitulo_06/artigo_39 — FETCHED THIS SESSION
+
+Verbatim text (confirmed from fetched content):
+"O operador deverá realizar o tratamento segundo as instruções fornecidas pelo controlador,
+que verificará a observância das próprias instruções e das normas sobre a matéria."
+
+Translation: "The operator must conduct data processing according to instructions provided by
+the controller, who shall verify compliance with such instructions and applicable regulations."
+
+Chapter: VI — Agentes de Tratamento de Dados Pessoais
+Title on page: "Obrigações do Operador em relação ao Controlador"
+
+Key point: Art. 39 creates a verification obligation running from controller to operator.
+4Shark's clients (as controladores) must verify that 4Shark (as operador) follows their
+instructions and applicable norms. When 4Shark introduces AI sub-operadores, the clients
+must be informed so they can verify the new arrangement.
+
+The same Art. 39 principle extends downstream: AI vendors (as sub-operadores) must follow
+4Shark's instructions. The Anthropic DPA addresses this via its sub-processor clause.
+
+Note: planalto.gov.br (official source) returned ECONNRESET during prior research.
+lgpd-brasil.info is used as secondary source. For binding legal decisions, verify against
+the official text at planalto.gov.br.
+
+URL fetched: https://lgpd-brasil.info/capitulo_06/artigo_39
+Verbatim quote: Confirmed from fetched content this session.
+
+---
+
+SECTION C — LGPD Arts. 6 and 9 (Transparency / data subject information rights)
+Sources: lgpd-brasil.info/capitulo_02/artigo_06 and lgpd-brasil.info/capitulo_02/artigo_09
+— FETCHED (prior session); PARAPHRASES ONLY — verbatim Portuguese statutory text NOT confirmed
+
+NOTE: lgpd-brasil.info returned paraphrases (English-language summaries), NOT verbatim
+Portuguese statutory text for Arts. 6 and 9. For binding legal reference, consult
+planalto.gov.br (was unavailable — ECONNRESET during research).
+
+Art. 6 paraphrase (from lgpd-brasil.info): Lists ten principles of personal data processing
+including transparência (transparency — providing clear, accurate, accessible information about
+processing), finalidade (purpose limitation), necessidade (necessity), livre acesso (free
+access), qualidade dos dados (data quality), segurança (security), prevenção (prevention),
+não discriminação (non-discrimination), and responsabilização e prestação de contas
+(accountability and reporting).
+
+Art. 9 paraphrase (from lgpd-brasil.info): Data subjects have the right to receive
+information about: purpose, form and duration of processing; the controller or operator
+responsible; contact information for the DPO; information about third-party sharing;
+and information about international data transfer.
+
+Primary obligation: CONTROLADOR (4Shark's client). The Aviso de Privacidade that data
+subjects (employees) receive is the client's obligation, not 4Shark's directly.
+
+What 4Shark must provide to clients: purpose of AI processing, identity of AI vendors,
+international transfer destination (US), transfer mechanism (contractual clauses / CPCs
+under CD/ANPD 19/2024), so clients can update their own Aviso de Privacidade.
+
+Arts. 6 and 9 verbatim text NOT confirmed from fetched pages — noted here as paraphrase.
+No verbatim citation made for these articles.
+
+---
+
+SECTION D — LGPD Art. 38 (DPIA / RIPD trigger)
+Source: https://lgpd-brasil.info/capitulo_06/artigo_38 — fetched prior session (summary context)
+
+Verbatim fragment:
+"A autoridade nacional poderá determinar ao controlador que elabore relatório de impacto
+à proteção de dados pessoais"
+
+Translation: "The national authority may determine that the controller prepare a personal data
+protection impact report."
+
+Key point: The Art. 38 fragment is explicitly directed at the CONTROLADOR — "determinar ao
+controlador." The RIPD obligation is the controller's, not the operator's. For the internal
+assistant scenario, this would be the client's obligation to prepare the RIPD, not 4Shark's.
+
+ANPD RIPD triggers — UNVERIFIED IN THIS SESSION:
+ANPD Resolution No. 2/2022 specifies triggers including large-scale processing, sensitive
+personal data, data of vulnerable groups (employees where power imbalance exists), and use of
+emerging or innovative technologies (AI assistants qualify). These triggers were not confirmed
+from a fetched URL in this research session — the trigger list is based on prior research context
+and standard ANPD guidance. For binding reference, consult anpd.gov.br Resolution No. 2/2022
+directly.
+
+What 4Shark should prepare to support clients' RIPD: description of AI processing activities,
+data categories processed, sub-processor chain (Anthropic / ElevenLabs / Deepgram), security
+measures in place (VPN-gating, Keycloak, PII minimization), and international transfer basis.
+
+URL for fragment: https://lgpd-brasil.info/capitulo_06/artigo_38
+Verbatim fragment: Confirmed (per prior session research context).
+
+---
+
+SECTION E — ElevenLabs DPA
+Source: https://elevenlabs.io/dpa — FETCHED PRIOR SESSION (last updated April 8, 2026)
+
+Key terms confirmed verbatim from fetched content:
+
+ElevenLabs role:
+"Processor on behalf of Customer"
+
+LGPD coverage — explicitly named in "Applicable Data Protection Laws":
+"Brazil's General Data Protection Law (Lei Geral de Proteção de Dados – LGPD)"
+
+Transfer mechanism:
+"Brazil SCCs" incorporated as transfer mechanism
+
+Sub-processor authorization:
+"general authorization to engage Subprocessors in accordance with this Section 6"
+
+New sub-processor advance notice requirement:
+"at least thirty (30) days prior" notice before new sub-processors
+
+Sub-processor list location:
+compliance.elevenlabs.io
+
+Data deletion timeline (enterprise):
+"within 30 days for enterprise customers" (Section 9)
+
+Significance: ElevenLabs is the only AI vendor in this research that (a) explicitly names LGPD
+in its DPA and (b) incorporates "Brazil SCCs" as a transfer mechanism. This is the most direct
+LGPD compliance posture of the three vendors evaluated. ElevenLabs DPA is accepted by
+executing the service agreement — it is a publicly available, standardized DPA.
+
+URL fetched: https://elevenlabs.io/dpa
+Verbatim quotes: Confirmed from fetched content (prior session).
+
+---
+
+SECTION F — Deepgram DPA Status
+Source: https://developers.deepgram.com/trust-security/data-privacy-compliance
+— FETCHED THIS SESSION
+
+LGPD: NOT MENTIONED on the page.
+
+Page covers the following frameworks only:
+- SOC 2 Type I and Type II (certificates available by request)
+- GDPR (EU-specific endpoint at api.eu.deepgram.com)
+- Australian Privacy (AU-specific endpoint, DPA available)
+- HIPAA (BAA available for Covered Entities)
+- CCPA (California Consumer Privacy Act compliant)
+- PCI (compliant with yearly reviews)
+
+No mention of: LGPD, Brazil, Brazilian data transfer compliance, Art. 33, CPCs, or any
+Brazilian regulatory framework.
+
+DPA availability per page: "For other frameworks (HIPAA, GDPR), agreements are available
+upon request through their Account Executive." A DPA for LGPD/Brazil is NOT confirmed as
+available on the public page — it must be specifically requested from Deepgram.
+
+Notable note for voice-agent users: "Voice Agent customers using a third-party LLM for the
+think step should confirm that provider's residency and processing guarantees independently."
+
+UNVERIFIED: Whether Deepgram provides a DPA that covers LGPD and includes a Brazilian
+transfer mechanism (Art. 33 basis). This must be confirmed directly with Deepgram before
+any client employee PII is sent via Deepgram APIs.
+
+URL fetched: https://developers.deepgram.com/trust-security/data-privacy-compliance
+LGPD coverage: NOT CONFIRMED. Status: UNVERIFIED.
+
+---
+
+SECTION G — CD/ANPD 19/2024 transfer mechanisms (cross-reference)
+
+For the four transfer mechanisms under CD/ANPD 19/2024, see doc_9.txt Section G and Q4-delta
+Dimension 4 in SPIKE.md. No new research conducted here — cross-reference only.
+
+Summary for Q5 use:
+1. Adequacy decision (Inciso I) — US: no adequacy. EU: adequacy per Resolution 32/2026.
+2. Specific contractual clauses (CPCs) — available under CD/ANPD 19/2024, Annex II.
+3. Standard contractual clauses (CPCs-padrão) — ANPD standard form.
+4. Global corporate rules (normas corporativas globais) — intra-group transfers only.
+
+EU SCCs (as incorporated in Anthropic DPA, SCCs Module 2) — whether ANPD will accept
+EU SCCs as satisfying the LGPD CPC requirement is legally unsettled. See Q4 Section C.
+
+---
+
+SECTION H — Vendor DPA summary table (raw research data for Q5 checklist)
+
+| Vendor | LGPD named in DPA? | Transfer mechanism | DPA accessibility | Source |
+|--------|--------------------|--------------------|-------------------|--------|
+| Anthropic | Not explicitly (DPA covers "applicable data protection laws"; LGPD implied) | EU SCCs Module 2 (whether satisfies LGPD CPCs: legally unsettled) | Auto-incorporated on commercial terms acceptance | doc_8.txt Section B |
+| ElevenLabs | YES — explicitly: "Brazil's General Data Protection Law (Lei Geral de Proteção de Dados – LGPD)" | "Brazil SCCs" incorporated | Available at elevenlabs.io/dpa (April 2026) | This session — elevenlabs.io/dpa |
+| Deepgram | NOT CONFIRMED | NOT CONFIRMED | Must be requested from account executive | This session — developers.deepgram.com/trust-security/data-privacy-compliance |
+
+Status key: Anthropic = READY (DPA auto-incorporated). ElevenLabs = AVAILABLE (accept DPA).
+Deepgram = UNVERIFIED — BLOCKING until DPA with LGPD coverage confirmed.

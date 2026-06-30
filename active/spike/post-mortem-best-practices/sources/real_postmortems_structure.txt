@@ -1,0 +1,100 @@
+SOURCE COLLECTION: Real Published Post-Mortems — Structural Analysis
+FETCHED: 2026-05-27
+
+=== GitLab Database Incident, January 2017 ===
+URL: https://about.gitlab.com/blog/2017/02/01/gitlab-dot-com-database-incident/
+
+STRUCTURE OBSERVED:
+1. Executive Summary (opening statement)
+2. Timeline with Incident Breakdown (3 separate incidents described)
+3. Problems Encountered (root cause analysis)
+4. Recovery (actions taken to restore service)
+
+VERBATIM QUOTES:
+- Severity: "We lost six hours of database data (issues, merge requests, users, comments, snippets, etc.) for GitLab.com."
+- On the critical mistake: "decides to remove the directory. After a second or two he notices he ran it on `db1.cluster.gitlab.com`, instead of `db2.cluster.gitlab.com`."
+- On backup failures: "out of five backup/replication techniques deployed none are working reliably or set up in the first place."
+
+NOTABLE: The document notably lacks a formal "Action Items" section. Instead: "in a few days we'll publish a post on why this happened and a list of measures we will implement to prevent it happening again."
+
+TIMELINE STRUCTURE: Timestamps in UTC (Jan 31 6pm UTC → Feb 1 01:18 UTC)
+
+=== Cloudflare Outage, July 2, 2019 ===
+URL: https://blog.cloudflare.com/details-of-the-cloudflare-outage-on-july-2-2019/
+
+STRUCTURE OBSERVED:
+1. Introduction/Context
+2. The Events of July 2 (initial incident description)
+3. What Happened (detailed chronological timeline)
+4. How Cloudflare Operates (system architecture explanation)
+5. WAF Threats (business context)
+6. Quicksilver (technical infrastructure details)
+7. What Went Wrong (root cause analysis)
+8. What's Happened Since (remediation actions)
+9. Conclusion
+10. Appendix (deep technical explanation)
+
+ROOT CAUSE VERBATIM:
+"An engineer wrote a regular expression that could easily backtrack enormously... A protection that would have helped prevent excessive CPU use... was removed by mistake... The regular expression engine being used didn't have complexity guarantees... The test suite didn't have a way of identifying excessive CPU consumption..."
+
+TIMELINE FORMAT: Timestamps with minutes precision (13:42 → 14:52)
+
+REMEDIATION VERBATIM: Lists specific items with ETAs (e.g., "switching regex engines to ones with runtime guarantees (ETA July 31)")
+
+=== Cloudflare Incident, June 20, 2024 ===
+URL: https://blog.cloudflare.com/cloudflare-incident-on-june-20-2024/
+
+STRUCTURE OBSERVED:
+1. Title & Metadata
+2. Opening Summary (dated paragraph with authors)
+3. Background (subsections: rate-limiting, traffic balancing)
+4. Incident timeline and impact
+5. Technical description of the error and how it happened
+6. Remediation and follow-up steps
+7. Conclusion
+
+OPENING SUMMARY VERBATIM:
+"On Thursday, June 20, 2024, two independent events caused an increase in latency and error rates for Internet properties and Cloudflare services that lasted 114 minutes."
+
+IMPACT METRICS VERBATIM:
+"During the 30-minute peak of the impact, we saw that 1.4 - 2.1% of HTTP requests to our CDN received a generic error page, and observed a 3x increase for the 99th percentile Time To First Byte (TTFB) latency."
+
+TIMELINE FORMAT: Bullet points with UTC timestamps (e.g., "14:14 DDoS rule gradual deployment starts")
+
+=== AWS S3 Outage, February 28, 2017 ===
+URL: https://aws.amazon.com/message/41926/
+
+STRUCTURE OBSERVED:
+1. Introduction/Summary Header
+2. Root Cause Explanation
+3. Impact Description
+4. Recovery Timeline
+5. Changes/Corrective Actions
+6. Communication Improvements
+7. Closing Apology
+
+ROOT CAUSE VERBATIM:
+"an authorized S3 team member using an established playbook executed a command which was intended to remove a small number of servers"
+"one of the inputs to the command was entered incorrectly and a larger set of servers was removed than intended"
+"Removing a significant portion of the capacity caused each of these systems to require a full restart"
+
+CORRECTIVE ACTIONS VERBATIM:
+"We have modified this tool to remove capacity more slowly and added safeguards to prevent capacity from being removed when it will take any subsystem below its minimum required capacity level"
+"We are also auditing our other operational tools to ensure we have similar safety checks"
+
+=== CROSS-SOURCE STRUCTURAL ANALYSIS ===
+
+Sections present in ALL four real post-mortems:
+- Summary / what happened (brief)
+- Timeline with timestamps
+- Root cause / what went wrong
+- Impact (quantified)
+- Remediation / what changed
+
+Sections present in SOME but not all:
+- Explicit "Action Items" table (present: PagerDuty, Cloudflare 2024; absent: GitLab, AWS)
+- Architecture/background explanation (present: Cloudflare; absent: GitLab, AWS)
+- "What went well" section (absent from all real examples; present in templates)
+- Messaging/communications section (present: PagerDuty template; absent from published examples)
+
+Pattern: Real published post-mortems tend to be more narrative and less template-rigid than prescribed templates.

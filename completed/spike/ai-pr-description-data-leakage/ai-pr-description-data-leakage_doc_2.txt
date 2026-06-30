@@ -1,0 +1,50 @@
+SOURCE: https://docs.github.com/en/code-security/secret-scanning/introduction/about-secret-scanning
+         + https://docs.github.com/en/code-security/secret-scanning/introduction/supported-secret-scanning-patterns
+FETCHED: 2026-06-25
+TITLE: GitHub Secret Scanning — About + Supported Patterns
+PUBLISHER: GitHub
+
+---
+
+## What GitHub Secret Scanning Detects
+
+GitHub Secret Scanning scans for "API keys, passwords, tokens, and other known secret types."
+
+It scans across:
+- Repository file contents (committed files)
+- "Titles, descriptions, and comments in pull requests" — PR body/description IS scanned
+- Issues
+- GitHub Actions workflows
+
+## Three Pattern Categories
+
+1. Generic patterns: "Secrets not tied to a specific provider, such as private keys and database connection strings" (regex-based detection)
+2. AI-detected patterns: Generic passwords identified through Copilot's AI models
+3. Provider patterns: "Secrets tied to a specific service provider (such as AWS, Azure, Stripe)" (regex-based detection)
+
+## What It Does NOT Cover
+
+The documentation provides no information about detecting:
+- Database connection strings WITHOUT credentials (i.e., just hostnames + db names + usernames, no password)
+- Bare hostnames or infrastructure topology
+- Customer names or business-identifying information
+- User counts, record counts, or scale-revealing metrics
+- Any non-credential metadata
+
+## Confirmed Coverage of PR Bodies
+
+From the About page: "GitHub Secret Scanning scans ... Titles, descriptions, and comments in pull requests"
+
+This confirms GitHub Secret Scanning DOES scan PR body prose — but only for credential/token patterns, not for free-form sensitive business data.
+
+## Relevance to the 4Shark Incident
+
+The Atento CO incident exposed:
+- Customer name (Atento CO): NOT a credential pattern — not detected
+- QA hostname (glazrdbvp051.database.windows.net): MIGHT match a connection string pattern if combined with credentials, but alone is not a recognized secret
+- Production hostname (sql4shark.database.windows.net): same — hostname alone is not a secret
+- DB name (CO_4Shark_DB): not a credential — not detected
+- DB username (userCO_4Shark_DB): username without password — not a credential — not detected
+- User count (6593): business metric — not detected
+
+Conclusion: GitHub Secret Scanning has ZERO coverage for the 4Shark incident pattern. The tool is designed for credentials (things that grant access), not for sensitive business/infra context.

@@ -1,0 +1,69 @@
+SOURCE MATERIAL — Terraform state/provider separation
+Collected 2026-06-26 for spike: terraform-stack-organization
+
+=== SOURCE 1 ===
+URL: https://spacelift.io/blog/terraform-multi-cloud
+Topic: credential blast radius with multi-cloud single state
+
+Verbatim (fetched):
+"Targeting multiple clouds from the same Terraform configuration requires Terraform to have
+credentials for all target clouds. This makes it even more important to handle these
+credentials carefully, due to the potential blast radius of having them leaked."
+
+=== SOURCE 2 ===
+URL: https://developer.hashicorp.com/terraform/tutorials/modules/organize-configuration
+Topic: blast radius via state separation
+
+Verbatim (fetched):
+"By creating separate directories for each environment, you can shrink the blast radius of
+your Terraform operations and ensure you will only modify intended infrastructure."
+
+Also from same page:
+"State separation signals more mature usage of Terraform; with additional maturity comes
+additional complexity."
+
+Also from same page (on monolithic state risk):
+"The previous operation destroyed both the development and production environment resources.
+When working with monolithic configuration... that approach can be risky and is not a
+sustainable way to manage distinct environments."
+
+=== SOURCE 3 ===
+URL: https://support.hashicorp.com/hc/en-us/articles/7955227415059-How-to-Split-State-Files
+(Surfaced via search result summary — page not directly fetched)
+Practitioner synthesis from search:
+"Organizations commonly want to create a strong separation between multiple deployments
+serving different development stages or different internal teams, where the backend for each
+deployment often has different credentials and access controls. CLI workspaces within a
+working directory use the same backend, so they are not a suitable isolation mechanism for
+this scenario."
+
+"The best practice is to split your infrastructure into multiple Terraform configurations
+(called root modules), which usually use provider configurations with different credentials."
+
+=== SOURCE 4 ===
+URL: https://docs.cloud.google.com/docs/terraform/best-practices/root-modules
+Topic: resource count guidance per state
+
+Verbatim (fetched):
+"Don't include more than 100 resources (and ideally only a few dozen) in a single state."
+
+"To manage applications and projects independently of each other, put resources for each
+application and project in their own Terraform directories."
+
+NOTE: This source does NOT address separation by cloud provider — it frames separation
+by application/service boundary and environment only.
+
+=== SOURCE 5 ===
+URL: https://developer.hashicorp.com/terraform/language/modules/develop/providers
+Topic: multi-provider mechanics (official reference)
+
+Verbatim (fetched):
+"The `providers` argument within a `module` block is similar to the `provider` argument
+within a resource, but is a map rather than a single string because a module may contain
+resources from many different providers."
+
+"If you need different instances of your module to use different provider configurations
+then you must use a separate `module` block for each distinct set of provider configurations."
+
+NOTE: HashiCorp's reference docs do not warn against multi-provider root modules —
+they only describe the mechanics. The "blast radius" framing is practitioner-sourced.

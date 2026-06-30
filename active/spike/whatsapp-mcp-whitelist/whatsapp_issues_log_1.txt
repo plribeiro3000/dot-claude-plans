@@ -1,0 +1,83 @@
+GitHub Issues — lharries/whatsapp-mcp
+Collected: 2026-05-27
+Command: gh issue list -R lharries/whatsapp-mcp --state all --limit 50
+
+== ISSUES RELEVANT TO WHITELIST / PRIVACY / ACCESS CONTROL ==
+
+Issue #218 — "Add policy enforcement for message sending" (OPEN, 2026-04-12)
+Author: L1AD
+Summary: The server gives agents access to send_message, send_file, send_audio from
+the personal account to ANY contact. Suggests documenting support for
+PolicyLayer/Intercept (open-source MCP proxy) with a YAML policy that requires
+approval or denies specific tools.
+No implementation or code filtering of read tools (list_messages, list_chats, etc.)
+No response from maintainer.
+
+Issue #215 — "[Security] Bridge REST API binds to 0.0.0.0" (OPEN, 2026-04-09)
+Author: djinnsix-ac (Allen Clark, djinnsix Ltd)
+The REST API (:8080) is exposed on ALL interfaces — anyone on the same LAN can
+call /api/send or /api/download without authentication.
+Fix: bind to 127.0.0.1 instead.
+Mentions their hardened fork: https://github.com/djinnsix/whatsapp-mcp (v0.2.0-djinnsix)
+No mention of JID whitelist or read-access filtering.
+
+Issue #198 — "Contact identity confusion: whatsmeow LID mappings never synced" (OPEN, 2026-04-01)
+Not relevant to whitelist. LID resolution bug.
+
+Issue #126 — "This project seems dead and broken — which fork is most active?" (OPEN, 2025-12-24)
+No activity from maintainer. Multiple community responses pointing to forks.
+
+Issue #151 — "Is this now abandonware?" (OPEN, 2026-01-15)
+No response from maintainer.
+
+== OBSERVATION ==
+No issue exists specifically requesting contact/JID whitelist or read-access filtering.
+The closest is #218 (send-only policy) via an external proxy.
+The maintainer has not merged any of 20+ open PRs since the repo was created.
+
+== PULL REQUESTS RELEVANT TO CONFIGURABILITY / ARCHITECTURE ==
+
+PR #242 — "feat: make bridge port and MCP API URL configurable via env vars" (OPEN, 2026-05-12)
+Author: realitix
+Adds WHATSAPP_BRIDGE_PORT (Go) and WHATSAPP_API_BASE_URL (Python) env vars.
+Shows the established pattern for the project: env vars for configuration.
+Not merged.
+
+PR #224 — "security: bind REST API to 127.0.0.1 by default" (OPEN, 2026-04-19)
+Addresses Issue #215. Not merged.
+
+PR #249 — "Multi tenant" (OPEN, 2026-05-17)
+Large PR (6118 additions, 1683 deletions). No detail visible in CLI output.
+Not reviewed due to size; likely about running multiple WhatsApp accounts.
+
+== FORKS EXAMINED FOR WHITELIST FEATURES ==
+
+djinnsix/whatsapp-mcp (v0.2.0-djinnsix)
+- Binds REST to 127.0.0.1
+- CVE patches (urllib3, h11)
+- Collision-safe media filenames
+- NO JID whitelist or read-access filtering
+
+LukasHaas/whatsapp-mcp
+- Expanded contact search (full address book)
+- LID resolution
+- Accent-insensitive search
+- NO JID whitelist or read-access filtering
+
+verygoodplugins/whatsapp-mcp
+- WHATSAPP_MEDIA_ROOTS for file path confinement
+- Bridge bearer-token auth
+- NO JID whitelist or read-access filtering
+
+FelixIsaac/whatsapp-mcp-extended
+- 26 tools including group management, polls, presence, blocklist
+- WHATSAPP_MCP_TOOLSETS env var for selecting tool subsets
+- NO JID whitelist or read-access filtering
+
+mario-andreschak/mcp-whatsapp-web (TypeScript, Baileys)
+- Different implementation (not whatsmeow-based)
+- NO contact filtering
+
+== CONCLUSION ==
+No fork or PR in the ecosystem implements a JID/contact whitelist for read access.
+The feature does not exist upstream. Implementation requires custom work.

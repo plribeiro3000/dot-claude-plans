@@ -1,0 +1,30 @@
+SOURCE: https://cloud.google.com/identity-platform/docs/multi-tenancy-authentication
+  (redirected to: https://docs.cloud.google.com/identity-platform/docs/multi-tenancy-authentication)
+FETCHED: 2026-06-17
+
+TITLE: Google Cloud Identity Platform — Multi-tenancy authentication
+
+VERBATIM QUOTE:
+"To sign in to a tenant, the tenant ID needs to be passed to the `auth` object."
+
+"After signing in with a tenant, a tenant user will be returned with `user.tenantId`
+set to that tenant."
+
+"`tenantId` is not persisted on page reloads," requiring developers to re-establish
+tenant context after navigation or redirect flows.
+
+"when a user tries to sign in to a provider (such as SAML) with an email that already
+exists for another provider (such as Google), the error
+`auth/account-exists-with-different-credential` is thrown."
+(NOTE: this is intra-tenant, not cross-tenant)
+
+## Google Cloud Identity Platform Design
+
+Google Identity Platform requires the TENANT ID to be set on the auth object BEFORE
+authentication. This is architecturally equivalent to Option B (tenant-aware auth) —
+the client must know and pass the tenant context at login time.
+
+The documentation does not explicitly state whether the same email can exist across
+different tenants, but the architecture requires tenant context to be passed by the
+client at every auth request. The tenantId is not persisted — it must be provided
+by the application for every request.

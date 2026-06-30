@@ -1,0 +1,13 @@
+SOURCE: https://www.monterail.com/blog/best-practices-for-ruby-on-rails-data-migrations
+FETCHED: 2026-06-23
+
+=== Skeleton models ===
+
+"To ensure migrations run correctly even after models have been changed or deleted, developers may need to include 'skeleton' model definitions within migration files or use pure SQL queries."
+
+=== data-migrate gem ===
+
+"This gem, a popular choice for Ruby on Rails development services, extends the Rails migration system to support data migrations, offering a standardized way to manage data changes."
+
+=== Note ===
+This source uses the term "skeleton model definitions" — equivalent to stub/local models. Confirms the two camps (skeleton models OR pure SQL) as the accepted solutions to drift.

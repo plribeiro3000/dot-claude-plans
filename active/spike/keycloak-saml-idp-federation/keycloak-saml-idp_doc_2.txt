@@ -1,0 +1,75 @@
+SOURCE: https://www.pulumi.com/registry/packages/keycloak/api-docs/attributeimporteridentityprovidermapper/
+FETCHED: 2026-05-28
+
+=== keycloak.AttributeImporterIdentityProviderMapper ===
+
+Overview:
+"can be used to map attributes from externally defined users to attributes or
+properties of the imported Keycloak user"
+
+Behavior by provider type:
+- OIDC providers: Maps ID or access token claims to Keycloak user attributes
+- SAML providers: Maps assertion attributes to user attributes
+- Social providers: Maps JSON fields from user profiles to attributes
+
+Required Configuration Fields:
+- identity_provider_alias: "The alias of the associated identity provider"
+- realm:                   "The name of the realm"
+- user_attribute:          "The user attribute or property name to store the mapped result"
+- name:                    "The name of the mapper"
+
+Optional Provider-Specific Fields:
+- claim_name:              "For OIDC based providers, this is the name of the claim to use"
+- attribute_name:          "For SAML based providers, this is the name of the attribute to search for in the assertion"
+- attribute_friendly_name: SAML attribute friendly name (conflicts with attribute_name)
+- extra_config:            Extends mapper configuration; Keycloak 10+ requires syncMode specification here
+
+Version Note:
+"If you are using Keycloak 10 or higher, you will need to specify the extraConfig argument"
+
+=== SOURCE: wjw465150.gitbooks.io (Keycloak docs) — Mapping Claims and Assertions ===
+
+Overview:
+"You can import the SAML and OpenID Connect metadata provided by the external IDP you are
+authenticating with into the environment of the realm."
+
+Broker mappers dual purpose:
+"import SAML attributes or OIDC ID/Access token claims into user attributes and user role mappings."
+
+Mapper Types available:
+- Attribute Importer
+- Hardcoded Role
+- Hardcoded Attribute
+(Additional types available via UI tooltip hover)
+
+Dot notation support:
+"dot notation for nesting and square brackets to access array fields by index. For example
+'contact.address[0].country'."
+
+Debugging:
+"enable the DEBUG level logger org.keycloak.social.user_profile_dump"
+
+=== TWO-STAGE MAPPING FLOW (composite finding from multiple sources) ===
+
+Stage 1 — SAML Assertion → Keycloak User Attribute:
+  Mapper type: "Attribute Importer"
+  Configuration: attribute_name (SAML attr name in assertion) → user_attribute (Keycloak user attr)
+  Result: SAML attribute stored as Keycloak user attribute
+
+Stage 2 — Keycloak User Attribute → OIDC Token Claim:
+  Under the downstream OIDC Client's Mappers tab, add:
+  Mapper type: "User Attribute"
+  Configuration: user_attribute (Keycloak user attr) → token_claim_name (claim in JWT)
+  Result: attribute value appears as claim in access_token / id_token that app reads
+
+This two-stage design is what allows SAML upstream + OIDC downstream to work:
+- The SAML assertion attribute (e.g., employeeId) is stored on the Keycloak user
+- The downstream OIDC client mapper includes it in the JWT
+- app reads the JWT claim as usual via JWT.decode — no change to app code
+
+SOURCE: https://github.com/keycloak/keycloak/discussions/8462
+NOTE: Known issue — "Access Token claims not imported using Identity Provider Attribute Importer Mappers"
+  in some Keycloak versions. The attribute is stored on the user BUT may not appear in the access_token
+  unless a separate Client Scope / Client mapper is explicitly configured on the downstream OIDC client.
+  This is a critical operational detail: the Attribute Importer alone is not sufficient; a second mapper
+  on the OIDC client side is required for the claim to appear in the JWT that app decodes.

@@ -1,0 +1,26 @@
+SOURCE: https://medium.com/@jeffcoh23/why-you-should-avoid-activerecord-when-using-ruby-on-rails-data-migrate-gem-2651739395d9
+FETCHED: 2026-06-23
+
+=== Core argument for raw SQL in data-migrate ===
+
+"Writing data migrations using only SQL...bypasses the Active Record layer to communicate directly with your database."
+
+"Active Record is an ORM (Object Relational Mapper) that sits atop your MySQL database — essentially adding a layer of complexity and integrity to that underlying database."
+
+=== What is eliminated with raw SQL ===
+
+This approach eliminates "the emphasis on the importance of carefully monitoring various changes to a model with yet to be run data migrations."
+
+=== The audit trail problem ===
+
+Gems like PaperTrail that "plug into Active Record code" won't function when using raw SQL, leaving "an auditing void for that record."
+
+=== Drift scenario ===
+
+"Jake had added a validation on the User model to disallow numbers in that field" after the migration was merged, causing the migration to fail when run in production against the new validation rules.
+
+"model and database validations" can change independently of pending migrations, creating synchronization problems.
+
+=== Note ===
+This article is the raw-SQL camp's strongest argument specifically within the data-migrate gem context.
+Key trade-off surfaced: raw SQL bypasses audit trail (PaperTrail won't fire). This directly relates to 4Shark's concern about bypassing the ORM and audit trail callbacks.

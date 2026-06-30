@@ -1,0 +1,98 @@
+# ANPD Enforcement History — Raw Source Material
+# Spike: LGPD Privacy Policy Requirements for Multi-Entity Economic Group
+# Fetched: 2026-06-25
+
+=======================================================================
+SOURCE: https://blog.bcompliance.com.br/2026/05/09/sancoes-anpd-canal-lgpd-fiscalizacao/
+VERIFIED: yes — fetched 2026-06-25, content confirmed
+=======================================================================
+
+## First Private Company Fine (July 2023)
+
+Company: Telekall Infoservice (microenterprise, telecommunications sector)
+Fine amount: R$ 14,400
+Violations:
+  1. Treating personal data without legal basis (Art. 7 LGPD)
+  2. Absence of a designated Data Protection Officer (DPO)
+
+Relevance to this spike: NO violation relating to CNPJ identification or
+controller misidentification in privacy policy. The DPO absence is the only
+"transparency" type violation.
+
+=======================================================================
+SOURCE: https://teletime.com.br/13/12/2024/anpd-fiscaliza-falta-de-encarregado-de-dados-e-canais-efetivos/
+VERIFIED: yes — fetched 2026-06-25, content confirmed including the "no CNPJ" note
+=======================================================================
+
+## Mass Notification (December 2024)
+
+20 large companies notified by ANPD including:
+- Uber
+- Serasa
+- Vivo (Telefônica)
+- TikTok (ByteDance)
+- X (Twitter)
+- Telegram
+- QuintoAndar
+- Latam Airlines
+- Cacau Show
+- Tinder
+(and 10 others across technology, telecoms, education, health, retail)
+
+Violations identified (from teletime.com.br fetch):
+  1. Missing or unregistered DPO: companies "não indicaram o contato do Encarregado
+     pelo tratamento de dados pessoais"
+  2. Ineffective communication channels: channels were non-functional or
+     non-responsive, preventing data subjects from exercising their rights
+
+Outcome: All 20 companies implemented adequacy measures following ANPD notification.
+
+CONFIRMED: "The article contains no reference to violations involving incorrect CNPJ
+registration or controller misidentification in privacy policies."
+
+=======================================================================
+SOURCE: https://blog.bcompliance.com.br/2026/05/09/sancoes-anpd-canal-lgpd-fiscalizacao/
+VERIFIED: yes — fetched 2026-06-25
+=======================================================================
+
+## ANPD Priority Themes Map (2026-2027)
+
+Four enforcement axes planned:
+  1. Data subjects' rights (emphasis on biometric, health, financial data)
+  2. Protection of children and adolescents online
+  3. Public authorities
+  4. Artificial intelligence
+
+40 enforcement actions planned in the data subjects' rights axis over two years.
+
+Note: "controller identification" and "privacy policy CNPJ format" are NOT listed
+as priority axes. Privacy policy formatting is not in the 2026-2027 enforcement plan.
+
+=======================================================================
+PUBLIC SECTOR ACTIONS NOTE
+=======================================================================
+
+ANPD's only sanctioning decisions in 2024 involved public sector entities.
+No private sector fines were issued in 2024.
+First private fine: Telekall, July 2023.
+
+=======================================================================
+SEARCH RESULT NOTE — controller identification enforcement
+=======================================================================
+
+Multiple searches for "ANPD" + "identificação do controlador" + "política de
+privacidade" + "CNPJ" found no enforcement action, normative resolution, guidance
+document, or published decision specifically targeting:
+- Incorrect CNPJ in a privacy policy
+- Wrong or incomplete controller identification in a published policy
+- Multi-entity groups failing to list all constituent CNPJs
+
+Absence confirmed after searching: Migalhas, Conjur, ConvergênciaDigital,
+bcompliance.com.br, and ANPD's own publications section.
+
+This absence is meaningful. ANPD's enforcement focus in 2023-2026 has been on:
+  1. Processing without legal basis
+  2. DPO designation and publicity
+  3. Communication channels for data subject rights
+  4. Data breaches (Art. 48) and security (Art. 46)
+  5. Children's data protection

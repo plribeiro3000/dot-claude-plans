@@ -1,0 +1,67 @@
+SOURCE: https://code.claude.com/docs/en/hooks (WorktreeCreate + WorktreeRemove sections)
+FETCHED: 2026-06-05
+
+--- WORKTREECREATE HOOK ---
+
+PURPOSE: Replaces Claude Code's default git worktree creation behavior. Allows you to
+customize how worktrees are created when using --worktree flag or isolation: "worktree" in
+subagent configuration.
+
+WHEN IT FIRES: When a worktree is being created via --worktree or isolation: "worktree".
+
+INPUT SCHEMA (stdin JSON, in addition to common fields):
+  worktree_name  - Name of the worktree to create
+  worktree_path  - Desired path for the worktree (default: .claude/worktrees/<name>)
+  base_commit    - Git commit or branch to base the worktree on
+  git_dir        - Path to the git repository
+
+Example input:
+  {
+    "session_id": "abc123",
+    "transcript_path": "/Users/.../.claude/projects/.../transcript.jsonl",
+    "cwd": "/Users/my-project",
+    "hook_event_name": "WorktreeCreate",
+    "worktree_name": "feature-branch-wt",
+    "worktree_path": "/Users/my-project/.git/worktrees/feature-branch-wt",
+    "base_commit": "main",
+    "git_dir": "/Users/my-project/.git"
+  }
+
+OUTPUT CONTRACT:
+  The hook MUST print the created worktree's absolute path to stdout on success.
+  Any other output is ignored.
+  Exit code 0 = success; non-zero = entire worktree creation fails.
+
+CRITICAL: The hook can return a DIFFERENT path than worktree_path received. This is how
+worktrees can be placed in /tmp or any custom directory — the hook creates the worktree
+wherever it wants and prints THAT path.
+
+--- WORKTREEREMOVE HOOK ---
+
+PURPOSE: Runs when a worktree is being removed, either at session exit or when a subagent
+finishes. Allows custom cleanup logic beyond git's default removal.
+
+WHEN IT FIRES:
+  - At session exit when using --worktree
+  - When a subagent with isolation: "worktree" finishes
+
+INPUT SCHEMA (stdin JSON):
+  worktree_path  - Path to the worktree being removed
+  worktree_name  - Name of the worktree
+
+DECISION CONTROL: NONE. Exit codes and output are IGNORED.
+Failures during worktree removal are logged in debug mode but do not affect session cleanup.
+
+IMPORTANT: After the WorktreeRemove hook completes (regardless of exit code), Claude Code's
+default cleanup still runs: git worktree remove <worktree_path>
+The hook runs BEFORE this cleanup, so it can perform custom state cleanup, archive files, etc.
+If worktree is in /tmp and has already been deleted (OS reboot), git worktree remove will
+fail silently — the stale administrative entry under .git/worktrees/ remains.
+
+--- CRITICAL STDOUT ISSUE (from tfriedel/claude-worktree-hooks) ---
+
+"Always redirect: git worktree add ... >/dev/null 2>&1
+This is critical because git worktree add's 'HEAD is now at...' message gets concatenated
+with your path output, and Claude can't parse it and hangs silently."
+
+Source: https://github.com/tfriedel/claude-worktree-hooks

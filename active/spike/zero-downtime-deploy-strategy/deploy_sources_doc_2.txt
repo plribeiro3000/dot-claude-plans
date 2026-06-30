@@ -1,0 +1,193 @@
+AUXILIARY SOURCE FILE — deploy_sources_doc_2.txt
+Spike: zero-downtime-deploy-strategy
+Fetched: 2026-06-24
+Purpose: AI-agent angle sources and unverified/partial sources
+
+=============================================================
+SOURCE A: Unleash blog — Claude Code + Unleash integration
+URL: getunleash.io/blog/claude-code-unleash-agentic-ai-release-governance
+STATUS: VERIFIED — with one UNVERIFIED excerpt (see below)
+=============================================================
+
+Context: Describes how CLAUDE.md rules govern agent deployment decisions through
+feature flag enforcement. Full verbatim excerpts in deploy_sources_doc_1.txt (Source 12).
+
+Confirmed verbatim (re-fetched 2026-06-24):
+"But autonomy without governance is a recipe for instability."
+
+UNVERIFIED excerpt — NOT FOUND on re-fetch (2026-06-24):
+"every piece of AI-generated logic behind a feature toggle before it hits the mainline
+repository"
+This phrase does NOT appear in the fetched page. It is NOT used to sustain any Finding
+or Option in SPIKE.md. Reason for original inclusion: fabricated composite. Removed.
+
+The article does describe the Unleash approach as mandating flags for ALL AI-generated code
+as policy — but this paraphrase is not supported by the specific verbatim phrase above.
+
+=============================================================
+SOURCE B: dev.to/nextools — Claude Code for Feature Flags
+URL: https://dev.to/nextools/claude-code-for-feature-flags-how-i-ship-risky-changes-without-losing-sleep-4he7
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Verbatim:
+"They let you separate the act of shipping code from the act of activating it."
+
+Rollout skill uses stages: "1%, 10%, 50%, 100%, with the explicit principle that
+'The schedule sets the maximum pace, but the metrics set the actual pace.'"
+
+NOTE: Article does NOT mention the agent over-recommending phased approaches or contain
+explicit CLAUDE.md deployment rules to arbitrate single vs multi-phase decisions.
+
+=============================================================
+SOURCE C: arxiv.org/html/2604.14228v1
+PAPER: Dive into Claude Code: The Design Space of Today's and Future AI Agent Systems
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Full verbatim excerpts in deploy_sources_doc_1.txt (Source 11).
+
+CRITICAL FINDING for the AI-angle section:
+The paper identifies a structural gap in how Claude Code reasons. Confirmed verbatim:
+"Claude Code's reactive loop follows the ReAct pattern (yao2022react): the model generates
+reasoning and tool invocations, the harness executes actions, and results feed the next
+iteration."
+
+And separately confirmed (verbatim):
+"each turn commits to one action sequence without backtracking"
+
+The paper contrasts this with (verbatim):
+"tree-search methods (zhou2026lats) that explore multiple action trajectories before committing"
+"explicit graph-based routing (langgraph2024), where control flow is defined as a state
+machine with typed edges"
+
+NOTE: The phrase "reactive ReAct loop rather than tree-search or graph-based routing" does
+NOT appear verbatim in the source. The three separate confirmed substrings above are the
+real text. The compound phrase was a fabricated composite and has been removed.
+
+This directly substantiates the engineer's observation that Claude "lacks a visão do todo"
+— architecturally, Claude Code commits to one action sequence per turn without backtracking
+to explore the full system context before recommending a deployment strategy.
+
+=============================================================
+SOURCE D: Google SRE Book
+URL: sre.google/sre-book/embracing-risk/
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Full verbatim excerpts in deploy_sources_doc_1.txt (Source 10).
+
+KEY SLO FRAMING: Google's "no longer zero outages" philosophy frames reliability as
+"reliable enough, but no more reliable than it needs to be" — operationalized via
+error budgets. This frames the 4Shark engineer's insight ("safest is not always best")
+within the canonical SRE vocabulary: the appropriate deployment strategy consumes an
+acceptable portion of the error budget, not the minimum possible portion.
+
+=============================================================
+SOURCE E: Web search synthesis — ECS zero downtime configuration
+SEARCH: "ECS rolling deployment minimumHealthyPercent maximumPercent zero downtime"
+STATUS: VERIFIED via AWS documentation (Source 8 in doc_1)
+=============================================================
+
+Three values that must be aligned for true ECS zero downtime (synthesis from search results):
+1. ALB deregistration delay
+2. App-level graceful shutdown (SIGTERM handling)
+3. ECS stopTimeout
+
+From search result synthesis:
+"stopTimeout must be greater than the sum of deregistration delay and graceful shutdown timeout"
+"set the deregistration delay attribute to approximately double your application's response time"
+
+Recommended zero-downtime ECS configuration (from oneuptime.com/blog results):
+- minimumHealthyPercent: 100
+- maximumPercent: 200
+
+=============================================================
+SOURCE F: Sidekiq Wiki — Deployment
+URL: github.com/sidekiq/sidekiq/wiki/Deployment
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Full verbatim in deploy_sources_doc_1.txt (Source 9).
+
+CRITICAL FOR 4SHARK: Sidekiq's default TERM timeout is 25 seconds. The engineer's
+concern about jobs "being processed mid-deploy" is directly addressed by Sidekiq's
+design: jobs are re-enqueued if they cannot complete within the timeout. However,
+the Iteration pattern (Sidekiq 7.3+) enables true resumability for long-running jobs,
+which is the appropriate mechanism for jobs that rename/restructure Redis keys.
+
+=============================================================
+SOURCE G: Feature toggle permissioning toggle — Fowler
+URL: martinfowler.com/articles/feature-toggles.html (primary)
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+From Fowler — three confirmed verbatim substrings (re-confirmed 2026-06-24):
+"These flags are used to change the features or product experience that certain users receive."
+
+"For example we may have a set of 'premium' features which we only toggle on for our paying customers."
+
+"I refer to this technique of turning on new features for a set of internal or beta users
+as a Champagne Brunch."
+
+"A Permissioning Toggle is used to manage features exposed to specific users and may
+be very long-lived compared to other categories of Feature Toggles."
+
+NOTE: The composite "Permissioning Toggles: Restrict features to specific user groups
+(premium users, beta testers, internal staff). Also called 'Champagne Brunch' toggles—an
+early tasting opportunity for internal teams." does NOT appear verbatim. The four
+confirmed substrings above are the real text.
+
+=============================================================
+SOURCE H: UNVERIFIED — Redirect failed
+URL: docs.launchdarkly.com/guides/best-practices/deployment-strategies
+STATUS: UNVERIFIED — page returned 301 redirect; redirect target also returned
+"Page Not Found". Content NOT used to sustain any Finding.
+=============================================================
+
+=============================================================
+SOURCE I: UNVERIFIED — 307 redirect
+URL: blogs.reliablepenguin.com/2025/11/16/database-migrations-without-drama-expand-contract-in-practice
+STATUS: UNVERIFIED — server returned HTTP 307 Temporary Redirect without body.
+Content NOT used to sustain any Finding.
+=============================================================
+
+=============================================================
+SOURCE J: Web search synthesis — Charity Majors / progressive delivery framing
+URL: charity.wtf/2023/03/08/deploys-are-the-wrong-way...
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Full verbatim in deploy_sources_doc_1.txt (Source 4).
+
+Charity Majors (co-founder Honeycomb, former Parse SRE) is widely cited as the
+canonical voice on "deploy vs release" distinction in the DevOps/SRE community.
+The 2023 blog post coins the "chainsaw vs scalpel" metaphor used throughout the
+feature flag literature.
+
+=============================================================
+SOURCE K: Web search synthesis — Sidekiq in-flight jobs
+URL: kirshatrov.com/posts/background-jobs-and-deploys
+STATUS: VERIFIED (fetched 2026-06-24)
+=============================================================
+
+Full verbatim in deploy_sources_doc_1.txt (Source 14).
+
+CRITICAL FINDING: The article identifies Resque vs Sidekiq as two different philosophies:
+- Sidekiq: kills and re-enqueues after timeout (25s default); fast but risks mid-job kills
+- Resque: waits indefinitely; safe but risks infinite loops
+
+4Shark uses Sidekiq. The engineer's concern about "groupfication documento" jobs being
+mid-deploy is addressed by: (a) Sidekiq re-enqueue on TERM, (b) Iteration pattern for
+resumability, OR (c) maintenance window to guarantee no in-flight processing.
+
+=============================================================
+OPEN QUESTION RAISED BY RESEARCH:
+Does 4Shark use Sidekiq's Iteration pattern for long-running jobs?
+If yes: phased deploy may be unnecessary for many Redis key rename scenarios.
+If no: the job-safety window is indeed needed, and the engineer's 3-round approach
+is justified not just for schema safety but for job continuity.
+
+This question should be answered with a codebase check before finalizing the decision
+framework — the spike agent does not have access to the app/integrator repos.
+=============================================================

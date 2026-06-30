@@ -1,0 +1,79 @@
+SOURCE: Microsoft Learn — bcp Utility (SQL Server)
+URL: https://learn.microsoft.com/en-us/sql/tools/bcp-utility?view=sql-server-ver16
+Retrieved: 2026-06-26
+
+--- KEY SECTIONS ---
+
+### bcp queryout mode
+
+"bcp [database_name. ] schema.table_name {in data_file | queryout data_file |
+ out data_file | format nul}..."
+
+"queryout data_file
+ Specifies the file to copy data into and is required when you bulk-copy data
+ from a query."
+
+The "queryout" direction: bcp runs a T-SQL query and writes the result rows
+to data_file. The key insight for the "generate SQL text" technique is that
+the SELECT query itself produces rows where each row IS a SQL string — bcp
+just writes those strings verbatim to the file.
+
+Example generating INSERT statements:
+  bcp "SELECT 'INSERT INTO TargetTable (col1, col2) VALUES (' +
+        CAST(col1 AS varchar) + ', ' + CAST(col2 AS varchar) + ');'
+       FROM SourceTable" queryout output.sql -S server -d db -T -c
+
+Each "row" in the bcp output is one INSERT statement. bcp does not natively
+generate INSERT statements — the query is what produces the SQL text.
+
+### -E flag (identity column explicit values)
+
+"-E
+ Specifies that identity value or values in the imported data file are to be
+ used for the identity column. If -E is not given, the identity values for
+ this column in the data file being imported are ignored, and SQL Server
+ automatically assigns unique values based on the seed and increment values
+ specified during table creation."
+
+NOTE: -E requires the session to have IDENTITY_INSERT enabled on the target
+table, which in turn requires either:
+  - ALTER TABLE ... (db_owner / ddl_admin permission), OR
+  - IDENTITY_INSERT granted at user level in Azure SQL (only possible at
+    db_owner level or via specific SQL Server permission)
+
+In DML-only scenarios (no ALTER TABLE or IDENTITY_INSERT rights), -E cannot
+be used. The workaround is the FK-remap-by-natural-key pattern:
+  - Export source rows WITHOUT identity values (let the destination assign new PKs)
+  - Map old PKs -> new PKs via natural keys AFTER import
+  - Update any FK columns to point to the new PKs
+
+### -c flag (character format)
+
+"-c
+ Performs the operation using a character data type. This option does not
+ prompt for each field; it uses char as the storage type, without prefixes,
+ and uses \t (tab character) as the field separator and \n (newline character)
+ as the row terminator."
+
+### -t field terminator
+
+"-t field_term
+ Specifies the field terminator. The default is \t (tab character). Use
+ this option to override the default field terminator."
+
+When generating SQL text via queryout, bcp -c will output each row on its
+own line with \n — which is exactly what you want for a file of INSERT
+statements. No field terminator matters because each row is a single string.
+
+--- IDENTITY_INSERT PERMISSION NOTE ---
+
+In Azure SQL with DML-only permissions, IDENTITY_INSERT requires:
+  SET IDENTITY_INSERT TableName ON;
+
+But SET IDENTITY_INSERT requires: The table owner, a member of sysadmin,
+db_owner, or db_ddladmin fixed roles.
+
+With only INSERT/UPDATE/DELETE (DML), IDENTITY_INSERT is NOT available.
+This is why the "generate SQL" technique was abandoned in favor of:
+  1. Import without PKs (let DB assign new values)
+  2. Remap FKs by natural key after import

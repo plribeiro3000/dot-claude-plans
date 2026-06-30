@@ -1,0 +1,67 @@
+SOURCE: PagerDuty Incident Response — Post-Mortem Template
+URL: https://response.pagerduty.com/after/post_mortem_template/
+FETCHED: 2026-05-27
+
+=== VERBATIM SECTION EXTRACTS ===
+
+SECTION 1 — Overview:
+"Include a short sentence or two summarizing the contributing factors, timeline summary, and the impact."
+
+SECTION 2 — What Happened:
+"Include a short description of what happened."
+
+SECTION 3 — Contributing Factors:
+"Include a description of any conditions that contributed to the issue. If there were any actions taken that exacerbated the issue, also include them here."
+
+SECTION 4 — Resolution:
+"Include a description of what solved the problem. If there was a temporary fix in place, describe that along with the long-term solution."
+
+SECTION 5 — Impact:
+"Be very specific here and include exact numbers."
+Tracks:
+- Time in SEV-1
+- Time in SEV-2
+- Notifications Delivered out of SLA
+- Events Dropped/Not Accepted
+- Accounts Affected
+- Users Affected
+- Support Requests Raised
+
+SECTION 6 — Responders:
+Lists: Incident Commander, scribe, and other involved personnel.
+
+SECTION 7 — Timeline:
+"Some important times to include: (1) time the contributing factor began, (2) time of the page, (3) time that the status page was updated, (4) time of any significant actions, (5) time the SEV-2/1 ended, (6) links to tools/logs."
+
+SECTION 8 — How'd We Do?
+Two subsections: "What Went Well?" and "What Didn't Go So Well?"
+
+SECTION 9 — Action Items:
+"Each action item should be in the form of a JIRA ticket" with specific tagging conventions.
+
+SECTION 10 — Messaging:
+Internal Email and External Message subsections for communicating findings.
+
+=== KEY PROCESS PRINCIPLES (from https://postmortems.pagerduty.com/culture/blameless/) ===
+
+WHAT BLAMELESS MEANS:
+"A blameless postmortem stays focused on how a mistake was made instead of who made it."
+
+WHY BLAME FAILS:
+"This impulse to blame and punish has the unintended effect of disincentivizing the knowledge sharing required to prevent future failure."
+
+THE GOAL:
+"The goal of the postmortem is to understand what systemic factors led to the incident and identify actions that can prevent this kind of failure from recurring."
+
+QUESTION GUIDANCE:
+"Ask 'what' and 'how' questions rather than 'who' or 'why.'"
+Avoid "why" questions because they "force people to justify their actions, attributing blame."
+
+FRAMING TECHNIQUE:
+"When inquiring about a human action, abstract to an inspecific responder. Anyone could have made the same mistake."
+
+MEETING SCHEDULING NOTE:
+Schedule postmortem meetings within 5 business days.
+
+NOTE ON BLAME-AWARE vs. BLAMELESS:
+The PagerDuty documentation acknowledges that "the tendency to blame is hardwired through millions of years of evolutionary neurobiology." The realistic goal is being "blame aware" — recognizing cognitive biases when they arise — rather than claiming true blamelessness is achievable.

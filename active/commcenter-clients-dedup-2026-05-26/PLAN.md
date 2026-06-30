@@ -170,7 +170,7 @@ The 4Shark action differs — B1 involves re-pointing Deals and disabling Client
 
 ---
 
-## To deliver — Bucket B7 (Felipe Granuzzio Fascirolli)
+## Done (4Shark side) + To deliver (Commcenter side) — Bucket B7 (Felipe Granuzzio Fascirolli)
 
 ### What happened (full timeline, evidence-backed)
 
@@ -182,13 +182,7 @@ The 4Shark action differs — B1 involves re-pointing Deals and disabling Client
 6. 2026-05-22 20:47:22 UTC: last PUT 204 on `/deals/13969` — Deal still in app, Client 9902 still in app
 7. **Between 2026-05-22 and 2026-05-26: Emerson hard-destroys Client 9902** in the app (via `Client.destroy`). The `dependent: :destroy` on `Client.has_many :deals` cascades → **Deal 13969 destroyed alongside**
 
-### Current state (snapshot 2026-05-26)
-
-- **Source normalized:** `id=9999` active (no prefix, B6-shape). The deal `13969` was already deleted from source by the customer earlier; only `14050` remains
-- **Mongo:** Client `9902 integrated` (vestige — no longer in app), Client `9999 pending` (POST keeps failing on retries because the row that conflicted is gone from app but the `9999` POST still returns 422 — to be verified next sync after name fix), Deal `13969 integrated` (vestige — no longer in app), Deal `14050 integrated` (in app, `client_id=nil`)
-- **App:** no Client with ext_id `9902` or `9999`; Deal `14050` exists with `client_id=nil`; Deal `13969` does not exist (cascaded)
-
-### Confirmed impact of the cascade
+### Confirmed impact of the cascade (Deal 13969)
 
 | Cascade target | dependent | Impact |
 |---|---|---|
@@ -200,78 +194,72 @@ The 4Shark action differs — B1 involves re-pointing Deals and disabling Client
 | `kpi_enrollments` | nullify | Not verified globally — even if some were nullified, recoverable when deal is re-created |
 | `delete_datasets` callback | after_destroy | Datasets are precomputed/recomputable — re-runs when deal exists again |
 
-**Net data loss:** the Deal 13969 itself (R$ 60, Bleica/Felipe, 2026-03-30). No commission damage. No goal damage. The Deal is the only thing lost.
+**Net data loss:** the Deal 13969 itself (R$ 60, Bleica/Felipe, 2026-03-30). No commission damage. No goal damage.
 
-### Why we cannot recreate it ourselves
+### Done — Phase 2 (2026-05-26) — 4Shark side
 
-We have the full deal data from the mongo import, **but** the new Felipe Client (9999) is not in the app yet because the name conflict prevented the original POST and the subsequent retries also failed. The pre-flight script (`/tmp/integration_debug_phase2_scripts_v2_commcenter_*.html` style) confirms: `Client 9999` not present in app. So we cannot create the Deal pointing to it.
+Executed via `bin/ecs run shared-001` and `bin/ecs run integrator-commcenter`. All 9 scripts (3 app + 3 mongo for 14050 + 3 mongo for 13969) ran clean.
 
-The customer needs to act so that (a) the Client 9999 enters the app correctly, and (b) the Deal 13969 is re-created in the source pointing to the right id.
+- **App (`shared-001`, cpy 2077):** `Deal app.id=19941012` (external_id=14050) destroyed via `destroy!`. Pre-flight confirmed `client_id=nil`, all restrict_with_exception associations = 0, no cascade impact
+- **Mongo (`integrator-commcenter`):** Resource Deal `14050` flipped `integrated → pending` via atomic `set(integration_status: 'pending')`. Next sync will POST instead of PUT
+- **Mongo (`integrator-commcenter`):** Resource Deal `13969` flipped `integrated → pending` via atomic `set(integration_status: 'pending')`. Next sync will POST a new Deal in the app (the cascaded one was a different `app.id`, irrelevant — POST resolves to the corrected Client `9999`)
 
-### Customer-side actions required
+Scripts: `/tmp/integration_debug_felipe_phase2_scripts_commcenter_20260526-200000.html` + `/tmp/integration_debug_felipe_13969_mongo_scripts_commcenter_20260526-201000.html`
 
-1. **Update name on source for `id=9999`** to include the CPF prefix:
+### Current state (post Phase 2)
+
+- **Source normalized:** `id=9999` active (no prefix). Deal `14050` points to `client_id=9999`. Deal `13969` still in the source pointing to the old `client_id=9902` (customer needs to retarget — see below)
+- **Mongo:** Client `9902 integrated` (vestige), Client `9999 pending`, Deal `14050 pending` (flipped), Deal `13969 pending` (flipped)
+- **App:** no Client with ext_id `9902` or `9999`; Deal `14050` no longer exists (destroyed); Deal `13969` does not exist (cascaded earlier)
+
+### To deliver — Customer-side actions (Commcenter)
+
+Three changes on the normalized base:
+
+1. **Update name on `id=9999`** to include CPF prefix:
    - From: `FELIPE GRANUZZIO FASCIROLLI`
    - To: `40249179865-FELIPE GRANUZZIO FASCIROLLI`
-   - This is the same shape as the 15 B6 updates (so B6 effectively becomes 16 ids). Bumping `updated_at` is mandatory — without it, the integrator will not pick up the change on the next sync
-2. **Re-create the Deal 13969 in the source normalized base** with the same details (date=2026-03-30, sold_price=60.0, description, etc.) pointing now to `client_id=9999` (the new Felipe id). Force `updated_at = NOW()` so integrator picks it up
-3. After the next sync runs: `POST /clients` for 9999 succeeds (name now unique, and the conflicting Client 9902 is gone from app), Client lands in app; subsequent `POST /deals` for the re-created Deal works (client_id resolves correctly)
+   - Force `updated_at` on the row so the integrator picks it up
+2. **On transaction 13969:** change `client_id` to `9999` and force `updated_at` on the row
+3. **On transaction 14050:** force `updated_at` on the row (`client_id` is already pointing to `9999`)
+
+After next sync: `POST /clients` for `9999` succeeds (name unique now, `9902` is gone from app), Client lands. Then `POST /deals` for `14050` and `13969` (both now `pending` in mongo) succeed with `client_id` resolving to the new Client `9999`.
 
 ### 4Shark-side actions (post customer fix)
 
-- `resource.set(integration_status: 'disabled')` on mongo Client `9902` (vestige cleanup)
-- `resource.set(integration_status: 'disabled')` on mongo Deal `13969` (vestige cleanup — the new re-created deal will have a different ext_id, so this stays as historical record)
-- Optionally re-trigger sync to accelerate
+- Verify next sync results: Client `9999` integrated, Deals `14050` and `13969` POSTed successfully with valid `client_id`
+- Then `resource.set(integration_status: 'disabled')` on mongo Client `9902` (vestige cleanup — no longer in app, never will be again)
 
 ---
 
-## Proposed message for Commcenter (commcenter)
+## Customer-facing package
 
-> Oi pessoal,
->
-> Encontramos 58 Clients que entraram na nossa base sem o prefixo do CPF no nome (formato `<cpf>-<nome>`), causado por uma mudanca no script de cadastro de voces que comecou em maio/2026. Desses, **36 ja foram tratados** do nosso lado e **17 precisam de acao de voces**.
->
-> **33 duplicatas resolvidas no app (4Shark fez):**
-> Para cada CPF duplicado em que as duas versoes (correta com prefixo + bugada sem prefixo) chegaram ao app, identificamos qual e qual, movemos todas as Deals da versao bugada para a correta, desativamos a versao bugada no app, e atualizamos o status do integrador. Lista detalhada de IDs em anexo.
->
-> **3 duplicatas resolvidas so no integrador (4Shark fez):**
-> Sao casos onde o re-cadastro (bugado) tentou subir e foi rejeitado pelo app, ficando pendente no nosso integrador. O Client correto ja estava la funcionando. Marcamos esses 3 como desativados no integrador para nao tentar de novo. Esses 3 IDs entram na lista de recomendacao abaixo.
->
-> **15 cadastros unicos com nome bugado (voces precisam atualizar):**
-> Sao registros que nao tem versao correta na base normalizada. Para esses, voces precisam rodar o SQL anexo na base normalizada para prefixar o nome com o CPF. Apos rodar, o integrador propaga a correcao para o app automaticamente.
->
-> **2 casos de CPF compartilhado por pessoas diferentes (precisamos da confirmacao de voces):**
-> Encontramos dois CPFs onde a mesma CPF aparece em registros com nomes de pessoas claramente diferentes — provavelmente houve typo do CPF em uma das duas rows. Como nao podemos saber qual e' a pessoa real, precisamos que voces confirmem:
-> - Para CPF `32294989848`, qual pessoa tem a CPF correta: **JULIANO MARTINS SOUSA** ou **Telma Benedita de Morais**?
-> - Para CPF `01673768881`, qual pessoa tem a CPF correta: **PEDRO SERRANO MORENO** ou **Antonio Carlos Moreno**?
->
-> **Recomendacao adicional (opcional, mas importante):**
-> Para os **36 registros** que desativamos do nosso lado (33 do app + 3 que ficaram so no integrador), recomendamos que voces apaguem as linhas correspondentes da base normalizada (ids listados abaixo) para evitar que esses registros sejam reutilizados acidentalmente no futuro. Nao e obrigatorio para os 33 que ja sumiram do app, mas para os 3 do integrador e' particularmente recomendado — se voces atualizarem qualquer atributo dessas rows na fonte, nosso integrador vai tentar reativar e o ciclo de duplicacao volta.
->
-> **1 caso especifico (Felipe Granuzzio Fascirolli) — voces precisam de duas correcoes:**
-> Esse e' um caso especial. O cadastro novo do Felipe (id=9999 na base de voces) nao chegou ao app porque o nome esta sem o prefixo do CPF e bateu com uniqueness do nome do cadastro antigo (que foi removido depois). Alem disso, uma transacao desse cliente (id=13969 originalmente, descricao "Numero para contato (whatsapp)", data 2026-03-30, R$ 60, vendedor Bleica) foi removida do app quando o cadastro antigo foi apagado.
->
-> Para resolver, precisamos que voces:
-> 1. **Atualizem o nome do Felipe (id=9999) na base normalizada** para incluir o prefixo do CPF: `40249179865-FELIPE GRANUZZIO FASCIROLLI`. E garantam que o `updated_at` da linha mude (forca o integrador a pegar a mudanca na proxima sync).
-> 2. **Re-criem a transacao 13969 na base normalizada** com os mesmos dados (data=2026-03-30, valor=R$ 60, vendedor `4sk_735` Bleica, descricao "Numero para contato (whatsapp)", status="movel") apontando agora para `client_id=9999` (o novo Felipe). Pode usar qualquer id novo da fonte para essa linha. Forcem `updated_at = NOW()`.
->
-> Apos voces fazerem essas duas alteracoes, a proxima sincronizacao automatica cadastra o Felipe corretamente e re-insere a transacao no app, ja apontando para o cliente certo.
->
-> Qualquer duvida, estamos disponiveis.
+Two artifacts to deliver to Commcenter as a single package:
 
-(Customer-facing message above is kept in pt-BR because that is the language the customer reads.)
+- **Spreadsheet** — `~/Downloads/commcenter_relatorio_commcenter_20260526.xlsx`. Six tabs: Duplicatas Resolvidas (33 pairs, 4Shark done — informational), Pendencias Resolvidas (3 zombies, 4Shark done — informational), Nomes para Corrigir (15 — customer updates name), CPFs para Confirmar (2 — customer confirms owner), Caso Felipe (1 client + 2 transactions — customer updates name and retargets/refreshes transactions), Apagar da Base (36 ids — customer recommended to delete from source)
+- **Email draft (pt-BR)** — `/tmp/email_draft_commcenter_20260526.txt`. Plain text, customer-friendly language (no "Client", no `updated_at`, no SQL hints). Walks Commcenter through the 4 actions: name fix (15), CPF confirmation (2), Felipe (cadastro + 2 transactions), delete from base (36 ids)
+
+The email is kept in pt-BR because that is the language the customer reads. The PLAN.md and all internal docs stay in English per Language Policy.
 
 ---
 
 ## Next steps
 
-1. **Handle C3** — 4Shark runs the 3 scripts (pre-flight + mutation + verification) in `bin/ecs run integrator-commcenter` to flip the 3 pending Resources to disabled
-2. **Deliver to Commcenter** — single package containing:
-   - B6 SQL (15 UPDATEs in the normalized source)
-   - B5 questions (2 CPFs to confirm — Juliano/Telma and Pedro/Antonio)
-   - B1 + C3 list (36 disabled ids — recommendation to delete from source; particularly important for the 3 from C3)
-3. **Handle B7 (Felipe)** — internal 4Shark decision on whether to bring him back to the app
-4. **After customer answers B5** — 4Shark disables the incorrect rows
-5. **After customer runs B6** — verify via audit that the 15 turned OK
-6. **Final verification** — re-run full audit (`integration_audit:client[2077]` + `mongo:client` + `normalized:client`) confirming the 58 left the "no prefix" bucket
-7. **Final consolidated report** — `.xlsx` or `.pptx` in `~/Downloads/`
+1. **Deliver the package to Commcenter** — spreadsheet + email (see Customer-facing package above)
+2. **After Commcenter acts** — wait for the next integrator sync run; verify:
+   - B6 (15 names): names propagated to app via PUT
+   - Felipe: Client `9999` POSTed successfully; Deals `14050` and `13969` POSTed with `client_id` resolving to Client `9999`
+3. **After Felipe verified** — `resource.set(integration_status: 'disabled')` on mongo Client `9902` (vestige cleanup)
+4. **After customer answers B5** — 4Shark disables the incorrect rows (the wrong-CPF side of each pair)
+5. **Final verification** — re-run full audit (`integration_audit:client[2077]` + `mongo:client` + `normalized:client`) confirming the 58 left the "no prefix" bucket
+6. **Final consolidated report** — `.xlsx` or `.pptx` in `~/Downloads/`
+
+### Done so far
+
+- ✅ B1 (33 duplicates) — app + mongo
+- ✅ C3 (3 zombies in mongo) — mongo
+- ✅ B7 Phase 2 (Felipe) — Deal 14050 destroyed in app; Resources Deal 14050 and 13969 flipped to `pending` in mongo
+- ⏳ B6 (15 names) — waiting for Commcenter
+- ⏳ B5 (2 CPFs) — waiting for Commcenter
+- ⏳ B7 customer actions (Felipe name + transactions retarget/refresh) — waiting for Commcenter
+- ⏳ Apagar da Base (36 ids) — waiting for Commcenter

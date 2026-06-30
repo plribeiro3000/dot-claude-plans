@@ -1,0 +1,43 @@
+GitHub API — squash merge settings for every repo in local.repositories
+Collected: 2026-06-27 via `gh api repos/4shark/<repo>`
+Command: for repo in ...; do gh api repos/4shark/$repo --jq "..."; done
+
+repo                    squash_msg          squash_title          allow_squash
+-----------             ------------------  --------------------  ------------
+ansible                 COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+app                     BLANK               PR_TITLE              false        ← ONLY DRIFTER
+app-mobileclient        COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+app-sdk-advpl           COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+app-sdk-dotnet          COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+app-webclient           COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+data-privacy            COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+dot-claude              COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+google-analytics-manager COMMIT_MESSAGES   COMMIT_OR_PR_TITLE    false
+integrator              COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+keycloak                COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+lambda                  COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+onboarding              COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+rubocop-fourshark       COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+setup                   COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+simplex-harvester       COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+terraform               COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+compliance              COMMIT_MESSAGES     COMMIT_OR_PR_TITLE    false
+
+Provider schema defaults (from resource_github_repository.go):
+  squash_merge_commit_message  default = "COMMIT_MESSAGES"
+  squash_merge_commit_title    default = "COMMIT_OR_PR_TITLE"
+
+Alignment analysis:
+  - 17/18 repos: GitHub values == provider schema defaults → no drift
+  - app (1/18): GitHub values (BLANK/PR_TITLE) != provider schema defaults (COMMIT_MESSAGES/COMMIT_OR_PR_TITLE) → DRIFT
+
+Full API response for app repo:
+{
+  "allow_merge_commit":true,
+  "allow_rebase_merge":false,
+  "allow_squash_merge":false,
+  "merge_commit_message":"PR_TITLE",
+  "merge_commit_title":"MERGE_MESSAGE",
+  "squash_merge_commit_message":"BLANK",
+  "squash_merge_commit_title":"PR_TITLE"
+}
