@@ -1,0 +1,55 @@
+Source: https://github.com/edoburu/docker-pgbouncer/blob/master/Dockerfile
+Fetched: 2026-06-30 (via WebFetch in spike session)
+
+=== KEY DOCKERFILE LINES ===
+
+ARG VERSION=1.25.2
+
+# No STOPSIGNAL directive present in the Dockerfile.
+# Docker default STOPSIGNAL is SIGTERM.
+# ECS default stop signal is SIGTERM.
+# Result: ECS sends SIGTERM to the container.
+
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
+
+Note: ENTRYPOINT is in exec form (JSON array) — not shell form.
+Exec form means the shell (/bin/sh) is NOT spawned; the entrypoint
+script is PID 1 directly.
+
+---
+
+Source: https://github.com/edoburu/docker-pgbouncer/blob/master/entrypoint.sh
+Fetched: 2026-06-30 (via WebFetch in spike session)
+
+=== KEY ENTRYPOINT.SH LINES ===
+
+The script configures pgbouncer.ini from environment variables, then ends with:
+
+  exec "$@"
+
+The `exec` builtin replaces the shell process with the command passed as
+arguments (i.e., "pgbouncer /etc/pgbouncer/pgbouncer.ini" from CMD).
+After exec, the shell is gone; pgbouncer becomes PID 1.
+
+Signal forwarding chain:
+  ECS → Docker → PID 1 = pgbouncer (after exec)
+  SIGTERM → pgbouncer directly (no shell intermediary)
+
+=== SIGNAL FORWARDING ANALYSIS ===
+
+1. Dockerfile ENTRYPOINT = exec form → no sh wrapper around entrypoint.sh
+   (but entrypoint.sh itself IS a shell script)
+2. entrypoint.sh runs as PID 1 (the shell interpreting entrypoint.sh is PID 1)
+3. `exec "$@"` at end of entrypoint.sh → replaces shell with pgbouncer →
+   pgbouncer becomes PID 1
+4. Docker/ECS sends SIGTERM to PID 1 = pgbouncer
+
+Result: pgbouncer receives SIGTERM directly. Since version 1.25.2 > 1.23.0,
+SIGTERM triggers "super safe shutdown" = SHUTDOWN WAIT_FOR_CLIENTS.
+
+=== VERSION DETERMINATION ===
+
+ARG VERSION=1.25.2 in Dockerfile (line found during WebFetch inspection).
+1.25.2 > 1.23.0 (the version where SIGTERM behavior changed to graceful).
+The graceful SIGTERM behavior is therefore active in the edoburu image.

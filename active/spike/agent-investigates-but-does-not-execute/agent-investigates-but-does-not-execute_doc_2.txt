@@ -1,0 +1,52 @@
+SOURCE: Anthropic Research — Trustworthy Agents
+URL: https://www.anthropic.com/research/trustworthy-agents
+FETCHED: 2026-06-30 (current spike session)
+
+--- VERIFIED CONTENT ---
+
+--- OVER-CAUTION BALANCE QUOTE (verified verbatim) ---
+
+"An agent that stops at every possible question will give up most of the autonomy that makes it useful; one that always pushes through will risk misreading what the user really intended."
+
+Context: This quote appears in the section discussing how Anthropic calibrates when agents should pause vs. proceed. It names both failure modes explicitly — excessive stopping is as harmful as excessive proceeding.
+
+--- TRAINING DESIGN QUOTE (verified verbatim) ---
+
+"First, we construct training scenarios that place Claude in ambiguous situations, and then reinforce Claude's choice to pause, rather than to assume."
+
+Context: This quote appears in the article's description of how Anthropic trains agents to handle ambiguous situations. It confirms that "pause rather than assume" is a deliberate training objective, not an emergent behavior.
+
+--- CALIBRATION CHALLENGE QUOTE (verified verbatim) ---
+
+"The challenge for us, then, is helping our models recognize which is which, and striking the right balance between pausing too often and not often enough."
+
+Context: Immediately follows the balance quote above. Anthropic acknowledges that calibration between over-caution and under-caution is an active design challenge, not a solved problem.
+
+--- SIGNIFICANCE FOR THIS SPIKE ---
+
+These three quotes together establish:
+1. Anthropic intentionally trains "pause rather than assume" as a safety behavior
+2. Anthropic acknowledges this creates a calibration problem (how much caution is too much?)
+3. The over-confirmation pattern observed at 4Shark is structurally expected: it is trained in by design, not a bug
+
+--- VERIFICATION BLOCK ---
+
+URL fetched: https://www.anthropic.com/research/trustworthy-agents
+Verbatim quotes checked (all three):
+  - "An agent that stops at every possible question will give up most of the autonomy that makes it useful"
+  - "we construct training scenarios that place Claude in ambiguous situations, and then reinforce Claude's choice to pause, rather than to assume"
+  - "striking the right balance between pausing too often and not often enough"
+All three quote substrings confirmed in current session's WebFetch return
+Fetch date: 2026-06-30
+
+--- UNVERIFIED QUOTES (from CLAUDE.md citations — NOT confirmed on this URL) ---
+
+Two quotes cited in ~/.claude/CLAUDE.md reference "Claude's Constitution" at
+URL: https://www.anthropic.com/news/claude-new-constitution
+These quotes were NOT confirmed when that URL was fetched:
+  - "maintaining human oversight is the mechanism that allows those mistakes to be caught and corrected"
+  - "should not cave simply because a human repeats assertions more forcefully"
+
+Status: UNVERIFIED — the fetched page did not contain these exact substrings.
+These may appear in a different Anthropic publication or may be paraphrased in CLAUDE.md.
+These claims are excluded from spike derivations.

@@ -1,0 +1,99 @@
+## Auxiliary source material — new research (session 2)
+## Topic: agent-investigates-but-does-not-execute
+## Covers: community terminology for gap-type distinction, decidability research
+## Written: 2026-06-30
+
+---
+
+## SOURCE 1: Uncertainty Decomposition for Clarification Seeking in LLM Agents
+URL: https://arxiv.org/html/2606.19559v1
+
+### Verified quote — two-confidence split
+"An agent may report low confidence because the action is difficult (e.g., many similar products to choose from) or because the user request is ambiguous (e.g., 'find me a shirt' without specifying color or size). These two situations call for different responses: the former suggests the agent should proceed cautiously, while the latter suggests it should ask the user for clarification."
+
+Verification: fetched URL in session 2. Substring confirmed in fetched document.
+
+### Terminology introduced
+- **Action Confidence (c_t)**: how likely the chosen action is to make progress toward task completion
+- **Request Uncertainty (u_t)**: the degree to which the user's goal is underspecified
+
+Paper's formula: ask when u_t is high AND c_t does not compensate.
+Do NOT ask when c_t is low (action is hard) — proceed cautiously instead.
+
+Significance: this paper provides the community name for the EXACT distinction the 4Shark engineer identified as missing from ASK-DONT-DECIDE.md. "Request Uncertainty" = irresolvable gap (ask is correct). Low "Action Confidence" on a well-specified task = resolvable gap (research more, do not ask).
+
+---
+
+## SOURCE 2: Ask or Assume? (Vienna 2025, Edwards & Schuster)
+URL: https://arxiv.org/html/2603.26233v1
+
+### Verified quote — resolvable tasks (the gap-b concept)
+"For the 156 tasks where UA-Multi refrained from asking, it still achieved a 76.92% resolve rate, indicating it correctly identified tasks that already contained sufficient information to proceed."
+
+Verification: fetched URL in session 2. Substring confirmed in fetched document.
+
+### Context
+UA-Multi = Uncertainty-Aware Multi-agent scaffold. The paper tests when to ask vs when to proceed. The 76.92% figure is for tasks where the agent correctly detected that sufficient information WAS ALREADY PRESENT — so asking was unnecessary. This is the empirical operationalization of the "resolvable gap" concept.
+
+The doc ASK-DONT-DECIDE.md cites this paper at lines 65-66 for the 69.40% vs 61.20% improvement, using it to support "asking improves outcomes." The paper's equally important finding (76.92% resolve rate on no-ask tasks) is not cited — the paper is used to support asking, not the complementary finding that NOT asking when info is sufficient is also correct.
+
+---
+
+## SOURCE 3: Shane Chang — "Training LLMs to make smarter clarifying assumptions"
+URL: https://shanechang.com/p/training-llms-smarter-clarifying-ambiguity-assumptions/
+
+### Verified quote — "truly needs to"
+"it's essential to balance *when* to ask versus *when to confidently answer*. Ideally, a model should only ask a question if it truly needs to."
+
+Verification: fetched URL in session 2. Substring confirmed in fetched document.
+
+### UNVERIFIED claim — NN/g Group attribution
+ASK-DONT-DECIDE.md line 101 states: "NN/g Group documents that bots that ask many questions frustrate users and seem less capable."
+Source cited in ASK-DONT-DECIDE.md: https://shanechang.com/p/training-llms-smarter-clarifying-ambiguity-assumptions/
+
+When the Shane Chang article was fetched, the string "NN/g" and "NN/g Group" did NOT appear in the fetched content. The attribution "NN/g Group documents..." cannot be confirmed from the cited source.
+
+Status: UNVERIFIED. The NN/g Group citation in ASK-DONT-DECIDE.md line 101 cannot be verified from the URL it attributes to Shane Chang.
+
+---
+
+## SOURCE 4: ASK-DONT-DECIDE.md (4Shark internal doc, fully read session 2)
+Path: /Users/plribeiro3000/.claude/docs/ASK-DONT-DECIDE.md (135 lines)
+
+### Line 32 — the terminal default (no upstream gate)
+"The boundary is judgment, but the safe direction is *ask*. The engineer can always say 'use your judgment for this category' — but Claude does not get to grant that permission to itself."
+
+### Lines 25-31 — passive conditions for not asking
+"What is NOT a decision (you may proceed without asking):
+- Mechanical execution of an explicit instruction ('rename X to Y everywhere')
+- Following a pattern that is unambiguous in the surrounding code (the file and 2-3 siblings agree)
+- Following a written rule in ~/.claude/docs/ that covers the situation
+- Trivial choices the engineer has explicitly delegated ('just pick a name')"
+
+Key observation: These conditions are DESCRIPTIVE (if these happen to be true, don't ask). They are NOT PRESCRIPTIVE (you MUST CHECK these conditions before asking). The doc does not require an active pre-check.
+
+### Lines 107-108 — the ask/no-ask balance statement
+"- Ask when the decision is non-trivial AND the answer is not in any documented rule AND the surrounding code does not unambiguously show the answer
+- Do not ask when the answer is in a rule, in the surrounding code, or in an explicit instruction the engineer just gave"
+
+Same pattern: conditions for not asking are stated; no mandatory gate to check them.
+
+---
+
+## SOURCE 5: CLAUDE.md — Research-First Policy (fully read session 1/2)
+Path: /Users/plribeiro3000/.claude/CLAUDE.md
+
+### Lines 483-487 — Research-First Policy (gate before RESPONDING)
+"### Research-First Policy
+- NEVER answer questions from training data alone — always verify with a real source first
+- Questions about the codebase (behavior, structure, configuration): use Grep/Read/Glob BEFORE responding
+- Questions about external tools, libraries, APIs, error messages: use WebSearch BEFORE responding"
+
+The asymmetry: gates RESPONDING (a response to the engineer) but NOT ASKING (invoking AskUserQuestion). No equivalent rule found: "before invoking AskUserQuestion about a fact or state, use Grep/Read/AWS read-only BEFORE asking."
+
+### Lines 225-228 — Production Access (capability vs non-searching access distinction)
+"### Production Access
+- Claude HAS read-only access to AWS — the default profile is read-only by design, use it freely for logs, service status, instance listing, and any describe/list/get operation
+- Claude does NOT have direct access to production databases or SSH — when production data is needed, ask the user to provide it"
+
+The two categories are named here at the policy level. But this section is NOT connected to the decidability logic in ASK-DONT-DECIDE.md — there's no bridge saying "before asking, determine which category your gap falls into."

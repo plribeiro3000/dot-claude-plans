@@ -13,7 +13,6 @@ Replace the hand-managed EC2 PgBouncer pets (one Puma + one Sidekiq per producti
 - **shared-001 — MIGRATED, VALIDATED, and DECOMMISSIONED.** App fully on the ECS pooler; both pets terminated; pet SG deleted.
 - **atento-001 — not started.**
 - **Datadog monitoring on the ECS pooler — not started** (gap: no stats user on the new pooler).
-- **Credential rotation — deferred** (separate effort; now also covers a leaked monitor password — see Incidents).
 
 ## Final architecture as built (shared-001)
 
@@ -74,14 +73,13 @@ The pets are **NOT terraform-managed** (the only `aws_instance` resources are Mo
 
 1. **Datadog monitoring on the ECS pooler.** The pets ran the **official Datadog Agent `pgbouncer` integration** (`/etc/datadog-agent/conf.d/pgbouncer.d/conf.yaml`): connects to the admin DB (`dbname: pgbouncer`) as `gjmatrmg7x` (the stats user), `collect_database_metrics: true`, tags `service:puma|sidekiq` + `env:shared001`, emits `pgbouncer.*`. No custom checks (`checks.d/` empty). **Gap:** the ECS pooler `.ini` has **no `admin_users`/`stats_users`** (removed during sanitization). To replicate: add a stats user to the `.ini` + userlist, run the **DD Agent as a sidecar** in the pooler task (Fargate awsvpc → reach pgbouncer at `localhost:6432`), DD API key as a secret.
 2. **Replicate on `atento-001`** — same end-to-end flow. Detailed runbook in `TASKS.md` (same folder). Productive — queue check + off-peak. Its pets are the rollback fallback until validated. **Atento-only twist (decided):** the sa-east-1 outbound worker (`app-outbound-atento-br`, on-demand) shares `/atento-001/DATABASE_URL` and already crosses to the us-east-1 atento pooler cross-region. **No BR pooler cluster** — the outbound reaches the us-east-1 pooler via cross-region connectivity (mechanism TBD: PrivateLink vs peering+SG+PHZ). Network spike: `~/.claude/plans/active/spike/br-pooler-network-topology/SPIKE.md`.
-3. **Credential rotation (`gjmatrmg7x` stats user)** — separate effort. Now **urgent for `gjmatrmg7x`** because its password leaked (Incidents). Monitoring-scope only (not the app data path). Coordinated across: pet/pooler userlists + the DD agent configs (and any other stack that reuses it).
-4. **`atento-001` Datadog** — same sidecar pattern once #1 is designed.
+3. **`atento-001` Datadog** — same sidecar pattern once #1 is designed.
 
 ## Incidents
 
 - **Image never booted (`:1`–`:3`).** Our Dockerfile set `ENTRYPOINT` but not `CMD`; per Docker semantics, overriding `ENTRYPOINT` zeroes the inherited base `CMD`. So `configured-entrypoint.sh`'s `exec /entrypoint.sh "$@"` ran with empty `$@`, the edoburu entrypoint's `exec "$@"` ran nothing, container exited 0 — "Starting ..." then dead. **Fix:** restore `CMD ["/usr/bin/pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]` (pgbouncer repo #4) → image `:4`. The deployment circuit breaker had been rolling back to `:1` (the only ever-stable revision).
 - **CNAME unresolvable.** The app VPC was not associated with `4shark.internal`. Fix = `aws_route53_zone_association` (terraform #571). The Cloud Map target resolved; only the convention CNAME name was missing the zone association.
-- **Credential leak (monitor password).** While inspecting the pet Datadog config, a `grep -v` filter using `\s` (unsupported in macOS grep) failed and the **`gjmatrmg7x` pgbouncer monitor password printed to chat**. Local copies purged; the value remains in the session transcript. It is a **monitoring-scope** credential (pgbouncer admin stats), **not** the app DB password (the app uses `ezmrc`/`DiYto`). → rotate `gjmatrmg7x` (Remaining #3). Lesson: redact secrets **at the source** with POSIX classes (`[[:space:]]`), never `\s` on macOS; prefer capturing to a local file and reporting only masked structure.
+- **Credential leak (monitor password).** While inspecting the pet Datadog config, a `grep -v` filter using `\s` (unsupported in macOS grep) failed and the **`gjmatrmg7x` pgbouncer monitor password printed to chat**. Local copies purged; the value remains in the session transcript. It is a **monitoring-scope** credential (pgbouncer admin stats), **not** the app DB password (the app uses `ezmrc`/`DiYto`). Handled by the engineer outside this plan. Lesson: redact secrets **at the source** with POSIX classes (`[[:space:]]`), never `\s` on macOS; prefer capturing to a local file and reporting only masked structure.
 
 ## Rollback (now mostly historical for shared-001)
 

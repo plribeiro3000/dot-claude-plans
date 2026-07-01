@@ -1,0 +1,53 @@
+Source: https://www.pgbouncer.org/usage.html
+Fetched: 2026-06-30 (verified in spike session)
+
+=== SIGNALS SECTION ===
+
+SIGHUP
+  Reload config. Same as issuing the command RELOAD on the console.
+
+SIGTERM
+  Super safe shutdown. Wait for all existing clients to disconnect, but don't
+  accept new connections. This is the same as issuing SHUTDOWN WAIT_FOR_CLIENTS
+  on the console.
+
+SIGINT
+  Safe shutdown. Same as issuing SHUTDOWN WAIT_FOR_SERVERS on the console.
+
+SIGUSR1
+  Same as issuing PAUSE on the console.
+
+SIGUSR2
+  Same as issuing RESUME on the console.
+
+NOTE: SIGQUIT was documented in a prior-session fetch as "Immediate shutdown.
+Same as issuing SHUTDOWN on the console." — not re-verified in this session.
+
+=== ADMIN CONSOLE COMMANDS (relevant subset) ===
+
+PAUSE
+  PgBouncer tries to disconnect from all servers. Disconnecting each server
+  connection waits for that server connection to be released according to the
+  server pool's pooling mode.
+
+SUSPEND
+  All socket buffers are flushed and PgBouncer stops listening for data on them.
+  The command will not return before all buffers are empty.
+
+RESUME
+  Resume work from previous KILL, PAUSE, or SUSPEND command.
+
+RECONNECT
+  Closes open server connections after release (per pooling mode), enabling
+  gradual switchover scenarios without requiring configuration reload.
+
+WAIT_CLOSE
+  Wait until all server connections, either of the specified database or of all
+  databases, have cleared the "close_needed" state.
+
+SHUTDOWN WAIT_FOR_CLIENTS
+  Stop accepting new connections and shutdown the process once all existing
+  clients have disconnected.
+
+SHUTDOWN WAIT_FOR_SERVERS
+  Stop accepting new connections and shutdown after all servers are released.

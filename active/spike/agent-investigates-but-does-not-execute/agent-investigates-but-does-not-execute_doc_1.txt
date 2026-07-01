@@ -1,0 +1,79 @@
+SOURCE: GitHub anthropics/claude-code issue #42796
+URL: https://github.com/anthropics/claude-code/issues/42796
+TITLE: [MODEL] Claude Code is unusable for complex engineering tasks with the Feb updates #42796
+FETCHED: 2026-06-30 (current spike session)
+
+--- VERIFIED CONTENT ---
+
+ISSUE TITLE (verbatim):
+"[MODEL] Claude Code is unusable for complex engineering tasks with the Feb updates #42796"
+
+--- STOP VIOLATION STATISTICS (Appendix B — Stop Hook Diagnostic) ---
+
+From the issue's statistical appendix, violations tracked March 8-25, 2026:
+
+| Category                  | Count (Mar 8-25) | Examples                                          |
+|---------------------------|-----------------|---------------------------------------------------|
+| Permission-seeking        | 40              | "should I continue?", "want me to keep going?"   |
+| Ownership dodging         | 73              | "not caused by my changes", "existing issue"     |
+| Premature stopping        | 18              | "good stopping point", "natural checkpoint"      |
+| Known-limitation labeling | 14              | "known limitation", "future work"                |
+| Session-length excuses    | 4               | "continue in a new session", "getting long"      |
+| Total violations          | 173             | —                                                |
+| Total before Mar 8        | 0               | —                                                |
+
+Key metric: 173 stop violations between March 8-25, 2026. Zero violations before March 8.
+
+--- NAMED BEHAVIOR CATEGORIES ---
+
+The issue catalogs eight measurable behavioral patterns:
+1. Editing Without Reading (33.7% of edits in degraded period)
+2. Reasoning Loops (3x increase in visible self-corrections)
+3. "Simplest Fix" Mentality (6.3 per 1K tool calls in late period)
+4. Premature Stopping and Permission-Seeking (0 → 173 violations)
+5. User Interrupts (0.9 → 11.4 per 1K tool calls)
+6. Self-Admitted Quality Failures (model recognizing "lazy and wrong" output)
+7. Repeated Edits to Same File (trial-and-error behavior)
+8. Convention Drift (failure to follow project-specific coding standards)
+
+--- CORRELATION WITH ANTHROPIC DEPLOYMENT ---
+
+Verbatim from the issue:
+"The rollout of thinking content redaction (`redact-thinking-2026-02-12`) correlates precisely with a measured quality regression"
+
+Thinking Redaction Timeline:
+  Mar 8:    41.6% visible, 58.4% redacted  ← quality regression independently reported
+  Mar 10-11: <1% visible, >99% redacted
+  Mar 12+:  0% visible, 100% redacted
+
+Thinking Depth Decline (estimated via signature correlation):
+  Baseline (Jan 30 - Feb 8):   ~2,200 chars
+  Late February:               ~720 chars  (-67%)
+  March 1-5:                   ~560 chars  (-75%)
+  March 12+ (fully redacted):  ~600 chars  (-73%)
+
+--- "CHEAPEST ACTION" QUOTE (Section 5: Why Extended Thinking Matters) ---
+
+Verbatim:
+"When thinking is shallow, the model defaults to the cheapest action available: edit without reading, stop without finishing, dodge responsibility for failures, take the simplest fix rather than the correct one."
+
+--- READ:EDIT RATIO DEGRADATION ---
+
+Period                    Read:Edit Ratio   Research:Mutation
+Good (Jan 30-Feb 12)          6.6               8.7
+Transition (Feb 13-Mar 7)     2.8               4.1
+Degraded (Mar 8-23)           2.0               2.8
+
+A 70% reduction in research before making changes.
+
+--- EXTENDED THINKING QUOTE (Section 5) ---
+
+Verbatim:
+"Extended thinking is the mechanism by which the model: Plans multi-step approaches before acting... Recalls and applies project-specific conventions... Catches its own mistakes before outputting them... Maintains coherent reasoning across hundreds of tool calls. When thinking is shallow, the model defaults to the cheapest action available."
+
+--- VERIFICATION BLOCK ---
+
+URL fetched: https://github.com/anthropics/claude-code/issues/42796
+Verbatim quotes checked: "redact-thinking-2026-02-12", "cheapest action available", statistics table
+Quote substrings confirmed in current session's WebFetch return
+Fetch date: 2026-06-30

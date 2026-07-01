@@ -1,0 +1,102 @@
+AUXILIARY FILE: Axis 2 Research — External Grounding Before Surfacing Options
+Spike: agent-investigates-but-does-not-execute
+Session: 2026-06-30 (second restructure)
+
+============================================================
+SOURCE 1: arxiv.org/html/2606.20245 — "Navigating Unreliable Parametric and Contextual Knowledge"
+URL: https://arxiv.org/html/2606.20245
+FETCHED: 2026-06-30
+VERIFIED QUOTES:
+---
+"Parametric knowledge" — the model's internal, pre-trained beliefs.
+"Contextual knowledge" or "non-parametric, contextual knowledge" — information provided in prompts.
+"information contained within the retrieved context contradicts the LLM's internal, parametric knowledge."
+"LLMs are trained on static corpora, they may provide outdated information with unwarranted confidence."
+"the wrong information may align with outdated parametric knowledge, reinforcing confirmation bias."
+"the model's performance can be significantly degraded, leading to the generation of factually incorrect or misleading answers."
+---
+SIGNIFICANCE: Establishes "parametric knowledge" as the canonical term for training-embedded knowledge, and "contextual knowledge" for retrieved-at-inference knowledge. Defines the staleness risk: "static corpora" → "outdated information with unwarranted confidence." Both terms appear verbatim in the fetched content.
+
+============================================================
+SOURCE 2: askdewey.com/insights/parametric-knowledge-explained
+URL: https://www.askdewey.com/insights/parametric-knowledge-explained
+FETCHED: 2026-06-30
+VERIFIED QUOTES:
+---
+"Parametric knowledge refers to the statistical patterns embedded in an LLM's trained weights."
+"Millions of documents go into the blender. One set of weights comes out. You can't un-blend the ingredients."
+"the statistical center of mass – the internet average, weighted by volume and repetition."
+"When the retrieved content is ambiguous, thin, or doesn't directly address the question, the model falls back on what it learned during training."
+"cognitive homogenization" — researchers' term for LLM outputs that "mirror a narrow and skewed slice of human experience."
+"26% of expert answers differed meaningfully from generic LLM responses"
+"The more differentiated your knowledge, the more it gets averaged away"
+---
+SIGNIFICANCE: Confirms "parametric knowledge" term with a memorable definition ("statistical patterns embedded in weights"). Documents the risk that parametric knowledge averages expert/contrarian positions away — relevant to option surfacing: the options the model generates from parametric knowledge represent "the internet average" of options, not necessarily current best practice.
+
+============================================================
+SOURCE 3: AWS Prescriptive Guidance — Pattern 5: Grounded agent AI workflow
+URL: https://docs.aws.amazon.com/prescriptive-guidance/latest/agentic-ai-serverless/pattern-grounded-agent-ai.html
+FETCHED: 2026-06-30
+VERIFIED QUOTES:
+---
+"LLMs hallucinate when they don't know the answer, posing risks to trust and compliance."
+"Responses lack grounding in domain-specific facts, policies, or real-time state (for example, orders, accounts, and entitlements)."
+"businesses want agents that reason intelligently, act autonomously, and remain grounded in fact."
+"Search or query knowledge bases to stay grounded in enterprise truth."
+"Grounded answers retrieve authoritative data from knowledge bases stored in Amazon S3."
+---
+SIGNIFICANCE: AWS names this architectural pattern "grounded agent AI workflow" and defines grounding as retrieving authoritative current data rather than relying on training. "Search or query knowledge bases to stay grounded in enterprise truth" is the closest community analog to the Axis 2 principle, but in the context of answering user queries, not specifically of surfacing options via AskUserQuestion. The term "grounding" is established.
+
+============================================================
+SOURCE 4: getmaxim.ai — "A Comprehensive Guide to Preventing AI Agent Drift Over Time"
+URL: https://www.getmaxim.ai/articles/a-comprehensive-guide-to-preventing-ai-agent-drift-over-time/
+FETCHED: 2026-06-30
+VERIFIED QUOTES:
+---
+"Concept drift occurs when relationships between input data and target variables change over time. The underlying patterns that models learned during training become invalid as environmental conditions evolve."
+"Context drift affects retrieval-augmented generation systems when the characteristics of retrieved data change over time. Knowledge bases grow stale as business policies update without corresponding documentation changes."
+"Retrieval-augmented generation techniques ground agents on vetted corporate data, ensuring responses reflect latest policies rather than outdated information learned during pre-training."
+---
+SIGNIFICANCE: "Concept drift" and "context drift" are named failure modes. "The underlying patterns that models learned during training become invalid as environmental conditions evolve" directly captures the risk in option surfacing: if an agent's training has drifted from current library APIs or best practices, the options it generates from parametric knowledge are drifted options.
+
+============================================================
+SOURCE 5: ReAct — arxiv 2210.03629
+URL: https://arxiv.org/abs/2210.03629
+FETCHED: 2026-06-30
+VERIFIED QUOTES:
+---
+"generating both reasoning traces and task-specific actions in an interleaved manner"
+"reasoning traces help the model induce, track, and update action plans as well as handle exceptions, while actions allow it to interface with external sources"
+---
+SIGNIFICANCE: ReAct is the community-named pattern for interleaving reasoning with external tool use (search, APIs, calculators). It implies research happens during reasoning, including before generating response content. The closest community analog to "ground your options before surfacing them" is the ReAct principle of interfacing with external sources during reasoning, not just at answer-generation time. But ReAct does not name the specific sub-case of external research before option-surfacing to a user.
+
+============================================================
+UNVERIFIED / NOT FOUND:
+- A specific community-named practice for "research externally before surfacing options via AskUserQuestion" was NOT found in any source fetched. The community names grounding (of answers/recommendations) and the ReAct interleaving pattern, but not the specific pre-AskUserQuestion option-research step as a distinct named practice.
+- "NN/g Group" citation in ASK-DONT-DECIDE.md line 101: previously documented as UNVERIFIED (Shane Chang URL does not contain "NN/g" — confirmed in prior session's doc_3.txt).
+
+============================================================
+CLAUDE.md Research-First Policy (exact text, lines 483-493):
+File: /Users/plribeiro3000/.claude/CLAUDE.md
+Lines: 483-493
+---
+### Research-First Policy
+
+- NEVER answer questions from training data alone — always verify with a real source first
+- Questions about the codebase (behavior, structure, configuration): use Grep/Read/Glob BEFORE responding
+- Questions about external tools, libraries, APIs, error messages: use WebSearch BEFORE responding
+- If you cannot find evidence: say "I did not find this" — NEVER fill the gap with a guess
+- When the engineer asks "what could this be?" or "why is this happening?": investigate the code and/or search the web — do not theorize from training data
+---
+ANALYSIS OF ASYMMETRY: The policy frames its gate as "BEFORE responding" — a response to an engineer's question. The trigger condition throughout is "the engineer asks" or "answer questions from." The policy is silent on the AskUserQuestion moment — when the agent itself is generating technical options or a recommendation to surface to the engineer. The agent can invoke AskUserQuestion with option A, B, C derived from parametric knowledge (training data) without any WebSearch, and nothing in CLAUDE.md or ASK-DONT-DECIDE.md currently requires external research at that moment.
+
+============================================================
+ASK-DONT-DECIDE.md (fully read, 135 lines):
+- Lines 38-48: How to ask — frame in terms of alternatives, carry evidence for each option. Evidence = "what file demonstrates each approach, what the trade-off is." This is INTERNAL evidence only (file:line references in the codebase). No external research mandated.
+- Lines 65-67: Cites Vienna 2025. Does NOT cite the 76.92% resolvable-gap finding. Does NOT mention WebSearch or external grounding before surfacing options.
+- Lines 107-109: Ask when "the answer is not in any documented rule AND the surrounding code does not unambiguously show the answer." This frames "not knowing the answer" as the trigger for asking. But the options themselves may still be generated from parametric knowledge without external research.
+- Lines 117-126: Hook enforcement table. No hook on "verify options externally before AskUserQuestion."
+- CONCLUSION: ASK-DONT-DECIDE.md mandates internal evidence in the question framing (file:line for each option) but does not mandate external research (WebSearch) to verify those options represent current best practices before surfacing them.
+
+============================================================
+END OF DOC 4

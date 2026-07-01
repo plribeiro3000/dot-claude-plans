@@ -1,0 +1,87 @@
+Source: https://docs.aws.amazon.com/AmazonECS/latest/APIReference/API_ContainerDefinition.html
+Fetched: 2026-06-30 (via AI summarizer in spike session; key section verified via grep on persisted tool-results file)
+Note: The full page auto-persisted to tool-results — stopTimeout block confirmed at lines 984-989 of the persisted file.
+
+=== STOPTIMEOUT PARAMETER ===
+
+stopTimeout
+  Type: Integer
+  Required: No
+  Example values: 120
+  Time duration (in seconds) to wait before the container is forcefully killed
+  if it doesn't exit normally on its own.
+  This parameter requires that the task or service uses platform version 1.3.0
+  or later (Linux). If the parameter isn't specified, then the default value of
+  30 seconds is used. The maximum value is 120 seconds.
+
+---
+
+Source: https://docs.aws.amazon.com/AmazonECS/latest/developerguide/task-lifecycle-explanation.html
+Fetched: 2026-06-30 (via WebFetch in spike session)
+
+=== ECS TASK LIFECYCLE STATES (relevant subset) ===
+
+PROVISIONING
+  Resources required to launch the task are being created (e.g. ENI attachment).
+
+PENDING
+  Task is waiting to be placed on a container instance or Fargate capacity.
+
+ACTIVATING
+  Task configuration is being applied.
+
+RUNNING
+  Task containers are running.
+
+DEACTIVATING
+  This state is reached before STOPPING. For tasks using a load balancer, the
+  target is deregistered from the load balancer before the task is stopped.
+
+STOPPING
+  The task is in the process of being stopped. A SIGTERM signal is sent to
+  the containers in the task. If the containers do not exit within the
+  stopTimeout period, a SIGKILL signal is sent to force the containers to stop.
+
+DEPROVISIONING
+  Resources associated with the task are being cleaned up. The ENI is
+  detached.
+
+STOPPED
+  The task has been stopped and all containers have exited.
+
+---
+
+Source: https://github.com/aws/containers-roadmap/issues/1639
+Fetched: 2026-06-30 (via WebFetch in spike session)
+
+=== CLOUD MAP / ECS DEREGISTRATION TIMING ===
+
+AWS community context from containers-roadmap issue #1639:
+"During a service update, the task is stopped as soon as the target is
+deregistered."
+
+Key difference vs ALB:
+- ALB target groups have a configurable "deregistration delay" (0-3600s) —
+  ECS deregisters the task from ALB BEFORE sending SIGTERM, allowing the
+  ALB to drain connections.
+- Cloud Map service discovery has NO equivalent deregistration delay.
+  The ECS task enters STOPPING (SIGTERM) immediately after Cloud Map
+  deregistration, with no buffer for DNS TTL expiry.
+
+DNS TTL: Cloud Map MULTIVALUE A records default to TTL=60s. After
+deregistration, DNS clients may continue sending connections to the old
+task IP for up to 60s (until their DNS TTL expires).
+
+This creates a race: old task receives SIGTERM and starts shutting down,
+but DNS-cached clients may still open new connections to it for up to 60s.
+
+=== ALB DEREGISTRATION DELAY (for contrast) ===
+
+Source: https://aws.amazon.com/blogs/containers/graceful-shutdowns-with-ecs/
+Fetched: 2026-06-30 (via WebFetch in spike session)
+
+The DEACTIVATING state is specifically for ALB-registered tasks. A task
+is first deregistered from the ALB, then SIGTERM is sent. The
+deregistration delay (configurable on the target group) provides a window
+for in-flight requests to complete before SIGTERM. Cloud Map tasks do NOT
+benefit from this deregistration delay — no equivalent exists.

@@ -48,8 +48,10 @@ Second (and last) productive stack. Mirrors the **validated** shared-001 flow, w
 
 ### Remaining in Phase 1
 
-- [ ] **Datadog Agent sidecar** (the DD-from-start piece — greenfield, no 4Shark ECS-sidecar sibling) → `modules/pgbouncer`: a `datadog/agent` sidecar container; DD API key secret (reuse the `DD_API_KEY` SSM pattern); pgbouncer integration via autodiscovery labels reaching `localhost:6432`; a `stats_users`/`admin_users` knob in the `.ini` + the stats user's **plaintext password** as a secret for the agent; decide **new stats user vs reuse `gjmatrmg7x`** (leaked, pending rotation). Untestable until MFA. Own design pass + PR. Retrofit shared with the same module capability after.
-- [ ] **Outbound DNS (delta b)** — the outbound VPC `vpc-0985020bde92bca75` already resolves `4shark.internal` (CNAME ✓) but NOT the Cloud Map zone `atento-001.internal` (the CNAME target). Add a cross-region `aws_route53_zone_association` of the outbound VPC to the pooler's Cloud Map zone (needs a module output for its `hosted_zone` id). Validate it resolves. Worker-specific (`desired=0`) → before the next outbound run / the Phase 4 swap. Deferred (validate with MFA).
+- [x] **Datadog Agent sidecar — BUILT (PR #575, plan clean: 5 add / 1 change / 1 destroy).** Resolved that the dashboard (Original + Extended) is **all standard metrics** — the engineer's widget queries use `pgbouncer.pools.*`, `pgbouncer.stats.avg_query_time`/`avg_transaction_time`, `pgbouncer.databases.max_connections` (the last gated by `collect_database_metrics`); the orphaned `pgbouncer_pool_size.pyc` custom check is abandoned. So the sidecar is the **standard integration**, no custom check. Module gained: optional `datadog/agent` sidecar (gated on `datadog_api_key_secret_arn`, so other stacks unaffected), container-autodiscovery labels on the pgbouncer container (password as `%%env_PGBOUNCER_STATS_PASSWORD%%`, never plaintext), `stats_users = <stats_user>` in the `.ini`, digest-pinned agent image, one `service` tag. Stats user = **gjmatrmg7x** (engineer decision). API key + stats password are Secrets Manager secrets (placeholder + ignore_changes, populated out of band).
+  - **Post-apply (needs MFA):** populate `atento-001-pgbouncer-stats-password` (gjmatrmg7x plaintext, leak-safe from the pet DD conf) + `atento-001-pgbouncer-datadog-api-key` (from `/atento-001/DD_API_KEY`); force-deploy; verify the agent emits `pgbouncer.*` (the `container_definitions` renders the DD content only at apply — verify the task def + a metric then).
+  - **Dashboard (engineer, in the DD UI):** drop the `service` (puma/sidekiq) dimension — the pooler is one consolidated `service:pgbouncer`.
+- [x] **Outbound DNS (delta b) — DONE + validated (PR #574, merged + applied).** Module now outputs `cloud_map_hosted_zone_id`; `app-atento-001/pgbouncer.tf` adds `aws_route53_zone_association.outbound_cloud_map` (zone = the Cloud Map zone, vpc = `vpc-0985020bde92bca75`, vpc_region = sa-east-1). Validated with a one-off Fargate task in the outbound cluster (sa-east-1) connecting via its real `DATABASE_URL` (now → the pooler CNAME): **OUTBOUND_OK result=1** — resolves the CNAME→Cloud Map chain, reaches the pooler over the peering (CIDR ingress), authenticates. The outbound is `desired=0`; this is ready for its next on-demand run.
 
 ## Phase 2 — Populate userlist + boot
 
@@ -60,12 +62,14 @@ Second (and last) productive stack. Mirrors the **validated** shared-001 flow, w
 
 - [ ] ECS Exec into a live atento web task → real-credential `SELECT 1` through `pgbouncer-atento-001.4shark.internal:6432` for **both** `DATABASE_URL` (writer) and `DATABASE_REPLICA_URL` (reader). Expect `OK result=1`. Leak-safe (only `OK`/`FAIL` printed).
 
-## Phase 4 — Cutover
+## Phase 4 — Cutover — DONE (us-east-1 app)
 
-- [ ] **Queue check** (productive — ~5 min no-processing window). Hold if heavy work is running.
-- [ ] **SSM swap (leak-safe)** — `/atento-001/DATABASE_URL` + `/atento-001/DATABASE_REPLICA_URL`: host → pooler CNAME, preserve user/password/dbname/sslmode, `put-parameter --value file://… --overwrite`, delete files. Serves **both** the us-east-1 app and the sa-east-1 outbound (intended — both use the pooler; no split). **Pre-req:** the cross-region connectivity (Phase 1) is in place + validated, so the outbound's next on-demand run reaches the pooler.
-- [ ] **Deploy** `gh workflow run deploy-atento-001.yaml -R 4shark/app --ref master` → all jobs green.
-- [ ] **Validate** — pooler logs show app client connections (`C-…` from app task IPs), zero auth/db errors.
+- [x] **Queue check** — atento RDS ~18-25 conns, low (much of it the pooler pre-warm). Cleared.
+- [x] **Pre-cutover validation (Phase 3)** — real-credential `SELECT 1` through `pgbouncer-atento-001.4shark.internal:6432` from a live web task: WRITER_OK + READER_OK.
+- [x] **SSM swap (leak-safe)** — `/atento-001/DATABASE_URL` + `/atento-001/DATABASE_REPLICA_URL` → pooler CNAME (both Version 3). Serves both the us-east-1 app and the sa-east-1 outbound (no split).
+- [x] **Deploy** — `deploy-atento-001.yaml` run **28455281088** (engineer-triggered) → success.
+- [x] **Validated** — pooler logs: 12 client connections, `db=atento001_master user=seVEbZU…` (writer) + `db=atento001_follower user=qwwoymcz…` (reader), zero auth/db errors. The app's client user = the backend user (seVEbZU/qwwoymcz); `writing` is a 4th userlist user, not the app's main path.
+- Rollback (if needed): revert the 2 SSM params to the pet host + redeploy — pets still alive (decom is Phase 5, gated on DD first).
 
 ## Phase 5 — Decommission
 
@@ -74,10 +78,18 @@ Second (and last) productive stack. Mirrors the **validated** shared-001 flow, w
 - [ ] Delete the pet SG (after confirming no ENI + no ingress/egress SG references).
 - [ ] **Check orphaned EBS** (`describe-volumes status=available`) + snapshots → none expected (root `DeleteOnTermination=true`), but verify.
 
+## Phase 6 — Per-environment ECR (image isolation) + drop the shared repo
+
+**Decision (engineer):** each environment gets its **own** `<env>-pgbouncer` ECR repo — isolated control per env, consistent with the app's per-env image repos. The pooler image is env-agnostic (config/userlist injected at runtime), but isolation + convention won over a shared repo; ECR cost is ~zero either way (no per-repo charge, tiny image — confirmed on aws.amazon.com/ecr/pricing). **Mechanism:** add `"${var.environment}-pgbouncer"` to the stack's `ecr_repositories` set — the **same set** drives `module.ecr` (repo creation) **and** the `iam_deploy` ECR push grant (`compute.tf` `ecr_repository_arns`), so one change creates the repo and lets the deploy user push to it.
+
+- [x] **atento-001 — DONE (PR #576, applied).** `app-atento-001/main.tf` ecr set += `atento-001-pgbouncer`; module image re-pointed `pgbouncer:5` → `atento-001-pgbouncer:f8ff14d`; image built (linux/amd64, **STOPSIGNAL SIGINT**) + pushed; pooler task def **rev 3**. Full plan was 11 add / 1 change / 10 destroy — the 9 app task-def replacements are **pre-existing GHA-deploy drift** (terraform state vs out-of-band deploys), **safe** because the app `ecs_service` has `ignore_changes = [task_definition]` (no redeploy) and ECS keeps existing services running on an INACTIVE revision; engineer approved applying the full plan.
+- [ ] **shared-001 (retrofit)** — `app-shared-001/main.tf` ecr set += `shared-001-pgbouncer`; re-point the shared pooler module image to `shared-001-pgbouncer:<sha>`; build + push; apply (PR-first).
+- [ ] **Drop the interim shared `pgbouncer` repo + the legacy `pgbouncer-puma`** — **ONLY after BOTH poolers point at their per-env repos.** Guard: confirm **no** ECS task def references `…/pgbouncer:*` (atento → done; shared → after the line above) and no other consumer, then delete both repos. `pgbouncer-puma` is dead pet-era; `pgbouncer` is this session's interim shared repo.
+
 ## Post-atento
 
-- [ ] **Retrofit shared-001 with the Datadog sidecar + stats user** (the same module capability built in Phase 1).
-- [ ] **Rotate `gjmatrmg7x`** (stats user, includes the leaked value) — monitoring scope, coordinated across both stacks' userlists + DD configs.
+- [ ] **Retrofit shared-001 to match atento** — the module is now mandatory-DD + graceful-deploy, so shared needs: its DD secrets (`shared-001-pgbouncer-{stats-password,datadog-api-key}`) + stats user, `env:shared-001` tag (no `service` tag), **per-env ECR** `shared-001-pgbouncer` (Phase 6), and the image already carries STOPSIGNAL/stopTimeout/healthCheck. shared's pooler currently still points at the interim `pgbouncer` repo and lacks the DD inputs — its terraform plan/apply errors (missing required arg) until retrofitted (fail-closed by design).
+- [ ] **pgbouncer-repo CI** — `deploy.yaml` pre-flight (fail-fast: assert AWS secrets + `aws ecs describe-services` probe) + a **build-on-merge** workflow: per-env jobs (mirror the app's `build-image.yaml`), each builds the image and pushes to `<env>-pgbouncer` with that env's GitHub Environment creds, tag `:<short_sha>` + `:latest`. Engineer chose per-env build to match the per-env ECR.
 - [ ] Move this feature folder `active/` → `completed/` once both stacks are done.
 
 ## Completion criteria (atento-001)
