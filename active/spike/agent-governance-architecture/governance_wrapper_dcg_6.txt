@@ -1,0 +1,43 @@
+SOURCE: https://github.com/Dicklesworthstone/destructive_command_guard
+FETCHED: 2026-07-01
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: `dcg` is explicitly named as a peer tool in 4Shark's
+own `validate-bash-command.sh` comment block ("The community has converged
+on a standard set (DCG, Claude Code Safety Net, git-safety-guard)" —
+`~/.claude/scripts/validate-bash-command.sh:49`). This fetch checks whether
+`dcg` is itself implemented as a WRAPPER (PATH shim around `git`/shell) or
+a HOOK (agent-lifecycle interceptor) — directly relevant to the
+wrapper-vs-hook axis (investigation question 4).
+
+FINDING: `dcg` is a HOOK, not a wrapper. Verbatim from the README (per the
+fetch):
+"Your AI agent invokes dcg as a PreToolUse hook before executing each shell
+command. The hook receives the command as JSON on stdin"
+
+Installation is agent-native hook registration, not PATH manipulation:
+- Claude Code: added to `~/.claude/settings.json` under `hooks.PreToolUse`
+- Codex CLI 0.125.0+: merged into `~/.codex/hooks.json`
+- GitHub Copilot CLI: configured in repo-local `.github/hooks/*.json`
+- Cursor IDE: configured through `~/.cursor/hooks.json`
+
+Mechanism: before executing any shell command, the agent calls `dcg` with
+the command as a JSON payload on stdin; `dcg` evaluates it and returns an
+allow/deny decision; the agent proceeds or aborts accordingly. No PATH
+shimming of `git` or any other binary occurs.
+
+SIGNIFICANCE FOR THIS SPIKE: this is a genuine "natural experiment" for the
+wrapper-vs-hook axis. Two different community projects both target GIT
+safety for AI agents:
+- `destructive_command_guard` (dcg) — concern: block destructive git/shell
+  operations (force-push, reset --hard, etc., the same concern class as
+  4Shark's `validate-bash-command.sh` git block, see CLAUDE.md
+  § Git Safety) — implemented as a HOOK.
+- `ai-aligned-git` (governance_wrapper_git_ai_aligned_5.txt) — concern:
+  force a normalized invocation shape and inject attribution metadata —
+  implemented as a WRAPPER.
+Both projects target "git + AI agents" but chose different mechanisms for
+different sub-concerns within that domain, converging with 4Shark's own
+existing split: 4Shark's git-destructive-operation concern is ALREADY
+handled by a hook (`validate-bash-command.sh`), matching the `dcg`
+approach — not by a wrapper.

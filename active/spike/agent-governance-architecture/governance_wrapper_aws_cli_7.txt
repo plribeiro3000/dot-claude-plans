@@ -1,0 +1,46 @@
+SOURCE: https://codenote.net/en/posts/aws-cli-ai-agent-secure-access-defense-in-depth/
+FETCHED: 2026-07-01
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: a documented "no-shell allowlist wrapper" pattern for
+the AWS CLI specifically built for AI-agent safety — used to answer
+investigation question 3(a) (which tools are most commonly wrapped, and
+why) with a second example beyond git, and to surface the general principle
+behind WHY a wrapper (vs a hook) is chosen for this case.
+
+MECHANISM (verbatim quotes from the fetch):
+"if key not in ALLOWED: print(f\"blocked: {key} is not allowlisted\",
+file=sys.stderr)" — command allowlisting inside the wrapper itself.
+"shell=False avoids shell metacharacter expansion" — the wrapper invokes
+the AWS CLI as an argument array via a non-shell exec, never through a
+shell string, so no injection/metacharacter surface exists at the
+invocation layer.
+"Pass only a safe CLI-specific vocabulary: instance IDs as
+`^i-[0-9a-f]+$`" — inputs are validated against a strict format before
+being placed into the argument array.
+
+STATED GENERAL PRINCIPLE (the closest thing found in this spike's research
+to an explicit "when to wrap" rule):
+"OWASP recommends, as the first line of defense against OS command
+injection, not invoking OS commands directly at all. If the AWS CLI is
+required, the next-best option is a wrapper that runs only allowlisted aws
+subcommands as an array, without going through a shell."
+
+The article frames the wrapper as sitting between IAM authorization and the
+actual AWS API call — one layer in a defense-in-depth stack, not a
+replacement for other layers (also uses a PreToolUse hook, per the fetch,
+as a complementary layer: "Since settings alone can be bypassed, block
+destructive commands reliably with a PreToolUse hook. The hook is not
+bypassed even by `--dangerously-skip-permissions`").
+
+SIGNIFICANCE FOR THIS SPIKE: this is structurally the closest community
+analogue to 4Shark's `ruby.sh` — both are wrapper scripts whose primary
+job is to REMOVE an unsafe invocation shape (shell metacharacter expansion
+for the AWS wrapper; `$(...)` command substitution and a leading `VAR=`
+env-var prefix for `ruby.sh`, per `~/.claude/docs/RUBY-COMMAND-EXECUTION.md:20-48`)
+from ever reaching the point where it would need to be parsed/matched/
+executed unsafely. Both wrappers exist to shrink an attack/failure surface
+at the INVOCATION-CONSTRUCTION layer, before the command is even a string
+the shell or the permission matcher has to reason about — as opposed to a
+hook, which reasons about an already-fully-formed command string after the
+fact.

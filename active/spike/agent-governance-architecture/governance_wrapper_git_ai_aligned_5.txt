@@ -1,0 +1,53 @@
+SOURCE: https://github.com/ai-ecoverse/ai-aligned-git
+SOURCE (raw): https://raw.githubusercontent.com/ai-ecoverse/ai-aligned-git/main/README.md
+FETCHED: 2026-07-01 (two WebFetch calls; second is a raw-file re-fetch used
+as self-check on the first)
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: the clearest found example of a GIT WRAPPER built
+specifically for AI coding agents — directly answers investigation question
+3(a)/3(b) (is a git wrapper a recognized pattern, what does it do).
+
+MECHANISM (confirmed on the raw-file re-fetch):
+"The installer will check prerequisites, install the wrapper, configure
+your PATH, and verify everything is working correctly."
+-> PATH-shim strategy: the wrapper is placed earlier in PATH than the real
+`git` binary, so every `git` invocation from a shell (including one spawned
+by an AI agent) is intercepted transparently — the agent does not need to
+be told to call a different command name.
+
+STATED RATIONALE (verbatim, from the raw README): the project's own
+framing of its purpose is "making sure Claude can't accidentally commit
+your AWS keys" — plus more broadly preventing "risky git practices like
+`git add .`, bypassing hooks with `--no-verify`, or committing under false
+attribution."
+
+WHAT IT BLOCKS / REQUIRES (confirmed on both fetches):
+- Blocks `git add .` and `git add -A` (bulk staging) — error message quoted
+  on first fetch: "Error: 'git add .' is not allowed when running under AI
+  control (claude). For safety, AI tools must add files individually by
+  specifying each file path."
+- Blocks `--no-verify` (bypassing commit hooks) — quoted error: "Error:
+  'claude' is trying to bypass commit hooks with --no-verify! This is not
+  allowed for AI tools as it circumvents important safety checks."
+- Requires (optionally, when configured) a `--vibe-level` flag with values
+  `prompt` / `co-author` / `sign-off`, disclosing the AI's collaboration
+  role.
+- Requires (optionally) a `--prompt` flag documenting the human instruction
+  that produced the change.
+- Detects 17+ AI coding agents by name (Claude, Cursor, GitHub Copilot,
+  Aider, and others) to decide when its AI-specific rules apply.
+
+SIGNIFICANCE FOR THIS SPIKE: this wrapper's concern set is NOT "block
+destructive git operations" (force-push, reset --hard, branch -D) — that is
+the concern 4Shark's `validate-bash-command.sh` hook already covers, and
+(per governance_wrapper_dcg_6.txt) the concern the community's other
+prominent git-safety tool (`destructive_command_guard`) also addresses via
+a HOOK, not a wrapper. `ai-aligned-git`'s concern is different: forcing a
+specific INVOCATION SHAPE (individual `git add <file>` instead of bulk
+`git add .`) and injecting/demanding metadata (attribution, `--vibe-level`,
+`--prompt`) that a bare git invocation does not naturally carry. This is
+the same shape of problem `ruby.sh` solves for Ruby (force a normalized
+invocation, inject something the raw command would not otherwise carry) —
+not the same shape of problem `validate-bash-command.sh` solves for git
+(block/allow a decision on an already-fully-formed command).

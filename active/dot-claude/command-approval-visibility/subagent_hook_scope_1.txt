@@ -1,0 +1,172 @@
+# Source: fresh research for sub-question 1 (does PermissionRequest fire for
+# subagent/Task-tool Bash calls?) and sub-question 2 (PreToolUse vs
+# PermissionRequest ordering) — run 2026-07-01 for PLAN-SPIKE.md
+# (command-approval-visibility). This supplements, and in one place
+# corrects, the internal citation trail in the source SPIKE.md.
+
+## Internal citation discrepancy found (documented plainly, not resolved)
+
+The source SPIKE.md (agent-command-approval-visibility) states in its
+"What remains uncertain" section that the completed spike
+`agent-pipe-chaining/SPIKE.md` (dated 2026-06-30) asserts, citing
+`llm-agent-command-chaining/SPIKE.md` Finding 5:
+
+  "exit code 2 from PreToolUse hooks is ignored for subagent (Task tool)
+  Bash calls" (agent-pipe-chaining/SPIKE.md:89)
+
+On direct re-read of `~/.claude/plans/active/spike/llm-agent-command-chaining/SPIKE.md`
+in full for this plan (2026-07-01): the file has 5 findings. Finding 5 in the
+CURRENT file is titled "The efficiency-reviewability tradeoff is explicit in
+published sources" and contains no mention of subagents, Task tool, or exit
+code 2. A full-text grep for "subagent" and "Task tool" across both
+`llm-agent-command-chaining/SPIKE.md` and its five `chaining_excerpt_*.txt`
+auxiliary files returns zero matches.
+
+This is stated as an observed discrepancy, not attributed to either spike
+being wrong — the sibling file may have been edited after being cited by
+`agent-pipe-chaining`, or the citation may not have resolved even at the
+time it was written. Per Citation Discipline (quote-or-drop), this spike
+does not rely on that internal citation to sustain any of its own findings.
+Instead, the question was independently re-researched externally (below),
+and the external evidence reaches a materially similar conclusion via
+freshly fetched, verified sources.
+
+## Fresh external evidence — subagent/Task-tool hook scope
+
+--- ISSUE #23983 (fetched via WebFetch, 2026-07-01) ---
+URL: https://github.com/anthropics/claude-code/issues/23983
+Title: "PermissionRequest hooks not triggered for subagent permission
+        requests in Agent Teams"
+
+Verbatim quotes (from the fetch):
+
+Expected behavior:
+"PermissionRequest hooks should fire for all permission requests, including
+those delegated from subagents to the parent session. The hook should
+intercept the request before it reaches the terminal UI, regardless of
+whether it originates from the main session or a subagent."
+
+Actual behavior (as summarized from the fetch, reflecting the reporter's
+own before/after table):
+"Main session permission requests -> Hook fires correctly. Subagent
+permission requests -> Hook is bypassed, terminal prompt shown."
+
+Impact quote:
+"This limitation breaks the use case of remote permission management. Users
+who set up hooks to approve/deny permissions from external services (phone
+notifications, Slack, Telegram, etc.) are forced back to the terminal when
+using Agent Teams -- defeating the purpose of the hook."
+
+Scope caveat: this issue's title specifically names "Agent Teams" (a
+multi-agent feature built on `TeamCreate` + the `Task` tool for parallel
+agent crews), not necessarily every invocation of the `Task` tool used to
+spawn a single subagent (4Shark's `@agent-plan-researcher` etc. shape). The
+underlying mechanism described (a subagent's permission request not
+reaching the configured hook, falling back to a terminal prompt in the
+parent session instead) is not qualified in the fetched text as exclusive
+to the "Teams" feature specifically as opposed to any Task-tool-spawned
+subagent — but this spike did not find a source that tests the plain
+single-subagent case in isolation from "Agent Teams."
+
+State: not confirmed via `gh api` in this pass (WebFetch only, per the
+Ground-Before-Surface / Exhaust-Before-Ask scope of this plan-research
+pass) -- if the exact open/closed state matters for the composed plan, a
+`gh api repos/anthropics/claude-code/issues/23983 --jq '{state,state_reason}'`
+read-only call resolves it.
+
+--- ISSUE #34692 (fetched via WebFetch, 2026-07-01) ---
+URL: https://github.com/anthropics/claude-code/issues/34692
+Title: "PreToolUse/PostToolUse hooks do not fire for subagent (Agent tool)
+        tool calls"
+State: closed / not planned (per the fetch)
+
+Verbatim quote:
+"When the main session spawns subagents via the Agent tool, any Bash, Edit,
+Write, Read, or Grep tool calls made by the subagent do not trigger
+PreToolUse or PostToolUse hooks configured in ~/.claude/settings.json. Only
+tool calls made directly by the main session thread fire the hooks."
+
+Reproduction (from the fetch):
+"1. Configure a PostToolUse hook for Bash commands in ~/.claude/settings.json
+2. Running git commit directly from the main session triggers the hook
+   correctly
+3. Spawning an Agent (subagent) that runs git commit does NOT trigger the
+   hook
+4. There is no warning or indication that hooks are being skipped"
+
+Relevance: this is the closest external, independently-filed, closed
+`not_planned` issue to the internal (unresolved-citation) claim this spike
+set out to check. It states PreToolUse does not fire AT ALL for
+subagent-originated tool calls -- a stronger claim than "fires but exit
+code ignored" (compare issues #40580 / #26923 below, which describe a
+different, narrower symptom).
+
+--- ISSUES #40580 and #26923 (surfaced via WebSearch synthesis, NOT
+    independently WebFetched and verbatim-confirmed in this pass) ---
+URL: https://github.com/anthropics/claude-code/issues/40580 (title:
+     "PreToolUse hook exit code ignored for subagent tool calls")
+URL: https://github.com/anthropics/claude-code/issues/26923 (title:
+     "PreToolUse hook exit code 2 does not block Task tool calls (agents
+     launch despite block)")
+
+Per Citation Discipline Rule 4, these two are marked UNVERIFIED in this
+auxiliary file -- the WebSearch tool's synthesized summary paraphrased
+them but this pass did not WebFetch either URL directly to confirm a
+verbatim quote. They are recorded here as a pointer only: their titles
+suggest a NARROWER and partially CONFLICTING picture from #34692 --
+specifically that PreToolUse hooks DO fire for subagent/Task-tool calls but
+the exit code (block decision) is ignored, rather than the hook not firing
+at all. This spike does not resolve the #34692-vs-#40580/#26923 tension;
+it is recorded as a genuine open question (see PLAN-SPIKE.md).
+
+## Fresh external evidence — PreToolUse vs PermissionRequest ordering
+
+--- dyad.sh blog post (fetched via WebFetch, 2026-07-01) ---
+URL: https://www.dyad.sh/blog/claude-code-permission-hooks
+
+Verbatim quote:
+"If neither of them catches the request, and Claude Code would normally
+show a permission dialog, the PermissionRequest hook fires."
+
+Relevance: this is a secondary (blog) source, not primary Anthropic
+documentation -- flagged as such. It is consistent with, and sharper than,
+the two primary-source excerpts already captured in `approval_doc_1.txt`
+and `approval_doc_2.txt` for the source SPIKE.md:
+  - approval_doc_1.txt: "A hook that exits with code 2 stops the tool call
+    before permission rules are evaluated, so the block applies even when
+    an allow rule would otherwise let the call proceed."
+  - approval_doc_2.txt: PermissionRequest fires "When a permission dialog
+    appears."
+Read together: a PreToolUse `exit 2` stops the call before permission
+rules are evaluated -- i.e., before the point where Claude Code would
+decide a dialog is needed -- so for a call a PreToolUse hook blocks, the
+"permission dialog would appear" condition that triggers PermissionRequest
+is never reached. The dyad.sh quote states this outcome directly ("if
+neither of them catches the request... PermissionRequest fires"), which
+this spike treats as corroborating, not sole, evidence -- no single
+primary-source Anthropic document was found stating the PreToolUse-vs-
+PermissionRequest precedence in one place.
+
+## What this auxiliary file supports (used in PLAN-SPIKE.md's Implementation
+   Option — A/B ordering & interaction section)
+
+1. The best-supported reading, combining the primary-source excerpts
+   (`approval_doc_1.txt`, `approval_doc_2.txt`) with the fresh dyad.sh quote,
+   is that a PreToolUse `exit 2` block pre-empts PermissionRequest entirely
+   for the SAME call in the main session — PermissionRequest never reaches
+   its firing condition once PreToolUse has already blocked.
+2. For subagent-originated Bash calls specifically, the fresh evidence
+   (issue #23983 for PermissionRequest, issue #34692 for PreToolUse/
+   PostToolUse generally) points toward NEITHER hook type reliably
+   intercepting a subagent's Bash call — though #34692 and the UNVERIFIED
+   #40580/#26923 disagree on the exact mechanism (hook does not fire at all,
+   vs. hook fires but exit code is ignored). Either way, the practical
+   consequence for 4Shark's option space is the same: implementing B
+   (PermissionRequest) is not evidenced to close a subagent gap that A
+   (PreToolUse, i.e. extending `validate-bash-command.sh`) leaves open.
+3. Neither of these two findings was independently re-derived from a
+   4Shark-owned empirical test (e.g., actually spawning a subagent in this
+   session and observing whether a matching PermissionRequest hook fires)
+   — that remains a test-to-run recommendation, not a closed question, per
+   the source SPIKE.md's own "What remains uncertain" framing extended to
+   this narrower point.

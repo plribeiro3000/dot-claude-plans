@@ -1,0 +1,126 @@
+# Source: anthropics/claude-code GitHub issues
+# Fetched fresh: 2026-07-01 (WebFetch for body text; `gh api` for
+# created_at/state/state_reason metadata — read-only, no mutation)
+
+--- ISSUE #51057 ---
+URL: https://github.com/anthropics/claude-code/issues/51057
+Title: [BUG] fewer-permission-prompts drops commands prefixed with
+       environment-variable assignments
+Created: 2026-04-20T08:39:03Z
+State: closed / state_reason: not_planned (confirmed via `gh api
+       repos/anthropics/claude-code/issues/51057`)
+
+Body (key passages, verbatim):
+
+"The fewer-permission-prompts skill silently drops commands that are
+prefixed with environment-variable assignments (e.g. FOO=bar cmd ...),
+claiming they're 'already covered' by an existing allowlist rule for the
+bare command. However, Claude Code's Bash permission matcher is a literal
+prefix matcher and does not strip env-var prefixes — so the user still gets
+prompted every time."
+
+Concrete example:
+"When a user has Bash(uv run:*) allowlisted but runs:
+TEST_DATABASE_URL="postgresql://postgres:test@localhost:55432/test" uv run
+pytest tests/foo.py
+1. The user gets a permission prompt (because the literal command doesn't
+   match uv run:*)
+2. They click 'Allow' -> an exact-match rule is added
+3. They run a similar command with different test path -> prompted again
+4. They run /fewer-permission-prompts -> the skill strips the
+   TEST_DATABASE_URL=... prefix, sees uv run pytest (already covered), and
+   drops all such commands from suggestions"
+
+Impact quote:
+"Low-severity but persistent UX issue: users who run env-var-prefixed
+commands never get consolidated rules, only exact-match accretion. A
+production settings.local.json in my setup has ~90 entries that could
+collapse into 4 prefix rules."
+
+--- ISSUE #15777 ---
+URL: https://github.com/anthropics/claude-code/issues/15777
+Title: [BUG] Approval patterns with environment variables don't match
+Created: 2025-12-30T06:13:33Z
+State: closed / state_reason: completed (per `gh api`) — BUT the issue
+       comments show it was closed as a DUPLICATE of #15292, not as an
+       independently verified fix. The state_reason/comment text disagree;
+       this spike does not resolve which is accurate (see "What remains
+       uncertain" in SPIKE.md).
+
+Body (verbatim):
+"Approval patterns containing environment variable assignments (like
+CUDA_VISIBLE_DEVICES="") don't match commands, even when the pattern appears
+correct in settings.json."
+
+Reproduction:
+settings.json: "Bash(CUDA_VISIBLE_DEVICES=\"\" python -m pytest:*)"
+Command run: CUDA_VISIBLE_DEVICES="" python -m pytest tests/ -x --tb=short
+Result: "Claude prompts for approval despite the pattern being in the allow
+list. Telling it to add the command to the approval list will not prevent
+it from asking for approval the next time."
+
+Comment (bot, 2025-12-30T08:19:26Z): "Marked as dupe of
+https://github.com/anthropics/claude-code/issues/15292"
+
+--- ISSUE #17356 ---
+URL: https://github.com/anthropics/claude-code/issues/17356
+Title: CLI: permissionDecisionReason not displayed in permission prompt for
+       PreToolUse 'ask' decisions
+Created: 2026-01-10T17:58:38Z
+State: closed / state_reason: not_planned (confirmed via `gh api`)
+
+Body (verbatim, key passages):
+
+Expected behavior: "According to the hooks documentation, for 'ask'
+decisions the permissionDecisionReason should be 'shown to user only, not
+to Claude.' The reason should be visible in the permission prompt so users
+understand why they're being asked for approval."
+
+Actual behavior: "The permission prompt appears but does not display the
+permissionDecisionReason or systemMessage fields. Users have no visibility
+into why the hook triggered the ask."
+
+Reporter's verification: "The hook JSON output is correct (verified by
+running manually):
+{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision":
+"ask", "permissionDecisionReason": "Suppression comment detected...",
+"systemMessage": "SUPPRESSION COMMENT: noqa (ruff/flake8)"}}
+The hook correctly triggers the 'ask' behavior (permission is requested),
+but the reason is not visible to help users make an informed decision."
+
+Use case cited: a hook that flags linter-suppression comments (# noqa,
+# type: ignore) and needs the human to see WHY the ask fired.
+
+Significance for this spike: this is the one documented field designed
+specifically to put HUMAN-FACING explanatory text into a permission prompt
+at approval time. Anthropic confirmed the bug and declined to fix it
+(not_planned) — so 4Shark cannot build a "hook explains what this command
+really does" mitigation on top of this field; it does not render.
+
+--- ISSUE #24224 (adjacent, NOT the same problem — cited for completeness/negative result) ---
+URL: https://github.com/anthropics/claude-code/issues/24224
+Title: Feature request: Config option to control text wrapping in terminal
+       output
+Created: 2026-02-08T17:16:16Z
+State: closed / state_reason: duplicate (confirmed via `gh api`)
+
+Body (verbatim, relevant passage):
+"When Claude Code renders long lines of text, it inserts hard line breaks
+at the terminal column width. When users copy this text to paste elsewhere
+(LinkedIn, Twitter, email, etc.), those hard breaks are preserved and break
+the formatting mid-sentence."
+
+Use case: copying assistant PROSE output to paste elsewhere cleanly — this
+issue is about the chat/message rendering pipeline (hard-wrap on copy), NOT
+about the Bash permission/approval dialog specifically. Included here as the
+closest adjacent, confirmed-real rendering-quality complaint found in the
+community; it corroborates that Claude Code's terminal text-rendering
+pipeline has known column-width/wrapping behavior, but it is NOT direct
+evidence that the approval DIALOG truncates or hides command text.
+
+Not found: a GitHub issue, blog post, or vendor document specifically
+reporting that the Bash approval/permission DIALOG (as opposed to general
+chat-message rendering, or the separate MATCHING-layer bugs above) truncates
+or visually hides part of a long or env-var-prefixed command string. This
+spike's web research (see SPIKE.md Finding 2) did not surface one despite
+multiple targeted search queries run 2026-07-01.

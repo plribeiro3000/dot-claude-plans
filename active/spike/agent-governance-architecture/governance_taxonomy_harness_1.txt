@@ -1,0 +1,130 @@
+SOURCE: https://github.com/ai-boost/awesome-harness-engineering
+SOURCE (raw): https://raw.githubusercontent.com/ai-boost/awesome-harness-engineering/main/README.md
+FETCHED: 2026-07-01 (two WebFetch calls, second re-fetch used as self-check on the first)
+TOOL: WebFetch, prompted to quote section headers verbatim
+
+PURPOSE IN THIS SPIKE: independent, community-maintained taxonomy of "AI agent
+harness engineering" — used in SPIKE.md Finding 5 to test whether the
+community recognizes categories of agent-governance mechanism beyond
+4Shark's three (hooks, docs, wrappers).
+
+=== First fetch — top-level category list ===
+
+1. Agent Loop — "The Thought/Action/Observation loop structure that underlies
+   virtually every agent harness."
+2. Planning & Task Decomposition — separating high-level strategy from
+   execution through structured milestone artifacts and step-list generation.
+3. Context Delivery & Compaction — managing finite context windows through
+   compression, caching, and selective information injection.
+4. Tool Design — establishing tool naming, schemas, error handling, and
+   return conventions that shape agent behavior.
+5. Skills & MCP — standardized protocols (Model Context Protocol) for
+   connecting agents to external capabilities and data sources.
+6. Permissions & Authorization — "Building structured permission and
+   authorization systems into agent harnesses instead of relying on
+   natural-language permission text."
+7. Memory & State — cross-session persistence and learned behavioral
+   adaptation across multiple executions.
+8. Task Runners & Orchestration — coordinating multi-agent teams and
+   workflow execution patterns.
+9. Verification & CI Integration — automated evaluation gates and
+   test-driven deployment processes.
+10. Observability & Tracing — instrumentation for auditing agent decisions
+    and debugging failures.
+11. Debugging & Developer Experience — tools for inspecting agent loops and
+    diagnosing harness misconfigurations.
+12. Human-in-the-Loop — approval flows, interruption mechanisms, and human
+    oversight integration.
+
+=== Second fetch (raw README) — detailed quotes per category, used for
+    verification/self-check of the above list ===
+
+## Permissions & Authorization
+"Structured authorization patterns for agents: how to give agents the right
+permissions without relying on prompt-level trust."
+- "Five-layer evaluation order (hooks -> deny rules -> permission mode ->
+  allow rules -> canUseTool)"
+- "Two-stage classifier: fast single-token gate first, chain-of-thought
+  reasoning only on flagged actions"
+- Pre-action authorization intercepting tool calls synchronously before
+  execution with cryptographically signed audit records (Open Agent Passport)
+
+## Tool Design
+"Tool naming, schema design, error messages, and return value conventions
+that make agents more reliable."
+- Tool annotations as risk vocabulary ("readOnlyHint," "destructiveHint,"
+  "idempotentHint," "openWorldHint")
+
+## Skills & MCP
+"Anthropic's open protocol for connecting agents to external tools, data
+sources, and services in a standardized way."
+- MCP server registry curation with ruleset-protected configurations
+- Schema-filtered planning subagents enforcing behavioral constraints via
+  tool schema rather than runtime permission checks
+
+## Memory & State
+"Covers in-context, external, and procedural memory patterns as
+harness-level concerns."
+- Three-tier memory architecture (core/archival/recall) with cross-session
+  retention
+- Hierarchical consolidation pipeline (episodes -> facts -> relationships ->
+  patterns)
+
+## Verification & CI Integration
+"✔️ Verification & CI Integration" — primary governance through automated
+testing, policy enforcement gates, and observability checkpoints that
+prevent agent regressions before deployment.
+- Deployment gates blocking releases on eval failures
+- Unit-test-style evals designed for agent behavior (not single LLM calls)
+- CI integration catching regressions against baseline benchmarks
+
+## Human-in-the-Loop
+"🧑‍💼 Human-in-the-Loop" — patterns for controlled agent autonomy where
+critical decisions require human review, approval, or oversight before
+execution.
+- Humans as "governors of the harness environment" rather than inspectors of
+  individual outputs
+
+## Observability & Tracing
+"👁️ Observability & Tracing" — instrumentation and logging that expose agent
+decision-making, tool invocations, and error modes in production.
+- Audit logging of all authorization decisions with root-cause diagnostics
+- Trajectory logging enabling post-hoc replay and failure analysis
+
+## Agent Loop
+"🔄 Agent Loop" — "The foundational paper defining the Thought/Action/
+Observation loop structure that underlies virtually every agent harness."
+- Programmable lifecycle hooks (SessionStart, PreToolUse, PostToolUse) for
+  guardrail injection
+- State machine guardrails constraining which tools agents can call in each
+  workflow phase
+
+## Security, Sandbox & Permissions
+"🔒 Security, Sandbox & Permissions" — isolation boundaries, sandboxed
+execution environments, and permission enforcement preventing unauthorized
+resource access.
+- Five-layer defense-in-depth safety via eager-construction scaffolding and
+  schema-filtered subagents
+- Deterministic sandbox container provisioning with crash recovery via
+  session replay
+- Intent-based permission gates replacing command-name deny lists with
+  semantic risk evaluation
+
+## Task Runners & Orchestration
+"⚙️ Task Runners & Orchestration" — "How task runners fit into the harness:
+queueing, parallelism, and progress reporting."
+- Supervisor/subagent topologies with error-recovery branches as first-class
+  primitives
+- Stateless agent separation ("brain," "hands," "session") enabling
+  independent failure recovery
+
+## Evals & Verification
+"✅ Evals & Verification" — measurement frameworks distinguishing what to
+evaluate, how to design eval harnesses, and why traditional unit tests fail
+for agents.
+- Three-dimensional risk taxonomy (source/failure-mode/consequence) with
+  fine-grained safety benchmarks
+- LLM-as-judge scoring combined with computational verification (linters,
+  tests)
+- Failure-classification mapping each failure mode to corresponding harness
+  component for targeted fixes

@@ -1,0 +1,34 @@
+SOURCE: https://dev.to/supertrained/tool-level-permission-scoping-in-mcp-why-server-authentication-isnt-enough-58ni
+FETCHED: 2026-07-01
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: tests whether MCP tool-level permission scoping is
+treated by the community as a genuinely distinct governance layer (vs a
+sub-form of generic permissions) — used in SPIKE.md Finding 7 / taxonomy
+table.
+
+KEY VERBATIM PASSAGES:
+"MCP server authentication and tool-level authorization are different
+layers. Conflating them creates lateral movement risk."
+Binary vs granular contrast: "Agent authenticates -> access granted -> all
+tools available" versus "Agent authenticates -> role/scope attached ->
+tools filtered by role."
+"Per-tool permission scoping is not a feature you add after deployment.
+It's an architecture decision that shapes how the server is built."
+
+SIGNIFICANCE FOR THIS SPIKE: the article treats tool-DISCOVERY scoping
+(hiding a tool from an agent's visible tool list entirely, not merely
+blocking its execution) as architecturally distinct from both (a) server-
+level authentication (can this agent talk to this MCP server at all) and
+(b) generic allow/deny command rules (can this agent run this specific
+call). This third axis — what the agent can even SEE as an option — has no
+equivalent in 4Shark's current three mechanisms: 4Shark's Bash
+permission.allow/ask/deny rules constrain execution, not visibility (the
+agent's context always includes the full Bash tool; only specific COMMANDS
+are gated). Anthropic's own permissions doc (governance_anthropic_
+permissions_3.txt) confirms a bare-tool-name deny rule ("A tool matched by
+a bare-name glob deny rule is removed from Claude's context, the same as a
+bare tool name") does achieve visibility-level suppression for whole tools
+— but 4Shark's config uses zero MCP servers and zero bare-tool deny rules
+of this shape (confirmed by direct grep of `settings.json`), so this
+capability exists in the platform but is unused by 4Shark today.

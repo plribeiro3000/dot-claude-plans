@@ -1,0 +1,107 @@
+SOURCE: https://code.claude.com/docs/en/permissions
+FETCHED: 2026-07-01
+TOOL: WebFetch — full document returned verbatim
+
+PURPOSE IN THIS SPIKE: vendor's own architecture for the permission-rule
+system, used in SPIKE.md to establish (a) permission allow/ask/deny rules
+are an architecturally distinct evaluation layer from PreToolUse hook
+scripts, even though 4Shark's own framing folds them under "hooks"; (b) the
+Agent(...) subagent-scoping permission primitive; (c) output-styles as a
+distinct mechanism directory.
+
+KEY VERBATIM PASSAGES:
+
+## Permission rule types
+"Allow rules let Claude Code use the specified tool without manual
+approval. Ask rules prompt for confirmation whenever Claude Code tries to
+use the specified tool. Deny rules prevent Claude Code from using the
+specified tool."
+"Rules are evaluated in order: deny, then ask, then allow. The first match
+in that order determines the outcome, and rule specificity doesn't change
+the order."
+
+## Hooks vs permission rules — the layering (directly answers whether
+   permission rules are a distinct layer from hook scripts)
+"[Claude Code hooks] provide a way to register custom shell commands to
+perform permission evaluation at runtime. When Claude Code makes a tool
+call, PreToolUse hooks run before the permission prompt. The hook output can
+deny the tool call, force a prompt, or skip the prompt to let the call
+proceed."
+"Hook decisions don't bypass permission rules. Deny and ask rules are
+evaluated regardless of what a PreToolUse hook returns, so a matching deny
+rule blocks the call and a matching ask rule still prompts even when the
+hook returned 'allow' or 'ask'. This preserves the deny-first precedence...
+including deny rules set in managed settings."
+"A blocking hook also takes precedence over allow rules. A hook that exits
+with code 2 stops the tool call before permission rules are evaluated, so
+the block applies even when an allow rule would otherwise let the call
+proceed."
+
+This confirms (per the harness-engineering taxonomy aux file) the
+"five-layer evaluation order (hooks -> deny rules -> permission mode ->
+allow rules -> canUseTool)" description independently, in the vendor's own
+words: hooks and permission rules are evaluated as separate, ordered layers,
+not one mechanism.
+
+## Permission modes (a layer above both hooks and allow/ask/deny rules)
+Table: default (prompts on first use), acceptEdits (auto-accepts file edits
++ common fs commands), plan (read-only exploration), auto ("Auto-approves
+tool calls with background safety checks that verify actions align with
+your request. Currently a research preview" — this is the model-classifier
+"auto mode" the sibling spike ai-agent-permission-control/SPIKE.md already
+covers in depth), dontAsk, bypassPermissions.
+
+## Sandboxing vs permissions — explicitly framed as complementary, distinct
+   layers
+"Permissions and sandboxing are complementary security layers:
+- Permissions control which tools Claude Code can use and which files or
+  domains it can access. They apply to all tools, including Bash, Read,
+  Edit, WebFetch, and MCP.
+- Sandboxing provides OS-level enforcement that restricts the Bash tool's
+  filesystem and network access. It applies only to Bash commands and their
+  child processes."
+"Sandbox restrictions prevent Bash commands from reaching resources outside
+defined boundaries, even if a prompt injection bypasses Claude's
+decision-making"
+
+## Agent (subagents) permission rules — confirms subagent-scoping is a
+   native, distinct permission primitive
+"Use Agent(AgentName) rules to control which subagents Claude can use:
+- Agent(Explore) matches the Explore subagent
+- Agent(Plan) matches the Plan subagent
+- Agent(my-custom-agent) matches a custom subagent named my-custom-agent
+Add these rules to the deny array in your settings or use the
+--disallowedTools CLI flag to disable specific agents."
+Also: "Agent(model:opus)" (Agent calls that request the Opus model tier) and
+"Agent(isolation:worktree)" (Agent calls that request a git worktree) as
+parameter-level match examples — i.e., a subagent's resource envelope
+(model tier, isolation mode) is itself a permission-rule-addressable
+surface, independent of any PreToolUse hook logic.
+
+## MCP-specific permission rules — confirms MCP tool scoping is a native,
+   distinct permission primitive (not merely a community best practice)
+"mcp__puppeteer matches any tool provided by the puppeteer server
+mcp__puppeteer__* uses wildcard syntax and also matches all tools from the
+puppeteer server
+mcp__puppeteer__puppeteer_navigate matches the puppeteer_navigate tool
+provided by the puppeteer server"
+"This configuration denies every MCP tool: { "deny": ["mcp__*"] }"
+
+## Output styles — confirms this is a real, separate configuration surface
+"place files in ~/.claude/agents/, ~/.claude/output-styles/, or
+~/.claude/settings.json to make them available in every project"
+(Listed alongside CLAUDE.md/rules/hooks as one of several distinct
+configuration-loading mechanisms in the "Additional directories grant file
+access, not configuration" table.)
+
+CROSS-CHECK AGAINST 4SHARK'S OWN CONFIG: `~/.claude/settings.json` (read in
+full, 704 lines) contains no `mcp` server configuration and no `sandbox`
+key anywhere in the file; `grep -ri "mcp\|sandbox" ~/.claude/settings.json`
+returned zero matches. There is also no `~/.claude/output-styles/`
+directory and no `Agent(...)` entries in the `permissions.allow`/`ask`/
+`deny` arrays (which list only `Bash(...)`, `Read(...)`, `Write(...)`,
+`Edit(...)`, `Glob(...)`, `Grep(...)`, `WebSearch`, `WebFetch`). 4Shark's
+subagent scoping (the Subagent Contract) is entirely a documentation/prose
+convention (`SUBAGENT-CONTRACT.md`, injected via `read-context.sh` at
+`SubagentStart`) plus after-the-fact verification by main — not the native
+`Agent(...)` permission-rule primitive.

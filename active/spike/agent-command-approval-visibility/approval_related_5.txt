@@ -1,0 +1,34 @@
+# Source: GMO Flatt Security Research — "Pwning Claude Code in 8 Different Ways"
+# URL: https://flatt.tech/research/posts/pwning-claude-code-in-8-different-ways/
+# Fetched fresh: 2026-07-01
+
+## Technique 8 — Bash Variable Expansion (visible text diverges from actual effect)
+
+Verbatim quote:
+"Since $( was blocked by Claude Code, I had to chain multiple variable
+expansions together: echo ${one="$"}${two="$one(touch /tmp/pwned)"}
+${two@P}"
+
+Framing (from the fetch): "This demonstrates a technique where the visible
+echo command masks the actual execution of touch /tmp/pwned through layered
+variable expansion using the @P prompt-parsing modifier."
+
+Relevance and scope limit: this is a DIFFERENT problem from the one this
+spike investigates — it is a deliberate adversarial bypass of a `$(...)`
+block, not a case of a legitimate command's tail scrolling off an approval
+prompt. It is cited here only as an illustrative, security-research-grade
+example that the general CLASS of problem — "what a human reads at the
+start of a command string is not reliably what the command actually does"
+— is a documented concern in the Claude Code security research community,
+not a novel 4Shark observation. It should NOT be read as direct evidence
+about approval-prompt truncation of long/env-var-prefixed commands; no
+direct evidence for that specific claim was found (see approval_issue_3.txt,
+final paragraph, for the explicit "not found" statement).
+
+Confirmed: the article's eight documented techniques (per the fetch
+performed for this spike) do not include a technique specifically about
+approval-dialog truncation, UI scrolling, or hidden compound-command tails.
+The fetch explicitly stated: "the eight techniques focus on blocklist
+bypasses, dangerous command options, tool-specific parsing quirks, and
+variable expansion chains — but don't specifically document approval UI
+evasion through truncation or hidden prefixes."

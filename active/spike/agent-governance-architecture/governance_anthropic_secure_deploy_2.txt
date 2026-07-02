@@ -1,0 +1,86 @@
+SOURCE: https://code.claude.com/docs/en/agent-sdk/secure-deployment
+(redirected from https://platform.claude.com/docs/en/agent-sdk/secure-deployment)
+FETCHED: 2026-07-01
+TOOL: WebFetch — full document returned verbatim (not a search synthesis)
+
+PURPOSE IN THIS SPIKE: vendor's (Anthropic's) own taxonomy of governance
+mechanisms for securely deploying Claude Code / Agent SDK. Used in SPIKE.md
+Findings 6-8 to establish sandboxing/isolation and the credential-proxy
+pattern as vendor-recommended, distinct mechanisms.
+
+KEY VERBATIM PASSAGES:
+
+"Unlike traditional software that follows predetermined code paths, these
+tools generate their actions dynamically based on context and goals. This
+flexibility is what makes them useful, but it also means their behavior can
+be influenced by the content they process: files, webpages, or user input.
+This is sometimes called prompt injection."
+
+"The good news is that securing an agent deployment doesn't require exotic
+infrastructure. The same principles that apply to running any semi-trusted
+code apply here: isolation, least privilege, and defense in depth."
+
+## Built-in security features
+- "Permissions system: Every tool and bash command can be configured to
+  allow, block, or prompt the user for approval."
+- "Command parsing for permissions: Before executing bash commands, Claude
+  Code parses them into an AST and matches the result against your
+  permission rules... This is a permission gate, not a sandbox; it does not
+  infer whether a command is dangerous from its target path or effects."
+- "Web search summarization: Search results are summarized rather than
+  passing raw content directly into the context, reducing the risk of
+  prompt injection from malicious web content."
+- "Sandbox mode: Bash commands can run in a sandboxed environment that
+  restricts filesystem and network access."
+
+## Security principles
+- Security boundaries: "A security boundary separates components with
+  different trust levels... rather than giving an agent direct access to an
+  API key, you could run a proxy outside the agent's environment that
+  injects the key into requests. The agent can make API calls, but it never
+  sees the credential itself."
+- Least privilege table: Filesystem (mount only needed directories, prefer
+  read-only), Network (restrict to specific endpoints via proxy),
+  Credentials (inject via proxy rather than exposing directly), System
+  capabilities (drop Linux capabilities in containers).
+- Defense in depth: container isolation, network restrictions, filesystem
+  controls, request validation at a proxy.
+
+## Isolation technologies table
+Sandbox runtime (good isolation, very low overhead, low complexity) |
+Containers/Docker (setup dependent, low overhead, medium complexity) |
+gVisor (excellent with correct setup, medium/high overhead, medium
+complexity) | VMs / Firecracker/QEMU (excellent with correct setup, high
+overhead, medium/high complexity).
+
+"For lightweight isolation without containers, sandbox-runtime enforces
+filesystem and network restrictions at the OS level... Filesystem: Uses OS
+primitives (bubblewrap on Linux, sandbox-exec on macOS) to restrict
+read/write access to configured paths."
+
+## Credential management — the proxy pattern (directly relevant to the
+   wrapper deep-dive)
+"The recommended approach is to run a proxy outside the agent's security
+boundary that injects credentials into outgoing requests. The agent sends
+requests without credentials, the proxy adds them, and forwards the request
+to its destination."
+
+"Provide access through an MCP server or custom tool that routes requests to
+a service running outside the agent's security boundary. The agent calls the
+tool, but the actual authenticated request happens outside... For example, a
+git MCP server could accept commands from the agent but forward them to a
+git proxy running on the host, which adds authentication before contacting
+the remote repository. The agent never sees the credentials."
+
+Advantages listed: "No TLS interception: The external service makes
+authenticated requests directly" and "Credentials stay outside: The agent
+only sees the tool interface, not the underlying credentials."
+
+NOTE: this document never uses the word "wrapper" for a same-machine
+PATH-shim script (4Shark's ruby.sh shape). Its closest analogous pattern is
+the external proxy / "custom tool" — architecturally similar in INTENT
+(never let the agent-visible invocation carry the secret) but different in
+MECHANISM (separate process/boundary outside the agent's environment, vs.
+4Shark's ruby.sh which runs inside the same trust boundary as the agent,
+purely to solve the permission-matcher string-prefix problem, not to hide a
+secret from a compromised agent).

@@ -1,0 +1,36 @@
+SOURCE: https://www.aikido.dev/blog/introducing-safe-chain
+FETCHED: 2026-07-01
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: a third example of a widely-used community wrapper
+(this time for npm/npx/yarn) — used to answer investigation question 3(a)
+(which tools are most commonly wrapped, and why) and to broaden the
+evidence base beyond git/AWS.
+
+MECHANISM (per the fetch, verbatim where quoted):
+Install: `npm install -g @aikidosec/safe-chain`, then `safe-chain setup`
+establishes shell integration, then a terminal restart activates aliases.
+"a secure wrapper for npm, npx, and yarn that sits in your current workflow
+and checks every package for malware before install"
+The tool creates ALIASES for `npm`, `npx`, and `yarn` (a PATH/alias-shim
+mechanism, the same general shape as `ai-aligned-git`'s PATH shim for
+`git`) rather than hooking into a specific agent's lifecycle events.
+
+WHAT IT CHECKS: every package is checked against "Aikido Intel", described
+as "our threat pipeline that detects around 200 malicious packages per day,
+before they show up in vulnerability databases" — blocking dependency
+confusion, backdoors, typosquats, and other supply-chain threats in
+real time during the install step, before any package code executes.
+
+SIGNIFICANCE FOR THIS SPIKE: notably, this wrapper is NOT AI-agent-specific
+in its marketing (it protects any developer's `npm install`), but its own
+materials explicitly extend coverage to AI coding tools — "Aikido Endpoint
+... covers npm, PyPI, Maven, NuGet, VS Code and Open VSX extensions, Chrome
+extensions, and AI coding tools like Cursor, Claude Code, Copilot, and
+Windsurf" (per the WebSearch result that led to this fetch, corroborated by
+the fetch's description of the npm/npx/yarn wrapper itself). This
+illustrates that "wrap the package manager" is a general software-supply-
+chain-security pattern that AI-agent use cases inherit rather than
+originate — package-manager wrapping predates and is broader than the
+AI-agent governance question, unlike `ai-aligned-git` and the AWS CLI
+allowlist wrapper, which were purpose-built for agents.

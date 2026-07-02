@@ -1,0 +1,41 @@
+SOURCE: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+FETCHED: 2026-07-01
+TOOL: WebFetch
+
+PURPOSE IN THIS SPIKE: tests whether Anthropic frames evals as a governance/
+control mechanism (parallel to permissions/hooks/sandboxing) or purely as a
+development/QA practice. Used in SPIKE.md Finding 9.
+
+FINDING (from the fetch): Anthropic does NOT explicitly frame evals as a
+governance/control mechanism alongside permissions, hooks, or sandboxing in
+this article. The closest relevant verbatim passage:
+
+"Good evaluations help teams ship AI agents more confidently. Without them,
+it's easy to get stuck in reactive loops—catching issues only in
+production"
+
+"Regression evals ask, 'Does the agent still handle all the tasks it used to?'
+and should have a nearly 100% pass rate"
+
+These frame evals as a quality/regression-detection practice for the agent's
+TASK behavior (does the agent still complete tasks correctly), not as a
+mechanism that blocks, permits, or reshapes what the harness allows the
+agent to do. This is a meaningfully different scope than the
+"Verification & CI Integration" / "Evals & Verification" categories in the
+awesome-harness-engineering taxonomy (see governance_taxonomy_harness_1.txt),
+which explicitly include "deployment gates blocking releases on eval
+failures" — i.e., that community list treats evals as gating the SHIP of a
+new harness/prompt/tool version, which is a governance act (deciding what
+version of the agent's configuration is allowed to run), even though
+individual evals do not intercept a live tool call the way a hook does.
+
+SIGNIFICANCE FOR THIS SPIKE: two credible sources disagree on how central
+"evals as governance" is. The vendor's own engineering blog treats evals as
+a QA/regression practice for agent task performance. An independent
+community taxonomy treats evals (specifically CI-gated regression evals) as
+one of twelve categories of harness governance. 4Shark has neither: no
+described mechanism tests whether a hook script, a doc rule, or a wrapper
+script itself behaves correctly release-over-release (no BATS/shellcheck/
+regression harness found under `~/.claude/scripts/` or `~/.claude/`; direct
+grep for "eval|regression" across `~/.claude/scripts/*.sh` returned no
+matches, confirmed 2026-07-01).

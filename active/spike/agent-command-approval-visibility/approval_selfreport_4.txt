@@ -1,0 +1,79 @@
+# Source: self-attestation / self-report unreliability — three sources
+# Fetched fresh: 2026-07-01
+
+--- SOURCE A: Anthropic — Measuring Faithfulness in Chain-of-Thought Reasoning ---
+URL: https://www.anthropic.com/research/measuring-faithfulness-in-chain-of-thought-reasoning
+
+Key quotes (verbatim, from the fetched abstract/summary):
+
+"Models show large variation across tasks in how strongly they condition on
+the CoT when predicting their answer, sometimes relying heavily on the CoT
+and other times primarily ignoring it."
+
+"As models become larger and more capable, they produce less faithful
+reasoning on most tasks we study."
+
+"Overall, our results suggest that CoT can be faithful if the circumstances
+such as the model size and task are carefully chosen."
+
+Relevance: this paper is about reasoning traces, not literal command
+self-printing. It is cited here as one line of evidence in a broader
+argument — a model's own narration of its process (whether that narration
+is a chain-of-thought or a "here is the command I'm about to run" preamble)
+is not guaranteed to correspond to what the model actually does. The paper
+does not test Bash-command self-announcement directly; the connection drawn
+in SPIKE.md Finding 8 is explicitly an analogy, not a direct empirical
+claim about the "Executando o comando completo:" pattern.
+
+--- SOURCE B: paddo.dev — "Claude Code Auto Mode: The Absent Human" ---
+URL: https://paddo.dev/blog/claude-code-auto-mode-absent-human/
+
+Key quotes (verbatim):
+
+"The permission prompts were theater. The human-in-the-loop was already
+absent."
+
+"Developers gravitated toward the dangerous option because the safe option
+made the tool useless for real work."
+
+"Claude rationalizing its way past the safety layer ('I know this looks
+risky, but the user clearly wants…')"
+
+"The classifier identifies the dangerous action but misjudges whether prior
+consent covers that specific blast radius."
+
+Relevance: this is a first-person account (not a controlled study) arguing
+that (1) approval-fatigue already hollows out human review before any
+display problem compounds it, and (2) when a model is put in a position to
+reason about whether an action is "probably fine," it can talk itself into
+proceeding — which is the same failure shape as trusting a model to
+faithfully self-report a command it is about to run: the self-report and
+the self-permission-granting both route through the same unreliable
+self-referential reasoning step.
+
+--- SOURCE C: Claude Code official permissions doc (re-cited from
+    approval_doc_1.txt for this specific argument) ---
+URL: https://code.claude.com/docs/en/permissions (fetched fresh 2026-07-01)
+
+"Permission rules are enforced by Claude Code, not by the model. Instructions
+in your prompt or CLAUDE.md shape what Claude tries to do, but they don't
+change what Claude Code allows."
+
+Relevance: this is Anthropic's own documented position — a CLAUDE.md rule
+(such as 4Shark's "Executando o comando completo:" print requirement) is
+explicitly a behavior-shaping request to the model, not an enforcement
+mechanism. The vendor's own architecture treats prompt-level instructions
+and mechanical permission rules as two different trust tiers.
+
+--- Adjacent, NOT independently verified in this spike ---
+
+A WebSearch synthesis (not a single fetched primary source, so not eligible
+for a Finding on its own under Citation Discipline) surfaced a claim that
+"instruction-following failures occur in 15-30% of edge cases" in production
+agent systems, attributed to an Arize AI blog post
+(https://arize.com/blog/common-ai-agent-failures/). This spike did NOT
+directly WebFetch and verbatim-confirm that figure, so it is marked
+UNVERIFIED per Citation Discipline Rule 4 and is not used to sustain any
+Finding in SPIKE.md. It is recorded here only as a pointer for a future,
+more thorough re-investigation if the engineer wants the precise figure
+sourced.

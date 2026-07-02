@@ -1,0 +1,106 @@
+# Source: Claude Code Hooks Reference (official)
+# URL: https://code.claude.com/docs/en/hooks
+# Fetched fresh: 2026-07-01
+
+## Full hook event table (relevant rows only, verbatim from the fetch)
+
+| Event | When it fires | Capabilities |
+|-------|---------------|--------------|
+| PreToolUse | Before a tool call executes | Block tool call; modify tool input; allow/deny/ask/defer permission; add context |
+| PermissionRequest | "When a permission dialog appears" | Allow/deny permission; modify tool input; apply permission rules |
+| PermissionDenied | When a tool call is denied by the auto mode classifier | Tell model it may retry the denied tool call |
+| Notification | "When Claude Code sends a notification" | Add context; emit terminal sequences (cannot block) |
+| MessageDisplay | While assistant message text is displayed | Replace displayed text on screen (display-only; transcript unchanged) |
+
+## PermissionRequest — exact behavior
+
+"PermissionRequest fires when Claude Code is about to show a permission
+dialog; a hook can pre-empt the dialog by returning a nested decision of
+allow or deny, optionally rewriting the input and even adding a standing
+permission rule on allow (addPermissionRuleOnAllow)."
+
+Output shape:
+```json
+{
+  "hookSpecificOutput": {
+    "hookEventName": "PermissionRequest",
+    "decision": {
+      "behavior": "allow",
+      "updatedInput": { "command": "npm run lint" },
+      "addPermissionRuleOnAllow": "Bash(npm *)"
+    }
+  }
+}
+```
+
+Input shape (community-sourced, cross-checked against the hook's documented
+tool-event fields):
+```json
+{
+  "session_id": "abc123",
+  "transcript_path": "/Users/.../.claude/projects/.../transcript.jsonl",
+  "cwd": "/Users/...",
+  "permission_mode": "default",
+  "hook_event_name": "PermissionRequest",
+  "tool_name": "Bash",
+  "tool_input": { "command": "npm install" }
+}
+```
+`tool_input.command` carries the FULL raw command string the hook can parse
+— this is the same field PreToolUse hooks already parse in
+validate-bash-command.sh and auto-approve-aws-readonly.sh.
+
+## What PermissionRequest does NOT do
+
+The hooks reference documents PermissionRequest's output as EITHER
+`decision.behavior: allow|deny` (with optional `updatedInput`) OR nothing
+(passes through to the native dialog). No field in the documented output
+schema lets a hook supply replacement TEXT for the dialog the human sees —
+the only content-transformation capabilities in the entire hook system are:
+PreToolUse `updatedInput` (changes what EXECUTES, not what is SHOWN before
+execution), PostToolUse `updatedToolOutput` (changes tool RESULT), and
+MessageDisplay `displayContent` (changes assistant MESSAGE text, a
+completely different UI surface — see Finding 10 in SPIKE.md).
+
+Not found: any hook event or output field documented to modify the rendered
+content of the native permission/approval dialog itself. The dialog either
+renders the raw tool_input verbatim, or a hook pre-empts it entirely
+(bypassing human review, not improving it).
+
+## MessageDisplay — display-only, does not touch permission dialogs
+
+"MessageDisplay | hookSpecificOutput | displayContent replaces the displayed
+text on screen. Display-only: the transcript and what Claude sees keep the
+original."
+
+This event fires "while assistant message text is displayed" — i.e. the
+model's own chat reply. It is a distinct UI surface from the Bash tool
+permission/approval dialog. The completed sibling spike
+agent-secret-output-leakage/SPIKE.md Findings 8-9 established this hook's
+full scope and residual gaps for the credential-masking use case; the same
+scope boundary (assistant text only) means MessageDisplay cannot be
+repurposed to redact or reformat what appears inside an approval prompt.
+
+## Notification hook — can emit terminal sequences, cannot block or rewrite dialog
+
+"Hooks run without a controlling terminal, so writing escape sequences
+directly to /dev/tty fails. Instead, return the escape sequence in the
+terminalSequence field and Claude Code emits it for you through its own
+terminal write path."
+
+Example:
+```bash
+seq=$(printf '\033]777;notify;%s;%s\007' "$title" "$body")
+jq -nc --arg seq "$seq" '{terminalSequence: $seq}'
+```
+
+This is a side-channel notification mechanism (desktop notification / bell),
+not a way to alter or augment the approval dialog's rendered text.
+
+## permissionDecisionReason — the one field the docs describe as human-facing, and its documented failure
+
+See approval_issue_3.txt (GitHub issue #17356) for the confirmed bug: the
+`permissionDecisionReason` field, which the hooks documentation states
+should be "shown to user only, not to Claude" for `ask` decisions, is NOT
+rendered in the CLI's native permission prompt. Anthropic closed the issue
+`not_planned`.

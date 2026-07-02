@@ -1,0 +1,90 @@
+# Source: Claude Code Permissions Documentation (official)
+# URL: https://code.claude.com/docs/en/permissions
+# Fetched fresh: 2026-07-01 (this spike; independent of the 2026-06-08 fetch
+# cited by the sibling spike llm-agent-command-chaining/chaining_excerpt_2.txt)
+
+## Advisory-only nature of CLAUDE.md (key quote for self-print unreliability)
+
+"Permission rules are enforced by Claude Code, not by the model. Instructions
+in your prompt or CLAUDE.md shape what Claude tries to do, but they don't
+change what Claude Code allows. To grant or revoke access, use /permissions,
+the rules described here, a permission mode, or a PreToolUse hook."
+
+## Compound commands (re-confirmed, current doc text — matches the 2026-06-08 fetch)
+
+"Claude Code is aware of shell operators, so a rule like Bash(safe-cmd *)
+won't give it permission to run the command safe-cmd && other-cmd. The
+recognized command separators are &&, ||, ;, |, |&, &, and newlines. A rule
+must match each subcommand independently."
+
+"When you approve a compound command with 'Yes, don't ask again', Claude Code
+saves a separate rule for each subcommand that requires approval, rather than
+a single rule for the full compound string. For example, approving git status
+&& npm test saves a rule for npm test, so future npm test invocations are
+recognized regardless of what precedes the &&. Subcommands like cd into a
+subdirectory generate their own Read rule for that path. Up to 5 rules may be
+saved for a single compound command."
+
+## Process wrappers — the stripped set does NOT include env-var assignments
+
+"Before matching Bash rules, Claude Code strips a fixed set of process
+wrappers so a rule like Bash(npm test *) also matches timeout 30 npm test.
+The recognized wrappers are timeout, time, nice, nohup, and stdbuf."
+
+"Bare xargs is also stripped, so Bash(grep *) matches xargs grep pattern.
+Stripping applies only when xargs has no flags..."
+
+"This wrapper list is built in and is not configurable. Development
+environment runners such as direnv exec, devbox run, mise exec, npx, and
+docker exec are not in the list. Because these tools execute their arguments
+as a command, a rule like Bash(devbox run *) matches whatever comes after
+run, including devbox run rm -rf ."
+
+NOTE: this is the complete, current, documented "stripped prefix" list. A
+leading `VAR=value` env-var assignment is NOT a member of this set. This is
+the official document's own enumeration — the omission is the confirmation
+that env-var prefixes are not normalized before matching (corroborating the
+community bug reports in approval_issue_3.txt).
+
+## Read-only command set (hardcoded, no prompt)
+
+"Claude Code recognizes a built-in set of Bash commands as read-only and runs
+them without a permission prompt in every mode. These include ls, cat, echo,
+pwd, head, tail, grep, find, wc, which, diff, stat, du, cd, and read-only
+forms of git. The set is not configurable; to require a prompt for one of
+these commands, add an ask or deny rule for it."
+
+## Hook precedence over allow rules (exit 2 hard block)
+
+"A blocking hook also takes precedence over allow rules. A hook that exits
+with code 2 stops the tool call before permission rules are evaluated, so the
+block applies even when an allow rule would otherwise let the call proceed.
+To run all Bash commands without prompts except for a few you want blocked,
+add 'Bash' to your allow list and register a PreToolUse hook that rejects
+those specific commands."
+
+## Warning about fragile argument-constraining Bash patterns (own quoted example matches VAR= opacity)
+
+"Bash permission patterns that try to constrain command arguments are
+fragile. For example, Bash(curl http://github.com/ *) intends to restrict
+curl to GitHub URLs, but won't match variations like: ... Variables:
+URL=http://github.com && curl $URL ..."
+
+This is the official documentation's own worked example of an env-var
+indirection defeating an argument-constraining rule — for a different
+resource (curl/URL filtering) but the identical structural mechanism
+(`VAR=value` then a reference) as the RAILS_MASTER_KEY / BUNDLE_GEMFILE case
+in RUBY-COMMAND-EXECUTION.md.
+
+## Extend permissions with hooks — PreToolUse only, no dialog-content hook mentioned here
+
+"Claude Code hooks provide a way to register custom shell commands to
+perform permission evaluation at runtime. When Claude Code makes a tool
+call, PreToolUse hooks run before the permission prompt. The hook output
+can deny the tool call, force a prompt, or skip the prompt to let the call
+proceed."
+
+This section (the permissions doc's own "Extend permissions with hooks"
+section) names only PreToolUse as the permission-evaluation hook. It does
+not mention PermissionRequest or any hook capable of altering the rendered
+dialog content — see approval_doc_2.txt for the hooks-doc side of this gap.
