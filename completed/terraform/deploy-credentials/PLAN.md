@@ -1,5 +1,7 @@
 # PLAN — Bring deploy AWS credentials under Terraform
 
+> ✅ **DONE (2026-07-03).** Delivered across all 12 stacks via **PR #589 (merged)**, all applied with 0 change/destroy. See `terraform/credential-hygiene/PLAN.md` (Workstream 1) for the closed summary.
+
 **Project**: `terraform` (`~/Projects/4Shark/terraform`)
 **Origin**: `~/.claude/plans/active/spike/terraform-deploy-credentials/SPIKE.md`
 **Decision (locked with engineer, 2026-07-01)**: Option B — static keys, fully in Terraform. Import existing keys (no rotation), read current values from live infra (SSM), and push to GitHub automatically.
