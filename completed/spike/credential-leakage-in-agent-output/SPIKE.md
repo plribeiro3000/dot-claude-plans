@@ -182,3 +182,15 @@ Grounded strictly in Findings 2, 3, and 4 (Finding 6 and the tool-landscape clai
 - **Option C**: Revisit the "no mechanical enforcement" decision from the prior spike specifically for the narrower case of output-side redaction tooling (Finding 5's gap: free-form credential values in prose) — e.g., evaluate whether a `MessageDisplay`-hook regex approach (already investigated mechanically in the prior spike, verdict "partially achievable") is worth adopting now that the industry framing confirms deterministic layers are what OWASP expects to do the actual enforcement work, even though this spike's sources don't mandate it.
 
 (NO recommendation — options surfaced; engineer and main decide)
+
+## Resolution — decided and implemented (2026-07-04)
+
+**Decision: Option B (strengthen the wording with the OWASP framing), realized as a new top-priority Critical Rule** rather than an in-place edit of Layer 0. A short rule — "Never Emit a Credential Value in the Session" — was added as the FIRST subsection under `## Critical Rules` at the top of `CLAUDE.md`, above every other rule, so it is present in every session and survives context compaction (the engineer's ask for a "small, highest-priority doc"). It is written in the declarative register Layer 0 already uses (not imperative), names OWASP LLM02:2025 with the verbatim "may not always be honored and could be bypassed" caveat, carries the "intent signal, not a guarantee" framing, and points to Layer 0 for the full handling. Layer 0 itself was left unchanged.
+
+**Source-agnostic correction:** the rule (and this spike's framing) was corrected to be source-agnostic — it guards the session output against a credential value from ANY in-session source (file read, command output, config/env, tool result, pasted text), with the email fetch demoted to one example. The earlier email-vector emphasis was a narrowing of the briefing, not of the problem.
+
+**Not adopted / deferred:**
+- **Option A (keep Layer 0 exactly as-is)** — rejected; the elevation + OWASP grounding was judged worth the small change.
+- **Option C (revisit mechanical enforcement for the free-form-credential gap)** — deferred as a possible future spike, NOT built. There is no mechanical way to redact the model's OWN output text inside Claude Code (a hook cannot edit the assistant's response; `MessageDisplay` only masks the on-screen render). Any mechanical layer could therefore only act upstream on the tool-result/input side (scrubbing a value before it enters context), which is a separate, heavier build with its own feasibility spike — and it is explicitly not the next step.
+
+**Delivered:** PR #340 — `docs(guardrails): add credential-value session-output guard-rail` — merged into `develop` on 2026-07-04.

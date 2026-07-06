@@ -45,22 +45,31 @@ Secrets and SSM URL flips were done out of band (no PR), value-to-file, never ec
 - [x] shared + atento legacy pooler `desired_count 2→0` (terraform PR #619) — same drain gate; atento held until its post-redeploy follower drain finished, then applied.
 - All four legacy pooler services now `0/0`. Still declared in terraform (modules/secrets/CNAME/ECR intact) — removed in T4.
 
-## T4 — Contract (drop all legacy code + infra) — IN PROGRESS
+## T4 — Contract (drop all legacy code + infra) — DONE
 
-Destructive. Per stack, one terraform PR (or grouped), applied per stack, engineer-gated. The legacy pooler is already at `0/0`, so removal destroys idle resources.
+Destructive, one terraform PR per stack, applied per stack, engineer-gated. Order beta → demo → shared → atento (non-prod first to prove the destroy shape).
 
-Per `app-<env>-001/`:
-- [ ] Remove the legacy module block (`module "pgbouncer"` / **`module "pgbouncer_v2"` for shared**) — destroys its ECS cluster, service, capacity provider, Cloud Map namespace + SD service, and the old CNAME record `pgbouncer-<env>-001.4shark.internal`.
-- [ ] Remove the 3 legacy secrets (`<env>-pgbouncer-*` for beta/demo/atento, `app-<env>-pgbouncer-*` — wait, verify per stack: beta/demo/atento legacy = `<env>-pgbouncer-*`; shared legacy = `app-shared-001-pgbouncer-*`) — userlist, stats-password, datadog-api-key + their `_version`.
-- [ ] Remove the legacy ECR `<env>-pgbouncer` from `main.tf`/`compute.tf` `ecr_repositories` (empty images first if the repo blocks on non-empty).
-- [ ] Drop the legacy cluster/IAM PassRole wiring (`module.pgbouncer[_v2].cluster_name` / `.execution_role_arn`) from the `cluster_names` / `task_execution_role_arns` lists.
+| Stack | PR | legacy module | destroy count |
+|---|---|---|---|
+| beta-001 | #620 | `module.pgbouncer` | 28 |
+| demo-001 | #621 | `module.pgbouncer` | 28 |
+| shared-001 | #622 | `module.pgbouncer_v2` | 29 |
+| atento-001 | #623 | `module.pgbouncer` (+ legacy cross-region zone assoc) | 29 |
 
-Cross-cutting:
-- [ ] `pgbouncer` repo CI: drop the `<env>-pgbouncer` build tags from `build.yaml` and the `pgbouncer` option/default from `deploy.yaml` (leave only `connection-pooler`).
-- [ ] Confirm no remaining reference to `pgbouncer-<env>-001.4shark.internal` anywhere (app SSM already flipped; grep terraform + app config).
+Per stack each PR: moved `aws_route53_zone_association.internal` into `connection_pooler.tf` (same address → no-op, keeps the new CNAME resolving), deleted `pgbouncer.tf` (secrets + module), dropped the legacy ECR + cluster/IAM wiring. Every plan reviewed: destroys were ONLY the legacy module + secrets + ECR (+ atento's legacy `outbound_cloud_map`), zero `module.connection_pooler`. All apps verified healthy after each apply.
 
-## Gates
+- [x] `pgbouncer` repo CI (PR #16): build pushes only `<env>-connection-pooler`; deploy drops the now-single-valued `pooler` input and targets `<env>-connection-pooler` directly. **Urgent because** the legacy ECRs were destroyed — the next build would have failed pushing to them.
 
-- Apply-before-merge, **per stack**. **Read every plan** — T4 is the first phase that DESTROYS; confirm the destroy list is only legacy pooler resources (cluster/service/SD/CNAME/secrets/ECR for the OLD module), never `module.connection_pooler`.
-- Engineer `go` before each productive stack (shared-001 / atento-001).
-- Order: do beta/demo first (non-prod) to prove the destroy plan shape, then shared/atento.
+### T4 execution notes (not in the original plan)
+
+1. **Legacy ECR must be emptied before the destroy.** `module.ecr` has no `force_delete`; a non-empty repo blocks the destroy. Emptied each `<env>-pgbouncer` repo with `aws ecr batch-delete-image` (two rounds — tag + digest entries) before applying.
+2. **Contract apply is a FULL apply (not `-target`), so it initializes the `rediscloud` + `mongodbatlas` providers** whose keys come from the stack `.envrc` via `op`. A transient `op` timeout leaves those keys empty and the apply errors at the end (`Missing Redis Cloud API Key`) — but the AWS destroys already completed (state written incrementally). Fix: re-run `plan`/`apply` (op responds → clean). The earlier `-target` applies never hit this because they skip those providers.
+3. **`aws_route53_zone_association.internal` is shared by both poolers** — it must be MOVED (same address) into `connection_pooler.tf`, never deleted with `pgbouncer.tf`, or the new CNAME stops resolving.
+
+## T5 — Residual follow-up (tiny)
+
+- [ ] Stale comments in the 4 `connection_pooler.tf` ("the old `pgbouncer-<env>-001.4shark.internal` keeps resolving until the contract phase") — now false; drop them (Kaizen, comment-only).
+
+## Gates (all satisfied)
+
+- Apply-before-merge, per stack; every destroy plan reviewed; productive stacks (shared/atento) engineer-gated; non-prod first.
