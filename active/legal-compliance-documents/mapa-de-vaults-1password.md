@@ -27,3 +27,7 @@ Não há vault company-wide.
 
 - A estrutura aplica menor privilégio por grupo (Operações ≠ Engenharia ≠ Marketing). Este documento torna a regra explícita e auditável, para que onboarding/offboarding a referenciem.
 - A participação nos vaults é gerida no admin do 1Password (Console UI) — não por IaC nem SSO no plano atual (Teams Starter). A trilha de auditoria é o histórico de participação nos vaults.
+
+## Credencial intencionalmente FORA do 1Password (chave de git push em disco)
+
+- **Chave SSH de GitHub (`~/.ssh/github`)** — mantida **em disco, não no agent biométrico do 1Password**, por decisão individual e **opt-in por engenheiro** (Paulo, 2026-07-06), para permitir `git push` remoto via Claude Code Remote Control (o prompt biométrico não pode ser satisfeito de um celular). Trade-off aceito: fora do gate do 1Password; mitigado por branch protection + PR review, e o blast radius do git push é baixo/reversível. Regra de governança: só credenciais **remote-able** (baixo blast radius, reversíveis) saem para disco; as **machine-bound** (Terraform/AWS, SSH de infra `kp-4shark`, etc.) ficam biométricas. Service Accounts do 1Password seriam a alternativa "vaulted", mas não estão disponíveis no Teams Starter. Detalhe em `~/.claude/plans/active/remote-git-access/PLAN.md` e no spike `credential-risk-classification`.
