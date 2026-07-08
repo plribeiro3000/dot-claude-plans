@@ -1,0 +1,57 @@
+SOURCE: AWS Backup Audit Manager — Controls and remediation
+URL: https://docs.aws.amazon.com/aws-backup/latest/devguide/controls-and-remediation.html
+Fetched: 2026-07-07 via WebFetch (full page content returned, not summarized)
+
+=====================================================================
+Control: "Restore time for resources meet target"
+=====================================================================
+
+"Description: Evaluates if restoring protected resources completed within
+the target restore time."
+
+"This control checks if the restore time of a particular resource meets the
+target duration. The rule is NON_COMPLIANT if LatestRestoreExecutionTimeMinutes
+of a resource type is greater than maxRestoreTime in minutes."
+
+"Parameters: maxRestoreTime (in minutes)"
+
+"Occurs: Automatically every 24 hours"
+
+"Scope: Tagged resources / Resources by type / Single resource"
+
+"Note: AWS Backup does not provide any service-level agreements (SLAs) for a
+restore time. Restore times can vary based upon system load and capacity,
+even for restores containing the same resources."
+
+=====================================================================
+Related control: "Cross-Region backup copy is scheduled"
+=====================================================================
+
+"Description: Evaluates if a resource is configured to create copies of its
+backups to another AWS Region."
+
+"Occurs: Automatically every 24 hours"
+
+=====================================================================
+Related control: "Last recovery point was created"
+=====================================================================
+
+"Description: This control evaluates if a recovery point has been created
+within the specified time frame (in days or hours). The control is
+compliant if the resource has had a recovery point created within the time
+frame specified."
+
+=====================================================================
+Related control: "Backup plan minimum frequency and minimum retention"
+=====================================================================
+
+"Description: Evaluates if backup plans contain at least one backup rule for
+which the backup frequency is at least [1 day] and retention period is at
+least [35 days]."
+
+Relevance: these three Audit Manager controls, taken together (recovery
+point exists, cross-region copy scheduled, restore time meets target), are
+the mechanism AWS Backup itself offers for producing continuous, dated,
+machine-checked compliance evidence toward a claim like "DR tested annually,
+RTO achieved" — as opposed to a one-off manually-run and manually-documented
+test.

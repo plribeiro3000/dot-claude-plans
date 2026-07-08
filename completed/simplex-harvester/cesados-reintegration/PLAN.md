@@ -4,6 +4,19 @@ Project: `simplex-harvester` (.NET) · Context: Atento MX/CO reconciliation
 Origin: divergences reported by Atento MX (118 active users disabled, 406 terminations still active, 1 negative carnet)
 Reference meeting: "Usuarios Atento MX" (2 Jul 2026) — Luis Bravo (Atento) + Hernán (original author of the Simplex procedures) + Santiago/Paulo (4Shark)
 
+## Status — RESOLVED (2026-07-07)
+
+The termination-detection bug is fixed and in production (release **1.3.0**). Final state:
+
+- **MX — done.** Harvester on the report path (`sp_reporte_cesados_4shark`); the padrón was reconciled this session (**286 users corrected + verified** — see "Phase 4 — execution results") and the client deliverable (spreadsheet `Atento_MX_Conciliacion_usuarios_20260707.xlsx` + reply to Luis Bravo) is prepared. Two edge cases (`enable`, carnet not in Simplex) are returned to the client to validate; the negative carnet is Atento's fix in Simplex (Arturo Mercado).
+- **CO — waiting on Atento, not urgent.** CO's Simplex does not yet have `sp_reporte_cesados_4shark`, so CO stays on the unchanged hierarchy-absence fallback and keeps working as-is. It **auto-switches** to the report path the moment the SP is deployed on CO's Simplex — no code change, no redeploy. CO is **not** reporting active/inactive divergences, so there is no pressure; deploying the SP on CO is a later, optional step.
+- **Group 90-day retention — deferred (separate track).** Access deactivation is immediate and operative; the 90-day **group** retention is NOT delivered — it depends on the groupification integration, blocked on group-membership source data (Atento's manual monthly upload today). Sequenced **after the VKPIs** (in progress, meeting scheduled). See `groupification-integration/PLAN.md`. The inert `ScheduleGroupExitOnTermination` added in PR #38 is a no-op today and should be removed as part of that work.
+
+Everything remaining is external or deferred — nothing blocking on 4Shark's side:
+- **Atento (Arturo Mercado):** correct the negative carnet in Simplex; regularize the old (B2) terminations; deploy `sp_reporte_cesados_4shark` on CO's Simplex when ready.
+- **Luis Bravo:** validate the 2 edge-case users not found in Simplex.
+- **4Shark follow-ups:** remove the inert `ScheduleGroupExitOnTermination`; retire the hierarchy-absence fallback once CO is on the report path.
+
 ## Objective
 
 Replace termination detection by **set difference** (normalized base × current hierarchy) with the **authoritative termination source** (`sp_reporte_cesados_4shark`, based on `Empleado_Cesado.EC_Fecha_Cese`). The harvester disables **whoever the cesados SP returns** (with the real termination date), no longer whoever "disappears" from the hierarchy report.
@@ -79,6 +92,8 @@ In the current `Load()`, per company, replace the `cesados` computation (`:619-6
 
 ## Window decision — 120 days, fixed, with documented rationale
 
+> **Post-merge update (PR #39).** PR #38 reintroduced the value as `DiasAntiguedadCesados` at the root of `appsettings.example.json`, which contradicted the config-envvars convention established in `62d0bef` (root scalars live as dedicated env vars; the container entrypoint rewrites `appsettings.json` with only `COMPANIES`, so a JSON-root scalar never reaches production and the value was always the code default anyway). PR #39 renames the key to `TerminationLookbackDays`, drops it from the example, and documents it as an optional per-country env-var override (default 120 in code). The rationale below is unchanged — only the config key's name and placement moved.
+
 **Decision: `@dias_antiguedad` = 120, fixed window, plus Guard 2 (idempotency).** We keep the value that ran in production — but now **with a documented rationale**. Hernán's actual mistake was not the 120; it was leaving the value undocumented while the SP header said 90 (a contradiction that caused the confusion). With Guard 2, a fixed window does not re-disable anyone, so we do **not** need a "since last run" mechanism or last-run persistence.
 
 **RATIONALE (must be documented in the code comment and, ideally, in the SP header):** `@dias_antiguedad` bounds **two** things — the terminations reported (`EC_Fecha_Cese >= today−N`) **and** the `empleado_historico` snapshot that enriches each termination (`eh.fecha >= today−N`, joined via INNER JOIN on `fecha_con_datos = max(eh.fecha) where EC_Fecha_Cese >= eh.fecha`). A termination near the window edge finds little/no `empleado_historico` inside the window and before the termination date → the INNER JOIN drops it → it is not reported → the user is not disabled. So the lookback window must be **larger** than the business window: **120 = 90 (retention/cascade) + ~30 (enrichment slack)**, guaranteeing terminations up to 90 days old are always reported. **It is not 90, precisely because of this edge effect.**
@@ -106,13 +121,67 @@ During the 90 days the groupification_history overlaps the periods → the casca
 
 ## Execution phases
 
-1. **DONE — code (PR #38, branch `feature/reintegrate-cesados-procedure` → `develop`):** `Termination` keyless model + `Terminations` DbSet; `ProcessTerminations` (cesados SP + Guard 1 reappearance + Guard 2 idempotency + `disable_user`, logging the termination date); `ScheduleGroupExitOnTermination` + `LastBusinessDay`; set difference removed; `DiasAntiguedadCesados` = 120 with the documented rationale comment. Build clean (0 errors). Clean English names (no `Cesado`/`LoadCesados`).
-2. **GATE — cesados SP present on ALL 4 Simplex targets** (see "Deploy prerequisite" below). Blocking: enable/rely-on the feature only after this passes. Includes a staging-harvester run against the QA Simplex.
-3. Deploy the harvester (build-on-merge to per-env ECR; deploy on demand).
-4. **Data remediation** (after the flow is live):
-   - 4Shark reactivates the 118 (including the 21 `pending` → Ch. 13 Scenario A reconciliation: `UserIdentifier` + `integrate!`).
-   - Atento (Mauricio Arturo Mercado) regularizes the old terminations (B2) and the negative carnet (C) in Simplex.
-   - Recent terminations (B1) are handled by the new flow (+ group retention).
+1. **DONE — code (PRs #38, #39):** `Termination` keyless model + `Terminations` DbSet; `ProcessTerminations` (cesados SP + Guard 1 reappearance + Guard 2 idempotency + `disable_user`, logging the termination date); `ScheduleGroupExitOnTermination` + `LastBusinessDay`; set difference removed. Config key `TerminationLookbackDays` = 120 with the documented rationale, sourced as a dedicated env var (PR #39 aligned it to the config-envvars convention). Build clean (0 errors). Clean English names (no `Cesado`/`LoadCesados`).
+2. **DONE — GATE resolved in code (Option A), non-blocking.** MX prod runs the report path immediately; CO stays on the hierarchy-absence fallback until its SP is deployed, then auto-switches. **No staging validation run** — the QA Simplex has no daily integration feeding it, so a staging harvester run cannot be measured meaningfully. Validation happens on the first production runs (monitoring the disable / group-exit log lines and the base snapshot).
+3. **DONE — deployed to production (release 1.3.0, PR #40).** HubFlow release cut, merged to `master`, tag `1.3.0`; the build pushed the image to both prod ECRs (`harvester-mx` + `harvester-co`), verified. The MX `TerminationLookbackDays=120` env var is set on prod + staging (terraform PR #656, applied). The scheduled task picks up `:latest` on its next daily run.
+4. **IN PROGRESS — Data remediation (current phase).**
+   - **4Shark side (this phase):** reconcile the Atento MX survey discrepancies (users active in 4Shark that should be inactive, and inactive that should be active, plus hierarchy corrections) directly on the MX normalized base via the integrator Rails console — see "Phase 4 — reconciliation mechanism" below. Includes reactivating the 118 (incl. the 21 `pending`). Distrust-the-data first: the survey premise is confirmed and split into Atento-source vs 4Shark-fixable buckets **before** any mutation (SCRIPT-DISCIPLINE).
+   - **Atento side:** Atento (Mauricio Arturo Mercado) regularizes the old terminations (B2) and the negative carnet (C) in Simplex — the discrepancies attributed to their source, not ours.
+   - Recent terminations (B1) are handled automatically by the new flow (+ group retention).
+
+## Phase 4 — execution results (2026-07-07)
+
+Fresh audit-rake snapshot (this date, app-atento-001 company 1318 + integrator-atento-mx) reconciled against Luis Bravo's list (`usuarios atento mx.xlsx`):
+
+- **Release 1.3.0 confirmed working in production** — of the 406 `bajas`, **235 were already correctly disabled** by the new termination-report flow (automatic). 171 remained active (old terminations, cese date outside the 120-day window → not reachable by the report).
+- **Integrator (normalized base) — 124 corrected + verified:** 115 `enable_user` + 9 `disable_user` written to `fsk_user_activity` (via `Database.with_connection` + `execute_procedure`, `@mode='DEBUG'`) and confirmed by the verification script (124/124 `ok`). The app reflects these on the integrator's next run.
+- **App (direct) — 162 orphan `bajas` disabled:** active in the app but absent from the normalized base (so unreachable by the integrator), disabled directly via `user.disable(by: nil)` on `app-atento-001` (162/162 `done`, `disabled_at` set immediately; disabler nil = same convention as the automated disables).
+- **Total corrected this session: 286.**
+
+Scripts kept in this folder: `preflight_/mutation_/verify_integrator_atento_mx.rb`, `app_preflight_/app_mutation_disable_atento_mx.rb`.
+
+Pending:
+- **2 `enable` with carnet absent from the normalized base** — investigate (likely anonymized/edge); not actioned.
+- **Post-integrator-run validation** — after the integrator runs, re-snapshot to confirm the 124 enable/disable flipped the app `user_disabled`; whatever still diverges then is a real exception (the separation the engineer wanted).
+
+## Phase 4 — reconciliation mechanism (integrator Rails console → MX normalized base)
+
+The 4Shark-side survey fixes are applied to the **MX normalized base** through the integrator's Rails console (the integrator holds that connection). The active/inactive discrepancies are the primary case → **`enable_user` / `disable_user`**. Hierarchy corrections, if any surface, use `create_promotion` / `create_demotion` / `update_user_parent` (the atento-mx-hierarchy rebuild is already done via the app, so these are only for residual cases).
+
+**Console mechanism** — the integrator's `Database` class is the normalized-base surface (`integrator/app/models/database.rb` on `master`; the same entry `integration_audit:normalized:user` uses). `Database.connect!` returns a pooled adapter (delegating via `method_missing`); `execute_procedure` (`microsoft_sql_adapter.rb:156`) runs `connection.execute("#{name} #{params}")`. In the integrator Rails console (`bin/ecs run <integrator>`):
+
+```ruby
+Database.connect!.execute_procedure(name: 'enable_user',  params: '@user_id=<id>')
+Database.connect!.execute_procedure(name: 'disable_user', params: '@user_id=<id>')
+```
+
+NOT `Source.normalized.first.connect!` — that came from the dev-only `db:sql:seed` rake (`return if Rails.env.production?`). Always read integrator code from `origin/master` (production runs master; `develop` carries unreleased refactors).
+
+**Procedures (verified — `integrator/docs/mssql-prefixed/Integrador-4Shark-MSSQL-Prefixo-3.0-p1.sql`):**
+
+| Procedure | Signature | Writes (type) | Line |
+|---|---|---|---|
+| `enable_user`  | `@user_id int, @mode='PRODUCTION'` | `fsk_user_activity` (`enable`)  | :921 |
+| `disable_user` | `@user_id int, @mode='PRODUCTION'` | `fsk_user_activity` (`disable`) | :939 |
+| `create_promotion`   | `@date, @parent_id=NULL, @role=NULL, @user_id, @mode` | `fsk_hierarchy` (`promotion`)    | :859 |
+| `create_demotion`    | `@date, @parent_id=NULL, @role=NULL, @user_id, @mode` | `fsk_hierarchy` (`demotion`)     | :880 |
+| `update_user_parent` | `@user_id, @date, @parent_id, @mode` | `fsk_hierarchy` (`update_parent`) | :901 |
+
+All are append-only log inserts (add an activity/hierarchy row; the integrator's next run propagates the change to the app). `@mode='DEBUG'` makes the SP SELECT the inserted row instead of running silently — useful for pre-flight/verification reads.
+
+**Discipline (SCRIPT-DISCIPLINE — production MX base).** Discovery first: confirm the survey premise and split Atento-source (B2/C, not ours) vs 4Shark-fixable. Then, per bucket (enable / disable), three scripts in order — pre-flight (read-only: confirm each user is in the expected pre-state), mutation (per-user `enable_user`/`disable_user`, log each, continue past errors, lowercase variables), verification (re-read `fsk_user_activity` latest-per-user, confirm the new state). Consolidated report at the end.
+
+## Phase 4 — survey data (supporting files, in this folder)
+
+The reconciliation input is Luis Bravo's list (sent via Santiago on Slack) plus the client-facing conciliation deck we produced. Both live alongside this PLAN:
+
+- **`usuarios atento mx.xlsx`** — Luis Bravo's source list. Three sheets = the three buckets, one row per user (columns include `ID 4shark de Usuario` = app `User.id`, `Identificador de Usuario` = carnet/`external_id`, `estatus atento mx`, `fecha` = cese date):
+  - `activos` — **118 rows**, disabled in 4Shark (`Desactivado? = Sí`) but `estatus atento mx = Activo` → Bucket A → **`enable_user`**.
+  - `bajas` — **406 rows**, active in 4Shark but `Dado de baja` with a `fecha` de cese (2020–2026) → Bucket B → **`disable_user`** (apply per the real cese date; the very old ones are B2/Simplex-data, see the buckets table).
+  - `negativo` — **1 row**, carnet `-138855` (RFC `RERJ020803TZ8`) → Bucket C → Atento corrects in Simplex.
+- **`Atento_MX_Conciliacion_usuarios_20260702.pdf`** — the client-facing deck (3 hallazgos: 406 / 118 / 1) presented to Atento MX. Findings 1 & 2 = 4Shark (flow reinforced by release 1.3.0 + this remediation); Finding 3 = Atento.
+
+**Discovery must resolve the ID space before any mutation.** `enable_user`/`disable_user` write to the **normalized base** and take the normalized `fsk_users.user_id` — NOT the app `User.id` that the XLSX `ID 4shark de Usuario` column carries. The bridge is `external_id`: the XLSX `Identificador de Usuario` (carnet) → normalized `fsk_users.external_id` → `fsk_users.id`. Pre-flight resolves carnet → normalized id per row (read-only, via `Database.connect!`) and confirms each user's current activity state matches the expected pre-state; only then does the mutation run. This is the app-id-vs-normalized-id trap the integration-debug skill exists to catch — do not feed `ID 4shark de Usuario` straight into `@user_id`.
 
 ## Deploy prerequisite — cesados SP on all 4 Simplex targets (validate before enabling)
 
@@ -146,6 +215,7 @@ Config verified in `terraform/integrator-atento/compute_harvester.tf` (prod) and
 
 ## Follow-ups (not blocking merge — from the pre-merge code review)
 
+0. **DONE (PR #39) — align the lookback config to the env-var convention.** The key `DiasAntiguedadCesados` was reintroduced at the `appsettings.example.json` root by PR #38, against the `62d0bef` config-envvars convention (and a JSON-root scalar never reaches the container, which the entrypoint rewrites with only `COMPANIES`). Renamed to `TerminationLookbackDays`, removed from the example, documented as an optional per-country env-var override (default 120 in code). No behavior change.
 1. **Group-exit vs rehire within 90 days.** `ScheduleGroupExitOnTermination` writes `finish_groupification` with a future date (`EC_Fecha_Cese + 90`) for every active group. If the person is rehired before that date, the pending future finish still fires — it may drop them from a group they rejoined. Confirm the desired behavior with the business and handle if needed.
 2. **Retire the hierarchy-absence fallback.** `DisableTerminationsByHierarchyAbsence` is a temporary dual path kept only until `sp_reporte_cesados_4shark` exists on every source (currently missing on CO prod + staging). Once CO's Simplex has the SP and is verified on the report path, remove the fallback and the `TerminationReportExists` branch so the code carries a single path.
 

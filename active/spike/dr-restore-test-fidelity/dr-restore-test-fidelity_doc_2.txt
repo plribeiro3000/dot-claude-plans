@@ -1,0 +1,145 @@
+SOURCE: AWS Backup — Restore testing (native "Restore testing" feature: RestoreTestingPlan / RestoreTestingSelection)
+URL: https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing.html
+URL (validation): https://docs.aws.amazon.com/aws-backup/latest/devguide/restore-testing-validation.html
+Fetched: 2026-07-07 via WebFetch (full page content returned, not summarized)
+
+=====================================================================
+Overview
+=====================================================================
+
+"Restore testing, a feature offered by AWS Backup, provides automated and
+periodic evaluation of restore viability, as well as the ability to monitor
+restore job duration times."
+
+"First, you create a restore testing plan where you provide a name for your
+plan, the frequency for your restore tests, and the target start time. Then,
+you assign the resources you want to include in your plan. You then choose
+to include specific or random recovery points in your test. AWS Backup
+intelligently infers the metadata that will be needed for your restore job
+to be successful."
+
+"When the scheduled time in your plan arrives, AWS Backup starts restore jobs
+based on your plan and monitors the time taken to complete the restore."
+
+"After the restore test plan completes its run, you can use the results to
+show compliance for organizational or governance requirements such as the
+successful completion of restore test scenarios or the restore job
+completion time."
+
+"Optionally, you can use Restore testing validation to confirm the restore
+test results."
+
+"Once the optional validation completes or the validation window closes, AWS
+Backup deletes the resources involved with the restore test, and the
+resources will be deleted in accordance with service SLAs."
+
+=====================================================================
+Restore testing compared with restore process (table)
+=====================================================================
+
+"Restore testing runs restore jobs in the same way as on-demand restores and
+uses the same recovery points (backups) as an on-demand restore. You will
+see calls to StartRestoreJob in CloudTrail (if opted-in) for each job started
+by restore testing."
+
+Differences table (paraphrased columns kept verbatim per cell):
+- Account: "Recommended best practice is to designate an account to be used
+  for restore tests" (Restore Testing) vs "You can restore resources from an
+  account" (Restore)
+- Cadence: "Periodically as part of a scheduled plan." (Restore Testing) vs
+  "On demand" (Restore)
+- Resources: "The resource types you can assign to your testing plan
+  include: Aurora, Amazon DocumentDB, Amazon DynamoDB, Amazon EBS, Amazon
+  EC2, Amazon EFS, Amazon FSx (Lustre, ONTAP, OpenZFS, Windows), Amazon
+  Neptune, Amazon RDS, and Amazon S3." (Restore Testing) vs "All resources
+  can be restored." (Restore)
+- Results: "After the restore testing job is completed, the restored
+  resource is deleted after the Restore testing validation window finishes."
+  (Restore Testing) vs "Once the restore job is completed, the restored
+  version of the resource remains." (Restore)
+
+=====================================================================
+Cost control
+=====================================================================
+
+"Restore testing has a cost per restore test. Depending on what resources
+are included in your restore testing plan, the restore jobs that are part
+of the plan may also have a cost."
+
+"When you set up a restore testing plan for the first time, you may find it
+beneficial to include a minimum number of resource types and protected
+resources to familiarize yourself with the feature, the process, and the
+average costs involved."
+
+=====================================================================
+Restore parameters (instance-class / sizing fidelity)
+=====================================================================
+
+"Certain resources require specifying parameters in preparation for a
+restore job. In most cases, AWS Backup will infer the values based on the
+stored backup."
+
+"It is recommended in most cases to maintain these parameters; however, you
+can change the values by choosing a different selection from the dropdown
+menu. Examples where changing the values may be optimal can include
+overriding encryption keys, Amazon FSx settings where data cannot be
+inferred, and creation of subnets."
+
+"For example, if an RDS database is one of the resource types you assign to
+your restore testing plan, parameters such as availability zone, database
+name, database instance class, and VPC security group will appear with
+inferred values you can change if applicable."
+
+=====================================================================
+Audit restore testing
+=====================================================================
+
+"Restore testing integrations with AWS Backup Audit manager to help you
+evaluate if a restored resource completed within your target restore time."
+(links to "Restore time for resources meet target" control — see doc_3)
+
+=====================================================================
+Restore testing validation
+=====================================================================
+
+"You have the option of creating an event-driven validation that runs when a
+restore testing job completes."
+
+"First, create a validation workflow with any target supported by Amazon
+EventBridge, such as AWS Lambda. Second, add an EventBridge rule that
+listens for the restore job reaching the status COMPLETED. Third, create a
+restore testing plan (or let an existing one run as scheduled). Finally,
+after the restore test has finished, monitor the logs of the validation
+workflow to ensure it ran as expected."
+
+"You can call the API PutRestoreValidationResult to post the results, which
+will then be viewable in the AWS Backup console and through AWS Backup API
+calls that describe and list restore jobs, such as DescribeRestoreJob or
+ListRestoreJob. Once a validation status is set, it cannot be changed."
+
+=====================================================================
+SECONDARY SOURCE: AWS Storage Blog — "Implementing restore testing for
+recovery validation using AWS Backup"
+URL: https://aws.amazon.com/blogs/storage/implementing-restore-testing-for-recovery-validation-using-aws-backup/
+Fetched: 2026-07-07 via WebFetch (summarized response with embedded quotes)
+=====================================================================
+
+"Manual testing, while essential, drains IT resources." (framing the problem
+restore testing solves)
+
+"When AWS Backup completes restoration, you can build restore testing
+validation with AWS Lambda functions triggered by Amazon EventBridge."
+
+"AWS Backup automatically starts the deletion process of the restored
+resource when either the validation is sent or the cleanup period expires."
+
+"automated backup validation is no longer optional: it's a fundamental
+requirement for modern business continuity" (article's framing, ties to
+DORA / NYDFS regulatory examples — not an AWS "recommended mechanism"
+statement per se, but consistent with the devguide's compliance-evidence
+framing above)
+
+NOTE: this blog-post source was fetched via WebFetch's summarization mode
+(model-mediated extraction), not raw page text. Confidence: medium — the
+quoted strings match phrasing style consistent with AWS blog writing but
+were not independently cross-checked against the raw HTML.

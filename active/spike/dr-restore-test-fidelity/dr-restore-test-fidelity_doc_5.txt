@@ -1,0 +1,104 @@
+SOURCE: NIST Special Publication 800-34 Rev. 1 — "Contingency Planning Guide
+for Federal Information Systems" (Marianne Swanson, Pauline Bowen, Amy Wohl
+Phillips, Dean Gallup, David Lynes; May 2010)
+URL: https://nvlpubs.nist.gov/nistpubs/legacy/sp/nistspecialpublication800-34r1.pdf
+Fetched: 2026-07-07 — downloaded the full PDF (930.6KB) and read pages 27,
+29-30 (document's own printed page numbers, Chapter 3) directly via the Read
+tool (rendered as page images, transcribed verbatim by direct reading — not
+LLM-summarized).
+
+=====================================================================
+Section 3.5 "Plan Testing, Training, and Exercises (TT&E)" — page 26-27
+=====================================================================
+
+"An ISCP should be maintained in a state of readiness, which includes having
+personnel trained to fulfill their roles and responsibilities within the
+plan, having plans exercised to validate their content, and having systems
+and system components tested to ensure their operability in the environment
+specified in the ISCP."
+
+"For each TT&E activity conducted, results are documented in an after-action
+report, and Lessons Learned corrective actions are captured for updating
+information in the ISCP."
+
+=====================================================================
+Section 3.5.1 "Testing" — page 27
+=====================================================================
+
+"ISCP testing is a critical element of a viable contingency capability.
+Testing enables plan deficiencies to be identified and addressed by
+validating one or more of the system components and the operability of the
+plan. Testing can take on several forms and accomplish several objectives
+but should be conducted in as close to an operating environment as
+possible. Each information system component should be tested to confirm
+the accuracy of individual recovery procedures."
+
+Areas to be addressed in a contingency plan test, as applicable:
+- "Notification procedures;"
+- "System recovery on an alternate platform from backup media;"
+- "Internal and external connectivity;"
+- "System performance using alternate equipment;"
+- "Restoration of normal operations; and"
+- "Other plan testing (where coordination is identified, i.e., COOP, BCP)."
+
+"To derive the most value from the test, the ISCP Coordinator should develop
+a test plan designed to examine the selected element(s) against explicit
+test objectives and success criteria. ... The scenario chosen may be a
+worst-case incident or an incident most likely to occur. It should mimic
+reality as closely as possible."
+
+Boxed definition ("Testing"):
+
+"Tests are evaluation tools that use quantifiable metrics to validate the
+operability of an information system or system component in an operational
+environment. For example, an organization could test call tree lists to
+determine if calling can be executed within prescribed time limits; another
+test may be removing power from a system or system component. A test is
+conducted in as close to an operational environment as possible; if
+feasible, an actual test of the components or systems used to conduct
+daily operations for the organization should be used. The scope of testing
+can range from individual system components or systems to comprehensive
+tests of all systems and components that support an ISCP. Tests often focus
+on recovery and backup operations; however, testing varies depending on the
+FIPS 199 impact level, the goal of the test, and its relation to a specific
+ISCP."
+
+=====================================================================
+Section 3.5.4 "TT&E Program Summary" — impact-graded testing depth —
+page 29-30
+=====================================================================
+
+"The depth and rigor of ISCP TT&E activities increases with the FIPS 199
+availability security objective. All tests and exercises should include some
+kind of determination of the effects on the organization's operations and
+provide for a mechanism to update and improve the plan as a result."
+
+"For low-impact systems, a tabletop exercise at an organization-defined
+frequency is sufficient. The tabletop should simulate a disruption, include
+all main ISCP points of contact, and be conducted by the system owner or
+responsible authority."
+
+"For moderate-impact systems, a functional exercise at an organization-
+defined frequency should be conducted. The functional exercise should
+include all ISCP points of contact and be facilitated by the system owner
+or responsible authority. Exercise procedures should be developed to
+include an element of system recovery from backup media."
+
+"For high-impact systems, a full-scale functional exercise at an
+organization-defined frequency should be conducted. The full-scale
+functional exercise should include a system failover to the alternate
+location. This could include additional activities such as full
+notification and response of key personnel to the recovery location,
+recovery of a server or database from backup media or setup, and
+processing from a server at an alternate location. The test should also
+include a full recovery and reconstitution of the information system to a
+known state."
+
+Table 3-6 "ISCP TT&E Activities" (selected rows):
+
+| TT&E Event | Sample Activity | FIPS 199 Availability Security Objective |
+|---|---|---|
+| Functional Exercise (CP-4) | "Simulation of a disruption with a system recovery component such as backup tape restoration or server recovery." | Mod. Impact = Yes; High Impact = Yes |
+| Full-Scale Functional Exercise (CP-4) | "Simulation prompting a full recovery and reconstitution of the information system to a known state and ensures that staff are familiar with the alternate facility." | High Impact = Yes |
+| Alternate Processing Site Recovery (CP-4, CP-7) | "Test/exercise the contingency plan at the alternate processing site to familiarize contingency personnel with the facility and available resources and evaluate the site's capabilities to support contingency operations. Includes a full recovery and return to normal operations to a known secure state. (For a high-impact system, the alternate site should be fully configured as defined in the plan.)" | High Impact = Yes |
+| System Backup (CP-9) | "Test backup information to verify media reliability and information integrity. (For a high-impact system, use sample backup information and ensure that backup copies are stored in a separate facility.)" | Mod. Impact = Yes; High Impact = Yes |

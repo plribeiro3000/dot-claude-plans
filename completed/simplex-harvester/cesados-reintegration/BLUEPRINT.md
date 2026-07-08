@@ -23,6 +23,8 @@ Read in full: `Services/SimplexHarvesterService.cs` (current) and `Services/_4Sh
 
 ## Change 1 — Config: `DiasAntiguedadCesados` = 120, documented
 
+> **Post-merge update (PR #39).** The key was renamed `DiasAntiguedadCesados` → `TerminationLookbackDays` and removed from `appsettings.example.json` to follow the config-envvars convention (`62d0bef`): it is now an optional per-country env var, default 120 in code. The read shape below is unchanged apart from the key string.
+
 Reintroduce the key. At the read site, the fixed English comment (this is the "document the reason" requirement — do not repeat the undocumented-value mistake):
 
 ```
@@ -102,6 +104,6 @@ Remaining, non-blocking:
 
 ## Test plan
 
-- Staging harvester against a QA Simplex: a fresh termination (recent `EC_Fecha_Cese`) → user disabled + each active group scheduled to exit at `cese+90`; a reappeared user (in cesados and in the current hierarchy) → NOT disabled (Guard 1); a re-run → no redundant disable/activity (Guard 2).
+- **No staging harvester run.** The QA Simplex has no daily integration feeding it, so a staging run cannot be measured meaningfully — validation moves to the first production runs. Watch the production log lines: a fresh termination (recent `EC_Fecha_Cese`) → user disabled + each active group scheduled to exit at `cese+90`; a reappeared user (in cesados and in the current hierarchy) → NOT disabled (Guard 1); a re-run → no redundant disable/activity (Guard 2).
 - Verify against the base with `integration_audit:normalized:user` / `:mongo:user` (the same snapshots used in the PLAN validation).
 - Confirm the commission calculation still includes a disabled-but-in-group user for a period within the 90-day window (already verified in code: `commission.rb:247-267`).

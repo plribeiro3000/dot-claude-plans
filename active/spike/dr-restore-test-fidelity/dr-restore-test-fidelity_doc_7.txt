@@ -1,0 +1,44 @@
+SOURCE: Google — Site Reliability Engineering (the "SRE book"), Chapter
+"Data Integrity: What You Read Is What You Wrote"
+URL: https://sre.google/sre-book/data-integrity/
+Fetched: 2026-07-07 via WebFetch, explicitly requested raw/verbatim
+extraction (second pass; first pass was already consistent)
+
+=====================================================================
+On testing recovery, not just taking backups
+=====================================================================
+
+"No one really wants to make backups; what people really want are
+restores."
+
+"you only know that you can recover your recent state if you actually do
+so"
+
+"If you discover that your restore process is broken before you need to
+rely upon it, you can address the vulnerability before you fall victim to
+it"
+
+"Continuously test the recovery process as part of your normal operations"
+
+"Set up alerts that fire when a recovery process fails to provide a
+heartbeat indication of its success."
+
+"The only test that should let you sleep at night is a full end-to-end
+test."
+
+"If recovery tests are a manual, staged event, testing becomes an unwelcome
+bit of drudgery that isn't performed either deeply or frequently enough to
+deserve your confidence."
+
+"automate these tests whenever possible and then run them continuously"
+
+Relevance: Google's framing draws a hard distinction between "a backup
+exists" and "recovery is proven" — and explicitly names "a full end-to-end
+test" as the only one that earns confidence, contrasted with manual,
+infrequent, partial tests. This is a data-point in favor of the engineer's
+premise that fidelity to the real recovery path matters, though this
+source is about Google's internal practice at Google's scale, not a
+compliance/audit standard — it is not itself evidence that an auditor
+would refuse a lower-fidelity test, only that Google's own engineering
+philosophy treats untested/manual/partial restores as insufficient
+assurance.

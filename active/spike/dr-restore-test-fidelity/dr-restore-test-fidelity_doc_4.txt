@@ -1,0 +1,50 @@
+SOURCE: Amazon RDS User Guide — "Restoring to a DB instance"
+URL: https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_RestoreFromSnapshot.html
+Fetched: 2026-07-07 via WebFetch (full page content returned, not summarized)
+
+=====================================================================
+Restore always creates a NEW instance — never restores in place
+=====================================================================
+
+"Amazon RDS creates a storage volume snapshot of your DB instance, backing
+up the entire DB instance and not just individual databases. You can create
+a new DB instance by restoring from a DB snapshot. You provide the name of
+the DB snapshot to restore from, and then provide a name for the new DB
+instance that is created from the restore. You can't restore from a DB
+snapshot to an existing DB instance; you create a new DB instance when you
+restore the snapshot."
+
+"You can use the restored DB instance as soon as its status is available.
+The DB instance continues to load data in the background. This is known as
+lazy loading. If you access data that hasn't been loaded yet, the DB
+instance immediately downloads the requested data from Amazon S3, and then
+continues loading the rest of the data in the background."
+
+(Relevance: "lazy loading" means the restored instance can become
+`available` — and therefore count as "restored" for a naive RTO metric —
+before all data has actually been pulled from S3. A query hitting
+not-yet-loaded pages pays a latency penalty until the background load
+catches up. This is a nuance for how "restore complete" is measured.)
+
+=====================================================================
+Security group / VPC considerations — endpoint changes on restore
+=====================================================================
+
+"When you restore a DB instance, the default virtual private cloud (VPC), DB
+subnet group, and VPC security group are associated with the restored
+instance, unless you choose different ones."
+
+"As soon as the restore is complete and your new DB instance is available,
+you can also change the VPC settings by modifying the DB instance."
+
+(Relevance: the restored instance gets a NEW endpoint/DNS name by default.
+Making the application actually use the restored database — the "point the
+app at the recovered database" step — is a separate action from the RDS
+restore operation itself, and is not covered by the restore duration metric
+alone.)
+
+=====================================================================
+Storage cannot shrink
+=====================================================================
+
+"You can't reduce the amount of storage when you restore a DB instance."

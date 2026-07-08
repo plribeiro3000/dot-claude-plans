@@ -1,0 +1,45 @@
+SOURCE: ISO 22301:2019 Clause 8.5 "Exercising and testing" — third-party
+summary (iso-docs.com is NOT the official ISO.org text; ISO 22301 itself is
+a paywalled standard not available for direct fetch/quote)
+URL: https://iso-docs.com/blogs/iso-22301-standard/iso-22301-clause-8-5-exercise-program
+Fetched: 2026-07-07 via WebFetch, explicitly requested raw/verbatim extraction
+
+CAVEAT: this is a commercial third-party explainer of the ISO 22301
+standard, not the standard's own text (ISO does not publish 22301 for free).
+Treat the quotes below as this site's paraphrase/summary of the clause, not
+as ISO's official wording. Useful for the general shape of the requirement,
+not for exact-wording compliance claims.
+
+=====================================================================
+Definitions given (site's paraphrase of the clause)
+=====================================================================
+
+"The clause defines an exercise as a 'process of carrying out a hypothetical
+scenario in a simulated environment to evaluate the effectiveness of
+specific aspects of the BCMS'. An exercise can take various forms, such as
+tabletop exercises, simulations, drills, or full-scale exercises."
+
+"The clause also defines testing as a 'process of verifying the
+effectiveness of specific aspects of the BCMS against pre-defined
+objectives'. Testing can be carried out through various means, such as
+document reviews, technical tests, or physical tests."
+
+"The objective of exercising and testing is to 'verify the effectiveness and
+suitability of the BCMS, and to identify opportunities for improvement'."
+
+=====================================================================
+Program requirements
+=====================================================================
+
+"The organization should establish a program for exercising and testing
+that includes a schedule, objectives, scope, scenarios, participants, and
+evaluation criteria. The exercises and tests should involve all relevant
+stakeholders, including employees, suppliers, customers, and external
+partners."
+
+Relevance: ISO 22301 (per this summary) does not prescribe a specific target
+infrastructure fidelity — it requires an evaluation against pre-defined
+objectives and success criteria, decided by the organization itself,
+documented, and periodically repeated. This puts the burden on 4Shark to
+define its own success criteria (e.g., "recovery point restored onto RDS/
+Aurora within N minutes") rather than the standard dictating a fixed bar.

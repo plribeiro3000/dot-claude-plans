@@ -1,0 +1,93 @@
+SOURCE: AWS Well-Architected Framework — Reliability Pillar
+URL (BP02): https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_disaster_recovery.html
+URL (BP03): https://docs.aws.amazon.com/wellarchitected/latest/reliability-pillar/rel_planning_for_recovery_dr_tested.html
+Fetched: 2026-07-07 via WebFetch (full page content returned, not summarized)
+
+=====================================================================
+REL13-BP02 Use defined recovery strategies to meet the recovery objectives
+=====================================================================
+
+"Define a disaster recovery (DR) strategy that meets your workload's recovery
+objectives. Choose a strategy such as backup and restore, standby
+(active/passive), or active/active."
+
+Four strategies, listed "in increasing order of cost and complexity, and
+decreasing order of RTO and RPO":
+
+- "Backup and restore (RPO in hours, RTO in 24 hours or less): Back up your
+  data and applications into the recovery Region. Using automated or
+  continuous backups will permit point in time recovery (PITR), which can
+  lower RPO to as low as 5 minutes in some cases. In the event of a disaster,
+  you will deploy your infrastructure (using infrastructure as code to reduce
+  RTO), deploy your code, and restore the backed-up data to recover from a
+  disaster in the recovery Region."
+- "Pilot light (RPO in minutes, RTO in tens of minutes)"
+- "Warm standby (RPO in seconds, RTO in minutes)"
+- "Multi-Region (multi-site) active-active (RPO near zero, RTO potentially
+  zero)"
+
+On what "restore" actually does during a real disaster (implementation step 4):
+
+"For backup and restore, restoring data from backup creates resources for
+that data such as EBS volumes, RDS DB instances, and DynamoDB tables. You
+also need to restore the infrastructure and deploy code. You can use AWS
+Backup to restore data in the recovery Region. ... Rebuilding the
+infrastructure includes creating resources like EC2 instances in addition to
+the Amazon Virtual Private Cloud (Amazon VPC), subnets, and security groups
+needed. You can automate much of the restoration process."
+
+On traffic cutover (implementation step 5):
+
+"This failover operation can be initiated either automatically or manually.
+Automatically initiated failover based on health checks or alarms should be
+used with caution since an unnecessary failover (false alarm) incurs costs
+such as non-availability and data loss. Manually initiated failover is
+therefore often used. In this case, you should still automate the steps for
+failover, so that the manual initiation is like the push of a button."
+
+=====================================================================
+REL13-BP03 Test disaster recovery implementation to validate the
+implementation
+=====================================================================
+
+"Regularly test failover to your recovery site to verify that it operates
+properly and that RTO and RPO are met."
+
+Common anti-patterns:
+- "Never exercise failovers in production."
+
+Benefits:
+- "Regularly testing you disaster recovery plan verifies that it will work
+  when it needs to, and that your team knows how to perform the strategy."
+
+Level of risk exposed if this best practice is not established: "High"
+
+Implementation guidance:
+
+"A pattern to avoid is developing recovery paths that are rarely exercised.
+For example, you might have a secondary data store that is used for
+read-only queries. When you write to a data store and the primary fails, you
+might want to fail over to the secondary data store. If you don't frequently
+test this failover, you might find that your assumptions about the
+capabilities of the secondary data store are incorrect. The capacity of the
+secondary, which might have been sufficient when you last tested, might be no
+longer be able to tolerate the load under this scenario. Our experience has
+shown that the only error recovery that works is the path you test
+frequently. This is why having a small number of recovery paths is best. You
+can establish recovery patterns and regularly test them. If you have a
+complex or critical recovery path, you still need to regularly exercise that
+failure in production to convince yourself that the recovery path works. In
+the example we just discussed, you should fail over to the standby
+regularly, regardless of need."
+
+Implementation steps:
+
+"Engineer your workloads for recovery. Regularly test your recovery paths.
+Recovery-oriented computing identifies the characteristics in systems that
+enhance recovery: isolation and redundancy, system-wide ability to roll back
+changes, ability to monitor and determine health, ability to provide
+diagnostics, automated recovery, modular design, and ability to restart.
+Exercise the recovery path to verify that you can accomplish the recovery in
+the specified time to the specified state. Use your runbooks during this
+recovery to document problems and find solutions for them before the next
+test."

@@ -1,0 +1,48 @@
+SOURCE: Acsense — "Disaster Recovery Testing: A Comprehensive Guide"
+(community/industry taxonomy of DR test types, tracing to the classic
+checklist/tabletop/walkthrough/simulation/parallel/full-interruption
+taxonomy used across the DR/BCP industry, e.g., DRI International body of
+knowledge)
+URL: https://acsense.com/blog/disaster-recovery-testing-a-comprehensive-guide/
+Fetched: 2026-07-07 via WebFetch (full extraction requested)
+
+=====================================================================
+The six-tier taxonomy, lowest to highest fidelity
+=====================================================================
+
+"Checklist testing is, as its name suggests, based on checklists. During
+this type of testing, the DRP is compared to a series of comprehensive
+checklists..." (limited scope — verifies the plan's documentation, not
+actual recovery mechanics)
+
+"Tabletop testing utilizes the knowledge and skill set of stakeholders. In
+this testing method, stakeholders throughout the business talk through the
+disaster recovery plan." (discussion-based, no technical testing)
+
+"Walk-through testing is similar to tabletop testing. However, while
+tabletop testing is a stationary activity, walk-through testing involves
+physically following the protocols in the DRP."
+
+"Simulation testing is a method of role-playing for a specific disaster
+scenario." (the source cautions this won't replicate the stress of actual
+events)
+
+"Parallel testing is a comprehensive testing approach. It involves creating
+a duplicate recovery system to use when running DRP tests." (this is the
+tier that matches "restore to a real RDS/Aurora target that is NOT
+production" — a duplicate system, exercised without touching the live
+system)
+
+"Full-interruption testing is similar to parallel testing. However, in this
+scenario, the tests are conducted on the live production system rather than
+a duplicate recovery system. This testing method is by far the most
+realistic..." (highest fidelity, highest risk — exercises production itself)
+
+Relevance: this taxonomy gives independent, named tiers between "does the
+plan read well on paper" (checklist/tabletop) and "did we actually fail
+over production" (full-interruption). The engineer's Option B/C candidates
+map to "parallel testing" (restore + drill on a non-prod duplicate) and
+"full-interruption testing" (which the engineer has already ruled out for
+production, for the correct reason — production restore-testing causes
+real client data loss back to the recovery-point instant, distinct from a
+game-day on non-prod which does not).

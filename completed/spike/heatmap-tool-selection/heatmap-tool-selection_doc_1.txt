@@ -1,0 +1,127 @@
+Source: https://learn.microsoft.com/en-us/clarity/faq
+Fetched: 2026-07-07
+Fetch method: WebFetch (full page body persisted as tool output; excerpted here for spike reference)
+
+Purpose: raw excerpt of the Microsoft Clarity official FAQ, preserved because the spike's
+Findings quote small slices of this page. Kept in full here so a future revision of the
+spike does not need to re-fetch the source.
+
+================================================================================
+RELEVANT SECTIONS (verbatim from the fetched page)
+================================================================================
+
+## About Clarity
+
+### What is the pricing model for Clarity?
+
+Clarity is a free service forever. You never encounter traffic limits or are compelled to
+upgrade to a paid version. [Learn more](https://clarity.microsoft.com/pricing).
+
+## Privacy
+
+### Is Clarity GDPR compliant?
+
+Clarity is [GDPR-compliant](glossary-of-terms) as a data controller. For more information,
+see the [Microsoft Privacy Statement](https://www.microsoft.com/privacy/privacystatement).
+
+### What data does Clarity collect?
+
+Clarity captures the user interactions on your website such as, how the page is rendering,
+user interactions such as mouse movements, clicks, scrolls, and so on. The code to capture
+this information is open source and available on [GitHub](https://github.com/microsoft/clarity).
+You can also read a summary of what data fields we collect. You can choose to mask your
+users' data. For more information, see [Microsoft Privacy Statement].
+
+### Where is my data stored?
+
+Your data is stored in the Microsoft Azure cloud service.
+
+### What about EU cross-border data transfer?
+
+Clarity customers in the EU are contracting with Microsoft Ireland Operations Limited (MIOL),
+which has a special contract (SCCs) with Microsoft Corporation (in the United States) allowing
+cross-border data transfers between those affiliate entities. Clarity customers shouldn't worry
+about cross-border data transfer restrictions because they're sending data to another EU
+company (MIOL).
+
+### How long can web admins access their Clarity data?
+
+The data is retained for the webmaster's consumption up to 30 days from the time of recording.
+
+### Can I delete data for a specific user?
+
+You need to delete the entire project to delete user's data.
+
+### What content can Clarity record?
+
+By default, Clarity suppresses the client's entire content. The website admin controls the
+content sent to Clarity, and website owners should use their dashboard settings to block
+confidential content.
+
+## Masking and unmasking content
+
+### Is masked data uploaded to Clarity?
+
+No.
+
+### Can I mask or unmask text on certain parts of the page?
+
+Yes. Learn how to mask and unmask.
+
+### Can I unmask input text boxes?
+
+Content in the input boxes is masked in all modes and can't be customized.
+
+### Can I mask style sheets or style tags?
+
+Currently, Clarity doesn't mask content within style sheets or style tags. Hence, it's
+recommended not to host sensitive content within CSS.
+
+## Project management
+
+### How do I create a project?
+
+Adding a project can be done in three simple steps. You can add an unlimited number of
+projects for each domain or website.
+
+## Google Analytics integration
+
+### How many web properties can I integrate?
+
+At this point, you can integrate only one web property.
+
+### Why do I see a failure when connecting with Google Analytics?
+
+Clarity attempts to create a custom dimension on your behalf while integrating with Google
+Analytics. There are a few reasons that it could fail, including a limit on the number of
+custom dimensions Google enforces per web property.
+
+## Heatmaps (or heat maps)
+
+### Can I use heat maps and follow privacy regulations?
+
+Yes. You can follow all privacy regulations, mask text, and create heat maps. Clarity
+creates heat maps based on element attributes and not the content of the element.
+
+### What is the maximum limitation on a heat map?
+
+Heat maps are limited to up to 100,000 page views per heat map.
+
+### What types of heat maps can I analyze using Clarity?
+
+Using Clarity, you can analyze Click maps and Scroll maps to understand user behavior.
+
+## Session recordings
+
+### How many sessions can Clarity record?
+
+Clarity records up to 100,000 sessions per project per day.
+
+### How long are my recordings retained?
+
+Clarity retains recordings for 30 days from the time of recording. However, Favorite
+recordings and randomly selected sample of recordings are retained for up to 9 months.
+
+================================================================================
+END OF EXCERPT
+================================================================================
