@@ -1,0 +1,983 @@
+diff --git i/settings.json w/settings.json
+index 93d0883..827bd52 100644
+--- i/settings.json
++++ w/settings.json
+@@ -1,379 +1,11 @@
+ {
+   "$schema": "https://json.schemastore.org/claude-code-settings.json",
+-  "alwaysThinkingEnabled": true,
+-  "autoMemoryEnabled": false,
+   "cleanupPeriodDays": 7,
+   "env": {
+     "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE": "70"
+   },
+-  "hooks": {
+-    "Notification": [
+-      {
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/notify.sh 'Task completed'"
+-          }
+-        ]
+-      }
+-    ],
+-    "SessionStart": [
+-      {
+-        "matcher": "*",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-dependencies.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-claude-version.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-projects-folder.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/cleanup-sessions.sh",
+-            "timeout": 30
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/migrate.sh",
+-            "timeout": 30
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/read-context.sh",
+-            "timeout": 60
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
+-            "timeout": 10
+-          }
+-        ]
+-      }
+-    ],
+-    "SubagentStart": [
+-      {
+-        "matcher": "*",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/read-context.sh",
+-            "timeout": 15
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-skill-tip.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-query-discipline.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-deployment-strategy.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      }
+-    ],
+-    "UserPromptSubmit": [
+-      {
+-        "matcher": "*",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-dependencies.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-claude-version.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-plans-autocommit.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-skill-tip.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-query-discipline.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-deployment-strategy.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      }
+-    ],
+-    "PostToolUse": [
+-      {
+-        "matcher": "Edit|Write|MultiEdit",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-abbreviated-variables.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-bulk-delete.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-raw-sql-query.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/check-pluck-ruby-reshape.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Read",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-full-read-reminder.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      }
+-    ],
+-    "PreToolUse": [
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/auto-approve-safe-mv.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/auto-approve-aws-readonly.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/redirect-ecs-scale.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/redirect-terraform.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Edit|Write|MultiEdit",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/auto-approve-claude-dir-writes.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "if": "Bash(terraform *)",
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "if": "Bash(direnv exec ~/Projects/4Shark/terraform/* terraform *)",
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "if": "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform *)",
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
+-            "timeout": 10
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-working-dir-reminder.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-output-preservation-reminder.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-pr-commit-data-policy.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-commit-policy-reminder.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Bash|Edit|Write|MultiEdit",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/validate-bash-command.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Edit|Write|MultiEdit",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/validate-bang-method-web-flow.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/validate-worker-topology-naming.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/validate-concurrent-index-migration.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Write",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/validate-rails-migration-creation.sh",
+-            "timeout": 5
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Edit|Write|MultiEdit",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-code-pattern-on-write.sh",
+-            "timeout": 10
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Skill",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/auto-approve-local-skills.sh",
+-            "timeout": 5
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-integration-debug-docs.sh",
+-            "timeout": 10
+-          }
+-        ]
+-      },
+-      {
+-        "matcher": "Task",
+-        "hooks": [
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-pr-review-context.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-policy-verifier-docs.sh",
+-            "timeout": 10
+-          },
+-          {
+-            "type": "command",
+-            "command": "$HOME/.claude/scripts/inject-code-policy-verifier-docs.sh",
+-            "timeout": 10
+-          }
+-        ]
+-      }
+-    ]
+-  },
+   "includeCoAuthoredBy": false,
+   "permissions": {
+-    "additionalDirectories": ["~/Projects", "~/.claude", "~/Downloads", "/tmp"],
+     "allow": [
+       "Read(**)",
+       "Read(/tmp/**)",
+@@ -384,11 +16,9 @@
+       "Grep(**)",
+       "WebSearch",
+       "WebFetch",
+-
+       "Bash(git:*)",
+       "Bash(git -C *)",
+       "Bash(gh:*)",
+-
+       "Bash(bundle:*)",
+       "Bash(rails:*)",
+       "Bash(rake:*)",
+@@ -411,7 +41,6 @@
+       "Bash(brakeman:*)",
+       "Bash(bundler-audit:*)",
+       "Bash(yard:*)",
+-
+       "Bash(~/.rvm/wrappers/*:*)",
+       "Bash($HOME/.rvm/wrappers/*:*)",
+       "Bash(~/.rvm/wrappers/*/bundle:*)",
+@@ -434,7 +63,6 @@
+       "Bash($HOME/.rbenv/shims/*:*)",
+       "Bash(~/.asdf/shims/*:*)",
+       "Bash($HOME/.asdf/shims/*:*)",
+-
+       "Bash(npm:*)",
+       "Bash(npx:*)",
+       "Bash(yarn:*)",
+@@ -449,7 +77,6 @@
+       "Bash(protractor:*)",
+       "Bash(cypress:*)",
+       "Bash(node:*)",
+-
+       "Bash(op:*)",
+       "Bash(bash -n:*)",
+       "Bash(bash $HOME/.claude/skills/apps/scripts/apps-services.sh:*)",
+@@ -518,7 +145,6 @@
+       "Bash(tfsec:*)",
+       "Bash(checkov:*)",
+       "Bash(infracost:*)",
+-
+       "Bash(ansible:*)",
+       "Bash(ansible-playbook:*)",
+       "Bash(ansible-galaxy:*)",
+@@ -527,7 +153,6 @@
+       "Bash(ansible-inventory:*)",
+       "Bash(ansible-config:*)",
+       "Bash(ansible-doc:*)",
+-
+       "Bash(aws * batch-get-*:*)",
+       "Bash(aws * describe-*:*)",
+       "Bash(aws * get-*:*)",
+@@ -539,7 +164,6 @@
+       "Bash(aws logs stop-query:*)",
+       "Bash(aws logs tail:*)",
+       "Bash(aws s3 ls:*)",
+-
+       "Bash(dotnet build:*)",
+       "Bash(dotnet test:*)",
+       "Bash(dotnet run:*)",
+@@ -548,7 +172,6 @@
+       "Bash(dotnet format:*)",
+       "Bash(dotnet watch:*)",
+       "Bash(nuget:*)",
+-
+       "Bash(docker build:*)",
+       "Bash(docker run:*)",
+       "Bash(docker ps:*)",
+@@ -556,7 +179,6 @@
+       "Bash(docker images:*)",
+       "Bash(docker-compose:*)",
+       "Bash(docker compose:*)",
+-
+       "Bash(ls:*)",
+       "Bash(pwd)",
+       "Bash(which:*)",
+@@ -598,49 +220,6 @@
+       "Bash(pbcopy)",
+       "Bash(pbpaste)"
+     ],
+-    "ask": [
+-      "Bash(git -C * rm *)",
+-      "Bash(git -C * tag *)",
+-
+-      "Bash(rm -rf:*)",
+-      "Bash(rm -r:*)",
+-      "Bash(terraform apply:*)",
+-      "Bash(terraform destroy:*)",
+-      "Bash(terraform import:*)",
+-      "Bash(terraform taint:*)",
+-      "Bash(terraform untaint:*)",
+-      "Bash(terraform state rm:*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* apply*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* destroy*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* import*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* taint*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* untaint*)",
+-      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* state rm*)",
+-
+-      "Bash(docker push:*)",
+-      "Bash(dotnet publish:*)",
+-      "Bash(npm publish:*)",
+-      "Bash(gem push:*)",
+-
+-      "Bash(sudo:*)",
+-      "Bash(ssh:*)",
+-      "Bash(scp:*)",
+-      "Bash(rsync:*)",
+-      "Bash(curl:*)",
+-      "Bash(wget:*)",
+-      "Bash(kill:*)",
+-      "Bash(killall:*)",
+-      "Bash(pkill:*)",
+-
+-      "Bash(gh auth logout:*)",
+-      "Bash(gh gpg-key delete:*)",
+-      "Bash(gh release delete:*)",
+-      "Bash(gh repo delete:*)",
+-      "Bash(gh secret delete:*)",
+-      "Bash(gh secret set:*)",
+-      "Bash(gh ssh-key delete:*)"
+-    ],
+-    "defaultMode": "acceptEdits",
+     "deny": [
+       "Read(./.env)",
+       "Read(./.env.*)",
+@@ -654,21 +233,18 @@
+       "Edit(./.env.*)",
+       "Edit(./**/.env)",
+       "Edit(./**/.env.*)",
+-
+       "Read(./secrets/**)",
+       "Read(./**/secrets/**)",
+       "Write(./secrets/**)",
+       "Write(./**/secrets/**)",
+       "Edit(./secrets/**)",
+       "Edit(./**/secrets/**)",
+-
+       "Read(./**/credentials.yml.enc)",
+       "Read(./**/master.key)",
+       "Write(./**/credentials.yml.enc)",
+       "Write(./**/master.key)",
+       "Edit(./**/credentials.yml.enc)",
+       "Edit(./**/master.key)",
+-
+       "Read(./**/*.pem)",
+       "Read(./**/*.key)",
+       "Read(./**/id_rsa*)",
+@@ -678,19 +254,16 @@
+       "Edit(./**/*.pem)",
+       "Edit(./**/*.key)",
+       "Edit(./**/id_rsa*)",
+-
+       "Bash(shutdown:*)",
+       "Bash(reboot:*)",
+       "Bash(mkfs:*)",
+       "Bash(dd:*)",
+-
+       "Read(./**/.npmrc)",
+       "Read(./**/.pypirc)",
+       "Write(./**/.npmrc)",
+       "Write(./**/.pypirc)",
+       "Edit(./**/.npmrc)",
+       "Edit(./**/.pypirc)",
+-
+       "Read(~/.ssh/**)",
+       "Read(~/.aws/**)",
+       "Read(~/.gnupg/**)",
+@@ -712,6 +285,51 @@
+       "Edit(~/.npmrc)",
+       "Edit(~/.pypirc)",
+       "Edit(~/.docker/config.json)"
++    ],
++    "ask": [
++      "Bash(git -C * rm *)",
++      "Bash(git -C * tag *)",
++      "Bash(rm -rf:*)",
++      "Bash(rm -r:*)",
++      "Bash(terraform apply:*)",
++      "Bash(terraform destroy:*)",
++      "Bash(terraform import:*)",
++      "Bash(terraform taint:*)",
++      "Bash(terraform untaint:*)",
++      "Bash(terraform state rm:*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* apply*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* destroy*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* import*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* taint*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* untaint*)",
++      "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform -chdir=* state rm*)",
++      "Bash(docker push:*)",
++      "Bash(dotnet publish:*)",
++      "Bash(npm publish:*)",
++      "Bash(gem push:*)",
++      "Bash(sudo:*)",
++      "Bash(ssh:*)",
++      "Bash(scp:*)",
++      "Bash(rsync:*)",
++      "Bash(curl:*)",
++      "Bash(wget:*)",
++      "Bash(kill:*)",
++      "Bash(killall:*)",
++      "Bash(pkill:*)",
++      "Bash(gh auth logout:*)",
++      "Bash(gh gpg-key delete:*)",
++      "Bash(gh release delete:*)",
++      "Bash(gh repo delete:*)",
++      "Bash(gh secret delete:*)",
++      "Bash(gh secret set:*)",
++      "Bash(gh ssh-key delete:*)"
++    ],
++    "defaultMode": "acceptEdits",
++    "additionalDirectories": [
++      "~/Projects",
++      "~/.claude",
++      "~/Downloads",
++      "/tmp"
+     ]
+   },
+   "skillOverrides": {
+@@ -719,8 +337,377 @@
+     "review": "off",
+     "security-review": "off"
+   },
++  "hooks": {
++    "Notification": [
++      {
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/notify.sh 'Task completed'"
++          }
++        ]
++      }
++    ],
++    "SessionStart": [
++      {
++        "matcher": "*",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-dependencies.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-claude-version.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-projects-folder.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/cleanup-sessions.sh",
++            "timeout": 30
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/migrate.sh",
++            "timeout": 30
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/read-context.sh",
++            "timeout": 60
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
++            "timeout": 10
++          }
++        ]
++      }
++    ],
++    "SubagentStart": [
++      {
++        "matcher": "*",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/read-context.sh",
++            "timeout": 15
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-skill-tip.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-query-discipline.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-deployment-strategy.sh",
++            "timeout": 5
++          }
++        ]
++      }
++    ],
++    "UserPromptSubmit": [
++      {
++        "matcher": "*",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-dependencies.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-claude-version.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-plans-autocommit.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-skill-tip.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-query-discipline.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-deployment-strategy.sh",
++            "timeout": 5
++          }
++        ]
++      }
++    ],
++    "PostToolUse": [
++      {
++        "matcher": "Edit|Write|MultiEdit",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-abbreviated-variables.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-bulk-delete.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-raw-sql-query.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/check-pluck-ruby-reshape.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Read",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-full-read-reminder.sh",
++            "timeout": 5
++          }
++        ]
++      }
++    ],
++    "PreToolUse": [
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/auto-approve-safe-mv.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/auto-approve-aws-readonly.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/redirect-ecs-scale.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/redirect-terraform.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Edit|Write|MultiEdit",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/auto-approve-claude-dir-writes.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
++            "if": "Bash(terraform *)",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
++            "if": "Bash(direnv exec ~/Projects/4Shark/terraform/* terraform *)",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-terraform-context.sh",
++            "if": "Bash(direnv exec ~/Projects/4Shark/terraform/* env AWS_PROFILE=4shark-mfa terraform *)",
++            "timeout": 10
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-working-dir-reminder.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-output-preservation-reminder.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-pr-commit-data-policy.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-commit-policy-reminder.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Bash|Edit|Write|MultiEdit",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/validate-bash-command.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Edit|Write|MultiEdit",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/validate-bang-method-web-flow.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/validate-worker-topology-naming.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/validate-concurrent-index-migration.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Write",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/validate-rails-migration-creation.sh",
++            "timeout": 5
++          }
++        ]
++      },
++      {
++        "matcher": "Edit|Write|MultiEdit",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-code-pattern-on-write.sh",
++            "timeout": 10
++          }
++        ]
++      },
++      {
++        "matcher": "Skill",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/auto-approve-local-skills.sh",
++            "timeout": 5
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-integration-debug-docs.sh",
++            "timeout": 10
++          }
++        ]
++      },
++      {
++        "matcher": "Task",
++        "hooks": [
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-pr-review-context.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-policy-verifier-docs.sh",
++            "timeout": 10
++          },
++          {
++            "type": "command",
++            "command": "$HOME/.claude/scripts/inject-code-policy-verifier-docs.sh",
++            "timeout": 10
++          }
++        ]
++      }
++    ]
++  },
+   "statusLine": {
+     "type": "command",
+     "command": "$HOME/.claude/scripts/statusline.sh"
+-  }
++  },
++  "alwaysThinkingEnabled": true,
++  "autoMemoryEnabled": false,
++  "theme": "dark",
++  "inputNeededNotifEnabled": true
+ }

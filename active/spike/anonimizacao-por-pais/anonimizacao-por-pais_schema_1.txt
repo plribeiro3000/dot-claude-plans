@@ -1,0 +1,147 @@
+Auxiliary file — anonimizacao-por-pais spike
+Source: ~/Projects/4Shark/app/db/schema.rb (read 2026-07-08)
+Excerpts relevant to jurisdiction/country resolution and the anonymization window. Verbatim,
+with original line numbers preserved as comments.
+
+--------------------------------------------------------------------------------------------
+db/schema.rb:505-534 — companies (NOTE: no country/jurisdiction column directly on this table)
+--------------------------------------------------------------------------------------------
+
+  create_table "companies", id: :serial, force: :cascade do |t|
+    t.boolean "auto_data_processing", default: false, null: false
+    t.boolean "basic_authentication", default: true, null: false
+    t.boolean "client", default: true
+    t.string "commission_queue_suffix"
+    t.datetime "created_at", null: false
+    t.boolean "deal_eligibility_module", default: false, null: false
+    t.datetime "disabled_at"
+    t.bigint "disabler_id"
+    t.boolean "goal_calculation_module", default: true, null: false
+    t.integer "license_quantity", default: 0
+    t.integer "locale", default: 0
+    t.boolean "manager_legal_module", default: true, null: false
+    t.boolean "money_sanitization", default: true, null: false
+    t.citext "name"
+    t.boolean "operator_legal_module", default: true, null: false
+    t.boolean "payment_api_exportation_module", default: false, null: false
+    t.boolean "payment_floating_point", default: false, null: false
+    t.string "primary_webclient_host", default: "", null: false
+    t.integer "start_processing_at", default: 0, null: false
+    t.integer "status"
+    t.boolean "subsidiaries_module", default: false, null: false
+    t.string "type", limit: 8000
+    t.datetime "updated_at", null: false
+    t.boolean "verified_emails", default: false, null: false
+    t.string "webclient_hosts", default: [], array: true
+    t.index ["commission_queue_suffix"], name: "index_companies_on_commission_queue_suffix", unique: true
+    t.index ["disabler_id"], name: "index_companies_on_disabler_id"
+    t.index ["name"], name: "index_companies_on_name", unique: true
+  end
+
+--------------------------------------------------------------------------------------------
+db/schema.rb:552-560 — company_business_territories (join table: a company can have MANY
+countries)
+--------------------------------------------------------------------------------------------
+
+  create_table "company_business_territories", force: :cascade do |t|
+    t.bigint "company_id", null: false
+    t.bigint "country_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["company_id", "country_id"], name: "index_company_business_territories_on_company_id_and_country_id", unique: true
+    t.index ["company_id"], name: "index_company_business_territories_on_company_id"
+    t.index ["country_id"], name: "index_company_business_territories_on_country_id"
+  end
+
+--------------------------------------------------------------------------------------------
+db/schema.rb:572-579 — countries (jurisdiction acronym lives here, e.g. BR / MX / CL / CO)
+--------------------------------------------------------------------------------------------
+
+  create_table "countries", force: :cascade do |t|
+    t.string "acronym"
+    t.datetime "created_at", null: false
+    t.string "flag_url"
+    t.string "name"
+    t.datetime "updated_at", null: false
+    t.index ["acronym"], name: "index_countries_on_acronym", unique: true
+  end
+
+--------------------------------------------------------------------------------------------
+db/schema.rb:2073-2084 — states (country_id FK; this is the join a user's own address goes
+through to reach a country)
+--------------------------------------------------------------------------------------------
+
+  create_table "states", id: :serial, force: :cascade do |t|
+    t.string "acronym", limit: 8000
+    t.bigint "country_id"
+    t.datetime "created_at", null: false
+    t.string "iso3166"
+    t.string "name", limit: 8000
+    t.datetime "updated_at", null: false
+    t.index ["country_id", "acronym"], name: "index_states_on_country_id_and_acronym", unique: true
+    t.index ["country_id", "name"], name: "index_states_on_country_id_and_name", unique: true
+    t.index ["country_id"], name: "index_states_on_country_id"
+    t.index ["iso3166"], name: "index_states_on_iso3166", unique: true
+  end
+
+--------------------------------------------------------------------------------------------
+db/schema.rb:2411-2457 — users (NOTE: state_id column present, no null: false constraint at
+the DB level — nullable; presence is enforced only at the model-validation layer, see
+app/models/user.rb:199 in anonimizacao-por-pais_code_2.rb)
+--------------------------------------------------------------------------------------------
+
+  create_table "users", id: :serial, force: :cascade do |t|
+    t.boolean "anonymized", default: false, null: false
+    t.string "city", limit: 8000
+    t.integer "company_id"
+    t.datetime "created_at"
+    t.datetime "current_sign_in_at"
+    t.string "current_sign_in_ip", limit: 8000
+    t.string "department", limit: 8000
+    t.datetime "disabled_at"
+    t.bigint "disabler_id"
+    t.integer "document_line"
+    t.string "email", limit: 8000, default: "", null: false
+    t.string "encrypted_password", limit: 8000, default: "", null: false
+    t.integer "failed_attempts", default: 0, null: false
+    t.string "first_name", limit: 8000
+    t.string "last_name", limit: 8000
+    t.datetime "last_sign_in_at"
+    t.string "last_sign_in_ip", limit: 8000
+    t.datetime "locked_at"
+    t.string "name"
+    t.bigint "owner_id"
+    t.string "register_type"
+    t.boolean "registration_password", default: true, null: false
+    t.datetime "remember_created_at"
+    t.datetime "reset_password_sent_at"
+    t.string "reset_password_token", limit: 8000
+    t.integer "sign_in_count", default: 0, null: false
+    t.integer "state_id"
+    t.bigint "subsidiary_id"
+    t.string "unique_register_id"
+    t.datetime "updated_at"
+    t.integer "user_document_id"
+    t.index ["company_id", "disabled_at"], name: "index_users_on_company_id_and_disabled_at"
+    t.index ["company_id", "email"], name: "index_users_on_company_id_and_email", unique: true, where: "(anonymized = false)"
+    t.index ["company_id", "register_type", "unique_register_id"], name: "user_encrypted_unique_register_id_index", unique: true, where: "(anonymized = false)"
+    t.index ["company_id"], name: "index_users_on_company_id"
+    t.index ["created_at"], name: "index_users_on_created_at"
+    t.index ["disabled_at"], name: "index_users_on_disabled_at"
+    t.index ["disabler_id"], name: "index_users_on_disabler_id"
+    t.index ["first_name", "last_name"], name: "index_users_on_first_name_and_last_name"
+    t.index ["name"], name: "index_users_on_name", opclass: :gin_trgm_ops, using: :gin
+    t.index ["owner_id"], name: "index_users_on_owner_id"
+    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
+    t.index ["state_id"], name: "index_users_on_state_id"
+    t.index ["subsidiary_id"], name: "index_users_on_subsidiary_id"
+    t.index ["user_document_id"], name: "index_users_on_user_document_id"
+  end
+
+NOTE — index awareness (per ActiveRecord Query Discipline): `users` already has an index on
+`state_id` alone (`index_users_on_state_id`) and a composite index on
+`["company_id", "disabled_at"]`. It does NOT have a composite index covering
+`(state_id, disabled_at)` or `(company_id, state_id, disabled_at)`. Any per-country query
+shape that filters/joins on `state_id` (or on `states.country_id` via a join) together with
+`disabled_at` should have this checked with `.explain` once the exact query shape is chosen —
+flagged here as a finding, not resolved.

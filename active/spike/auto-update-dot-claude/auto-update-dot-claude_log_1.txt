@@ -1,0 +1,32 @@
+Command: git -C ~/.claude status --porcelain=v1; git -C ~/.claude branch --show-current; git -C ~/.claude remote -v; git -C ~/.claude log --oneline -5
+Captured: 2026-07-08, during this spike's research phase.
+
+--- STATUS (porcelain, at capture time) ---
+?? .last-cleanup
+?? .last-update-result.json
+?? MEMORY.md
+?? chrome/
+?? uploads/
+
+(Only untracked paths (??) at capture time — settings.json was clean at this exact
+moment. The ground truth described by the engineer for this spike documents that
+settings.json going dirty with an " M settings.json" line, caused by the desktop
+app's live rewrite of the file — reordering keys, stripping blank lines, re-adding
+personal prefs — was directly observed TWICE earlier in this same session, and each
+time resolved manually with `git -C ~/.claude checkout settings.json` followed by
+`git -C ~/.claude pull`. That sequence is the manual precedent this spike's Finding 1
+recipe is modeled on.)
+
+--- BRANCH ---
+develop
+
+--- REMOTE ---
+origin  git@github.com:4shark/dot-claude.git (fetch)
+origin  git@github.com:4shark/dot-claude.git (push)
+
+--- LOG (most recent 5) ---
+9ca1fa9 Merge pull request #359 from 4shark/feature/native-app-nudge
+99ad352 feat(session): recommend the native desktop app when running in a terminal
+a18bc28 Merge pull request #358 from 4shark/feature/merged-branch-check
+0480de0 feat(git): add merged-branch check at session start
+c2edbd8 Merge pull request #357 from 4shark/feature/abandoned-worktree-check

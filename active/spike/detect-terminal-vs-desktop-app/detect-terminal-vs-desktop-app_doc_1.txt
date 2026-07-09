@@ -1,0 +1,43 @@
+SOURCE: https://code.claude.com/docs/en/env-vars
+FETCHED VIA: WebFetch tool, prompt: "Find any mention of CLAUDE_CODE_ENTRYPOINT environment variable..."
+DATE: 2026-07-07/08 (session date)
+
+--- Returned content (as extracted by WebFetch) ---
+
+"there is no mention of a `CLAUDE_CODE_ENTRYPOINT` environment variable" in
+the official Claude Code environment-variables reference page.
+
+Related environment-detection variables that ARE documented on that page:
+
+1. CLAUDECODE
+   "Set to 1 in subprocesses Claude Code spawns (Bash and PowerShell tools,
+   tmux sessions, hook commands, status line commands, stdio MCP server
+   subprocesses). IDE extensions also set this in their integrated
+   terminals. Use to detect when a script is running inside a subprocess
+   spawned by Claude Code."
+
+   Significance for this spike: this quote confirms that hook commands
+   (e.g. a SessionStart hook) run as a subprocess of the Claude Code
+   process and therefore inherit process environment variables the same
+   way the Bash tool does. This is the basis for "a SessionStart hook CAN
+   read CLAUDE_CODE_ENTRYPOINT" (§ Question 2 in SPIKE.md) even though the
+   variable itself is undocumented.
+
+2. CLAUDE_CODE_CHILD_SESSION
+   "Set to 1 in subprocesses Claude Code spawns via the Bash, PowerShell,
+   and Monitor tools, hook commands, and status line commands. Not set for
+   stdio MCP server subprocesses... Unlike CLAUDECODE, this is only set by
+   Claude Code itself when it launches a subprocess and not by IDE
+   extensions, so it reliably distinguishes a nested session from a
+   top-level `claude` launched in an IDE-integrated terminal."
+
+3. CLAUDE_CODE_BRIDGE_SESSION_ID
+   "Set automatically in Bash tool and hook command subprocesses while the
+   session has an active Remote Control connection."
+
+None of these three official variables distinguish "desktop app" from
+"terminal CLI" — they distinguish nested-subprocess-vs-not, and
+Remote-Control-active-vs-not. CLAUDE_CODE_ENTRYPOINT, the variable this
+session observed as `claude-desktop`, is NOT present anywhere on this
+official reference page.
+</content>

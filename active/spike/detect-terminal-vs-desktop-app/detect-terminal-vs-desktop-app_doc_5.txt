@@ -1,0 +1,58 @@
+SOURCE: https://code.claude.com/docs/en/remote-control
+FETCHED VIA: WebFetch tool (official Anthropic documentation)
+DATE: 2026-07-07/08 (session date)
+
+--- Verbatim excerpts, as returned by WebFetch ---
+
+"Remote Control connects claude.ai/code or the Claude app for iOS and
+Android to a Claude Code session running on your machine. Start a task at
+your desk, then pick it up from your phone on the couch or a browser on
+another computer."
+
+"When you start a Remote Control session on your machine, Claude keeps
+running locally the entire time, so nothing moves to the cloud. With
+Remote Control you can:
+* Use your full local environment remotely: your filesystem, MCP servers,
+  tools, and project configuration all stay available, and typing @
+  autocompletes file paths from your local project
+* Work from both surfaces at once: the conversation stays in sync across
+  all connected devices, so you can send messages from your terminal,
+  browser, and phone interchangeably
+* Send images and files from your phone or browser
+* Survive interruptions: if your laptop sleeps or your network drops, the
+  session reconnects automatically when your machine comes back online"
+
+"Unlike Claude Code on the web, which runs on cloud infrastructure, Remote
+Control sessions run directly on your machine and interact with your local
+filesystem. The web and mobile interfaces are just a window into that
+local session."
+
+On starting from the Desktop app specifically:
+"In the Desktop app, you can also toggle this from Settings -> Claude Code
+-> Enable remote control by default." — confirming Remote Control is a
+first-class, one-toggle feature inside the Desktop app itself, not just a
+CLI flag.
+
+Mobile push notifications section:
+"When Remote Control is active, Claude can send push notifications to your
+phone. Claude decides when to push. It typically sends one when a
+long-running task finishes or when it needs a decision from you to
+continue."
+
+Related feature "Dispatch" (Desktop-only):
+From the "Choose the right approach" comparison table: "Dispatch — Message
+a task from the Claude mobile app — Claude runs on: Your machine (Desktop)
+— Setup: Pair the mobile app with Desktop — Best for: Delegating work while
+you're away, minimal setup."
+
+SIGNIFICANCE: this is the officially documented basis for the "agora eu
+consigo usar remoto" hook the engineer wants in the nudge. Two distinct
+official mobile-companion capabilities exist and both require the Claude
+mobile app (iOS/Android): (1) Remote Control — steer/continue a session
+already running locally from the phone, works from CLI or Desktop; (2)
+Dispatch — message a NEW task from the phone that spawns a session on the
+Desktop app specifically ("Claude runs on: Your machine (Desktop)"),
+meaning Dispatch is a Desktop-exclusive capability the CLI does not have on
+its own (the CLI can do Remote Control, but Dispatch as documented here is
+listed as spawning on Desktop).
+</content>

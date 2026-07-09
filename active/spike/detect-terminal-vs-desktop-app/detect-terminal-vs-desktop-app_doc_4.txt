@@ -1,0 +1,41 @@
+SOURCE: https://github.com/anthropics/claude-code/issues/28144
+FETCHED VIA: WebFetch tool
+DATE: 2026-07-07/08 (session date)
+
+--- Returned content (as extracted by WebFetch) ---
+
+Issue title: "Feature Request: Claude should know its runtime environment
+(Desktop App vs CLI vs Web) #28144"
+
+Issue status: Closed as duplicate (filed 2026-02-24, per the WebFetch
+extraction).
+
+Problem statement (quoted by WebFetch as verbatim from the issue body):
+"Claude Code does not know which interface it is running in. When asked,
+it cannot distinguish between the Desktop App, the CLI/Terminal, or the
+Web interface. This leads to incorrect assumptions and confusing guidance
+for users."
+
+Expected behavior (quoted by WebFetch as verbatim):
+"Claude should be aware of its runtime environment from the start of every
+session. For example, the system context could include a field like:
+Runtime: Claude Code Desktop App (v2.0.76)
+or
+Runtime: Claude Code CLI (v2.0.76)"
+
+Suggested implementation (quoted by WebFetch as verbatim):
+"Add the runtime environment identifier to the system context that Claude
+receives at session start, alongside existing fields like platform, shell,
+and OS version."
+
+SIGNIFICANCE: this is an open, community-filed feature request (closed as
+a duplicate of another one, meaning the underlying need is acknowledged to
+exist elsewhere in the tracker, not that it shipped) asking Anthropic to
+add exactly the capability this spike is investigating — an official way
+for Claude itself to know it is running in the Desktop App vs the CLI vs
+the Web. As of this fetch there is no evidence this shipped as an official,
+documented mechanism (the official env-vars page — doc_1 — does not
+document CLAUDE_CODE_ENTRYPOINT). This corroborates that env-var sniffing
+of CLAUDE_CODE_ENTRYPOINT is currently the ONLY available signal, and it
+is not an Anthropic-sanctioned/documented one.
+</content>

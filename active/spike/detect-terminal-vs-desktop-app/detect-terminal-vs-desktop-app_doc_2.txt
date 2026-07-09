@@ -1,0 +1,59 @@
+SOURCE: multiple third-party community gists (NOT Anthropic-official)
+FETCHED VIA: WebFetch tool
+DATE: 2026-07-07/08 (session date)
+
+Four different unofficial community gists were fetched, asking each the
+same question: "what does CLAUDE_CODE_ENTRYPOINT contain, and what values
+does it take?" The results were CONTRADICTORY across gists — direct
+evidence that this variable is undocumented/internal and community
+reverse-engineering of it is inconsistent.
+
+--- Gist 1: https://gist.github.com/mculp/e6a573f2a45ef7dbbf30f6a8574c7351 ---
+Returned description: "Entrypoint type (local-agent, remote...)"
+Values shown: local-agent, remote (list "appears incomplete").
+
+--- Gist 2: https://gist.github.com/jedisct1/9627644cda1c3929affe9b1ce8eaf714 ---
+Returned description: "Custom application entrypoint. Allows specifying
+alternative entry points or initialization modules for specialized
+deployments. Values: file paths or module names. Used for custom
+initialization scenarios."
+This description does NOT match observed behavior (this session's real
+value is the literal string "claude-desktop", not a file path or module
+name) — strong signal this particular gist's entry is unreliable /
+possibly hallucinated by whatever process generated it.
+
+--- Gist 3: https://gist.github.com/yi/451831e61e9255f02a15b3bc4b134e19 ---
+CLAUDE_CODE_ENTRYPOINT was not found in this gist's list at all.
+
+--- Gist 4: https://gist.github.com/unkn0wncode/f87295d055dd0f0e8082358a0b5cc467 ---
+Returned description: "Identifies how Claude Code was launched (e.g., cli,
+sdk-ts/sdk-py/sdk-cli, mcp, claude-vscode, claude-desktop, remote_*,
+local-agent, claude-in-slack/teams, claude-code-github-action)."
+Values listed: cli, sdk-ts, sdk-py, sdk-cli, mcp, claude-vscode,
+claude-desktop, remote_* (remote variants), local-agent, claude-in-slack,
+claude-in-teams, claude-code-github-action.
+
+This is the ONLY one of the four gists whose value list is CONSISTENT with
+this session's ground-truth observation (CLAUDE_CODE_ENTRYPOINT=claude-desktop
+observed directly via env probe in the running desktop-app session). It
+also lists "cli" as the plain-terminal value, matching the working
+hypothesis.
+
+--- Also searched via WebSearch: "ENTRYPOINT" claude code desktop app ---
+One search result summary stated: "The CLAUDE_CODE_ENTRYPOINT environment
+variable controls retry watchdog functionality, which is only active on
+Linux when set to `remote`." and "setting an environment variable to 1
+includes the session entry-point (e.g., interactive vs -p vs SDK) as a
+label on all OpenTelemetry metric data points" — this corroborates that
+CLAUDE_CODE_ENTRYPOINT is used internally for OpenTelemetry labeling
+(entrypoint-as-metric-dimension), which is consistent with it existing as
+a real internal variable, just not surfaced in end-user docs.
+
+CONCLUSION FOR THIS AUXILIARY FILE: no single authoritative, Anthropic-
+published source documents CLAUDE_CODE_ENTRYPOINT or its value catalog.
+The community's own attempts to document it disagree with each other on
+three out of four tries. Only the ground-truth observation from this
+literal running session (CLAUDE_CODE_ENTRYPOINT=claude-desktop, in a
+verified desktop-app session) and the one gist whose values match it
+should be treated as reliable signal.
+</content>

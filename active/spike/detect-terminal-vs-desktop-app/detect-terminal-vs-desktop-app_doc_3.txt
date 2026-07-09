@@ -1,0 +1,96 @@
+SOURCE: https://code.claude.com/docs/en/desktop-quickstart
+        https://code.claude.com/docs/en/desktop-linux
+        https://code.claude.com/docs/en/desktop (full page, persisted separately
+          at ~/.claude/projects/-/c28dba9f-85fc-4f0c-a6d4-a1204cb75578/tool-results/toolu_01LTgFhrzfkZC2s6rqTERuQq.txt)
+        https://claude.com/download
+FETCHED VIA: WebFetch tool (official Anthropic documentation, code.claude.com)
+DATE: 2026-07-07/08 (session date)
+
+--- desktop-quickstart (verbatim, as returned by WebFetch) ---
+
+"The desktop app gives you Claude Code with a graphical interface built for
+running multiple sessions side by side: a sidebar for managing parallel
+work, a drag-and-drop layout with an integrated terminal and file editor,
+visual diff review, live app preview, GitHub PR monitoring with auto-merge,
+and scheduled tasks. No terminal required."
+
+Download cards, verbatim:
+"Download for macOS ... Universal build for Intel and Apple Silicon"
+"Download for Windows ... For x64 processors"
+"Get Claude for Linux (beta) ... apt or .deb for Ubuntu and Debian"
+
+"For Windows ARM64, download the ARM64 installer... On Linux, install with
+apt; see Claude Desktop on Linux."
+
+"Claude Code requires a Pro, Max, Team, or Enterprise subscription."
+
+"On macOS and Windows, download the installer from the links above and run
+it. On Linux, follow the install steps in Claude Desktop on Linux. Launch
+Claude from your Applications folder on macOS, the Start menu on Windows,
+or your application launcher on Linux, then sign in with your Anthropic
+account."
+
+"The desktop app includes Claude Code. You don't need to install Node.js
+or the CLI separately. To use `claude` from the terminal, install the CLI
+separately."
+
+--- desktop-linux (verbatim) ---
+
+"Linux support for the Claude desktop app is in beta. The Chat, Cowork, and
+Code tabs are all available."
+
+"Requirements
+* Ubuntu 22.04 or later, or Debian 12 or later
+* x86_64 or arm64
+Other Debian-based distributions that meet these requirements may work but
+aren't officially tested."
+
+"What's not in the Linux beta yet
+* Computer Use: app and screen control isn't available on Linux.
+* Dictation: voice input isn't available in the Linux desktop app. Use
+  voice dictation in the CLI instead.
+* Quick Entry global hotkey: works on X11. On native Wayland it requires
+  your desktop environment's GlobalShortcuts portal.
+* Fedora and RHEL: only Debian-based distributions are supported today.
+  Support for additional distributions is coming in the future."
+
+"For anything not yet available in the desktop app, the CLI runs the same
+Claude Code engine and supports a wider range of Linux distributions."
+
+Install method: adds Anthropic's own apt repository
+(https://downloads.claude.ai/claude-desktop/apt/stable) with signing key
+fingerprint 31DD DE24 DDFA B679 F42D 7BD2 BAA9 29FF 1A7E CACE, or a
+downloadable .deb from claude.com/download.
+
+--- desktop (full page) — corroboration of the macOS bundle id and CLI
+    comparison table ---
+
+Line ~629 (Device management policies section):
+"macOS: configure via `com.anthropic.claudefordesktop` preference domain
+using tools like Jamf or Kandji"
+— this matches the `__CFBundleIdentifier=com.anthropic.claudefordesktop`
+observed directly in this session's ground-truth env probe, corroborating
+from an independent official source that this bundle id belongs to the
+desktop app (macOS LaunchServices convention — Linux/Windows builds would
+not set this, since it's a macOS-specific mechanism).
+
+Feature-comparison table includes:
+"Scripting and automation | CLI: --print, Agent SDK | Desktop: Not
+available"
+"What's not available in Desktop... Linux (beta): Computer Use isn't yet
+available in the Linux desktop app."
+
+--- claude.com/download (as summarized by WebFetch) ---
+
+"macOS ... Windows ... Linux — Button label: 'Download for Linux' —
+Directs to documentation rather than direct download — System requirements
+note: 'Claude Desktop for Linux is in beta and supports Ubuntu and Debian
+(x64 and arm64)' — Feature limitations stated: 'Computer Use is not yet
+available on Linux' and 'Dictation is also not available in this release'"
+
+CONCLUSION FOR THIS AUXILIARY FILE: the native desktop app (the one that
+runs Claude Code sessions with entrypoint value claude-desktop) exists,
+officially, for macOS, Windows (x64 + ARM64), and Linux/Ubuntu+Debian
+(beta). This is a single unified "Claude" desktop app with three tabs
+(Chat / Cowork / Code) — "Code" is the tab that IS Claude Code with a GUI.
+</content>

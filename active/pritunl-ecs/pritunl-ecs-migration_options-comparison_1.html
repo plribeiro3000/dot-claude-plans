@@ -1,0 +1,467 @@
+<!--
+  pritunl-ecs-migration_options-comparison_1.html — Options + trade-offs for the
+  seven open sub-decisions in the Pritunl VM-to-ECS containerization migration.
+
+  Adapted from ~/.claude/templates/html/comparison-board.html. No "recommended"
+  badges and no verdict language — per plan-researcher's research-only contract,
+  every sub-decision is presented neutrally for the engineer to choose.
+
+  DECISION MADE (2026-07-08): all seven sub-decisions below were decided by the
+  engineer after this options survey was reviewed. This file is kept as the
+  historical options record (every option, pro/con, cost/risk, citation that was
+  on the table). The converged, single-path plan — encoding the seven choices,
+  the Ansible-task-by-task new-home mapping, and the newly-researched items
+  (Renovate update loop, STOPSIGNAL, WireGuard host/image split) — lives in
+  PLAN-SPIKE.md in this same directory. Read PLAN-SPIKE.md for the current plan;
+  read this file only for the discarded-alternatives record.
+-->
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pritunl VM → ECS — Open Sub-Decisions (historical — decisions made, see PLAN-SPIKE.md)</title>
+<meta name="description" content="Seven open sub-decisions for the Pritunl VPN containerize-to-ECS migration, each with options and trade-offs, no recommendation. Superseded by PLAN-SPIKE.md once the engineer decided.">
+<style>
+  :root {
+    --bg:#fafaf9; --surface:#fff; --surface-alt:#f5f5f4; --text:#1c1917;
+    --text-muted:#78716c; --border:#e7e5e4; --accent:#2563eb; --accent-light:#eff6ff;
+    --success:#16a34a; --success-bg:#dcfce7;
+    --danger:#dc2626;  --danger-bg:#fef2f2;
+    --warn:#d97706; --warn-bg:#fffbeb;
+    --radius:8px; --shadow:0 1px 3px rgba(0,0,0,0.08); --shadow-hover:0 4px 12px rgba(0,0,0,0.12);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#1c1917; --surface:#292524; --surface-alt:#1f1d1c; --text:#fafaf9;
+      --text-muted:#a8a29e; --border:#44403c; --accent-light:#1e3a5f;
+      --success-bg:#14532d; --danger-bg:#7f1d1d; --warn-bg:#451a03;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation:none!important; transition:none!important; } }
+  *{box-sizing:border-box} html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;font-size:15px}
+  .container{max-width:1400px;margin:0 auto;padding:2rem 1.5rem}
+  header.report-header{border-bottom:1px solid var(--border);padding-bottom:1.5rem;margin-bottom:2rem}
+  header.report-header h1{margin:0 0 .5rem;font-size:1.75rem;font-weight:600;letter-spacing:-.01em}
+  header.report-header .subtitle{color:var(--text-muted);margin:0}
+  header.report-header .meta{color:var(--text-muted);font-size:.85rem;margin-top:.75rem}
+  nav.toc{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.5rem;margin-bottom:2rem;box-shadow:var(--shadow)}
+  nav.toc h2{font-size:.85rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:0 0 .5rem}
+  nav.toc ol{margin:0;padding-left:1.2rem}
+  nav.toc li{margin:.2rem 0}
+  nav.toc a{color:var(--accent);text-decoration:none}
+  nav.toc a:hover{text-decoration:underline}
+  section.decision{margin-bottom:3rem;scroll-margin-top:1rem}
+  section.decision h2{font-size:1.3rem;margin:0 0 .25rem;border-bottom:2px solid var(--accent);padding-bottom:.5rem}
+  section.decision .decision-note{color:var(--text-muted);font-size:.9rem;margin:.5rem 0 1.25rem}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.25rem}
+  .option-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);transition:transform 150ms ease,box-shadow 150ms ease;display:flex;flex-direction:column}
+  .option-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+  .option-title{font-size:1.1rem;font-weight:600;margin:0 0 .25rem}
+  .option-tagline{color:var(--text-muted);font-size:.87rem;margin:0 0 1rem}
+  .pros-cons{margin-bottom:1rem}
+  .pros-cons h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .35rem;font-weight:600}
+  .pros-cons ul{list-style:none;padding:0;margin:0}
+  .pros-cons li{padding:.2rem 0;display:flex;gap:.4rem;align-items:flex-start;font-size:.88rem}
+  .pros-cons li .marker{flex-shrink:0;width:1.1rem;height:1.1rem;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;margin-top:.15rem}
+  .marker-pro{background:var(--success-bg);color:var(--success)}
+  .marker-con{background:var(--danger-bg);color:var(--danger)}
+  .effort{margin-top:auto;padding-top:.75rem;border-top:1px dashed var(--border);font-size:.82rem;color:var(--text-muted);display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+  .effort strong{color:var(--text)}
+  .cite{margin-top:.6rem;font-size:.78rem;color:var(--text-muted);background:var(--surface-alt);border-radius:4px;padding:.4rem .6rem}
+  .cite code{font-size:.76rem}
+  .flag-box{margin:1rem 0 0;padding:1rem 1.25rem;background:var(--warn-bg);border-left:4px solid var(--warn);border-radius:0 var(--radius) var(--radius) 0;font-size:.9rem}
+  .flag-box strong{color:var(--warn)}
+  .decided-banner{margin:0 0 2rem;padding:1rem 1.25rem;background:var(--success-bg);border-left:4px solid var(--success);border-radius:0 var(--radius) var(--radius) 0;font-size:.92rem}
+  .decided-banner strong{color:var(--success)}
+  @media print{
+    body{background:#fff;color:#000} .container{max-width:none;padding:0}
+    .option-card{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="decided-banner"><strong>Decision made (2026-07-08):</strong> all seven sub-decisions below were resolved by the engineer. This page is kept as the historical options record only. The converged, single-path plan — the chosen architecture, the exhaustive Ansible-task-to-new-home mapping, and the newly-researched Renovate/STOPSIGNAL/WireGuard-split items — lives in <code>PLAN-SPIKE.md</code> in this same directory.</div>
+  <header class="report-header">
+    <h1>Pritunl VM &rarr; ECS — Open Sub-Decisions</h1>
+    <p class="subtitle">Containerize-to-ECS direction is decided (engineer, informed). This page surfaces the seven remaining sub-decisions as neutral options with trade-offs — no recommendation, no pick.</p>
+    <p class="meta">Generated 2026-07-08 · Source: PLAN-SPIKE.md, ~/.claude/plans/active/pritunl-ecs/</p>
+  </header>
+
+  <nav class="toc">
+    <h2>Sub-decisions</h2>
+    <ol>
+      <li><a href="#base-image">Base image</a></li>
+      <li><a href="#runtime">Runtime / launch type</a></li>
+      <li><a href="#mongodb">MongoDB</a></li>
+      <li><a href="#networking">Networking / public entry</a></li>
+      <li><a href="#branch-model">Branch model for the new repo</a></li>
+      <li><a href="#ansible-fate">Ansible role fate</a></li>
+      <li><a href="#cutover">Cutover</a></li>
+    </ol>
+  </nav>
+
+  <section class="decision" id="base-image">
+    <h2>1. Base image</h2>
+    <p class="decision-note">Pritunl (the VPN server) has no official Docker image — Docker Hub's <code>pritunl</code> org publishes only <code>pritunl-zero</code> and <code>pritunl-bastion</code>, a different product. Every candidate is a community image.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. jippi/docker-pritunl</h3>
+        <p class="option-tagline">Published to ghcr.io, Docker Hub, and AWS public ECR</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Three registries, including AWS public ECR (no third-party pull-through needed)</li>
+            <li><span class="marker marker-pro">+</span>Explicit external-Mongo env var (<code>PRITUNL_MONGODB_URI</code>)</li>
+            <li><span class="marker marker-pro">+</span>Documents both <code>--network=host</code> and explicit-port alternatives</li>
+            <li><span class="marker marker-pro">+</span>Has a version-tagged release history (Renovate can track <code>FROM</code>)</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Unofficial — supply chain trust rests on one external maintainer</li>
+            <li><span class="marker marker-con">&minus;</span><code>privileged: true</code> shown in every example (see Runtime sub-decision)</li>
+          </ul>
+        </div>
+        <div class="cite">github.com/jippi/docker-pritunl — docker-compose.yml: <code>privileged: true</code>; README: "If you have MongoDB running somewhere else you'd like to use, you can do so through the <code>PRITUNL_MONGODB_URI</code> env var"</div>
+        <div class="effort"><span>Renovate fit: <strong>Good</strong></span><span>Maturity: <strong>Active</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. goofball222/pritunl</h3>
+        <p class="option-tagline">IPv6 + reverse-proxy support</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Explicit "requires an external Mongo DB" contract in the README — matches the split-Mongo direction</li>
+            <li><span class="marker marker-pro">+</span>IPv6 / reverse-proxy support if ever needed</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Single registry (Docker Hub) — no ECR mirror</li>
+            <li><span class="marker marker-con">&minus;</span>Same <code>privileged: true</code> requirement</li>
+            <li><span class="marker marker-con">&minus;</span>Smaller community footprint than jippi's image</li>
+          </ul>
+        </div>
+        <div class="cite">github.com/goofball222/pritunl README: "This container requires an external Mongo DB and should be run via Docker Compose or other orchestration."; compose example shows <code>network_mode: bridge</code>, <code>privileged: true</code>, <code>sysctls: net.ipv6.conf.all.disable_ipv6=0</code></div>
+        <div class="effort"><span>Renovate fit: <strong>Good</strong></span><span>Maturity: <strong>Moderate</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">C. omegion/pritunl-docker</h3>
+        <p class="option-tagline">AMD64 + ARM64 builds</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Multi-arch (ARM64 opens cheaper Graviton container instances)</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Least documented of the three — README's external-Mongo guarantee could not be independently confirmed (fetch returned conflicting content); treat as unverified</li>
+            <li><span class="marker marker-con">&minus;</span>Smallest community footprint</li>
+          </ul>
+        </div>
+        <div class="cite">github.com/omegion/pritunl-docker — image published as <code>omegion/pritunl:latest</code> (per repository search summary; README contents not independently quote-verified — UNVERIFIED)</div>
+        <div class="effort"><span>Renovate fit: <strong>Good</strong></span><span>Maturity: <strong>Low</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">D. 4Shark-authored Dockerfile (apt install, mirrors current Ansible) — CHOSEN</h3>
+        <p class="option-tagline">Build from repo.pritunl.com/stable/apt inside a 4Shark Dockerfile</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Same install source the Ansible role already uses — zero behavior drift from today's package</li>
+            <li><span class="marker marker-pro">+</span>Full control over the image, no third-party trust dependency</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>No upstream <code>FROM &lt;tag&gt;</code> to pin — apt install from a rolling <code>stable</code> repo has no version in the Dockerfile for Renovate's <code>docker</code> datasource to track. Breaks the auto-update loop the Docker-image-tool-repo standard depends on (Renovate needs a tracked tag; see item 2 of the standard) unless a custom Renovate datasource/regex is built to watch the apt repo's package index — resolved in PLAN-SPIKE.md via a <code>github-releases</code> custom regex manager against <code>pritunl/pritunl</code></li>
+            <li><span class="marker marker-con">&minus;</span>4Shark owns Dockerfile maintenance (WireGuard modules, MongoDB driver compatibility, etc.) that a community image already carries</li>
+          </ul>
+        </div>
+        <div class="cite">ansible/roles/4shark.pritunl/tasks/main.yml:93-98 — <code>apt_repository: repo: "deb [ signed-by={{ pritunl_gpg_keyring }} ] https://repo.pritunl.com/stable/apt {{ pritunl_ubuntu_codename }} main"</code> (today's install source, UNPINNED)</div>
+        <div class="effort"><span>Renovate fit: <strong>Resolved via custom manager</strong></span><span>Maturity: <strong>N/A — new</strong></span></div>
+      </div>
+    </div>
+    <div class="flag-box"><strong>Cross-cutting constraint:</strong> whichever image is chosen, the <code>DOCKER-IMAGE-TOOL-REPOSITORIES.md</code> standard requires a <code>FROM image:&lt;tag&gt;@sha256:&lt;digest&gt;</code> pin with a Renovate-trackable tag (item 2). Options A/B/C have version-tagged releases; Option D does not, by construction.</div>
+  </section>
+
+  <section class="decision" id="runtime">
+    <h2>2. Runtime / launch type</h2>
+    <p class="decision-note">Grounded fact: Pritunl in a container needs <code>privileged: true</code> or <code>/dev/net/tun</code> passthrough, host-loaded WireGuard kernel modules, and host or explicit-port networking. Fargate does not expose host kernel modules or privileged mode — it is out.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. ECS on EC2, dedicated container instance — CHOSEN</h3>
+        <p class="option-tagline">One EC2 host running the ECS agent, one task, privileged + host networking</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>4Shark already runs ECS-EC2 elsewhere (app-outbound, integrators, onboarding, setup all use <code>modules/ecs_service</code> + <code>modules/ecs_capacity</code>) — a known operational pattern</li>
+            <li><span class="marker marker-pro">+</span>Preserves the WireGuard-kernel-module and host-networking requirements the current VM already satisfies</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span><code>modules/ecs_service</code> hardcodes <code>network_mode = bridge</code> for EC2 and has no <code>privileged</code> flag — new Terraform work needed (extend the module or write bespoke resources, as <code>modules/pritunl</code> already does today)</li>
+            <li><span class="marker marker-con">&minus;</span>Single container instance = single point of failure unless a second stands by (ASG min/max=1 is the current VM's posture too, so this is not a regression, just not an improvement)</li>
+          </ul>
+        </div>
+        <div class="cite">terraform/modules/ecs_service/main.tf:14 — <code>network_mode = var.launch_type == "FARGATE" ? "awsvpc" : "bridge"</code> (no privileged/host branch); terraform/modules/ecs_capacity/main.tf:53-102 (ASG-backed EC2 capacity provider pattern already in the fleet)</div>
+        <div class="effort"><span>New Terraform: <strong>Moderate</strong></span><span>Fargate-compatible: <strong>No</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. ECS on EC2 + NLB with UDP listeners — NOT chosen</h3>
+        <p class="option-tagline">Same EC2/privileged container, fronted by a Network Load Balancer</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>NLB supports a static Elastic IP per AZ, so the fixed-IP constraint (see Networking sub-decision) can still be met</li>
+            <li><span class="marker marker-pro">+</span>Opens a path to multi-instance HA later without re-architecting the entry point</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>NLB does not solve MongoDB/session-state sharing across instances — HA still needs a plan for Pritunl's own state, which is not stateless</li>
+            <li><span class="marker marker-con">&minus;</span>More infrastructure than the current single-VM topology for a VPN gateway whose load profile has not required HA to date</li>
+            <li><span class="marker marker-con">&minus;</span>Adds an NLB cost + operational surface not present today</li>
+          </ul>
+        </div>
+        <div class="cite">terraform/vpn/README.md:5-6 — current topology is a single t3a.micro; no HA requirement documented today</div>
+        <div class="effort"><span>New Terraform: <strong>High</strong></span><span>Fargate-compatible: <strong>No</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">C. Fargate (ruled out by grounded facts)</h3>
+        <p class="option-tagline">Listed for completeness — not viable</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul><li><span class="marker marker-pro">+</span>Would match the pgbouncer/connection-pooler and keycloak precedent (both Fargate)</li></ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Fargate does not support <code>privileged: true</code>, host-loaded kernel modules, or <code>network_mode: host</code> — all required by every community Pritunl image</li>
+          </ul>
+        </div>
+        <div class="cite">terraform/app-shared-001/connection_pooler.tf + modules/connection_pooler/main.tf:250-260 — the two existing tool-repo precedents (connection-pooler, auth-001) both run <code>requires_compatibilities = ["FARGATE"]</code>, confirming no existing 4Shark tool repo has solved the privileged/host-network case on Fargate</div>
+        <div class="effort"><span>New Terraform: <strong>N/A</strong></span><span>Fargate-compatible: <strong>N/A (ruled out)</strong></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="decision" id="mongodb">
+    <h2>3. MongoDB</h2>
+    <p class="decision-note">Pritunl's current org/users/VPN profiles live in the running VM's local MongoDB (see terraform/modules/pritunl/README.md:111 — "OpenVPN routes ... and client profiles are configured inside Pritunl directly"). Whatever is chosen must carry this state across the cutover.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. Amazon DocumentDB</h3>
+        <p class="option-tagline">Managed MongoDB-compatible service</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul><li><span class="marker marker-pro">+</span>Fully managed — no MongoDB patching/backup ops</li></ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Explicitly unsupported by Pritunl: "Pritunl, Pritunl Zero and Pritunl Cloud all utilize capped collections and tailable cursors for publish subscribe messaging. This prevents using the MongoDB API compatible databases such as DocumentDB." — a hard blocker, not a tuning issue</li>
+          </ul>
+        </div>
+        <div class="cite">forum.pritunl.com/t/is-aws-documentdb-supported-as-a-database/1299 — verbatim quote above, confirmed current (no fix timeline given)</div>
+        <div class="effort"><span>Viability: <strong>Blocked</strong></span><span>Migration effort: <strong>N/A</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. MongoDB container/sidecar with persistent EBS — CHOSEN</h3>
+        <p class="option-tagline">Self-managed Mongo, same task or same instance, EBS-backed volume</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Closest architectural match to today (Mongo colocated with Pritunl)</li>
+            <li><span class="marker marker-pro">+</span>Supports capped collections/tailable cursors — no Pritunl compatibility issue</li>
+            <li><span class="marker marker-pro">+</span>A straightforward <code>mongodump</code>/<code>mongorestore</code> migrates the existing state</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>ECS-EC2 <code>bridge</code>-mode volume persistence needs an EBS-backed host path (or a separate EBS-backed volume mount) tied to the specific container instance — instance replacement needs care so the volume reattaches</li>
+            <li><span class="marker marker-con">&minus;</span>4Shark still owns MongoDB version upgrades/patching, same as today</li>
+          </ul>
+        </div>
+        <div class="cite">ansible/roles/4shark.pritunl/tasks/main.yml:56-61 — current MongoDB 8.0 self-managed via apt; terraform/modules/ecs_service/main.tf:56-62 — the module already supports a <code>volume</code> block with <code>host_path</code></div>
+        <div class="effort"><span>Migration effort: <strong>Low</strong></span><span>Ops burden: <strong>Same as today</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">C. Small dedicated MongoDB VM (kept outside the container) — NOT chosen</h3>
+        <p class="option-tagline">Decouple Mongo's lifecycle from the Pritunl container entirely</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Mongo state survives a Pritunl container/task replacement independently — no volume-reattachment coordination</li>
+            <li><span class="marker marker-pro">+</span>Matches the jippi/goofball222 "external MongoDB" model directly (<code>PRITUNL_MONGODB_URI</code> / <code>MONGODB_URI</code>)</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Keeps one VM in the topology — only Pritunl itself is containerized, not the full stack</li>
+            <li><span class="marker marker-con">&minus;</span>Adds a network hop + a security-group rule between the ECS instance and the Mongo VM</li>
+          </ul>
+        </div>
+        <div class="cite">github.com/jippi/docker-pritunl README: "If you have MongoDB running somewhere else you'd like to use, you can do so through the <code>PRITUNL_MONGODB_URI</code> env var"</div>
+        <div class="effort"><span>Migration effort: <strong>Lowest</strong></span><span>Ops burden: <strong>Same as today, isolated</strong></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="decision" id="networking">
+    <h2>4. Networking / public entry</h2>
+    <p class="decision-note">Existing <code>.ovpn</code> profiles and WireGuard client configs are pinned to the current Elastic IP. Repointing every engineer's client config is a coordination cost the option comparison below must account for.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. EIP directly on the ECS container instance's ENI — CHOSEN</h3>
+        <p class="option-tagline">Same EIP-association model as today, just re-pointed at the new instance</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>The EIP allocation itself can be reused — only the <code>aws_eip_association</code> target changes, so the public IP address does not have to change</li>
+            <li><span class="marker marker-pro">+</span>Zero client reconfiguration if the same EIP is reassociated</li>
+            <li><span class="marker marker-pro">+</span>Simplest possible mapping from the current architecture</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Single instance = single point of failure for the public entry point (same as today)</li>
+          </ul>
+        </div>
+        <div class="cite">terraform/modules/pritunl/main.tf:32-44 — <code>aws_eip</code> + <code>aws_eip_association</code> against the instance today; the EIP allocation is a distinct resource from the instance and survives instance replacement if re-associated</div>
+        <div class="effort"><span>Client reconfig: <strong>None</strong></span><span>Effort: <strong>Low</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. NLB with UDP listeners + EIP on the NLB — NOT chosen</h3>
+        <p class="option-tagline">Front the container with a Network Load Balancer</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>NLB supports a static EIP per AZ — a fixed public IP is still achievable</li>
+            <li><span class="marker marker-pro">+</span>Decouples the public IP from any single container instance's lifecycle</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>If the NLB's EIP differs from today's, every engineer's <code>.ovpn</code>/WireGuard config needs updating — a coordinated cutover event</li>
+            <li><span class="marker marker-con">&minus;</span>More infrastructure (target group, health checks, UDP listener behavior) for a gateway that has run on a bare EIP association without issue</li>
+          </ul>
+        </div>
+        <div class="cite">Same runtime sub-decision Option B citation applies — NLB is the same infra either way</div>
+        <div class="effort"><span>Client reconfig: <strong>Possible</strong> (unless EIP is migrated to the NLB)</span><span>Effort: <strong>Higher</strong></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="decision" id="branch-model">
+    <h2>5. Branch model for the new repo</h2>
+    <p class="decision-note">The Docker-image-tool-repository standard offers two shapes, chosen by whether the tool has a non-production instance to validate a new image before production.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. Main-only (pgbouncer reference) — CHOSEN</h3>
+        <p class="option-tagline">Single protected <code>main</code>, merge-to-main == ships</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Simpler branch protection, no HubFlow overhead</li>
+            <li><span class="marker marker-pro">+</span>Matches the fact that there is exactly one VPN gateway — no natural staging instance to validate against, same situation pgbouncer's per-environment poolers face (each environment's pooler still ships main-only)</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>No pre-production validation step for a new Pritunl base-image version before it reaches the one gateway every engineer depends on</li>
+          </ul>
+        </div>
+        <div class="cite">~/.claude/docs/DOCKER-IMAGE-TOOL-REPOSITORIES.md:17 — "main-only ... For a simple, stable tool with no staging instance. Reference: pgbouncer"</div>
+        <div class="effort"><span>Setup cost: <strong>Low</strong></span><span>Pre-prod validation: <strong>None</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. HubFlow (keycloak reference) — NOT chosen</h3>
+        <p class="option-tagline"><code>develop</code> builds staging, <code>master</code> builds production</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>A base-image bump (new Pritunl/Mongo/WireGuard version) gets validated on a non-production instance first, mirroring how keycloak validates on <code>auth-001-staging</code></li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Requires standing up and maintaining a second Pritunl instance (staging VPN gateway) purely for image validation — infrastructure and cost 4Shark does not run today</li>
+            <li><span class="marker marker-con">&minus;</span>A staging VPN gateway has its own EIP/DNS/client-config question, layering more scope onto this migration</li>
+          </ul>
+        </div>
+        <div class="cite">~/.claude/docs/DOCKER-IMAGE-TOOL-REPOSITORIES.md:18 — "HubFlow ... for an actively-versioned tool that validates each new image on a non-production instance before production. Reference: keycloak"; keycloak/.github/workflows/deploy.yaml:9-14 — auth-001-staging shares the production cluster but is a distinct service/task-family</div>
+        <div class="effort"><span>Setup cost: <strong>Higher</strong> (needs a staging VPN)</span><span>Pre-prod validation: <strong>Yes</strong></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="decision" id="ansible-fate">
+    <h2>6. Ansible role fate</h2>
+    <p class="decision-note">Every current Ansible responsibility needs an explicit new home — this is where behavior silently disappears if not tracked one item at a time. The exhaustive, per-task mapping (superseding the two-option table below) is in PLAN-SPIKE.md.</p>
+    <table style="width:100%;border-collapse:collapse;margin-top:1rem;font-size:.88rem">
+      <thead>
+        <tr style="background:var(--surface-alt)">
+          <th style="text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--border)">Current Ansible responsibility</th>
+          <th style="text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--border)">Option A: retire entirely (bake into image/entrypoint)</th>
+          <th style="text-align:left;padding:.5rem .75rem;border-bottom:1px solid var(--border)">Option B: keep for host-level prep only</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">MongoDB install/config (tasks/main.yml:32-79)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Moves into the Mongo container/sidecar image or the separate Mongo VM's own provisioning — not this repo's Dockerfile</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Unchanged if MongoDB stays on a VM (sub-decision 3, Option C)</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Pritunl + WireGuard apt install (tasks/main.yml:83-113)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Fully replaced by the container image (sub-decision 1)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">N/A — the image always replaces the apt install regardless of A/B here</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">WireGuard kernel modules + <code>/dev/net/tun</code> readiness on the host</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Must still happen somewhere — a container cannot load host kernel modules for itself</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Natural fit — a slim host-prep role (or the ECS-optimized AMI's own bootstrap) loads modules before the ECS agent starts tasks</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">dnsmasq DNS forwarding for <code>*.4shark.internal</code> (tasks/main.yml:138-187, templates/dnsmasq-vpn.conf.j2)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Would need to run as a sidecar container sharing the Pritunl container's network namespace (bound to the VPN virtual interface) — new container definition work</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Could stay a host-level systemd service if host networking is used, same binding requirement as today (starts after Pritunl creates the tun/wg interface)</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">fail2ban per-IP protection (tasks/main.yml:203-237, filter+jail templates)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">fail2ban bans via host iptables — cannot run meaningfully as an unprivileged sidecar; would need host-level iptables access regardless</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Natural fit — stays a host-level service reading the Pritunl journal log (needs a volume mount from the container's log path) and manipulating host iptables</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">logrotate for pritunl/mongod/dnsmasq logs</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">ECS/CloudWatch Logs driver (<code>awslogs</code>) replaces file-based logrotate for the containerized services, matching the pgbouncer/connection-pooler pattern</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Only relevant for whatever stays host-level (fail2ban's own log, dnsmasq if kept host-level)</td></tr>
+        <tr><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)"><code>pritunl set-mongodb</code> / rate-limit / auditing config (tasks/main.yml:191-201)</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Becomes container entrypoint logic (mirrors pgbouncer's <code>configured-entrypoint.sh</code> materializing config at container start) or env-var-driven if the chosen image supports it</td><td style="padding:.5rem .75rem;border-bottom:1px solid var(--border)">Same — this is entrypoint work either way, independent of A/B here</td></tr>
+      </tbody>
+    </table>
+    <div class="flag-box"><strong>Net effect (as decided):</strong> the engineer's decision resolves this to a spectrum, not a binary A/B — WireGuard kernel modules, <code>/dev/net/tun</code>, and base OS hardening move to the host (EC2 launch template / AMI / user-data); Pritunl, dnsmasq, and fail2ban all move into the image/entrypoint (all three benefit from the same <code>privileged: true</code> + host-networking grant sub-decision 2 already makes, so dnsmasq can still bind the VPN virtual interface and fail2ban can still manipulate the host's real iptables from inside the container). See PLAN-SPIKE.md § "Ansible-task → new-home mapping" for the full per-task table and the reasoning.</div>
+  </section>
+
+  <section class="decision" id="cutover">
+    <h2>7. Cutover</h2>
+    <p class="decision-note">Per DEPLOYMENT-STRATEGY.md's decision framework: phase only if the in-flight contract breaks backward-incompatibly. A VPN gateway has no <code>Computation</code>-tracked background jobs, but it does have long-lived client connections and irreplaceable state (org/users/profiles) — the framework's other triggers (irreversible data-shape change, cross-service contract) are what apply here, not the Sidekiq-specific ones.</p>
+    <div class="grid">
+      <div class="option-card">
+        <h3 class="option-title">A. Maintenance window — drain, migrate, cut over — CHOSEN (with a pre-flip parallel validation step)</h3>
+        <p class="option-tagline">Dump/restore Mongo state, stop the old instance, start the new one, reassociate the EIP, during a scheduled low-traffic window</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Simplest to reason about — one clean state transfer, no dual-write complexity for VPN org/user data</li>
+            <li><span class="marker marker-pro">+</span>Matches DEPLOYMENT-STRATEGY.md's "drained maintenance window" single-deploy condition</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Every connected engineer is disconnected during the window and must reconnect</li>
+            <li><span class="marker marker-con">&minus;</span>Requires coordinating a window across the team (VPN is how engineers reach private infra, including for their own work)</li>
+          </ul>
+        </div>
+        <div class="cite">~/.claude/docs/DEPLOYMENT-STRATEGY.md — "a maintenance window (weekend / dawn) with the queue drained" — the maintenance-window condition generalizes to VPN sessions drained rather than Sidekiq queue drained</div>
+        <div class="effort"><span>Downtime: <strong>Short, scheduled</strong></span><span>Rollback: <strong>Keep old VM stopped, not destroyed, until validated</strong></span></div>
+      </div>
+
+      <div class="option-card">
+        <h3 class="option-title">B. Parallel run — new gateway on a new IP, migrate clients gradually, then retire the old one — NOT chosen</h3>
+        <p class="option-tagline">Stand up the ECS-based Pritunl alongside the existing VM, reissue client profiles progressively</p>
+        <div class="pros-cons">
+          <h4>Pros</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>No hard cutover moment — engineers migrate on their own schedule</li>
+            <li><span class="marker marker-pro">+</span>New instance fully validated with real traffic before the old one is retired</li>
+          </ul>
+          <h4>Cons</h4>
+          <ul>
+            <li><span class="marker marker-con">&minus;</span>Org/user state exists in two places during the transition — new users created against which instance? Needs an explicit single-source-of-truth rule for the parallel period</li>
+            <li><span class="marker marker-con">&minus;</span>If the fixed-EIP constraint (sub-decision 4) holds, a parallel run needs a second, temporary public IP — every client gets a temporary profile, then a second reconfiguration back to the final IP if the EIP is reused at the end</li>
+            <li><span class="marker marker-con">&minus;</span>Longest wall-clock exposure — two gateways to secure and patch simultaneously</li>
+          </ul>
+        </div>
+        <div class="cite">terraform/modules/pritunl/README.md:111 — "OpenVPN routes ... and client profiles are configured inside Pritunl directly" confirms state lives only in Pritunl's own Mongo, so a parallel run genuinely forks that state unless one instance is designated authoritative</div>
+        <div class="effort"><span>Downtime: <strong>None</strong></span><span>Rollback: <strong>Trivial (old VM still live)</strong></span></div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
