@@ -53,14 +53,26 @@ Research backing this plan (do not re-run — decisions below are already settle
    `terraform/modules/atento_001_task_config/main.tf:53`) is ~5 months longer than that documented
    window — so the reduction ALIGNS the system with its own policy rather than introducing a new one.
 7. **No global fallback — the country is mandatory by design.** An account with
-   `retention_jurisdiction_country_id` still NULL (only possible during the Phase 1→2 window) is
-   simply NOT eligible for anonymization — it is excluded from selection until backfill sets its
-   country. There is NO 2008 default branch anywhere. Phase 3 enforces presence so NULL cannot persist.
-8. **Phasing**: expand → backfill → contract (Parallel Change). The column starts nullable, is
-   backfilled, then made mandatory in a second release. Each release is a normal single deploy —
+   `retention_jurisdiction_country_id` still NULL (only possible during the transition before Phase 5)
+   is simply NOT eligible for anonymization — it is excluded from selection until backfill sets its
+   country. There is NO 2008 default branch anywhere. Phase 5 enforces presence so NULL cannot persist.
+8. **Phasing**: expand → write-path → backfill → contract (Parallel Change). The column starts
+   nullable; the write-path (creation/edit accepts and persists the country) ships and deploys
+   BEFORE the backfill, so new accounts are born with a country while the existing ones are
+   backfilled — closing the gap instead of leaving a window where fresh accounts are created NULL.
+   The column is then made mandatory in a final release. Each release is a normal single deploy —
    this change only alters the cron selection query, not any in-flight job contract, so no phased
    Sidekiq or maintenance window is needed (per DEPLOYMENT-STRATEGY: interruption alone doesn't
    justify phasing; the `Computation` counters already make an interrupted anonymization safe).
+9. **Write-path ships before the backfill (engineer-corrected ordering).** Account creation and
+   edit must accept and persist `retention_jurisdiction_country_id` — and be deployed to
+   production — before the backfill runs. Otherwise any account created between the backfill and
+   the final deploy is born NULL, re-opening the gap the backfill just closed. The field is a
+   **user-chosen country selector** — the jurisdiction is a deliberate choice and may diverge from
+   the account's locale/territory, so it is picked explicitly, not derived — with a **tooltip**
+   explaining what the field means and asking the user to set it carefully. Backend:
+   `CreateCompanyGraphqlMutation` / `UpdateCompanyGraphqlMutation` (`app`). Front: `app-webclient`
+   company create + update forms.
 
 ## The four selection sites that change
 
@@ -101,53 +113,104 @@ Fan-out entry point (unchanged, for reference): `Company::Anonymizer#perform`
   could exist before its window is set), but every existing country is populated by the data
   migration in Phase 1. Resolution never hits a NULL because selection excludes companies whose
   country is unset, and every seeded country has a value.
-- **NO global default.** The country is mandatory by design (Phase 3). There is no
+- **NO global default.** The country is mandatory by design (Phase 5). There is no
   `USER_ANONYMIZING_WINDOW` fallback branch in the resolution. The ENV constant's only remaining
-  role is historical until Phase 3 lands; the new code does not read it.
+  role is historical until Phase 5 lands; the new code does not read it.
 
 ## Execution phases
 
-### Phase 1 — Expand (Release 1: schema + per-country values ONLY) — DONE, PR #5217
+### Phase 1 — Expand (schema + per-country values ONLY) — DONE, merged into develop (#5217)
 
 **Structure only — NO producer change, NO behavior change.** The four producers keep using the
-global `ApplicationConfiguration.user_anonymizing_window` until Phase 3. This is the load-bearing
+global `ApplicationConfiguration.user_anonymizing_window` until Phase 5. This is the load-bearing
 decision (engineer): because the producers do not resolve per country until the column is mandatory,
-Phase 3 needs NO defensive nil handling — there is never a nil to guard against when the producers run.
+Phase 5 needs NO defensive nil handling — there is never a nil to guard against when the producers run.
 
-1. Migration: add `countries.anonymizing_window_days` (integer, nullable) — generated, then `db:migrate`.
-2. Migration: add `companies.retention_jurisdiction_country_id` (bigint, nullable) — one action.
-3. Migration: **simple** index on `retention_jurisdiction_country_id` (concurrently +
-   `disable_ddl_transaction!`), matching the codebase's bare-FK index convention (NOT composite —
-   engineer's choice).
+1. Migration: add `countries.anonymizing_window_days` (integer, nullable).
+2. Migration: add `companies.retention_jurisdiction_country_id` (bigint, nullable).
+3. Migration: **simple** index on `retention_jurisdiction_country_id` (concurrently + `disable_ddl_transaction!`).
 4. Migration: add the FK `validate: false`, then a separate `validate_foreign_key` migration.
 5. Data migrations: **one migration per country** (`AddAnonymizingWindowDaysTo<Country>`), each
    `country = Country.find_by(acronym: '..'); return if country.nil?; country.update(...)` —
-   matching the sibling per-country `AddFlagTo<Country>` migrations. **Brazil (1855, 5y+1m), Mexico
-   (3680, 10y+1m), and Colombia (3680, 10y+1m) are seeded** — the figures the engineer settled on.
-   Every other country stays NULL until the client/legal team confirms its window (the
-   internet-sourced figures were NOT trusted for PII retention). Each confirmed value later lands
-   as its own `AddAnonymizingWindowDaysTo<Country>` migration.
+   matching the sibling `AddFlagTo<Country>` migrations. **Brazil (1855, 5y+1m), Mexico (3680,
+   10y+1m), and Colombia (3680, 10y+1m) are seeded**; every other country (AR/CL/GT/PA/PE) stays
+   NULL until the client/legal team confirms its window (the internet-sourced figures were NOT
+   trusted for PII retention). Each confirmed value later lands as its own migration.
 6. `Company belongs_to :retention_jurisdiction_country ... optional: true` (presence deferred to
-   Phase 3); `Country has_many :retention_jurisdiction_companies ... dependent: :nullify`.
-7. Tests: the two associations (shoulda-matchers), matching sibling model specs.
-8. Changelog entry under `## [Unreleased]` (`### Added` — structure, not behavior).
+   Phase 5); `Country has_many :retention_jurisdiction_companies ... dependent: :nullify`.
+7. Association specs; changelog `### Added — Per-country retention window`.
 
-**Completion criteria**: migrations applied, `schema.rb` updated, seed values verified, association
-specs green, `/test` clean. **(met)**
+**Completion criteria**: merged into develop via #5217, `/test` clean, seed values verified. **(met)**
 
-### Phase 2 — Backfill (operational, between releases)
+### Phase 2 — Release + Deploy to production (BEFORE the backfill)
 
-Assign `retention_jurisdiction_country_id` on every existing company. Data operation governed by
-SCRIPT-DISCIPLINE (distrust the input, three-script per bucket, variables-not-constants, consolidated
-report). The source of each company's governing country is operational input (which country each
-account belongs to) — NOT auto-inferable from `business_territories` (multi-valued) or `branch` (a
-different meaning). **Confirm the assignment source with the engineer before running.**
+The Phase 1 columns and per-country values live on `develop` but **not in production yet**. The
+backfill (Phase 4) mutates production accounts, so the schema and the seeded values must be live in
+production first. This phase cuts a release off `develop` and deploys it.
 
-**Completion criteria**: zero companies with `retention_jurisdiction_country_id: nil`.
+1. Cut the release with **HubFlow** from `develop` — NEVER `git checkout -b release/*`:
+   `git hf release start X.Y.Z`. Minor bump (last release is 3.50.0 → 3.51.0), version decided by the
+   engineer at cut time — not fixed here, and tagging is engineer-authorized only.
+2. On the release branch: version bump + CHANGELOG (the `## [Unreleased]` entries, including
+   `### Added — Per-country retention window`, roll into `## [X.Y.Z] - DATE`). Commit, push, PR against `master`.
+3. Finish via **HubFlow** (`git hf release finish X.Y.Z`) — tags `master`, back-merges into `develop`.
+   Run from the **main working tree, never a worktree** (§ HubFlow Policy).
+4. **Single normal deploy — NOT phased.** This change is structure only (nullable columns, concurrent
+   index, `validate: false` FK, per-country value updates); none of it breaks an in-flight job
+   contract, so a phased deploy is unnecessary (§ Deployment Strategy). The ephemeral migration task
+   runs the migrations before the new code goes live.
+5. Productive app stacks: **`shared-001` and `atento-001`**. **Check the Sidekiq queue depth before
+   deploying each** (app/CLAUDE.md — hold if the queue is heavy). Trigger per DEPLOY-REFERENCE.md.
+6. Verify in production (read-only): the two columns exist and BR/MX/CO carry their window values
+   (AR/CL/GT/PA/PE NULL, by design).
 
-### Phase 3 — Contract (Release 2: mandatory column + activate per-country resolution)
+**Completion criteria**: release tagged, both productive stacks on the new version, columns + seeded
+values confirmed in production.
 
-By now every account has a country (Phase 2), so the producers resolve per account with NO nil handling.
+### Phase 3 — Write-path (creation/edit accept the country) + Release + Deploy
+
+New accounts must be born with a country before the backfill runs (decision 9). This phase makes
+account creation and edit accept `retention_jurisdiction_country_id`, ships it, and deploys it —
+two PRs across two repos, deployed before Phase 4.
+
+**Backend (`app`)** — Pattern Priming against sibling mutations before writing:
+1. `CreateCompanyGraphqlMutation`: add the `retention_jurisdiction_country_id` argument and permit it.
+2. `UpdateCompanyGraphqlMutation`: same.
+3. Expose the field on `CompanyGraphqlType` so the edit form can read the current value.
+4. Tests for the two mutations accepting/persisting the field; changelog `### Added`.
+
+**Front (`app-webclient`)** — Pattern Priming against the existing company form fields before writing:
+1. Company create form: a country selector bound to `retention_jurisdiction_country_id`, sourced
+   from the countries list, with a **tooltip** explaining the field and asking for care in setting it.
+2. Company update form: the same selector, pre-filled with the current value.
+3. `company.model.ts` + the create/update services carry the field into the mutation payload.
+
+**Release + deploy** — HubFlow release each repo per its deploy path (`app` via GitHub Actions,
+`app-webclient` via Netlify — DEPLOY-REFERENCE.md); check the Sidekiq queue before the `app` deploy
+to the productive stacks (`shared-001`, `atento-001`). The field is **not yet mandatory** —
+creation still succeeds without it (Phase 5 enforces presence), so this deploy is backward-compatible.
+
+**Completion criteria**: both repos released and deployed; a new account can be created/edited with a
+chosen country in production.
+
+### Phase 4 — Backfill (operational, in production)
+
+Assign `retention_jurisdiction_country_id` on every existing company. Runs AFTER Phase 3, so the
+write-path is already live and no new account is born NULL during the backfill window. Data operation
+governed by SCRIPT-DISCIPLINE (distrust the input, three-script per bucket, variables-not-constants,
+consolidated report). The source of each company's governing country is operational input — NOT
+auto-inferable from `business_territories` (multi-valued) or `branch` (a different meaning).
+**Confirm the assignment source with the engineer before running.** Only countries with a seeded
+window (BR/MX/CO) can bind accounts that Phase 5 will anonymize; accounts of not-yet-priced countries
+stay unbound or are handled per the engineer's call.
+
+**Completion criteria**: zero companies with `retention_jurisdiction_country_id: nil` (or the agreed
+subset bound).
+
+### Phase 5 — Contract (Release + Deploy: mandatory column + activate per-country resolution)
+
+By now every bound account has a country (Phase 4) and new accounts are born with one (Phase 3), so
+the producers resolve per account with NO nil handling.
 
 1. Migration: `retention_jurisdiction_country_id` NOT NULL on `companies`.
 2. `validates :retention_jurisdiction_country_id, presence: true` on `Company`.
@@ -159,29 +222,34 @@ By now every account has a country (Phase 2), so the producers resolve per accou
    filter — the column is mandatory now.
 5. Fix `app/docs/architecture/API_PATTERNS.md` § "Anonymization and the 5-year rule": remove the
    stale "2590 days / ~7 years" claim (production is 2008) and generalize to the per-account, per-country window.
-6. Tests: `Company#anonymizing_window` + the producer selection behavior.
-7. Changelog entry (`### Changed` — behavior now per-country; **Brazil moves 2008 → 1855**).
+6. Tests: `Company#anonymizing_window` + the producer selection behavior. Changelog `### Changed` —
+   behavior now per-country; **Brazil moves 2008 → 1855** (irreversible; takes effect on this deploy).
+7. **Release + deploy this phase too** (same HubFlow + deploy flow as Phase 2) — this is where the
+   per-country behavior actually goes live and the first cron run anonymizes on the new windows.
 
-**Completion criteria**: column NOT NULL, presence validated, producers resolve per account, tests green, `/test` clean.
+**Completion criteria**: column NOT NULL, presence validated, producers resolve per account, released and deployed.
 
 ## Risks
 
 - **Brazil reduction is irreversible** (2008 → 1855). Anonymization cannot be undone (LGPD art. 12).
   Accepted by the engineer (all-at-once, aligning the system with the already-documented window).
-  This takes effect in **Phase 3**, when the producers start resolving per country — the first
+  This takes effect in **Phase 5**, when the producers start resolving per country — the first
   `anonymization:company` run after that release anonymizes Brazilian accounts in the newly-exposed
-  1855–2008-day band. Phase 1 (structure only) has no such effect.
+  1855–2008-day band. Phases 1–4 (structure, deploy, write-path, backfill) have no such effect.
 - **Colombia/Panama legal basis is the weakest** (SPIKE-v2 Finding 7). Colombia 20y is the largest
   *mandatory* figure but covers a subset (SG-SST); Panama 9y is a composite. If legal review later
   revises these, it is a one-row data change in `countries` (the whole point of Option B).
-- **Backfill correctness** (Phase 2): a wrong country on an account applies the wrong retention and
+- **Backfill correctness** (Phase 4): a wrong country on an account applies the wrong retention and
   can anonymize early. The three-script pre-flight/verify pattern (SCRIPT-DISCIPLINE) guards this.
-- **Index absence** on `disabled_at` today means the current query is already unindexed; Phase 1
-  adds the composite, improving rather than regressing it.
+- **Index absence** on `disabled_at` remains — Phase 1 added a **simple** index on the FK
+  (`retention_jurisdiction_country_id`), not on `disabled_at`. The per-account selection in Phase 5
+  navigates by id (join decomposition), so `disabled_at` is not on a scanned hot path.
 
 ## Out of scope
 
 - Per-user retention (explicitly excluded by the engineer).
-- Auto-inference of an account's governing country (operational decision, Phase 2).
-- A UI/admin surface to edit `retention_jurisdiction_country_id` (not requested; note as a possible
-  follow-up if account creation/editing needs it).
+- Auto-inference of an account's governing country (operational decision, Phase 4).
+
+(The UI/admin surface to set `retention_jurisdiction_country_id` on account creation/edit, previously
+noted here as a possible follow-up, is now IN scope as Phase 3 — the write-path that must ship before
+the backfill.)

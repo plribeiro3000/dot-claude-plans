@@ -261,18 +261,36 @@ OR where there was no genuine prior approval:
   box swung 52→53→40→52 across the four runs). He is the reviewer most invested in this box and never approved
   a final list → full re-review of the V4 list. (Evidence: `~/offboarding-aster*/sergio@4shark.com.br/plan.json`.)
 - **camila, emerson, ione, santiago** — list identical AND run-1 genuinely approved → **prior OK carries forward, no re-send**.
-- **meajuda** (no-owner intake box) — **always full-delete, no per-item review**: everything in this box was
-  mirrored to **Zendesk**, where the actual involved parties already received it and decide there (runbook
-  §8). So the V4 "revisar" flip on the 1 item ("PSC", Áster's `Transacoes_Faturamento_pecas.xlsx`) is
-  **overridden → delete** — meajuda stays **30/0 full delete**. (DPO-confirmed 2026-06-12.)
+- **meajuda** (no-owner intake box) — **STANDING RULE: delete everything, no review, ever. Nothing to resolve
+  here.** `meajuda` is not a person's mailbox — it is the intake address whose sole purpose is to receive tickets,
+  and every message in it is mirrored to **Zendesk**, where the actual involved parties already received it and
+  decide there (runbook §8). There is therefore no owner to consult and no per-item judgement to make: the whole
+  box is deleted wholesale. Any classifier "revisar"/keep flip on a meajuda item (e.g. the V4 flip on "PSC",
+  Áster's `Transacoes_Faturamento_pecas.xlsx`) is **overridden → delete** by this rule — meajuda is **full delete
+  (30/0)**. This is a property of the box, not a per-run decision; it does not depend on any reply. (DPO-confirmed
+  2026-06-12.) **TODO: this rule belongs in runbook §8 as an explicit named exception, not just a plan note —
+  it keeps resurfacing as a false pendency.**
 
 **V2 review sent — DONE (2026-07-10).** The 4 v2 reviews were sent to **danilo, patrick, paulo, sergio** (in-thread
 replies on the original "Encerramento Aster (LGPD)" e-mails, each with its box's `review-v2.html` attached — the
 run-4/rule-B list). Camila / emerson / ione / santiago carried forward their run-1 OK (lists identical AND genuinely
-approved) → no re-send. **Now waiting on the 4 OKs — this is the current blocker; nothing downstream runs until they reply.**
+approved) → no re-send.
+
+**V2 replies — status (2026-07-10):**
+- ✅ **Danilo** — replied 12:59, "OK". Approved.
+- ✅ **Patrick** — replied 12:44, "meu tem 0 para revisar, pode prosseguir apagando". Approved (his box has no "revisar" items).
+- ✅ **Paulo (own box)** — replied 14:52, "nenhum dos dois e-mails devem ser apagados" (the 2 "revisar" items: "Fluxo de como criar planos e calendário" and "[4shark] Desenvolvimento de Controle de Dados na Base Normatizada"). Confirms **keep** on both — identical to what rule B already classified (keep=2), so the delete set is unchanged: box resolves at **64 delete / 2 keep**.
+- ⏳ **Sérgio — awaiting his final OK (the ONLY open item in the whole workstream). Took three back-and-forth rounds on 2026-07-10 because he never gives a clear per-item verdict — he answers with a hedged opinion + a counter-question instead.** The exchange:
+  1. 12:40 — v2 sent.
+  2. 13:16 (Sérgio) — only *describes* the "revisar" items ("são todos emails de faturamento com a nota em anexo, com exceção de 1 email '[4shark] Desenvolvimento de Controle de Dados na Base Normatizada' que acredito ser de integração"). No decision.
+  3. 14:57 (Paulo) — tries to pin it: "Então não apago nenhum dos itens que foram como revisar, correto?"
+  4. 14:59 (Sérgio) — still no decision: "creio que seria melhor manter esse emails de envio da nota/faturamento. **O que vc acha? o que o LGPD diz sobre esse item?**" — bounces the decision back and asks for guidance.
+  5. 15:05 (Paulo) — reframes to a yes/no: we only delete emails/attachments carrying **personal** sensitive data; the AI marks them and escalates doubts to the box owner; **the final OK is yours**; keep the "revisar" ones if you want; I need only your OK + direction on deleting the AI-marked ones. **← awaiting his reply.**
+
+  **This is his standing pattern (imprecise, defers the call) — not a substantive disagreement.** Everything he gestures at keeping already agrees with rule B: his box's billing/NFSe e-mails → keep (fiscal), the POC `SCRIPTS ASTER.zip` → keep (4Shark's own). The only thing missing is his explicit final OK, not any classification change.
 
 Remaining (PR #15 merged; the email `delete` has NOT run):
-1. **Collect the 4 OKs** (danilo, patrick, paulo, sergio) + resolve meajuda's 1 item (DPO). ← **BLOCKED, awaiting replies.**
+1. **Sérgio's final OK — the sole open item.** Three rounds on 2026-07-10; Paulo's 15:05 message reduced it to a yes/no, awaiting his reply. Danilo + Patrick + Paulo already OK; **meajuda has NOTHING to resolve** (no-owner intake box → full delete, see below). Once Sérgio replies, all owner confirmations are closed and the `delete` can run. ← **current blocker.**
 2. **Grant DWD just-in-time**, then **delete** per account after each owner confirms (+ `elisio` + `meajuda`
    directly, no-owner exception). Pilot on a seeded test mailbox before any real delete.
 3. **Recordkeeping** — manifests → `s3://4shark-backups/email-erasure/aster/<date>/` + one row in the

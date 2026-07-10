@@ -1,6 +1,6 @@
 # PLAN — Legal & Compliance Documents Overhaul
 
-**Last updated:** 2026-06-24
+**Last updated:** 2026-07-10
 **Owner:** Paulo Ribeiro (plribeiro3000) — DPO/encarregado
 **Status:** In progress (multi-workstream)
 **Working language note:** this PLAN is in English (internal engineering doc per Language Policy); Portuguese proper nouns, legal terms (LGPD, operador/controlador, "Termo de Ciência"), filenames and S3 keys are preserved literally. The documents themselves are Portuguese (client/employee-facing).
@@ -150,6 +150,7 @@ The spike (`~/.claude/plans/active/spike/lgpd-policy-gap-analysis/SPIKE.md`) map
 - [x] **RoPA / Registro de Operações de Tratamento** (Tier A — art. 37) — DONE: `records/registro-de-operacoes-de-tratamento-ropa.md` (WS6).
 - [x] **Transferência internacional de dados** (Finding 7 — Res. CD/ANPD 19/2024, grace period ended Aug 2025) — DONE as documentation, not a standalone policy: covered by the RoPA international-transfer section + the DPA international-transfer clause (AWS us-east-1, SCCs when applicable). Standalone "Política de Transferência Internacional" optional — create only if a client/audit demands it.
 - [x] **Política de Cookies** (Finding 3 — ANPD Cookie Guide 2022) — addressed inside the public privacy policy v2 (essential cookies disclosed; disabling blocks access). No standalone needed unless non-essential cookies are added.
+- [x] **Plano de Continuidade de Negócios (BCP) / DRP** (Finding 6 — LGPD availability + Barigui R93) — **DONE (2026-07-10, compliance PR #9, merged).** Created as a dedicated internal policy `internal/plano-de-continuidade-de-negocios-e-recuperacao-de-desastres.md` (Termo de Ciência format, registered in the applicability matrix as row #16, signed by Desenvolvimento / reference for Operações — same as the Backup policy). States the committed recovery parameters (RPO ≤ 1h, RTO 4h — the same targets given to Barigui, no measured-margin detail exposed), the two recovery scenarios (region-healthy corruption vs. full region loss), the geographic-separation (cross-region backup) resilience, and the recovery-test cadence (periodic automated validation + annual game-day with documented results). Unblocked by the cross-region backup (ANALYSIS T5) + the measured restore tests (ANALYSIS P7, 3 drills 2026-07-10). The operational restore procedure + measured drill numbers live separately in the dot-claude runbook `disaster-recovery/BACKUP-RESTORE-TESTING.md` (internal — deliberately kept out of the client-facing policy). Closes Barigui R92 + R93 (both NÃO → can flip to SIM). Supersedes the "Defer" note previously in the best-practice bucket.
 
 **Pending — decide/finish next session:**
 - [ ] **Canal de atendimento ao titular — public DSR visibility** (Finding 2, Priority 2 — arts. 18, 41; ANPD active enforcement). Internal runbook exists (WS8) and the public policy v2 already carries the contact `privacidade-dados@4shark.com.br` (D17). Remaining: confirm the public policy text explicitly tells titulares HOW to exercise their rights (visible channel, not just an email). Likely a one-paragraph confirmation/addition to the public policy — NOT a new document.
@@ -159,7 +160,6 @@ The spike (`~/.claude/plans/active/spike/lgpd-policy-gap-analysis/SPIKE.md`) map
 **Deferred — best-practice, not an LGPD mandate (create only when a client/audit/enterprise-sales cycle asks):**
 - [ ] **Política de Gestão de Fornecedores / Suboperadores** (Finding 4) — substance already covered minimally by the DPA suboperator-authorization clause + the RoPA suboperator list (AWS / Google Workspace / 1Password / Zendesk). A standalone policy adds maturity for enterprise procurement.
 - [ ] **Política de Classificação da Informação** (Finding 5) — ISO 27001-grade; defer until the team grows or ISO 27001 / SOC 2 is pursued.
-- [ ] **Plano de Continuidade de Negócios (BCP) / DRP** (Finding 6) — Backup policy covers the recovery dimension; a formal BCP is for enterprise due-diligence. Defer.
 - [ ] **RIPD / DPIA** (Finding 8) — NOT triggered today (4Shark is operadora; no sensitive data; standard employee data is low-risk). The obligation is the controladora-client's. Monitor if processing scope expands.
 
 ---
@@ -198,5 +198,5 @@ The core of the plan is DONE and validated against the repo (2026-06-28): the pu
 
 - **Terms of Use `.md`** — DONE (PR #8, 2026-06-28); the source had no other-company residue, so a faithful transcription sufficed (corrected version kept per engineer). Every document the plan named is now in the repo. Remaining on the terms: decide the two flagged editorial items + whether to re-render/republish the public PDF from this source.
 - **Signing mechanics (WS5 tail)** — the document-generation runbook (fill date + entity/CNPJ per `entidades-do-grupo.md`, render via pandoc+WeasyPrint, sign via DocuSign per D12) and Camada 2 (the placeholders themselves are filled at signing time, by design — not a content gap).
-- **WS9 optional enhancement** — the public policy already exposes the DSR channel (§Correção e Exclusão + §Entre em Contato via `privacidade-dados@`); optionally enumerate the full art. 18 rights list. Not a gap. The deferred best-practice docs (supplier mgmt, classification, BCP, RIPD) and multi-country (WS7) stay parked until a client/audit asks.
+- **WS9 optional enhancement** — the public policy already exposes the DSR channel (§Correção e Exclusão + §Entre em Contato via `privacidade-dados@`); optionally enumerate the full art. 18 rights list. Not a gap. The BCP/DRP was delivered (compliance PR #9, 2026-07-10 — WS9 Finding 6, closes Barigui R92/R93). The remaining deferred best-practice docs (supplier mgmt, classification, RIPD) and multi-country (WS7) stay parked until a client/audit asks.
 - **WS4 tail (optional, no-op now)** — PDF-build CI to S3 on tag; drop the now-no-op `auto_init` from the identity `github_repository` resource. (The `~/Downloads` working-folder cleanup is DONE — engineer removed both folders 2026-06-28.)
