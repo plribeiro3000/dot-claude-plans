@@ -427,11 +427,30 @@ Phase 2 is decomposed into **5 PRs (Option A)** — see `phase-2-terraform/TASKS
 - **SPIKE-4** (staging Mongo) → separate database on the production Mongo VM — *pending the SPIKE-2 outcome, which may change the Mongo host model.*
 - **SPIKE-5** (staging public entry) → **finding**: staging **cannot reuse production's EIP while production is running** (an EIP associates to exactly one ENI at a time; prod is always-on). Staging needs its own entry (default public IP on stop/start, or private-only validation) — final choice deferred.
 - **SPIKE-3** (Mongo SG scoping) → **there is a documented 4Shark security best-practice** for SG-to-SG vs CIDR; apply the documented rule (doc lookup pending — candidate docs identified).
-- **SPIKE-2** (Mongo VM provisioning) → **spike done** (`~/.claude/plans/active/spike/mongodb-base-image/SPIKE.md`). Finding reframes the premise: the shared base the engineer wanted **already exists** — the 15 self-managed integrator Mongo VMs already share ONE AMI (`ami-0bd91caaa9bc42cf3`) + ONE Ansible role (`4shark.mongodb8`, MongoDB 8.2); `app-*` Mongo is Atlas (managed, no VM). The only real drift is Pritunl itself: `4shark.pritunl` duplicates Mongo install logic, pinned at 8.0 without the hardening `4shark.mongodb8` has. **Direction (pending engineer confirmation): PR 2.3's Mongo VM reuses the existing `4shark.mongodb8` role + the shared Mongo AMI** rather than a new role, a new Docker image, or a new AMI pipeline — kills the duplication and the 8.0/8.2 drift. No shared-base-image initiative needed.
+- **SPIKE-2** (Mongo VM provisioning) → **spike done** (`~/.claude/plans/active/spike/mongodb-base-image/SPIKE.md`). Finding reframes the premise: the shared base the engineer wanted **already exists** — the 15 self-managed integrator Mongo VMs already share ONE AMI (`ami-0bd91caaa9bc42cf3`) + ONE Ansible role (`4shark.mongodb8`, MongoDB 8.2); `app-*` Mongo is Atlas (managed, no VM). The only real drift is Pritunl itself: `4shark.pritunl` duplicates Mongo install logic, pinned at 8.0 without the hardening `4shark.mongodb8` has. **RESOLVED (2026-07-10): a dedicated golden-AMI pipeline was built and merged** — see the "Golden-AMI pipeline built" subsection below. PR 2.3's Mongo VM launches from the new golden AMI (MongoDB 8.2) via a `data "aws_ami"` tag lookup, so no per-VM Ansible role runs at all (the 2A/2B question is moot) and the 8.0→8.2 drift is closed at the AMI. This supersedes the earlier "reuse `4shark.mongodb8` + the shared AMI `ami-0bd91caaa9bc42cf3`" direction — the shared base is now a versioned Packer-built golden AMI, not the hand-baked `ami-0bd91caaa9bc42cf3`.
 - **SPIKE-6** (staging host stop/start lifecycle) and **SPIKE-7** (`ecs_service` extend vs bespoke task def) → still open.
 
 ### Next steps
 
-1. **Mongo base-image spike** (in progress) — resolves SPIKE-2 and fixes the shape of the Mongo-VM PR.
-2. **SPIKE-3 doc lookup** — apply the documented SG rule.
-3. **Phase-2 PRs 2.1 → 2.5** in fresh, focused sessions, each with Pattern Priming + PR-first + gated plan/apply.
+1. **SPIKE-3 doc lookup** — apply the documented SG rule (the remaining PR-2.3 blocker now that SPIKE-2 is resolved).
+2. **Parallelizable immediately** — PR 2.1 (ECR) and PR 2.2 (identity governance) have no spike blocker.
+3. **PR 2.3 (Mongo VM)** once SPIKE-3 resolves — launch the dedicated Mongo VM from the golden AMI via `data "aws_ami"` (by `Name`/`Version` tag) + the dedicated Mongo security group. No Ansible role runs on the VM (superseded by the golden AMI).
+4. **SPIKE-7 → PR 2.4 (prod ECS)**; **SPIKE-4/5/6 → PR 2.5 (staging ECS)**; **SPIKE-8 → Phase 3 validation** (independent, empirical SIGTERM/session-drain test).
+5. Each PR in a fresh, focused session with Pattern Priming + PR-first + gated plan/apply.
+
+### Golden-AMI pipeline built (2026-07-10) — resolves SPIKE-2
+
+A dedicated MongoDB golden-AMI pipeline was built, merged, and validated in production. This is the shared Mongo base the VPN's dedicated Mongo VM (PR 2.3) consumes — it replaces both the "reuse `ami-0bd91caaa9bc42cf3` + `4shark.mongodb8`" idea and any per-VM Ansible provisioning.
+
+**What was built (all merged):**
+- **`mongodb`** repo (main-only, Docker-image-tool-repository shape) — Packer HCL2 build (`packer/mongodb.pkr.hcl`) that bakes the role onto Ubuntu 24.04 and snapshots a versioned, tagged AMI. Builds on push-to-main or `workflow_dispatch`; prunes to the 3 most recent.
+- **`ansible-role-mongodb`** repo (main-only) — the MongoDB provisioning role (`4shark.mongodb`, MongoDB **8.2**, THP/numactl hardening, `mongod.conf` with an EMPTY `replSetName`), split out of the ansible monorepo so the build pins + auto-updates it. Pulled at build time via `ansible/requirements.yml` (currently pinned to `main`; a `v1.0.0` tag is deferred — not yet cut).
+- **`terraform/mongodb`** stack — the AMI-build IAM user (`mongodb-ami-build`, minimum Packer EC2 policy), its access key, a read-only deploy key on `ansible-role-mongodb`, and the `mongodb` GitHub Environment secrets. Applied.
+
+**Build facts for reference:** builds in **sa-east-1** in account `405749097490`, in the **management VPC public subnet** (`subnet-05ef68e0a36f73693`), on a `t3a.micro` (unlimited CPU credits), Ansible connecting directly with pipelining. ~10 min wall time (~7 min of which is the EBS snapshot). AMI tagged `Name=mongodb`, `Version=8.2-<UTC-timestamp>`, `MongoDBVersion=8.2`, plus `GitCommit`/`BuildDate`. First production AMI: `mongodb-8.2-20260710180906`.
+
+**How PR 2.3 consumes it:** the dedicated Mongo VM is a bare `aws_instance` whose `ami` comes from a `data "aws_ami"` lookup (`owners = ["self"]`, `most_recent = true`, filter `tag:Name = "mongodb"`) — never a hardcoded id. Single-node standalone `mongod` (the empty `replSetName` is already baked; Pritunl needs a plain standalone, no replica set — matches the golden-AMI plan's Phase 2 "greenfield, single-node, 20GB"). No Ansible runs on the VM. The 8.0→8.2 move is inherent (the AMI is 8.2).
+
+**Still open for the Mongo VM specifically:** the dedicated security group mechanism (**SPIKE-3**, SG-to-SG vs CIDR) is the remaining PR-2.3 blocker; and confirm at authoring time that the golden AMI's baked `mongod.conf` bind address / auth posture suits the Pritunl-container-over-VPC connection (the URI Pritunl sets points at the Mongo VM's private address — decision 3).
+
+**Cross-reference:** the golden-AMI plan of record is `~/Projects/4Shark/dot-claude-plans/active/mongodb-golden-ami/PLAN.md` (its Phase 2 IS this Pritunl Mongo VM adoption; its Phase 3 is the integrator fleet cutover, out of scope for the VPN migration).
