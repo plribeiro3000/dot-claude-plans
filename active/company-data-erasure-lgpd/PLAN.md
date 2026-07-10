@@ -202,8 +202,10 @@ skips the trash; search tab count lags the index).
 **OK status (2026-06-11)** — 7 review e-mails were sent on 2026-06-08 (camila, danilo, emerson, ione,
 patrick, paulo, sergio; **santiago was NOT sent** — the batch was 7, not 8):
 - ✅ Paulo, Camila, Patrick, Ione, Emerson — approved.
-- ✅ Sérgio — responded: his "Pendente" hits are billing/NFSe/financial (fiscal retention) → keep. This
-  review surfaced the classifier gap below.
+- ⚠️ Sérgio — did **NOT** approve run-1. His reply (that his "Pendente" hits are billing/NFSe/financial,
+  fiscal retention → keep) was the **correction that surfaced the classifier gap and triggered the whole
+  run-2/3/4 rework**. This is a **rejection, not an OK** — there is no prior approval to carry forward.
+  He must re-confirm the final rule-B list (see re-send scope).
 - ✅ **Santiago [ES]** — trained 1:1 in ES on 2026-06-11; `review-es.html` sent that day and **approved**.
 - ⏳ **Danilo — no reply yet: the ONLY outstanding OK in the e-mail flow.**
 
@@ -244,28 +246,39 @@ confirmed working. **DWD revoked after the run.**
 **Re-send scope — decided by diffing V4 against the run-1 owners already approved (NOT "all owners").** The
 owner review is an **internal risk control**, not an LGPD requirement; the legal duty is to execute the
 erasure and keep the record (accountability, art. 6º X). Owners approve **the message list in their box**,
-not the prompt — so the question is "did the list change?", not "did the rule change?". V4's list is
-**byte-identical to the approved run-1 for 5 of 8 owner boxes**. Re-confirm only where it materially changed:
-- **danilo** — never replied with an OK (the only outstanding one) → full review.
+not the prompt — so the question is "did the list change?", not "did the rule change?". V4's decision set is
+**byte-identical to run-1 for 5 of 8 owner boxes** (camila, emerson, ione, santiago, sergio) — but an identical
+list only carries a **prior OK** where run-1 was actually approved. Re-confirm where the list materially changed
+OR where there was no genuine prior approval:
+- **danilo** — never replied with an OK (the only originally-outstanding one) → full review.
 - **patrick** (42→43 delete) — a **new deletion** (revisar→apagar) he never approved → re-confirm.
 - **paulo** (65→64 delete) — one item devolved apagar→revisar; the deletion set is a **subset** of what he
   approved (no over-deletion risk), but that item now sits on his review awaiting his call → re-confirm.
-- **camila, emerson, ione, santiago, sergio** — list identical → **prior OK carries forward, no re-send**.
+- **sergio** — **re-confirm (was wrongly grouped as "no re-send")**. The V4 decision set is byte-identical to
+  run-1 (52 delete / 57 keep, **0 item flips**), so the "did the list change?" test alone would wave him
+  through — but the "prior OK" premise is **false for him**: his run-1 review was the **correction that broke
+  run-1 and forced the rework**, not an approval, and **109/109 triage reasons were rebuilt** under rule B (his
+  box swung 52→53→40→52 across the four runs). He is the reviewer most invested in this box and never approved
+  a final list → full re-review of the V4 list. (Evidence: `~/offboarding-aster*/sergio@4shark.com.br/plan.json`.)
+- **camila, emerson, ione, santiago** — list identical AND run-1 genuinely approved → **prior OK carries forward, no re-send**.
 - **meajuda** (no-owner intake box) — **always full-delete, no per-item review**: everything in this box was
   mirrored to **Zendesk**, where the actual involved parties already received it and decide there (runbook
   §8). So the V4 "revisar" flip on the 1 item ("PSC", Áster's `Transacoes_Faturamento_pecas.xlsx`) is
   **overridden → delete** — meajuda stays **30/0 full delete**. (DPO-confirmed 2026-06-12.)
 
+**V2 review sent — DONE (2026-07-10).** The 4 v2 reviews were sent to **danilo, patrick, paulo, sergio** (in-thread
+replies on the original "Encerramento Aster (LGPD)" e-mails, each with its box's `review-v2.html` attached — the
+run-4/rule-B list). Camila / emerson / ione / santiago carried forward their run-1 OK (lists identical AND genuinely
+approved) → no re-send. **Now waiting on the 4 OKs — this is the current blocker; nothing downstream runs until they reply.**
+
 Remaining (PR #15 merged; the email `delete` has NOT run):
-1. **Send v2 review to danilo, patrick, paulo** (review.html in `~/offboarding-aster-run4-ruleB/<box>/`);
-   carry forward the other owners' OK. Santiago [ES] identical → no re-send.
-2. **Collect the 3 OKs** + resolve meajuda's 1 item (DPO).
-3. **Grant DWD just-in-time**, then **delete** per account after each owner confirms (+ `elisio` + `meajuda`
+1. **Collect the 4 OKs** (danilo, patrick, paulo, sergio) + resolve meajuda's 1 item (DPO). ← **BLOCKED, awaiting replies.**
+2. **Grant DWD just-in-time**, then **delete** per account after each owner confirms (+ `elisio` + `meajuda`
    directly, no-owner exception). Pilot on a seeded test mailbox before any real delete.
-4. **Recordkeeping** — manifests → `s3://4shark-backups/email-erasure/aster/<date>/` + one row in the
+3. **Recordkeeping** — manifests → `s3://4shark-backups/email-erasure/aster/<date>/` + one row in the
    "Registro de Exclusões LGPD" register (note which boxes were direct-deleted and why).
-5. **Delete the local outputs** (`~/offboarding-aster*`) (runbook §8 Step 5).
-6. **Revoke DWD** (runbook §8 Step 6).
+4. **Delete the local outputs** (`~/offboarding-aster*`) (runbook §8 Step 5).
+5. **Revoke DWD** (runbook §8 Step 6).
 
 Once these are done, this plan moves to `completed`.
 

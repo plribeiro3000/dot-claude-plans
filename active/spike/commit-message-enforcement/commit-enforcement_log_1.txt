@@ -1,0 +1,183 @@
+Raw evidence — git commit-subject sampling across 4Shark repositories
+Collected via: git -C ~/Projects/4Shark/<repo> log --format='%s' -n <N>
+Collected: 2026-07-10
+
+=== app (last 40 subjects) ===
+Merge pull request #5215 from 4shark/feature/permission-resolver-spec-order
+test(graphql): make permission resolver specs order-independent
+Merge pull request #5213 from 4shark/feature/fix-ecs-remote-access-link
+Merge tag '3.49.0' into develop
+docs(readme): fix and expand documentation index
+chore(release): 3.49.0
+Merge pull request #5212 from 4shark/feature/user-history-excel-ttl
+Merge pull request #5204 from 4shark/feature/statement-audit-canceled-plan
+feat(statement-audit): add time window filter and fix canceled plan status
+feat(user-history): add Excel retention and regeneration
+Merge tag '3.48.0' into develop
+chore(release): 3.48.0
+Merge pull request #5209 from 4shark/feature/user-history-excel-export
+feat(user-history): export user history as Excel
+Merge tag '3.47.0' into develop
+chore(release): 3.47.0
+Merge pull request #5207 from 4shark/feature/atento-001-deploy-retarget
+ci(deploy): retarget atento-001 deploy to the renamed cluster
+Merge tag '3.46.0' into develop
+chore(release): 3.46.0
+Merge pull request #5205 from 4shark/feature/seat-action-status-predicates
+fix(seat-action-document): generate status predicate methods
+Merge pull request #5201 from 4shark/feature/bulk-hierarchy-change
+Merge pull request #5203 from 4shark/renovate/renovatebot-github-action-46.x
+chore(deps): update renovatebot/github-action action to v46.1.17
+Merge pull request #5181 from 4shark/renovate/aws-actions-configure-aws-credentials-digest
+Merge pull request #5202 from 4shark/feature/drop-dead-mongo-database
+chore(config): remove the unused MONGO_DATABASE configuration
+feat(seat-action-document): add bulk hierarchy change
+Merge pull request #5200 from 4shark/feature/plan-statement-audit-empty-fix
+refactor(plan-statement-audit): check for statements existence instead of emptiness in producer
+fix(plan-statement-audit): prevent audit stuck in processing when no statements exist
+Merge tag '3.45.0' into develop
+chore(release): 3.45.0
+Merge pull request #5179 from 4shark/feature/plan-statement-audit-time-window
+feat(plan-statement-audit): add time window filter support
+Merge pull request #5196 from 4shark/feature/group-document-upload-entry
+feat(group-document): add upload entry on groups listing
+Merge pull request #5195 from 4shark/feature/payroll-request-for-payment-scope
+feat(payroll-integration): expose bulk capability and scope requests by payment
+
+=== terraform (last 40 subjects, sample) ===
+Merge pull request #670 from 4shark/feature/register-mongodb-repo
+chore(identity): register mongodb repository
+Merge pull request #669 from 4shark/feature/standardize-rds-maintenance-window
+chore(rds): standardize maintenance windows to Sunday afternoon
+Merge pull request #668 from 4shark/feature/register-pritunl-repo
+chore(identity): register pritunl repository and backfill repository descriptions
+Merge pull request #667 from 4shark/renovate/aws-6.x
+chore(deps): update terraform aws to v6.53.0
+Merge pull request #666 from 4shark/feature/staff-atento-cors-tighten
+fix(atento-001): drop wildcard netlify origin from backend CORS
+Merge pull request #665 from 4shark/feature/staff-atento-cors
+fix(atento-001): allow staff front origin in backend CORS
+Merge pull request #664 from 4shark/feature/staff-atento-dns
+feat(dns): add staff-atento front-end CNAME record
+Merge pull request #663 from 4shark/renovate/google-7.x
+chore(deps): update terraform google to ~> 7.38
+Merge pull request #661 from 4shark/feature/cross-region-backup-second-wave
+feat(backup): extend cross-region DR backup to remaining databases
+Merge tag '2.0.0' into develop
+chore(release): 2.0.0
+Merge pull request #659 from 4shark/feature/changelog-execution-order
+docs(changelog): reorder Unreleased entries to execution order, not alphabetical
+Merge pull request #658 from 4shark/feature/remove-dead-pgbouncer-module
+refactor(modules): remove dead pgbouncer module superseded by connection_pooler
+Merge pull request #657 from 4shark/feature/docs-staleness-fixes
+docs: refresh stale documentation across README, stack READMEs, and module inputs
+Merge pull request #655 from 4shark/feature/standardize-log-retention-180
+Merge pull request #656 from 4shark/feature/harvester-mx-termination-lookback-envvar
+feat(integrator-atento): set harvester termination lookback env var for MX
+fix(terraform): standardize log retention to 180 and drop spurious ecs_services dependency on module.app
+Merge pull request #654 from 4shark/feature/remove-applied-moved-blocks
+refactor(terraform): remove applied one-time moved blocks
+
+=== keycloak (full history at sample time) ===
+Merge pull request #18 from 4shark/feature/document-automation
+docs: document the automated dependency-update, build, and deploy pipeline
+Merge pull request #14 from 4shark/feature/add-renovate-runner
+ci: add the Renovate runner workflow
+Merge pull request #13 from 4shark/feature/move-upgrade-to-bin
+chore: relocate the upgrade script to bin/upgrade
+Merge tag '1.2.0' into develop
+chore(release): 1.2.0
+Merge pull request #11 from 4shark/feature/keycloak-26-6-4
+chore(deps): upgrade Keycloak base image to 26.6.4
+Merge pull request #10 from 4shark/feature/maintenance-upgrade-script
+feat(deploy): add maintenance-window upgrade deploy script
+Merge tag '1.1.0' into develop
+chore(release): 1.1.0
+Merge pull request #7 from 4shark/feature/keycloak-26-6-upgrade
+chore(deps): upgrade Keycloak base image to 26.6.3
+Merge pull request #8 from 4shark/feature/deploy-wait-timeout
+ci(deploy): poll for service stability instead of the fixed 10-minute waiter
+Merge tag '1.0.0' into develop
+chore(release): 1.0.0
+Merge pull request #5 from 4shark/feature/hubflow-deploy
+ci(deploy): add the staging target and map infra names per target
+Merge pull request #4 from 4shark/feature/hubflow-build
+ci(build): drive the image target by branch for HubFlow
+Merge pull request #3 from 4shark/feature/build-context-cleanup
+chore: exclude local-only files from the build context and drop tracked ACME state
+Merge pull request #2 from 4shark/feature/readme-standard
+docs(readme): document the CI build/deploy flow and base-image updates
+Merge pull request #1 from 4shark/feature/image-cicd
+feat: add automated image build, deploy, and supply-chain workflows
+initial commit
+
+=== pritunl (full history, git -C ~/Projects/4Shark/pritunl log) ===
+Merge pull request #1 from 4shark/feature/repo-scaffold
+feat: scaffold the containerized Pritunl VPN image
+Initial commit
+
+=== mongodb (git log --all — the branch commit is on feature/repo-scaffold, not yet merged) ===
+feat: scaffold the MongoDB golden-AMI build pipeline (origin/feature/repo-scaffold, feature/repo-scaffold)
+Initial commit (HEAD -> main, origin/main, origin/HEAD)
+
+Worktree registration (git -C ~/Projects/4Shark/mongodb worktree list):
+/Users/plribeiro3000/Projects/4Shark/mongodb                             fd2ae7a [main]
+/Users/plribeiro3000/Projects/4Shark/mongodb/.claude/worktrees/scaffold  61407cb [feature/repo-scaffold]
+
+=== pgbouncer (git log --format='%s' --reverse | head -10 — earliest commits) ===
+feat: thin PgBouncer image over edoburu, pinned by digest
+feat: render multi-database config and auth_query via entrypoint
+Merge pull request #1 from 4shark/feature/multidb-entrypoint
+feat: write static userlist from a secret instead of auth_query
+Merge pull request #2 from 4shark/feature/userlist-entrypoint
+docs: keep image comments mechanical, drop credential/migration detail
+Merge pull request #3 from 4shark/feature/sanitize-comments
+fix: restore CMD so the entrypoint launches pgbouncer
+Merge pull request #4 from 4shark/fix/pgbouncer-restore-cmd
+feat(deploy): add parameterized ECS deploy workflow and graceful SIGINT shutdown
+
+=== Scope-usage ratio (last 60 subjects per repo, Merge commits excluded) ===
+Computed via:
+  total  = git log --format='%s' -n 60 | grep -vE '^Merge (pull request|tag)' | wc -l
+  scoped = same set | grep -cE '^[a-z]+\([^)]+\):'
+
+app:            30/30  (100%)
+terraform:      28/30  (93%)
+integrator:     25/27  (93%)
+dot-claude:     27/30  (90%)
+onboarding:     25/28  (89%)
+setup:          25/28  (89%)
+app-webclient:  30/31  (97%)
+keycloak:       10/16  (62%)
+pgbouncer:       5/18  (28%)
+
+=== dot-claude — commit body shape check (git log -n 3 --format='%B---END---') ===
+Merge pull request #364 from 4shark/feature/output-policy-no-artifacts
+
+docs(output-policy): document Artifacts as a non-sanctioned output surface---END---
+docs(output-policy): document Artifacts as a non-sanctioned output surface
+---END---
+Merge pull request #363 from 4shark/feature/output-policy-native-first
+
+docs(output-policy): make native-app-first with terminal caveats inline---END---
+
+Observation: non-merge commit bodies are a single subject line, no additional
+body paragraph — consistent with "one commit per pull request" and
+"succinct" changelog/commit conventions. Relevant to hook feasibility: most
+4Shark `git commit` invocations are a single `-m "type(scope): subject"`,
+not a `-m subject -m body` pair.
+
+=== settings.json allow-list entries matching git commit ===
+grep -n '"Bash(git' settings.json:
+  19:      "Bash(git:*)",
+  20:      "Bash(git -C *)",
+  290:      "Bash(git -C * rm *)",
+  291:      "Bash(git -C * tag *)",
+
+Observation: `Bash(git:*)` already auto-approves `git commit ...` in any
+shape. A validate-commit-message.sh PreToolUse hook would need to actively
+emit exit code 2 (hard block, mirrors validate-bash-command.sh's existing
+blocks) to override this broad allow — a passive "ask" reclassification is
+not enough, because "ask" still lets the engineer rubber-stamp a malformed
+message. Exit-2 block is the shape already used for git safety blocks in
+validate-bash-command.sh (reset --hard, branch -D, checkout ., etc.).

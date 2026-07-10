@@ -120,10 +120,13 @@ Phase 3 needs NO defensive nil handling — there is never a nil to guard agains
    `disable_ddl_transaction!`), matching the codebase's bare-FK index convention (NOT composite —
    engineer's choice).
 4. Migration: add the FK `validate: false`, then a separate `validate_foreign_key` migration.
-5. Data migrations: **one migration per country** (`AddAnonymizingWindowDaysTo<Country>`, 8 total),
-   each `country = Country.find_by(acronym: '..'); return if country.nil?; country.update(...)` —
-   matching the sibling per-country `AddFlagTo<Country>` migrations. Values: BR/AR/CL 1855, MX/PE 3680,
-   PA 3315, CO 7330, GT 760.
+5. Data migrations: **one migration per country** (`AddAnonymizingWindowDaysTo<Country>`), each
+   `country = Country.find_by(acronym: '..'); return if country.nil?; country.update(...)` —
+   matching the sibling per-country `AddFlagTo<Country>` migrations. **Brazil (1855, 5y+1m), Mexico
+   (3680, 10y+1m), and Colombia (3680, 10y+1m) are seeded** — the figures the engineer settled on.
+   Every other country stays NULL until the client/legal team confirms its window (the
+   internet-sourced figures were NOT trusted for PII retention). Each confirmed value later lands
+   as its own `AddAnonymizingWindowDaysTo<Country>` migration.
 6. `Company belongs_to :retention_jurisdiction_country ... optional: true` (presence deferred to
    Phase 3); `Country has_many :retention_jurisdiction_companies ... dependent: :nullify`.
 7. Tests: the two associations (shoulda-matchers), matching sibling model specs.

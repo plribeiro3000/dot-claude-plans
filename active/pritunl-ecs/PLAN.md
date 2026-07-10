@@ -397,3 +397,41 @@ These items are surfaced by the draft as unresolved and remain unresolved here �
 ---
 
 > **Authoring:** written by `@agent-plan-composer` from the engineer-validated `PLAN-SPIKE.md` (second-pass revision — the engineer changed the MongoDB placement, branch model, and cutover/deploy model decisions after reviewing the first converged draft; the base image, runtime/launch-type, and public-entry decisions are unchanged). No new options, no new technical decisions, no new assumptions were introduced at the composer stage — every claim traces to the draft. The `output-verifier` and `policy-verifier` run scope-containment, citation-integrity, contract-compliance, template-compliance, reference-resolution, and policy-conformance checks after this write.
+
+---
+
+## Execution progress & session discoveries (2026-07-10)
+
+Appended by the main session to record what was executed and discovered. This section is the source of truth for resuming; the plan body above is the original strategy.
+
+### Phase 1 — DONE (merged)
+
+- **Repo `pritunl` created and governed** — added to the identity stack (`repositories` + `hubflow_repositories` + `auto_init`, infrastructure team) in [terraform#668](https://github.com/4shark/terraform/pull/668); applied via the `ivo` break-glass profile (MFA) and merged. The same PR backfilled the description on the 15 repositories that had none.
+- **Branches bootstrapped to HubFlow**, mirroring `keycloak`: `develop` + `master`, default branch `develop`, `main` removed, `hubflow.prefix.versiontag = v`. Branch protections active.
+- **Scaffold merged** — [pritunl#1](https://github.com/4shark/pritunl/pull/1): `Dockerfile`, `configured-entrypoint.sh`, `fail2ban-pritunl.filter`, `renovate.json`, `ci.yaml`, `renovate.yml`, `build.yaml`, `deploy.yaml`, the three min-age files, `CHANGELOG.md`, `README.md`, `.dockerignore`. **hadolint clean, image builds with `--no-cache`, pinned Pritunl version verified installed.**
+
+### Discoveries that change the plan
+
+1. **The apt `stable` channel lags upstream GitHub releases** — Pritunl's `repo.pritunl.com/stable/apt` (noble) is at `1.32.4567.52-0ubuntu1~noble` while GitHub releases are `1.34.x`. **Supersedes SPIKE-1's github-releases assumption**: the image installs the pinned `.deb` from apt, so Renovate tracks the apt channel via the **`deb` datasource**, not `github-releases`. The apt stable train is the correct thing for a production VPN to track.
+2. **DL3008 resolved the idiomatic way — pin ALL apt packages + Renovate `deb`** — not a hadolint ignore. Every package is pinned via `ARG *_VERSION`; a single Renovate regex `customManager` pairs them with the `deb` datasource (ubuntu archive `noble` + `noble-updates` + `noble-security` for the OS packages, the pritunl repo for pritunl). Reproducible builds + supply-chain min-age on the OS packages, auto-maintained. (Grounded in Renovate deb-datasource docs + community multi-package examples.)
+3. **Pinned ubuntu base digest** = `ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90`.
+4. **`STOPSIGNAL SIGTERM`** grounded in Pritunl's own systemd unit (no `KillSignal` override → systemd default SIGTERM, `TimeoutStopSec=20`); ECS `stopTimeout >= 20s`. Session-drain-on-SIGTERM stays a Phase-3 live-test item (SPIKE-8).
+5. **CI lesson (recorded for future tool repos)** — a script the CI invokes directly (`.github/scripts/verify-minimum-age.sh`) needs the **executable bit committed (0755)**; the `Write` tool creates files `0644`, which made the "Verify Minimum Age" check fail with exit 126 (Permission denied). Fixed with `chmod +x` + amend. Set the exec bit on any CI-invoked script at scaffold time.
+6. **Phase-2 coupling** — `terraform/modules/iam_deploy`'s `ECSClusterAll` statement builds `Resource` from `var.cluster_names` unconditionally, so `cluster_names = []` yields an invalid empty-`Resource` policy. **The deploy IAM is coupled to the ECS cluster** — the "ECR-only" first PR is NOT separable; the Build-unblock PR must include the ECS cluster + task-execution role. The module already exposes `ec2_instance_arns` for `ec2:Start/StopInstances` — it anticipates the Mongo VM + the staging-at-zero start/stop model.
+7. **Infra naming (locked)** — prod `vpn`, staging `vpn-staging`, region `sa-east-1`, registry `405749097490.dkr.ecr.sa-east-1.amazonaws.com`. The new ECS infrastructure **extends the existing `terraform/vpn/` stack** (alongside `module.pritunl` — the current VM — which stays until cutover).
+
+### Phase-2 decisions — status
+
+Phase 2 is decomposed into **5 PRs (Option A)** — see `phase-2-terraform/TASKS-SPIKE.md` and `phase-2-terraform/phase-2_blocking-decisions.md`.
+
+- **SPIKE-4** (staging Mongo) → separate database on the production Mongo VM — *pending the SPIKE-2 outcome, which may change the Mongo host model.*
+- **SPIKE-5** (staging public entry) → **finding**: staging **cannot reuse production's EIP while production is running** (an EIP associates to exactly one ENI at a time; prod is always-on). Staging needs its own entry (default public IP on stop/start, or private-only validation) — final choice deferred.
+- **SPIKE-3** (Mongo SG scoping) → **there is a documented 4Shark security best-practice** for SG-to-SG vs CIDR; apply the documented rule (doc lookup pending — candidate docs identified).
+- **SPIKE-2** (Mongo VM provisioning) → **spike done** (`~/.claude/plans/active/spike/mongodb-base-image/SPIKE.md`). Finding reframes the premise: the shared base the engineer wanted **already exists** — the 15 self-managed integrator Mongo VMs already share ONE AMI (`ami-0bd91caaa9bc42cf3`) + ONE Ansible role (`4shark.mongodb8`, MongoDB 8.2); `app-*` Mongo is Atlas (managed, no VM). The only real drift is Pritunl itself: `4shark.pritunl` duplicates Mongo install logic, pinned at 8.0 without the hardening `4shark.mongodb8` has. **Direction (pending engineer confirmation): PR 2.3's Mongo VM reuses the existing `4shark.mongodb8` role + the shared Mongo AMI** rather than a new role, a new Docker image, or a new AMI pipeline — kills the duplication and the 8.0/8.2 drift. No shared-base-image initiative needed.
+- **SPIKE-6** (staging host stop/start lifecycle) and **SPIKE-7** (`ecs_service` extend vs bespoke task def) → still open.
+
+### Next steps
+
+1. **Mongo base-image spike** (in progress) — resolves SPIKE-2 and fixes the shape of the Mongo-VM PR.
+2. **SPIKE-3 doc lookup** — apply the documented SG rule.
+3. **Phase-2 PRs 2.1 → 2.5** in fresh, focused sessions, each with Pattern Priming + PR-first + gated plan/apply.

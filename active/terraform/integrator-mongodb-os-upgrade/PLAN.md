@@ -15,7 +15,7 @@ The 5 integrator environments run MongoDB 4.4 on Ubuntu 18.04 (Bionic). Both are
 
 There are no automated backups, no upgrade procedures, and no documented process for maintaining these servers. This plan defines the exact upgrade sequence, respecting compatibility constraints between MongoDB versions and Ubuntu LTS releases.
 
-**Why this plan, and not a re-platform:** the alternative of moving MongoDB off dedicated EC2 was evaluated in two spikes and rejected on the evidence. `~/.claude/plans/completed/spike/mongodb-on-ecs/SPIKE.md` ruled out ECS (no StatefulSet-equivalent primitive for a replica set). `~/.claude/plans/completed/spike/mongodb-eks-vs-ec2-cost-maintenance/SPIKE.md` ruled out EKS on quantified cost + maintenance grounds (every EKS scenario priced costs more in sa-east-1 — the cheapest is +16.6%/month — and EKS trades manual OS toil for a new Kubernetes-version-lifecycle + operator-tracking burden rather than reducing maintenance). This in-place manual OS upgrade is the chosen path: it resolves the unmaintained-OS pain directly, on the platform already in use, at the lowest cost.
+**Why this plan, and not a re-platform:** the alternative of moving MongoDB off dedicated EC2 was evaluated in two spikes and rejected on the evidence. `~/.claude/plans/completed/spike/mongodb-on-ecs/SPIKE.md` ruled out ECS (no StatefulSet-equivalent primitive for a replica set). `~/.claude/plans/completed/spike/mongodb-eks-vs-ec2-cost-maintenance/SPIKE.md` ruled out EKS on quantified cost + maintenance grounds (every EKS scenario priced costs more in sa-east-1 — the cheapest is +16.6%/month — and EKS trades manual OS toil for a new Kubernetes-version-lifecycle + operator-tracking burden rather than reducing maintenance). This manual OS upgrade — by re-provisioning the nodes on the EC2 platform already in use — is the chosen path: it resolves the unmaintained-OS pain directly, at the lowest cost.
 
 ---
 
@@ -33,9 +33,13 @@ There are no automated backups, no upgrade procedures, and no documented process
 
 **Friday's step — Step 2: Ubuntu 18.04 → 20.04 by RE-PROVISIONING (engineer decided 2026-07-08).**
 
-- **Method: re-provision, NOT in-place `do-release-upgrade`.** Replace each replica-set member with a fresh Ubuntu 20.04 instance (already on MongoDB 5.0) one member at a time so the set keeps quorum → 0-downtime: bring up the new 20.04 node, `rs.add()` it, wait for initial sync to `SECONDARY`, then remove/retire the old 18.04 member (`rs.remove()`); for the primary, `rs.stepDown()` first. Needs Terraform/AMI work — the mongo module pins the AMI with `lifecycle { ignore_changes = [ami] }`, so the AMI bump + instance replacement is driven deliberately (new instance alongside → join the set → retire the old), not by a `do-release-upgrade`.
-- **Order: OS-first (engineer decided).** Do the OS upgrade to 20.04 across the fleet before any further Mongo hop; then Mongo 5.0→6.0→7.0→8.0 all run on 20.04+ (later, Ubuntu 20.04→22.04→24.04).
+- **Method: re-provision.** Replace each replica-set member with a fresh Ubuntu 20.04 instance (already on MongoDB 5.0) one member at a time so the set keeps quorum → 0-downtime: bring up the new 20.04 node, `rs.add()` it, wait for initial sync to `SECONDARY`, then remove/retire the old 18.04 member (`rs.remove()`); for the primary, `rs.stepDown()` first. Needs Terraform/AMI work — the mongo module pins the AMI with `lifecycle { ignore_changes = [ami] }`, so the AMI bump + instance replacement is driven deliberately (new instance alongside → join the set → retire the old).
+- **Order: OS-first (engineer decided).** Do the OS upgrade to 20.04 across the fleet before any further Mongo hop; then Mongo 5.0→6.0→7.0→8.0 all run on 20.04+ (final OS hop: Ubuntu 20.04 → 24.04 direct, skipping 22.04 — see the 2026-07-10 refinement below).
 - Re-create the access mechanism per environment first (SSM key + runner task-def revision — recipe in § Operational learnings), unless the re-provision approach is driven entirely via Terraform + the app's own connection (in which case SSH may not even be needed — evaluate Friday).
+
+### Refinement — skip Ubuntu 22.04 (engineer decided 2026-07-10)
+
+The final OS hop goes **20.04 → 24.04 directly, skipping 22.04** — the upgrade sequence drops from 7 steps to 6. This is safe and cheaper because the adopted OS-upgrade method is **re-provisioning** (Step 2 decision, 2026-07-08): a fresh Ubuntu 24.04 node is stood up and joined to the replica set, so there is no need to step through 22.04 as an intermediate LTS. MongoDB 8.0 supports 24.04, and the `libssl1.1` blocker only ever affected MongoDB ≤5.0. The Upgrade Sequence and Step Details below reflect this.
 
 ### commcenter — Step 1 (MongoDB 4.4 → 5.0) — DONE (2026-07-08)
 
@@ -107,9 +111,9 @@ There are no automated backups, no upgrade procedures, and no documented process
 
 ---
 
-## Upgrade Sequence (7 Steps)
+## Upgrade Sequence (6 Steps)
 
-Ubuntu 20.04 supports MongoDB 5.0 through 8.0, so all MongoDB hops can be completed on a single Ubuntu version after the first OS upgrade. This minimizes the number of OS upgrades interleaved with MongoDB upgrades.
+Ubuntu 20.04 supports MongoDB 5.0 through 8.0, so all MongoDB hops can be completed on a single Ubuntu version after the first OS upgrade. This minimizes the number of OS upgrades interleaved with MongoDB upgrades. The final OS hop goes **20.04 → 24.04 directly, skipping 22.04** (refinement 2026-07-10): re-provisioning stands up a fresh 24.04 node directly, and MongoDB 8.0 supports 24.04, so 22.04 as an intermediate LTS is unnecessary.
 
 ```
 START:  MongoDB 4.4 + Ubuntu 18.04 (Bionic)
@@ -119,8 +123,7 @@ Step 2: Ubuntu 18.04 → 20.04  (with MongoDB 5.0) ← OS upgrade required befor
 Step 3: MongoDB 5.0 → 6.0    (on Ubuntu 20.04)
 Step 4: MongoDB 6.0 → 7.0    (on Ubuntu 20.04)
 Step 5: MongoDB 7.0 → 8.0    (on Ubuntu 20.04)  ← all MongoDB hops done
-Step 6: Ubuntu 20.04 → 22.04  (with MongoDB 8.0)
-Step 7: Ubuntu 22.04 → 24.04  (with MongoDB 8.0)
+Step 6: Ubuntu 20.04 → 24.04  (with MongoDB 8.0, re-provision) ← skips 22.04
 
 END:    MongoDB 8.0 + Ubuntu 24.04 (Noble)
 ```
@@ -130,7 +133,7 @@ END:    MongoDB 8.0 + Ubuntu 24.04 (Noble)
 1. **Step 1 on Bionic:** MongoDB 5.0 is the last version that supports Ubuntu 18.04. Must upgrade MongoDB first because 4.4 packages may not install cleanly on newer Ubuntu.
 2. **Step 2 before more MongoDB hops:** Ubuntu 20.04 supports MongoDB 5.0 through 8.0, creating a stable platform for all remaining MongoDB upgrades.
 3. **Steps 3-5 on Focal:** All three remaining MongoDB hops can execute on Ubuntu 20.04 without any OS change in between. This is the fastest section.
-4. **Steps 6-7 after MongoDB is done:** Ubuntu hops are simpler when MongoDB is already at its target version — no repo switching needed, just `do-release-upgrade` with MongoDB 8.0 packages available for all target Ubuntu versions.
+4. **Step 6 (final OS hop) after MongoDB is done:** with MongoDB already at 8.0, the last Ubuntu hop is a single re-provision **20.04 → 24.04, skipping 22.04** — MongoDB 8.0 supports 24.04, and the re-provision method (fresh instance) has no requirement to step through each intermediate LTS.
 
 ---
 
@@ -169,27 +172,18 @@ END:    MongoDB 8.0 + Ubuntu 24.04 (Noble)
 
 **Compatibility:** MongoDB 5.0 supports Ubuntu 20.04 ✓
 
-**Rolling OS upgrade procedure (per node, same order: secondary → arbiter → primary):**
+**Re-provision procedure (per member, same order: secondary → arbiter → primary), keeping quorum for 0-downtime:**
 
-For each node:
-1. Stop mongod: `systemctl stop mongod`
-2. Verify data directory is on a separate EBS volume (`/data/db`) — data survives OS upgrade
-3. Run: `do-release-upgrade`
-4. Handle prompts:
-   - Keep existing `/etc/mongod.conf` (or the custom `mongod.conf` from Ansible)
-   - Accept default for other packages
-5. Reboot when prompted
-6. After reboot, reconfigure MongoDB 5.0 apt repository for `focal` codename:
+For each member:
+1. Provision a fresh Ubuntu 20.04 instance running MongoDB 5.0, apt repo pinned to the `focal` codename:
    ```bash
    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-5.0.gpg ] https://repo.mongodb.org/apt/ubuntu focal/mongodb-org/5.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-5.0.list
    ```
-7. `apt update && apt install -y mongodb-org` (reinstall to ensure correct packages)
-8. Start mongod: `systemctl start mongod`
-9. Wait for node to rejoin replica set: `rs.status()`
+2. `rs.add()` the new node; wait for initial sync to `SECONDARY` (`rs.status()`).
+3. `rs.remove()` the old 18.04 member it replaces, then retire that instance.
+4. For the primary member: `rs.stepDown()` first, wait for the election, then replace it after the secondary and arbiter are already on 20.04.
 
-**For the primary:** Run `rs.stepDown()` before stopping mongod. Upgrade after secondary and arbiter are back online.
-
-**Estimated time per node:** 30-45 minutes (including reboot and rejoin)
+**Estimated time per member:** 30-45 minutes (mostly initial sync + verify)
 
 ---
 
@@ -248,39 +242,20 @@ For each node:
 
 ---
 
-### Step 6: Ubuntu 20.04 → 22.04 (with MongoDB 8.0)
+### Step 6: Ubuntu 20.04 → 24.04 (with MongoDB 8.0, re-provision — skips 22.04)
 
-**Compatibility:** MongoDB 8.0 supports Ubuntu 22.04 ✓
+**Compatibility:** MongoDB 8.0 supports Ubuntu 24.04 ✓. **22.04 is skipped entirely** (refinement 2026-07-10): the adopted OS-upgrade method is **re-provisioning** (Step 2 decision, 2026-07-08) — a fresh Ubuntu 24.04 node is stood up and joined to the replica set, so there is no requirement to step through 22.04 as an intermediate LTS.
 
-**Library change:** Ubuntu 22.04 ships with OpenSSL 3.0 and `libssl3` instead of `libssl1.1`. MongoDB 8.0 supports OpenSSL 3.0 — no issue.
+**Library note:** Ubuntu 24.04 ships OpenSSL 3.0 (`libssl3`); MongoDB 8.0 supports it — no issue. The `libssl1.1` constraint only ever blocked MongoDB ≤5.0, long past by this step.
 
-**Rolling OS upgrade procedure (same as Step 2):**
-1. Stop mongod
-2. `do-release-upgrade`
-3. Reboot
-4. Reconfigure apt repo for `jammy` codename:
-   ```bash
-   echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu jammy/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-   ```
-5. `apt update && apt install -y mongodb-org`
-6. Start mongod, verify replica set
-
----
-
-### Step 7: Ubuntu 22.04 → 24.04 (with MongoDB 8.0)
-
-**Compatibility:** MongoDB 8.0 supports Ubuntu 24.04 ✓
-
-**Rolling OS upgrade procedure (same as Steps 2 and 6):**
-1. Stop mongod
-2. `do-release-upgrade`
-3. Reboot
-4. Reconfigure apt repo for `noble` codename:
+**Procedure — re-provision one replica-set member at a time (same shape as Step 2), keeping quorum for 0-downtime:**
+1. Provision a fresh Ubuntu 24.04 instance running MongoDB 8.0, apt repo pinned to the `noble` codename:
    ```bash
    echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
    ```
-5. `apt update && apt install -y mongodb-org`
-6. Start mongod, verify replica set
+2. `rs.add()` the new node; wait for initial sync to `SECONDARY`.
+3. `rs.remove()` the old 20.04 member it replaces (for the primary, `rs.stepDown()` first).
+4. Repeat per member (SECONDARY → ARBITER → PRIMARY order); verify the replica set is healthy on 24.04.
 
 ---
 
@@ -378,8 +353,7 @@ After every step (MongoDB or Ubuntu upgrade), verify:
 | Step 3 | MongoDB 5.0 → 6.0 | 60-90 min |
 | Step 4 | MongoDB 6.0 → 7.0 | 60-90 min |
 | Step 5 | MongoDB 7.0 → 8.0 | 60-90 min |
-| Step 6 | Ubuntu 20.04 → 22.04 (3 nodes) | 2-3 hours |
-| Step 7 | Ubuntu 22.04 → 24.04 (3 nodes) | 2-3 hours |
+| Step 6 | Ubuntu 20.04 → 24.04 (3 nodes, re-provision, skips 22.04) | 2-3 hours |
 | Post-validation | Full test cycle | 1 hour |
 | **Total per environment** | | **~12-16 hours** |
 
@@ -413,21 +387,19 @@ The current `4shark.mongodb` role installs MongoDB 4.4 from the Bionic repositor
    - `community.mongodb.mongodb_status` — validate replica set
    - `community.mongodb.mongodb_stepdown` — step down primary
    - `community.mongodb.mongodb_maintenance` — enable/disable maintenance mode
-4. **Create OS upgrade playbook** (`playbooks/upgrade-ubuntu.yml`) that:
-   - Stops mongod
-   - Runs `do-release-upgrade -f DistUpgradeViewNonInteractive`
-   - Reconfigures MongoDB apt repository for new codename
-   - Reinstalls MongoDB packages
-   - Starts mongod
+4. **Create OS re-provision playbook** (`playbooks/reprovision-node.yml`) that, per replica-set member:
+   - Provisions a fresh instance on the target Ubuntu LTS with the correct MongoDB apt repository/codename
+   - `rs.add()` the new node and waits for initial sync to `SECONDARY`
+   - `rs.remove()` and retires the old member (steps down the primary first)
    - Validates replica set membership
 
 ---
 
 ## Terraform Changes
 
-### During Upgrade (No Changes)
+### During Upgrade
 
-The Terraform module uses `lifecycle { ignore_changes = [ami, user_data, user_data_base64] }` on all MongoDB instances. The OS and MongoDB upgrades happen in-place via Ansible — Terraform does not need to be modified during the upgrade.
+**MongoDB version hops (Steps 1, 3, 4, 5)** are in-place (apt on the running node) — no Terraform change. **OS hops (Steps 2 and 6)** are re-provisioning: a fresh instance is stood up on the new Ubuntu LTS, joined to the replica set, and the old one retired. The module pins the AMI with `lifecycle { ignore_changes = [ami, user_data, user_data_base64] }`, so the AMI/instance replacement for an OS hop is driven deliberately (new instance alongside → join → retire the old), not by a fleet-wide AMI bump.
 
 ### After Upgrade (Post-Migration Cleanup)
 
@@ -444,10 +416,8 @@ After all environments are upgraded:
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | PSA write concern issue on 5.0 upgrade | Writes block if secondary goes down | Set `defaultWriteConcern: { w: 1 }` BEFORE Step 1 |
-| `do-release-upgrade` breaks mongod config | mongod fails to start after OS upgrade | Keep original `mongod.conf`, reconfigure apt repo manually |
 | Data loss during upgrade | Unrecoverable | Implement backups BEFORE starting (pre-requisite) |
 | Application incompatibility with new MongoDB | Integration jobs fail | Test on pilot environment (commcenter) first |
-| `do-release-upgrade` prompts hang | Upgrade stalls, node offline too long | Use `-f DistUpgradeViewNonInteractive` flag for non-interactive mode |
 | EBS volume detachment during OS upgrade | Data directory unavailable | Verify `/data/db` mount in `/etc/fstab` survives reboot |
 | MongoDB repo GPG key mismatch after OS upgrade | apt update fails | Re-import GPG key for the target MongoDB version |
 
