@@ -1,0 +1,55 @@
+Raw grep output — `grep -n "retention_jurisdiction" db/schema.rb` and
+`grep -n "business_territor" app/**/*.rb` (excluding spec files)
+Repository: ~/Projects/4Shark/app, branch develop, HEAD at spike time = 1b6e1bb4e
+Command: git -C ~/Projects/4Shark/app log --oneline -10
+
+1b6e1bb4e Merge pull request #5222 from 4shark/feature/retention-jurisdiction-presence
+6bb5cf483 feat(company): validate presence of retention jurisdiction country
+94416132d Merge pull request #5221 from 4shark/feature/retention-jurisdiction-write-path
+3eb34f3da feat(company): accept retention jurisdiction country on create and update mutations
+c4fa314e8 Merge pull request #5217 from 4shark/feature/per-country-anonymization-window
+77118f16b feat(anonymization): add per-country retention window
+3272f7ba1 Merge tag '3.50.0' into develop
+986ca70c3 Merge pull request #5219 from 4shark/feature/fix-websocket-driver-cve
+
+---
+
+Command: grep -n "retention_jurisdiction" db/schema.rb
+
+524:    t.bigint "retention_jurisdiction_country_id"
+535:    t.index ["retention_jurisdiction_country_id"], name: "index_companies_on_retention_jurisdiction_country_id"
+2684:  add_foreign_key "companies", "countries", column: "retention_jurisdiction_country_id"
+
+---
+
+Command: grep -rn "business_territor" app --include="*.rb" | grep -v "_spec.rb"
+
+app/graphql_mutations/create_company_graphql_mutation.rb:6:  argument :business_territories, [CompanyBusinessTerritoryInputGraphqlType], required: false
+app/graphql_mutations/create_company_graphql_mutation.rb:33:    params[:business_territories] = params[:business_territories].map(&:to_hash) if params[:business_territories].instance_of?(Array)
+app/graphql_mutations/create_company_graphql_mutation.rb:51:        business_territories: %i[country_id]
+app/graphql_mutations/create_company_graphql_mutation.rb:54:        params[:business_territories_attributes] = params.delete(:business_territories) || []
+app/graphql_mutations/update_company_graphql_mutation.rb:5:  argument :business_territories, [CompanyBusinessTerritoryInputGraphqlType], required: false
+app/graphql_mutations/update_company_graphql_mutation.rb:29:    params[:business_territories] = params[:business_territories].map(&:to_hash) if params[:business_territories].instance_of?(Array)
+app/graphql_mutations/update_company_graphql_mutation.rb:42:        business_territories: %i[id country_id _destroy]
+app/graphql_mutations/update_company_graphql_mutation.rb:45:        params[:business_territories_attributes] = params.delete(:business_territories) || []
+app/models/country.rb:4:  has_many :business_territories, class_name: 'CompanyBusinessTerritory', dependent: :destroy, inverse_of: :country
+app/models/country.rb:18:  has_many :companies, through: :business_territories
+app/models/country.rb:22:  scope :for_company, ->(company) { joins(:business_territories).where('business_territories.company_id': company) if company.present? }
+app/models/company.rb:14:  has_many :business_territories, class_name: 'CompanyBusinessTerritory', inverse_of: :company, dependent: :destroy
+app/models/company.rb:73:  has_many :countries, through: :business_territories
+app/models/company.rb:78:  accepts_nested_attributes_for :business_territories, allow_destroy: true, reject_if: :all_blank
+app/models/company.rb:80:  validates :business_territories, length: { minimum: 1 }
+app/models/company_business_territory.rb:4:  belongs_to :company, optional: true, inverse_of: :business_territories
+app/models/company_business_territory.rb:5:  belongs_to :country, optional: true, inverse_of: :business_territories
+app/models/company_business_territory.rb:12:  rescue_unique_constraint index: :index_company_business_territories_on_company_id_and_country_id, field: :country_id
+app/scopes/state_scope.rb:9:        .joins(country: :business_territories)
+app/scopes/state_scope.rb:10:        .where('business_territories.company_id': user.company_id)
+app/scopes/register_type_scope.rb:9:        .joins(country: :business_territories)
+app/scopes/register_type_scope.rb:10:        .where('business_territories.company_id': user.company_id)
+app/scopes/country_scope.rb:9:        .joins(:business_territories)
+app/scopes/country_scope.rb:10:        .where('business_territories.company_id': user.company_id)
+app/graphql_types/company_graphql_type.rb:11:  field :business_territories, [CompanyBusinessTerritoryGraphqlType], null: true
+app/graphql_types/country_graphql_type.rb:5:  field :business_territories, [CompanyBusinessTerritoryGraphqlType], null: true
+app/graphql_types/query_type.rb:50:  field :company_business_territories, resolver: CompanyBusinessTerritoryGraphqlResolver
+
+No matches under app/controllers, app/forms, lib/tasks, db/seeds.rb (app repo has no db/seeds.rb outside vendored gem examples).

@@ -41,6 +41,33 @@ There are no automated backups, no upgrade procedures, and no documented process
 
 The final OS hop goes **20.04 → 24.04 directly, skipping 22.04** — the upgrade sequence drops from 7 steps to 6. This is safe and cheaper because the adopted OS-upgrade method is **re-provisioning** (Step 2 decision, 2026-07-08): a fresh Ubuntu 24.04 node is stood up and joined to the replica set, so there is no need to step through 22.04 as an intermediate LTS. MongoDB 8.0 supports 24.04, and the `libssl1.1` blocker only ever affected MongoDB ≤5.0. The Upgrade Sequence and Step Details below reflect this.
 
+### RESUME POINT — 2026-07-10 (Step 2 golden AMI built; node re-provision resumes Monday)
+
+**Friday's session went into building the Step 2 input image**, not the node work. The Ubuntu 20.04 + MongoDB 5.0 golden AMI did not exist yet, and building it surfaced three focal-specific blockers that had to be solved first. The replica-set node re-provisioning (the actual Step 2 node work) was NOT started; it resumes Monday.
+
+**Golden AMI READY:** `ami-0e4d77e66719fceb1` — tags `Name=mongodb`, `Version=5.0-20260710205053`, `MongoDBVersion=5.0`, region `sa-east-1`. Exactly the input Step 2 needs ("a fresh Ubuntu 20.04 instance running MongoDB 5.0"). Built and validated end-to-end (all Ansible tasks passed, including install + start mongod); a boot smoke-test of the AMI was NOT done.
+
+**The AMI build lives on the `mongodb` repo branch `mongo5-ubuntu20`, NOT on main** — main is the latest-version image (8.x/noble) and does not build 5.0/focal. Rebuild the 5.0 image with: `gh workflow run build.yaml -R 4shark/mongodb --ref mongo5-ubuntu20`. Three focal-specific fixes live on that branch, each a real wall that was solved:
+- **ansible-core pinned to 2.18** (build.yaml step: venv + `$GITHUB_PATH`). ansible-core ≥2.19 dropped Python 3.8 target support; focal ships Python 3.8, so the runner's default ansible-core fails at fact-gathering.
+- **Forced apt refresh** (`vars: { apt_cache_valid_time: 0 }` in `ansible/playbook.yml`). Focal cloud images boot with stale/empty apt lists; without this a non-preinstalled `main` package (numactl) has no candidate.
+- **`cloud-init status --wait`** shell provisioner before Ansible (`packer/mongodb.pkr.hcl`) — THE real numactl fix; the provisioner was racing cloud-init's first-boot apt setup. Root cause confirmed via the spike at `active/spike/focal-numactl-unavailable/SPIKE.md` (the earlier "universe disabled" hypothesis was wrong — numactl is in focal `main`).
+- The role `ansible-role-mongodb` is released `v0.1.0` (5.0/focal defaults); the mongodb branch's `requirements.yml` pins the role at `v0.1.0`.
+
+**Step 2 method decision (2026-07-10): 3 new nodes at once (parallel), NOT one-at-a-time.** The engineer chose the fastest variant. Initial sync is the bottleneck (~30-45 min/data-node); standing up the new nodes together lets the two data-node syncs run in parallel → ~half the wall-clock of the one-at-a-time recipe in Step 2 below. Safe here because the integrator primaries are near-idle (several on daily-shutdown). Operational care: add the two new DATA nodes as `{ votes: 0, priority: 0 }` during initial sync so the transition never has an even voting count / election tie; the arbiter carries no data (instant) so swap it near the end. After both new data nodes are `SECONDARY`, reconfigure votes/priority, `rs.stepDown()` to elect a new-20.04 primary, then `rs.remove()` and retire the three old 18.04 members.
+
+**Per-environment terraform facts (commcenter, the pilot — `terraform/integrator-commcenter/mongodb.tf`):** the three nodes are hardcoded `aws_instance` blocks — `mongo003` (primary, `t3.small`, subnet `prv-a`/1a), `mongo004` (secondary, `t3.small`, `prv-b`/1b), `mongo005` (arbiter, `t3.micro`, `prv-b`/1b). Each pins `ami = "ami-0bd91caaa9bc42cf3"` (the old 18.04 image), `key_name = "kp-4shark"`, `iam_instance_profile = "mongo-cwagent"`, SG `module.this.default_security_group_id`, subnets from SSM (`/networking/integrator-commcenter/prv_{a,b}_subnet_id`), `lifecycle { prevent_destroy = true, ignore_changes = [ami, user_data, user_data_base64] }`, root `gp2` 60/60/20 GB with `delete_on_termination = false`, name `4client-commcenter-mongoNNN`. The other three environments (almaviva, maqnelson, atento) have the same shape in their own `integrator-<client>` stacks — swap the client segment.
+
+**Monday's concrete Step 2 sequence (commcenter first, then the other three):**
+1. Re-create the access mechanism per environment (SSM key `/integrator-<client>/mongo-ssh-key` + runner task-def revision — recipe in § Operational learnings). Confirm mongo running (commcenter is always-on).
+2. Terraform: add three new `aws_instance` blocks in the stack with `ami = "ami-0e4d77e66719fceb1"`, same instance types / subnets / SG / profile / key as the existing trio (keep the PSA-across-AZ layout: primary-candidate in 1a, secondary + arbiter in 1b), new non-colliding names (e.g. `mongo006/007/008`). `terraform plan` → apply (MFA `4shark-mfa`).
+3. The new nodes boot already running MongoDB 5.0 with an EMPTY `replSetName` (per the golden image) — set `replSetName` to the commcenter set and start.
+4. `rs.add()` the two new data nodes as `{ votes: 0, priority: 0 }` + the new arbiter; wait both data nodes to `SECONDARY` (parallel sync).
+5. Reconfigure votes/priority on the new data nodes; `rs.stepDown()` → new-20.04 primary elected.
+6. `rs.remove()` the three old members; lift `prevent_destroy` and remove the old `aws_instance` blocks; `terraform apply` to retire the old instances.
+7. Validate: `rs.status()` all on 20.04, `buildInfo` `5.0.34`, FCV `5.0`, app health, one integration run.
+
+**Access boundary:** the session has no SSH / production-Mongo access and terraform apply needs MFA — the agent generates the terraform + `rs.*` commands and drives the plan; the engineer runs the `rs.*` and returns the output.
+
 ### commcenter — Step 1 (MongoDB 4.4 → 5.0) — DONE (2026-07-08)
 
 - All 3 nodes upgraded **4.4.30 → 5.0.34**, rolling (secondary → arbiter → primary via `rs.stepDown()`), no read downtime; only the primary election blip (~10-20s) with the integrator idle.
@@ -171,6 +198,10 @@ END:    MongoDB 8.0 + Ubuntu 24.04 (Noble)
 ### Step 2: Ubuntu 18.04 → 20.04 (with MongoDB 5.0)
 
 **Compatibility:** MongoDB 5.0 supports Ubuntu 20.04 ✓
+
+**Golden AMI ready (2026-07-10):** `ami-0e4d77e66719fceb1` (Ubuntu 20.04 + MongoDB 5.0) — use this as the fresh-instance image. See the 2026-07-10 RESUME POINT above for how it was built and how to rebuild it.
+
+**Method chosen (2026-07-10): 3 new nodes at once (parallel sync), not the one-at-a-time recipe below.** The per-member recipe here is the conservative fallback; the adopted-for-speed variant and its operational care (new data nodes `votes:0/priority:0` during sync) are in the 2026-07-10 RESUME POINT above.
 
 **Re-provision procedure (per member, same order: secondary → arbiter → primary), keeping quorum for 0-downtime:**
 

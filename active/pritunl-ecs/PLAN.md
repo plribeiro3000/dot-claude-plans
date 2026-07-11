@@ -424,19 +424,24 @@ Appended by the main session to record what was executed and discovered. This se
 
 Phase 2 is decomposed into **5 PRs (Option A)** — see `phase-2-terraform/TASKS-SPIKE.md` and `phase-2-terraform/phase-2_blocking-decisions.md`.
 
-- **SPIKE-4** (staging Mongo) → separate database on the production Mongo VM — *pending the SPIKE-2 outcome, which may change the Mongo host model.*
-- **SPIKE-5** (staging public entry) → **finding**: staging **cannot reuse production's EIP while production is running** (an EIP associates to exactly one ENI at a time; prod is always-on). Staging needs its own entry (default public IP on stop/start, or private-only validation) — final choice deferred.
-- **SPIKE-3** (Mongo SG scoping) → **there is a documented 4Shark security best-practice** for SG-to-SG vs CIDR; apply the documented rule (doc lookup pending — candidate docs identified).
+- **SPIKE-4** (staging Mongo) → ✅ **RESOLVED — separate database on the production Mongo VM (4B)**, per the documented `auth-001` staging precedent (`auth_001_staging.tf`: reuses the prod data host, isolated only by its own database). See `phase-2-terraform/phase-2_blocking-decisions.md`.
+- **SPIKE-5** (staging public entry) → ✅ **RESOLVED — the instance's default (non-elastic) public IP on stop/start (5B)**. An always-allocated EIP contradicts the zero-idle-cost staging posture; validation needs a reachable VPN endpoint (rules out private-only); the tester brings the instance up and reads the fresh IP then. See `phase-2-terraform/phase-2_blocking-decisions.md`.
+- **SPIKE-3** (Mongo SG scoping) → ✅ **RESOLVED — CIDR-scoped ingress (3B)** from the management VPC private subnet where Pritunl runs. 4Shark's documented convention is CIDR (`VPC-CROSS-VPC-CONNECTIVITY.md:40`, `auth-001/security_groups.tf`); zero SG-to-SG precedent in the repo; `VPC-DEPOSED-SG-DEPENDENCY.md` documents the migration fragility SG-to-SG references add. See `phase-2-terraform/phase-2_blocking-decisions.md`.
 - **SPIKE-2** (Mongo VM provisioning) → **spike done** (`~/.claude/plans/active/spike/mongodb-base-image/SPIKE.md`). Finding reframes the premise: the shared base the engineer wanted **already exists** — the 15 self-managed integrator Mongo VMs already share ONE AMI (`ami-0bd91caaa9bc42cf3`) + ONE Ansible role (`4shark.mongodb8`, MongoDB 8.2); `app-*` Mongo is Atlas (managed, no VM). The only real drift is Pritunl itself: `4shark.pritunl` duplicates Mongo install logic, pinned at 8.0 without the hardening `4shark.mongodb8` has. **RESOLVED (2026-07-10): a dedicated golden-AMI pipeline was built and merged** — see the "Golden-AMI pipeline built" subsection below. PR 2.3's Mongo VM launches from the new golden AMI (MongoDB 8.2) via a `data "aws_ami"` tag lookup, so no per-VM Ansible role runs at all (the 2A/2B question is moot) and the 8.0→8.2 drift is closed at the AMI. This supersedes the earlier "reuse `4shark.mongodb8` + the shared AMI `ami-0bd91caaa9bc42cf3`" direction — the shared base is now a versioned Packer-built golden AMI, not the hand-baked `ami-0bd91caaa9bc42cf3`.
-- **SPIKE-6** (staging host stop/start lifecycle) and **SPIKE-7** (`ecs_service` extend vs bespoke task def) → still open.
+- **SPIKE-6** (staging host stop/start lifecycle) → ✅ **RESOLVED — direct stop/start** via `stop-instance.sh`/`start-instance.sh` + `ecs-scale.sh` (ASG-from-zero ruled out by the AWS-documented "launches 2 instances" behavior).
+- **SPIKE-7** (`ecs_service` extend vs bespoke task def) → ✅ **RESOLVED — bespoke `aws_ecs_task_definition` (7B)**: `modules/ecs_service` is consumed by ~19 stacks (regression blast radius) and `modules/pritunl` is already bespoke. See `phase-2-terraform/phase-2_blocking-decisions.md`.
+- **SPIKE-8** (Pritunl SIGTERM session-drain) → ⏳ empirical Phase-3 test (not doc-resolvable, not a Phase-2 blocker) — proceed with `STOPSIGNAL SIGTERM` + ECS `stopTimeout: 20s`; the drain-vs-drop test runs during Phase-3 pre-flip validation.
 
 ### Next steps
 
-1. **SPIKE-3 doc lookup** — apply the documented SG rule (the remaining PR-2.3 blocker now that SPIKE-2 is resolved).
-2. **Parallelizable immediately** — PR 2.1 (ECR) and PR 2.2 (identity governance) have no spike blocker.
-3. **PR 2.3 (Mongo VM)** once SPIKE-3 resolves — launch the dedicated Mongo VM from the golden AMI via `data "aws_ami"` (by `Name`/`Version` tag) + the dedicated Mongo security group. No Ansible role runs on the VM (superseded by the golden AMI).
-4. **SPIKE-7 → PR 2.4 (prod ECS)**; **SPIKE-4/5/6 → PR 2.5 (staging ECS)**; **SPIKE-8 → Phase 3 validation** (independent, empirical SIGTERM/session-drain test).
-5. Each PR in a fresh, focused session with Pattern Priming + PR-first + gated plan/apply.
+All Phase-2 decisions are resolved (see "Phase-2 decisions — status" and `phase-2-terraform/phase-2_blocking-decisions.md`); the PRs are execution-only. **PR 2.1 (ECR) and PR 2.2 (governance) are DONE + merged** (see "Phase 2 execution progress" below). Remaining order:
+
+1. **PR 2.3 (Mongo VM)** — dedicated Mongo VM from the golden AMI via `data "aws_ami"` (SPIKE-2) + CIDR-scoped Mongo SG (SPIKE-3). No Ansible on the VM. Next up; substantially larger than 2.1/2.2 (bare `aws_instance` + AMI lookup + security group + IAM route-advertisement role).
+2. **PR 2.4 (prod ECS)** — bespoke `aws_ecs_task_definition`, privileged + host networking (SPIKE-7).
+3. **PR 2.5 (staging ECS)** — desired_count=0, DB on the shared Mongo VM (SPIKE-4), default public IP on stop/start (SPIKE-5), direct host stop/start (SPIKE-6).
+4. **Phase 3** — empirical SIGTERM/session-drain test (SPIKE-8) + the one-time cutover.
+
+Each PR in a fresh, focused session with Pattern Priming + PR-first + gated plan/apply.
 
 ### Golden-AMI pipeline built (2026-07-10) — resolves SPIKE-2
 
@@ -454,3 +459,9 @@ A dedicated MongoDB golden-AMI pipeline was built, merged, and validated in prod
 **Still open for the Mongo VM specifically:** the dedicated security group mechanism (**SPIKE-3**, SG-to-SG vs CIDR) is the remaining PR-2.3 blocker; and confirm at authoring time that the golden AMI's baked `mongod.conf` bind address / auth posture suits the Pritunl-container-over-VPC connection (the URI Pritunl sets points at the Mongo VM's private address — decision 3).
 
 **Cross-reference:** the golden-AMI plan of record is `~/Projects/4Shark/dot-claude-plans/active/mongodb-golden-ami/PLAN.md` (its Phase 2 IS this Pritunl Mongo VM adoption; its Phase 3 is the integrator fleet cutover, out of scope for the VPN migration).
+
+### Phase 2 execution progress (2026-07-10)
+
+- **PR 2.1 (ECR) — DONE + merged** ([terraform#679](https://github.com/4shark/terraform/pull/679)): added `vpn` + `vpn-staging` ECR repositories to the **`vpn` stack** (`vpn/ecr.tf`), mirroring the auth-001 two-target shape (`image_tag_mutability = MUTABLE`, scan-on-push, AES256). Tags are inline `{ Environment = "management", Role = "vpn" }` — the `vpn` stack has no `local.tags` and tags inline, so the new file matches the local convention rather than auth-001's `local.tags`. Plan was clean (2 add / 0 change / 0 destroy — the `module.pritunl` VM untouched), applied via `4shark-mfa`, merged. The pritunl build workflow now has push targets in `405749097490.dkr.ecr.sa-east-1.amazonaws.com`.
+- **PR 2.2 (governance) — DONE + merged** ([terraform#680](https://github.com/4shark/terraform/pull/680)): Phase 1 (#668) had already added `pritunl` to `local.repositories` and `local.hubflow_repositories`, so 2.2 was scoped to the `Verify Minimum Age` required-status-check lists. **Broadened mid-flight to close a gap the engineer spotted**: the golden-AMI repos `mongodb` and `ansible-role-mongodb` were registered in `local.main_branch_repositories` but never added to `local.main_branch_repositories_with_min_age_check`, even though their CI produces the check. So the final change added THREE repos to their respective required-check lists — `pritunl` → `hubflow_repositories_with_min_age_check`; `mongodb` + `ansible-role-mongodb` → `main_branch_repositories_with_min_age_check`. Plan clean (0 add / **4 change** / 0 destroy — the 4 `github_branch_protection` resources gained the required check), applied via `ivo`, merged. Verified: all 4 branches (`pritunl` master+develop, `mongodb` main, `ansible-role-mongodb` main) now require `Verify Minimum Age`. Each already produces the check, so no merges are blocked.
+- **PRs 2.3–2.5** — not started; all decision-unblocked (spikes resolved above). PR 2.3 is next and is the first substantial one (bare `aws_instance` from the golden AMI + CIDR-scoped Mongo SG + IAM); best done in a fresh, focused session.

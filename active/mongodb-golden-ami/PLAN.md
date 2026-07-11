@@ -47,8 +47,9 @@ a `data "aws_ami"` lookup — never a hardcoded id.
 ## Current state (2026-07-10)
 
 Done:
-- `mongodb` build repo created + scaffolded (its own PR #1 merged). NOTE: that
-  scaffold COPIED the role — must be undone (step 3 below), replaced by a pull.
+- `mongodb` build repo created + scaffolded. The initial scaffold COPIED the role;
+  that was later undone and replaced by a `requirements.yml` pull (see Remaining
+  step 1 and Execution progress below — both DONE).
 - `ansible-role-mongodb` repo created, registered in terraform/identity, renamed
   in-place from the wrong `ansible-role-mongodb8` (terraform #671/#672/#673 all
   merged; the rename used `moved` blocks, 0 destroy).
@@ -83,17 +84,44 @@ for now — they still serve the current fleet until Phase 3 cuts it over.
 
 ## Remaining steps (order)
 
-1. **`mongodb` build repo** — undo the copied role; add `requirements.yml` pulling
-   `ansible-role-mongodb` (pinned to `main`/SHA for now, NOT a tag) + wire the
-   Packer ansible provisioner to install-then-use it. Update the open mongodb#1
-   in place.
-2. **VALIDATE** — run a real Packer build that pulls the role and produces a
-   bootable MongoDB AMI. Confirm mongod installed, THP disabled, config in place.
-   This is the gate.
-3. **Cut `v1.0.0`** (post-validation, explicit engineer OK) — then flip the
-   consumer pin from `main`/SHA to `v1.0.0` and enable Renovate on the tag.
-4. **Phase 2 / Phase 3** (below) — greenfield Pritunl Mongo, then the integrator
-   fleet rolling cutover; the ansible-monorepo legacy cleanup rides along here.
+1. ✅ **`mongodb` build repo** — DONE. The copied role was removed; `ansible/requirements.yml`
+   pulls `ansible-role-mongodb` (pinned to `main`) and the Packer ansible provisioner
+   installs-then-uses it. main is a clean orphan (ivonoide init dropped).
+2. ✅ **VALIDATE** — DONE. Real Packer builds produced bootable MongoDB 8.2 AMIs
+   (mongod installed, THP disabled via the baked systemd unit, config in place); the
+   pipeline runs in production (build on push-to-main). See "Execution progress" below.
+3. ⏸ **Cut `v1.0.0`** — **deferred by the engineer** ("deixa a tag de fora"). The role
+   stays pinned to `main` for now. When cut (explicit tag OK required), flip the pin
+   from `main` → `v1.0.0` and enable Renovate on the tag.
+4. **Phase 2 / Phase 3** — Phase 2 (Pritunl Mongo VM adopts the AMI) is in progress
+   under the VPN migration plan (`~/Projects/4Shark/dot-claude-plans/active/pritunl-ecs/PLAN.md`,
+   its PR 2.3). Phase 3 (integrator fleet cutover) + the ansible-monorepo legacy cleanup
+   ride along later.
+
+## Execution progress (2026-07-10)
+
+- **Build infra (terraform/mongodb stack) — applied + merged**: IAM user `mongodb-ami-build`
+  (minimum Packer EC2 policy), its access key, a read-only SSH deploy key on the private
+  `ansible-role-mongodb`, and the `mongodb` GitHub Environment secrets (AWS keys + the
+  deploy-key private half). The role is private, so the build loads the deploy key and
+  clones it over SSH.
+- **Validation surfaced and fixed four real build gaps** (the gate did its job):
+  1. no default VPC in the account → the Packer `amazon-ebs` source now targets the
+     management VPC public subnet via `subnet_filter` (by tag) + `associate_public_ip_address`.
+  2. private role clone failed anonymously → SSH deploy key + `git@github.com` in
+     `requirements.yml` + a workflow step that loads the key.
+  3. the build was slow → tuned; see next.
+  4. per-task SSH overhead (a `mkdir` took ~35s) was the real cost, not CPU — fixed by
+     `use_proxy = false` (Ansible connects directly to the instance's public IP) +
+     `ANSIBLE_PIPELINING=True`. Provisioning dropped from ~8.5 min to ~1.5 min.
+- **Instance right-sized back to `t3a.micro`** after the diagnosis proved CPU was never
+  the bottleneck; `enable_unlimited_credits = true` keeps the short package-install burst
+  from throttling. Micro + unlimited + pipelining ≈ the same speed as a larger instance
+  (~10 min total, ~7 of which is the AWS-side EBS snapshot). First production AMI:
+  `mongodb-8.2-20260710180906`.
+- **Supply-chain governance**: `mongodb` and `ansible-role-mongodb` were added to
+  `main_branch_repositories_with_min_age_check` in the identity stack (terraform#680), so
+  their merges now require the `Verify Minimum Age` check they already produce.
 
 ## Phase 2: Pritunl Mongo VM adopts the golden AMI (greenfield, single-node, 20GB)
 

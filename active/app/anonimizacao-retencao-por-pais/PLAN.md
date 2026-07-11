@@ -142,7 +142,7 @@ Phase 5 needs NO defensive nil handling — there is never a nil to guard agains
 
 **Completion criteria**: merged into develop via #5217, `/test` clean, seed values verified. **(met)**
 
-### Phase 2 — Release + Deploy to production (BEFORE the backfill)
+### Phase 2 — Release + Deploy to production (BEFORE the backfill) — DONE (release 3.51.0, deployed to shared-001 + atento-001)
 
 The Phase 1 columns and per-country values live on `develop` but **not in production yet**. The
 backfill (Phase 4) mutates production accounts, so the schema and the seeded values must be live in
@@ -165,9 +165,10 @@ production first. This phase cuts a release off `develop` and deploys it.
    (AR/CL/GT/PA/PE NULL, by design).
 
 **Completion criteria**: release tagged, both productive stacks on the new version, columns + seeded
-values confirmed in production.
+values confirmed in production. **(met)** — 3.51.0 tagged and back-merged; both productive stacks
+deployed; BR/MX/CO windows confirmed live.
 
-### Phase 3 — Write-path (creation/edit accept the country) + Release + Deploy
+### Phase 3 — Write-path (creation/edit accept the country) + Release + Deploy — DONE (app #5221 write-path + #5222 presence; app-webclient #6590; deployed)
 
 New accounts must be born with a country before the backfill runs (decision 9). This phase makes
 account creation and edit accept `retention_jurisdiction_country_id`, ships it, and deploys it —
@@ -191,9 +192,15 @@ to the productive stacks (`shared-001`, `atento-001`). The field is **not yet ma
 creation still succeeds without it (Phase 5 enforces presence), so this deploy is backward-compatible.
 
 **Completion criteria**: both repos released and deployed; a new account can be created/edited with a
-chosen country in production.
+chosen country in production. **(met)** — backend #5221 (mutations accept + persist the field) and
+front #6590 (user-chosen country selector + tooltip, required on create/edit). **Presence brought
+forward from Phase 5 at the engineer's call (#5222):** the model-level
+`validates :retention_jurisdiction_country_id, presence: true` shipped here, ahead of the backfill.
+Trade-off accepted knowingly: between the #5222 deploy and Phase 4 completion, any existing NULL
+account failed every `.save`/`.update` (the write-block — Finding C2 of the business-territory
+spike); Phase 4 then filled every account, satisfying it.
 
-### Phase 4 — Backfill (operational, in production)
+### Phase 4 — Backfill (operational, in production) — DONE (beta 54, demo 157, shared 78, atento 8; all verified)
 
 Assign `retention_jurisdiction_country_id` on every existing company. Runs AFTER Phase 3, so the
 write-path is already live and no new account is born NULL during the backfill window. Data operation
@@ -205,15 +212,51 @@ window (BR/MX/CO) can bind accounts that Phase 5 will anonymize; accounts of not
 stay unbound or are handled per the engineer's call.
 
 **Completion criteria**: zero companies with `retention_jurisdiction_country_id: nil` (or the agreed
-subset bound).
+subset bound). **(met)** — every company in all four environments now has a country.
+
+**Executed approach (engineer decision at run time, refining decision 1 / this phase's original
+premise).** Decision 1 and this phase originally said the country was NOT auto-inferable from
+`business_territories`. At run time the engineer decided the opposite where it is unambiguous: for
+the backfill the governing country WAS derived from the account's **single** `business_territory`.
+A spike (`active/spike/business-territory-retention-jurisdiction/SPIKE.md`) first confirmed the
+premise change was safe and that **nothing consumes `retention_jurisdiction_country_id` yet** (the
+anonymization workers still run the single global window — so the backfill's live purpose today is
+only to unblock the presence write-block, not to change anonymization). Rule applied per
+environment via the three-script pattern (pre-flight → mutation → verification): `retention =
+single territory country`, with no-window countries (GT/CL/PE/AR) tied to their own country all the
+same. Two demo multi-territory accounts were handled specially:
+- **#633 (Atento Mexico API)** carried an erroneous `BR` territory (added 2025-12-04, three months
+  before its `MX` territory on 2026-03-02; zero subsidiaries → removal safe). The `BR` territory row
+  was removed, leaving `MX` → retention `MX`.
+- **#488 (Conta Global)** is a legitimate `Holding` with 8 per-country child CallCenters (which
+  backfilled per-country on their own via the single-territory rule). The aggregator record got a
+  **representative country (BR)**; its business_territory/branch divergence (holding territory
+  `[AR,BR,CO,MX,PE]` vs 8 branch countries `[AR,BR,CL,CO,GT,MX,PA,PE]`) is left as a separate
+  follow-up, NOT corrected in this pass.
 
 ### Phase 5 — Contract (Release + Deploy: mandatory column + activate per-country resolution)
 
 By now every bound account has a country (Phase 4) and new accounts are born with one (Phase 3), so
 the producers resolve per account with NO nil handling.
 
+**NEW GAP surfaced by the backfill — must be resolved before items 3–4 go live.** The backfill bound
+production accounts to **AR, CL, GT, PA, PE** (the engineer's "amarra ao país mesmo" decision), but
+those countries still have `anonymizing_window_days = NULL` (only BR/MX/CO are seeded — Phase 1
+item 5). The country FK is now non-null everywhere, so the country-level "NO nil handling" premise
+holds — but the **window** can still be NULL, and item 3's `Company#anonymizing_window`
+(`retention_jurisdiction_country.anonymizing_window_days.days.ago`) would raise on a NULL window for
+those accounts. **Engineer decision (resolved): option (b) — the producers exclude accounts whose
+country window is still NULL.** AR/CL/GT/PA/PE accounts are simply not selected for anonymization
+until their window is seeded later (a one-row `countries` update per country, once legal confirms).
+Code-only; no dependency on legal confirmation to ship Phase 5. Item 4 below carries this filter.
+
+**Note:** item 2 (`validates :retention_jurisdiction_country_id, presence: true`) already shipped
+early in Phase 3 (#5222) — no work left on that item; only the DB `NOT NULL` (item 1), the resolution
+(item 3), the producers (item 4), and the docs (item 5) remain.
+
 1. Migration: `retention_jurisdiction_country_id` NOT NULL on `companies`.
-2. `validates :retention_jurisdiction_country_id, presence: true` on `Company`.
+2. `validates :retention_jurisdiction_country_id, presence: true` on `Company` — **already shipped in
+   Phase 3 (#5222); nothing left on this item.**
 3. `Company#anonymizing_window` → `retention_jurisdiction_country.anonymizing_window_days.days.ago`.
 4. Change the four producers (`Company::UserAnonymizer`, `Company::ActionAnonymizer::Producer`,
    `Company::DocumentRedactor::Producer`, `User::Anonymizer::Producer`) to resolve per account via
@@ -228,6 +271,8 @@ the producers resolve per account with NO nil handling.
    per-country behavior actually goes live and the first cron run anonymizes on the new windows.
 
 **Completion criteria**: column NOT NULL, presence validated, producers resolve per account, released and deployed.
+
+**Status:** code landed in PR #5223 (items 1, 3, 4, 5, 6 done; item 2 was already shipped in #5222). **Item 7 (release + deploy) still pending** — go-live is where the per-country behavior activates and the irreversible Brazil 2008 → 1855 reduction takes effect. Per the gate decision, the producers exclude accounts whose country window is still NULL, so AR/CL/GT/PA/PE accounts are not anonymized until their `anonymizing_window_days` is seeded (a one-row `countries` update per country, once legal confirms).
 
 ## Risks
 
