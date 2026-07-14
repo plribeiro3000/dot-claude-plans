@@ -92,11 +92,13 @@ Fan-out entry point (unchanged, for reference): `Company::Anonymizer#perform`
 
 ## Technical decisions (resolved via Pattern Priming — engineer-confirmed)
 
-- **Resolution is direct, per account — NO iteration over countries.** Each company resolves its
-  own country and window: `company.retention_jurisdiction_country.anonymizing_window_days`. A user
-  resolves to one company, which resolves to one country, which gives one window. The window cutoff
-  lives on `Company` as `Company#anonymizing_window` (returns the `Time` cutoff, mirroring the
-  `ApplicationConfiguration.user_anonymizing_window` it replaces).
+- **~~Resolution is direct, per account — NO iteration over countries.~~ SUPERSEDED (engineer review
+  of PR #5223 → Phase 5 item 4): resolution is database-side, iterating the countries that have a
+  window and comparing `disabled_at` in SQL per country. No `Company#anonymizing_window` method.**
+  The original text follows for history: each company resolved its own country and window
+  (`company.retention_jurisdiction_country.anonymizing_window_days`); the cutoff lived on `Company`
+  as `Company#anonymizing_window` (a `Time`, mirroring the `ApplicationConfiguration.user_anonymizing_window`
+  it replaced).
 - **Producers 1–3 (company-disablement — select disabled companies)**: select disabled companies
   that HAVE a country (`where.not(disabled_at: nil).where.not(retention_jurisdiction_country_id:
   nil)`), then keep the ones whose `disabled_at` is past their own `anonymizing_window`. Companies
@@ -257,12 +259,19 @@ early in Phase 3 (#5222) — no work left on that item; only the DB `NOT NULL` (
 1. Migration: `retention_jurisdiction_country_id` NOT NULL on `companies`.
 2. `validates :retention_jurisdiction_country_id, presence: true` on `Company` — **already shipped in
    Phase 3 (#5222); nothing left on this item.**
-3. `Company#anonymizing_window` → `retention_jurisdiction_country.anonymizing_window_days.days.ago`.
+3. **No `Company#anonymizing_window` method** — the eligibility comparison is done database-side in
+   the producers (engineer review of PR #5223, superseding the earlier per-account-method approach).
 4. Change the four producers (`Company::UserAnonymizer`, `Company::ActionAnonymizer::Producer`,
-   `Company::DocumentRedactor::Producer`, `User::Anonymizer::Producer`) to resolve per account via
-   `Company#anonymizing_window` instead of the global cutoff. IDs-only + `Company.find` per id (join
-   decomposition), consistent across all four. NO `where.not(retention_jurisdiction_country_id: nil)`
-   filter — the column is mandatory now.
+   `Company::DocumentRedactor::Producer`, `User::Anonymizer::Producer`) to select **database-side, per
+   country**: iterate the countries that have an `anonymizing_window_days`, and for each, select the
+   disabled companies (or, for `User::Anonymizer::Producer`, the disabled users of that country's
+   enabled companies) whose `disabled_at` is past `anonymizing_window_days.days.ago` — the comparison
+   runs in SQL, filtered by the indexed `retention_jurisdiction_country_id`, using the
+   `Company.disabled` / `Company.enabled` scopes. This **supersedes the plan's earlier "NO iteration
+   over countries" and per-account `Company#anonymizing_window` decisions** (engineer review of PR
+   #5223). Countries with a NULL window are excluded by the `Country.where.not(anonymizing_window_days:
+   nil)` at the top of each producer — which also resolves the AR/CL/GT/PA/PE gap without a separate
+   filter.
 5. Fix `app/docs/architecture/API_PATTERNS.md` § "Anonymization and the 5-year rule": remove the
    stale "2590 days / ~7 years" claim (production is 2008) and generalize to the per-account, per-country window.
 6. Tests: `Company#anonymizing_window` + the producer selection behavior. Changelog `### Changed` —
