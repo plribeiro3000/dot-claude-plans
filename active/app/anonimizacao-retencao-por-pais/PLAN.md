@@ -9,12 +9,49 @@ retention periods for employee data. This plan makes the retention window resolv
 account**, driven by the country that legally governs each account's data retention.
 
 Research backing this plan (do not re-run — decisions below are already settled):
-- `~/.claude/plans/active/spike/anonimizacao-por-pais/SPIKE.md` (v1) — the anonymization pipeline
-  map and the Brazil/Mexico legal basis
-- `~/.claude/plans/active/spike/anonimizacao-por-pais/SPIKE-v2.md` (v2) — the per-account premise,
-  per-country legal research, and the naming/domain analysis
-- `~/.claude/plans/active/spike/anonimizacao-por-pais/anonimizacao-por-pais_legal_sources_v2_country_retention.md`
+- `~/Projects/4Shark/dot-claude-plans/active/spike/anonimizacao-por-pais/SPIKE.md` (v1) — the
+  anonymization pipeline map and the Brazil/Mexico legal basis
+- `~/Projects/4Shark/dot-claude-plans/active/spike/anonimizacao-por-pais/SPIKE-v2.md` (v2) — the
+  per-account premise, per-country legal research, and the naming/domain analysis
+- `~/Projects/4Shark/dot-claude-plans/active/spike/anonimizacao-por-pais/anonimizacao-por-pais_legal_sources_v2_country_retention.md`
   — every legal source per country, with URLs and verification status
+- `~/Projects/4Shark/dot-claude-plans/completed/spike/anonymization-producer-gating/SPIKE.md` — the
+  unbounded-daily-re-scan question that produced the terminal flag (Phase 5, items 5–8). **Read its
+  "Outcome" section first**: the option analysis in the body mischaracterized the terminal flag as
+  the highest-cost option, and the Outcome records what actually shipped and why it is cheap.
+
+## RESUME HERE — 2026-07-15
+
+**Phases 1–4 are done. Phase 5's code is merged into `develop`. Only the release + deploy (item 11) is
+left, and the release is already cut and waiting.**
+
+`release/3.54.0` is cut from `develop` and pushed; **PR #5232 — `[3.54.0] - 2026-07-15` → `master`** is
+open. `config/version.rb` is at `3.54.0` and the CHANGELOG's `## [Unreleased]` rolled into
+`## [3.54.0] - 2026-07-15` (dated tomorrow deliberately — the engineer merges it first thing).
+
+Tomorrow, in order:
+
+1. **Merge PR #5232** — engineer only; the merge is never the agent's call.
+2. **Run `/merge-cleanup`** from the **main working tree** of `app` (never a worktree — `git hf` checks
+   out `master` and `develop`, impossible from a linked worktree). It detects the `release/*` branch and
+   runs `bash ~/.claude/scripts/hubflow.sh release finish 3.54.0 "<tag-message>"`, which tags `master`
+   at the `chore(release): 3.54.0` commit, back-merges into `develop`, and deletes the branch. Match the
+   tag-message convention from the previous tag first (`git tag -n1 3.53.0`). Invoking `/merge-cleanup`
+   on a release branch IS the tag authorization — it does not ask again.
+3. **Deploy** `shared-001`, then `atento-001` (DEPLOY-REFERENCE.md). **Check the Sidekiq queue depth
+   before each** — hold if it is heavy (app/CLAUDE.md). Single normal deploy; nothing here needs phasing.
+4. **Watch the first `anonymization:company` cron run after the deploy.** That run is the go-live. Two
+   consequences, both intended and already accepted:
+   - **Brazil 2008 → 1855 fires as one irreversible batch** — every Brazilian account disabled in the
+     newly-exposed 1855–2008-day band becomes eligible on that first run (LGPD art. 12: cannot be undone).
+   - **The terminal flag self-backfills on the same run** — every already-anonymized company is selected,
+     observed complete, and self-marks. That first run IS the backfill, by design.
+
+After that run, the feature is live and Phase 5 is complete — and **that is the trigger for Phase 6**:
+closing the silent-retention gap (an account whose country has a NULL window is never anonymized, and
+nothing says so). That is the agreed next thing to look at once today's plan is finished; its shape is
+still undecided and is the engineer's call. Everything else is in § Open follow-ups — none of it blocks
+the release.
 
 ## Settled decisions (engineer-approved)
 
@@ -118,6 +155,36 @@ Fan-out entry point (unchanged, for reference): `Company::Anonymizer#perform`
 - **NO global default.** The country is mandatory by design (Phase 5). There is no
   `USER_ANONYMIZING_WINDOW` fallback branch in the resolution. The ENV constant's only remaining
   role is historical until Phase 5 lands; the new code does not read it.
+- **Terminal flag on `companies.anonymized`, marked by a fourth leg that OBSERVES the other three —
+  no `Computation`, no cross-leg coordination, no backfill (engineer decision, PR #5229).** The
+  daily cron re-derives its eligible-company population from scratch forever, so a company
+  anonymized years ago is re-scanned every day for the life of the platform. The gate is a boolean
+  `anonymized` column (default false); the three "disabled company" producers add
+  `.without_anonymization` to their scan, and a fourth leg (`Company::Anonymizer::Producer` →
+  `Consumer` → `Finalizer`) marks the flag once the company is genuinely done.
+  - **Why not a gate on "company still has a non-anonymized user"** (the first proposal): the three
+    legs run in parallel with no ordering. If the user leg finishes while document redaction is
+    still incomplete, a user-based gate stops re-visiting the company from that day forward and the
+    un-redacted documents are never found again. The user leg never touches `Document` — see the
+    gating spike, Finding 4.
+  - **Why no `Computation`**: completion here is **observed, not coordinated**. The Consumer asks
+    each of the three legs "is there pending work?" — `User.exists?(anonymized: false)`,
+    `Document...without_status(:redacted).exists?`, `UserIdentifierAction.exists?(anonymized: false)` —
+    and only chains to the `Finalizer` when all three answer no. Every check reads **durable data
+    state, not job state**, so there is no race with the legs' own jobs and nothing to synchronize:
+    a leg that has not run yet, or was interrupted mid-run, still has its rows pending, so the flag
+    is simply not set and the company is re-scanned tomorrow. This is what makes the terminal flag
+    cheap instead of the "highest cost" option the spike first characterized it as.
+  - **Why no backfill**: the flag defaults to false, so on the first cron run after deploy every
+    already-anonymized company is selected, observed as complete, and self-marks. The backfill is
+    the first run.
+  - **Re-enable clears it**: `Company#enable` sets `anonymized: false` alongside `disabled_at`/
+    `disabler_id`, so a company that is re-enabled and later disabled again starts a fresh cycle
+    rather than being suppressed by a stale flag.
+  - **`User::Anonymizer::Producer` (the fourth producer) is deliberately NOT gated** — it scans
+    `Company.enabled` for individually-disabled users, and an enabled company never reaches a
+    terminal state (new users can be disabled at any time for the life of the account). There is
+    nothing to permanently exclude.
 
 ## Execution phases
 
@@ -236,7 +303,7 @@ same. Two demo multi-territory accounts were handled specially:
   `[AR,BR,CO,MX,PE]` vs 8 branch countries `[AR,BR,CL,CO,GT,MX,PA,PE]`) is left as a separate
   follow-up, NOT corrected in this pass.
 
-### Phase 5 — Contract (Release + Deploy: mandatory column + activate per-country resolution)
+### Phase 5 — Contract (Release + Deploy: mandatory column + activate per-country resolution + terminal flag)
 
 By now every bound account has a country (Phase 4) and new accounts are born with one (Phase 3), so
 the producers resolve per account with NO nil handling.
@@ -253,8 +320,9 @@ until their window is seeded later (a one-row `countries` update per country, on
 Code-only; no dependency on legal confirmation to ship Phase 5. Item 4 below carries this filter.
 
 **Note:** item 2 (`validates :retention_jurisdiction_country_id, presence: true`) already shipped
-early in Phase 3 (#5222) — no work left on that item; only the DB `NOT NULL` (item 1), the resolution
-(item 3), the producers (item 4), and the docs (item 5) remain.
+early in Phase 3 (#5222) — no work left on that item. For what is done and what remains across the
+rest of the items, see the **Status** block at the end of this phase (only item 11, release + deploy,
+is left).
 
 1. Migration: `retention_jurisdiction_country_id` NOT NULL on `companies`.
 2. `validates :retention_jurisdiction_country_id, presence: true` on `Company` — **already shipped in
@@ -272,16 +340,143 @@ early in Phase 3 (#5222) — no work left on that item; only the DB `NOT NULL` (
    #5223). Countries with a NULL window are excluded by the `Country.where.not(anonymizing_window_days:
    nil)` at the top of each producer — which also resolves the AR/CL/GT/PA/PE gap without a separate
    filter.
-5. Fix `app/docs/architecture/API_PATTERNS.md` § "Anonymization and the 5-year rule": remove the
+5. Migration: `companies.anonymized` (boolean, `default: false`, `null: false`) — the terminal flag.
+6. `Company.without_anonymization` scope (`where(anonymized: false)`); the three "disabled company"
+   producers (`Company::UserAnonymizer`, `Company::ActionAnonymizer::Producer`,
+   `Company::DocumentRedactor::Producer`) add it to their per-country scan.
+   `User::Anonymizer::Producer` is deliberately NOT gated (enabled companies have no terminal state).
+7. Fourth leg, fired from `Company::Anonymizer#perform` alongside the existing three:
+   `Company::Anonymizer::Producer` (per-country scan of disabled + not-yet-flagged companies past
+   their window) → `Company::Anonymizer::Consumer` (observes the three legs' pending work via
+   `exists?`; returns early on any pending) → `Company::Anonymizer::Finalizer` (sets the flag).
+8. `Company#enable` clears the flag — full reimplementation (no `super`), setting
+   `anonymized: false` with `disabled_at`/`disabler_id` so a re-enabled account starts a fresh cycle.
+9. Fix `app/docs/architecture/API_PATTERNS.md` § "Anonymization and the 5-year rule": remove the
    stale "2590 days / ~7 years" claim (production is 2008) and generalize to the per-account, per-country window.
-6. Tests: `Company#anonymizing_window` + the producer selection behavior. Changelog `### Changed` —
-   behavior now per-country; **Brazil moves 2008 → 1855** (irreversible; takes effect on this deploy).
-7. **Release + deploy this phase too** (same HubFlow + deploy flow as Phase 2) — this is where the
-   per-country behavior actually goes live and the first cron run anonymizes on the new windows.
+10. Tests: the producer selection behavior + `Company#enable` clearing the flag. Changelog
+    `### Changed` — behavior now per-country; **Brazil moves 2008 → 1855** (irreversible; takes
+    effect on this deploy) — and `### Added` for the skip of already-anonymized accounts.
+11. **Release + deploy this phase too** (same HubFlow + deploy flow as Phase 2) — this is where the
+    per-country behavior actually goes live and the first cron run anonymizes on the new windows.
 
-**Completion criteria**: column NOT NULL, presence validated, producers resolve per account, released and deployed.
+**Completion criteria**: both columns in place (`retention_jurisdiction_country_id` NOT NULL,
+`anonymized` NOT NULL), presence validated, producers resolve per account and skip already-anonymized
+accounts, released and deployed.
 
-**Status:** code landed in PR #5223 (items 1, 3, 4, 5, 6 done; item 2 was already shipped in #5222). **Item 7 (release + deploy) still pending** — go-live is where the per-country behavior activates and the irreversible Brazil 2008 → 1855 reduction takes effect. Per the gate decision, the producers exclude accounts whose country window is still NULL, so AR/CL/GT/PA/PE accounts are not anonymized until their `anonymizing_window_days` is seeded (a one-row `countries` update per country, once legal confirms).
+**Status:** **`feature/per-country-anonymization` is MERGED into `develop`** — PR #5223, rebased onto
+develop at 3.53.0 immediately before the merge (the rebase linearized the branch, dropping the #5229
+merge commit). The code landed in two PRs that were first merged into that feature branch:
+- **#5223** — items 1, 3, 4, 9 (the NOT NULL migration, database-side per-country resolution in the
+  four producers, and the API_PATTERNS fix). Item 2 was already shipped in #5222. Review-driven
+  hardening included: `Country` `dependent: :nullify` → `:restrict_with_exception` (the NOT NULL made
+  `:nullify` a latent `PG::NotNullViolation` on country destroy), and
+  `validates :anonymizing_window_days, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true`
+  (a `0` window would make every disabled account of that country immediately eligible — irreversible
+  mass anonymization).
+- **#5229** — items 5, 6, 7, 8: the `companies.anonymized` terminal flag, the
+  `without_anonymization` gate on the three "disabled company" producers, the
+  `Producer`/`Consumer`/`Finalizer` fourth leg, and `Company#enable` clearing the flag.
+- Item 10 (tests + changelog) is covered across both.
+
+**Item 11 (release + deploy) is the only one left, and it is IN PROGRESS** — `release/3.54.0` is cut
+from `develop` and **PR #5232 (`[3.54.0] - 2026-07-15` → `master`) is open**, awaiting the engineer's
+merge on 2026-07-15. **§ RESUME HERE carries the exact sequence** from that merge through go-live
+(merge → `/merge-cleanup` runs `hubflow.sh release finish` → deploy `shared-001`/`atento-001` after the
+queue check → watch the first cron run). Per the gate decision, the producers iterate only countries
+with a seeded window, so AR/CL/GT/PA/PE accounts are not anonymized until their
+`anonymizing_window_days` is seeded (a one-row `countries` update per country, once legal confirms).
+
+**Deploy shape — still a single normal deploy, now for two reasons.** The per-country change only
+alters the cron selection query (decision 8). The flag work adds a column and a NEW fan-out
+(`Company::Anonymizer::Producer`/`Consumer`/`Finalizer`) but changes no existing job's argument
+shape, introduces no non-idempotent step, and derives no `Computation` key — the three conditions
+that would force expand/contract per DEPLOYMENT-STRATEGY. The ephemeral migration task adds the
+`anonymized` column (default false, so existing rows are backfilled by Postgres, not by a data
+migration) before the new code goes live; a worker still running old code during the rollover simply
+does not fire the fourth leg that day.
+
+### Phase 6 — Close the silent-retention gap (starts when Phase 5 is live)
+
+**Trigger: the moment item 11 is done** — release merged, deployed, first `anonymization:company` run
+observed. Everything planned for 2026-07-14 ends there; **this is the next thing to look at.**
+
+**The gap.** Every producer iterates only `Country.where.not(anonymizing_window_days: nil)`. An account
+whose retention jurisdiction country has a NULL window is therefore **never anonymized — and nothing
+says so.** Today that is AR / CL / GT / PA / PE (Phase 1 item 5 left them unseeded on purpose, pending
+legal). Before this feature the single global window guaranteed every disabled account was eventually
+processed; that safety net is now gone **by design**, and nothing replaced it.
+
+**Why it matters.** LGPD storage limitation makes the window a **maximum**, not an option — "we retain
+it until someone remembers to seed the country" is not a defensible position. And the failure is
+**silent**: no error, no job, no log line; it surfaces only at an LGPD verification, which is the worst
+possible moment to discover it. Raised as a Medium finding by the PR #5223 review.
+
+**Shape NOT decided — the engineer's call.** Options surfaced, none chosen:
+- a periodic check that flags any country referenced by a disabled company but lacking a window;
+- a guard at write/seed time — a country cannot be used as a retention jurisdiction until it has a window;
+- accept it explicitly and track the unseeded countries out-of-band until legal confirms.
+
+**Seeding the five countries does NOT close this.** Follow-up 1 removes today's *instance* of the gap;
+the gap itself is structural — a country added tomorrow, or a jurisdiction pointed at an unseeded
+country, reopens it. Phase 6 is about the class of problem, not the current five.
+
+## Learnings (from execution — read before touching this feature again)
+
+1. **`business_territory` is NOT the retention jurisdiction.** It is where the company *does business*,
+   and it is legitimately multi-valued. For a **single**-territory account it is a sound proxy (one
+   country of operation → that country's law governs), and that is exactly how the backfill used it.
+   For multi-territory it breaks down and needs judgment — see the two demo accounts in Phase 4. The
+   plan originally asserted the country was "NOT auto-inferable from `business_territories`" (decision
+   1); the refinement is that it IS inferable precisely when the territory is unambiguous. Established
+   by `active/spike/business-territory-retention-jurisdiction/SPIKE.md`.
+2. **A `Holding`'s territory is not its branches, and `Company` has no `parent_id`.** The company-to-
+   company hierarchy is `Holding` (an STI subtype) + `CompanyBranch`; **no code links
+   `company_business_territories` to `company_branches`** — they are independently written. The demo
+   "Conta Global" proved it: territory `[AR,BR,CO,MX,PE]` (5) vs 8 branch countries
+   `[AR,BR,CL,CO,GT,MX,PA,PE]`. Do not infer one from the other.
+3. **Until Phase 5, nothing read `retention_jurisdiction_country_id`.** The anonymization workers ran
+   the single global `USER_ANONYMIZING_WINDOW` the whole time. So the backfill's *live* purpose was
+   never "fix anonymization" — it was **unblocking writes**: the presence validation (#5222, brought
+   forward from Phase 5) made every `.save`/`.update` on a NULL account fail. The DB had no `NOT NULL`
+   until Phase 5, so a NULL never broke a read.
+4. **`countries.anonymizing_window_days` is an Integer (a count of days); `companies.disabled_at` is a
+   datetime.** They can never be compared directly — the integer must be converted to a cutoff
+   (`anonymizing_window_days.days.ago`) and compared against `disabled_at`. This was a real bug caught
+   in review. A `0` window would make `0.days.ago == now`, so every disabled account of that country
+   would be instantly eligible — which is why the `greater_than: 0` validation now exists.
+5. **`DocumentRedactor` vs `Anonymizer` is a real domain distinction, not a naming clash to
+   standardize.** They are different operations: `Company::DocumentRedactor::Consumer` **redacts** —
+   `attachment.destroy` + `document.redact!` (status `:redacted`), i.e. the file is removed;
+   `User::Anonymizer::Consumer` **anonymizes** — replaces email/name/`unique_register_id` with
+   `ANONYMIZED_VALUE` in place, the row stays. The LGPD domain language uses both verbs deliberately
+   ("anonymizes users, redacts documents"). Renaming to one verb would erase a distinction the law and
+   the code both make.
+6. **This project does not unit-test workers.** There is no `spec/workers` and nothing exercises a
+   Producer/Consumer/`perform`. The per-country selection therefore has **no unit test** — the coverage
+   is the review plus the model-level specs. Do not "add worker specs" as a convention here without the
+   engineer's call; do not treat the absence as an oversight to fix in passing.
+7. **A rebase can silently corrupt the CHANGELOG — always diff it against the base afterwards.** When
+   `feature/per-country-anonymization` was rebased onto develop at 3.53.0, git auto-merged the
+   `### Changed` block **into the already-released `## [3.52.0]` section** and left the file with no
+   `## [Unreleased]` at all. Nothing conflicted; nothing errored. `git diff origin/develop...HEAD --
+   CHANGELOG.md` is what caught it — the diff must be *only* the new `## [Unreleased]` block.
+8. **The schema.rb conflict on a rebase is mechanical: take the highest `version:`.** It is the max
+   migration timestamp across the merged tree, and it conflicted on every replayed commit. The rest of
+   the file auto-merged correctly both times.
+
+## Open follow-ups (none block the release)
+
+1. **Seed `anonymizing_window_days` for AR / CL / GT / PA / PE** — pending client/legal confirmation
+   (the internet-sourced figures in § Per-country values were deliberately not trusted for PII
+   retention). Until each is seeded, accounts bound to that country are **never anonymized**: the
+   producers iterate only `Country.where.not(anonymizing_window_days: nil)`. Each confirmed value is a
+   one-row `countries` update shipped as its own migration, matching Phase 1 item 5. **Feeds Phase 6
+   but does not close it** — seeding these five removes today's instance of the silent-retention gap,
+   not the gap itself.
+2. **Demo "Conta Global" (#488) territory/branch divergence** — its `business_territory` (5 countries)
+   does not match its 8 `company_branches`. It got a representative country (BR) in the backfill so it
+   would not block; the divergence itself was deliberately left alone (learning 2 explains why the two
+   are not derivable from each other). Demo-only, non-productive `holding_dashboard` feature.
 
 ## Risks
 
@@ -298,6 +493,20 @@ early in Phase 3 (#5222) — no work left on that item; only the DB `NOT NULL` (
 - **Index absence** on `disabled_at` remains — Phase 1 added a **simple** index on the FK
   (`retention_jurisdiction_country_id`), not on `disabled_at`. The per-account selection in Phase 5
   navigates by id (join decomposition), so `disabled_at` is not on a scanned hot path.
+- **The terminal flag's completeness check is a maintenance coupling — a new PII leg MUST be added to
+  `Company::Anonymizer::Consumer` or accounts get flagged with residual PII.** The Consumer names the
+  three concerns explicitly (`User` / `Document` / `UserIdentifierAction`); it is the only thing
+  standing between a company and permanent exclusion from the daily scan. If a fourth PII surface is
+  ever anonymized by a new leg fired from `Company::Anonymizer#perform` and its `exists?` check is
+  not added to the Consumer, every company will be flagged while that leg still has pending rows, and
+  no daily run will ever revisit them. The failure is **silent** (nothing errors; the data is simply
+  never anonymized) and only surfaces at an LGPD verification. There is no mechanical guard for this
+  — the coupling is by convention: **whoever adds a leg to `Company::Anonymizer#perform` adds its
+  pending-work check to `Company::Anonymizer::Consumer` in the same PR.**
+- **Un-flagging is not a recovery path for a wrongly-flagged account.** The flag suppresses the scan;
+  it does not delete anything. If an account is flagged in error, clearing `anonymized` back to false
+  puts it back in the next daily run and the legs resume — nothing is lost. The irreversible half is
+  the anonymization itself (LGPD art. 12), which the flag never triggers on its own.
 
 ## Out of scope
 
