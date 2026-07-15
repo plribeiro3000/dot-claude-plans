@@ -1,0 +1,211 @@
+# Raw grep outputs — ~/Projects/4Shark/ansible
+# Captured 2026-07-15. venv/, .git/, .idea/, .claude/ excluded throughout.
+
+################################################################################
+# 1. LEGACY NAMING — files matching /4client|foreclient|fore_client/i
+################################################################################
+# grep -rniE '4client|foreclient|fore_client' -l playbooks roles imported_roles packer group_vars README.md run_playbook.sh techstack.yml
+
+group_vars/all/all.yml
+playbooks/README.md
+playbooks/provision-4client-app-server.yml
+playbooks/provision-4client-mongodb-server.yml
+playbooks/provision-4client-out.yml
+playbooks/provision-4client-without-vpn.yml
+playbooks/provision-4client.yml
+playbooks/provision-integrator-server.yml
+playbooks/vars/aws/4client-almaviva-vpc.yml
+playbooks/vars/aws/4client-aster-maquinas-vpc.yml
+playbooks/vars/aws/4client-atento-br-vpc.yml
+playbooks/vars/aws/4client-commcenter-vpc.yml
+playbooks/vars/aws/4client-maqnelson-vpc.yml
+playbooks/vars/aws/4client-redebrasil-vpc.yml
+playbooks/vars/aws/4client-unimaq-vpc.yml
+
+NOTE: "foreclient" / "fore_client" produce ZERO hits. The retired name survives
+only in its abbreviated "4client" form.
+
+IMPORTANT NUANCE: the legacy name is NOT confined to legacy files. The two LIVE
+playbooks also carry it:
+  - provision-4client-mongodb-server.yml  (last human commit 2026-05-14)
+  - provision-integrator-server.yml       (last human commit 2026-03-03) — builds the
+    "4client-<name>-mongoNNN" hostnames into its MONGODB connection string
+The "4client" hostname convention is BAKED INTO LIVE INFRASTRUCTURE — see the running
+instance "4client-redebrasil-mongo003/4/5" in ansible_aws_state_1.txt. Renaming is a
+DNS + replica-set-member migration, not a rename of files.
+
+################################################################################
+# 2. WORDPRESS FOOTPRINT
+################################################################################
+Files referencing wordpress/wp:
+  packer/aws-ami-4shark-wp.json
+  playbooks/aws-ami-4shark-wp.yml
+  playbooks/provision-4shark-wp.yml
+  playbooks/files/aws-ami-4shark-wp.yaml/rc.local
+  group_vars/all/all.yml    (aws_4shark_wp_images.production: "ami-c58e80d2";
+                             aws_vpc.4shark-wp-production.{subnet_a,subnet_b,security_groups,efs_id})
+
+################################################################################
+# 3. IMPORTED (GALAXY) ROLES — which playbooks reference each
+################################################################################
+# for r in <role>; do grep -rl -- "$r" playbooks roles; done
+
+=== Datadog.datadog ===
+provision-4client-app-server.yml provision-4client-out.yml provision-4client-without-vpn.yml
+provision-4client.yml provision-integrator-server.yml provision-redis-5-master-slave.yml
+
+=== geerlingguy.apache ===
+aws-ami-4shark-wp.yml
+
+=== geerlingguy.ntp ===
+provision-4client-app-server.yml provision-4client-mongodb-server.yml provision-4client-out.yml
+provision-4client-without-vpn.yml provision-4client.yml provision-integrator-server.yml
+provision-openvpn.yml provision-pritunl.yml provision-redis-5-master-slave.yml
+provision-redis-5-sentinel.yml
+
+=== geerlingguy.php ===
+aws-ami-4shark-wp.yml
+
+=== geerlingguy.ruby ===
+provision-4client-app-server.yml provision-4client-out.yml provision-4client-without-vpn.yml
+provision-4client.yml
+
+=== jnv.unattended-upgrades ===
+provision-4client-app-server.yml provision-4client-mongodb-server.yml provision-4client-out.yml
+provision-4client-without-vpn.yml provision-4client.yml provision-integrator-server.yml
+provision-openvpn.yml provision-pritunl.yml provision-redis-5-master-slave.yml
+provision-redis-5-sentinel.yml
+
+=== nickhammond.logrotate ===
+provision-redis-5-master-slave.yml provision-redis-5-sentinel.yml
+
+=== weareinteractive.environment ===
+provision-4client-app-server.yml provision-4client-out.yml provision-4client-without-vpn.yml
+provision-4client.yml
+
+READ: only geerlingguy.ntp and jnv.unattended-upgrades are referenced by a playbook
+that still has a live target (provision-4client-mongodb-server.yml, provision-pritunl.yml).
+The other six are referenced exclusively by DEAD or SUPERSEDED playbooks.
+
+CORRECTION TO THE BRIEFING PREMISE: imported_roles/ is NOT vendored into the repo.
+.gitignore:2 lists `imported_roles`, so the directory on disk is the output of
+install_requirements.sh (`ansible-galaxy install -r requirements.yml -p ./imported_roles/`)
+and is not tracked by git. The tracked declaration is requirements.yml (8 entries).
+Deleting the repo does not "delete vendored code" — it deletes a 530-byte manifest.
+
+################################################################################
+# 4. ORPHAN ROLE CHECK
+################################################################################
+# grep -rl '4shark.common_users' playbooks roles
+(no output — ZERO references)
+
+READ: roles/4shark.common_users is referenced by NO playbook and NO other role.
+It is an orphan. It is also the role that ships the committed private key
+(see section 6).
+
+################################################################################
+# 5. VAULT VARIABLES — what group_vars/all/vault.yml must hold, and who consumes it
+################################################################################
+# grep -rhoE 'vault_[a-z0-9_]+' playbooks roles group_vars/all/all.yml | sort -u
+
+vault_datadog_api_key
+vault_jumpcloud_all_systems_group
+vault_jumpcloud_api_key
+vault_jumpcloud_x_connect_key
+vault_openvpn_ldap_bind_password
+vault_redis_default_password
+
+Consumption sites (grep -rn):
+  group_vars/all/all.yml:10   jumpcloud_api_key: "{{ vault_jumpcloud_api_key }}"
+  group_vars/all/all.yml:11   jumpcloud_x_connect_key: "{{ vault_jumpcloud_x_connect_key }}"
+  group_vars/all/all.yml:12   jumpcloud_all_systems_group: "{{ vault_jumpcloud_all_systems_group }}"
+  group_vars/all/all.yml:15   datadog_api_key: "{{ vault_datadog_api_key }}"
+  playbooks/vars/openvpn/openvpn-settings-ldap.yml:18   openvpn_ldap_bind_password: "{{ vault_openvpn_ldap_bind_password }}"
+  playbooks/provision-redis-5-master-slave.yml:181,193,211   redis_password / password
+  playbooks/provision-redis-5-sentinel.yml:181   redis_sentinel_password
+  playbooks/remove-redis-5-pair-from-sentinel.yml:21   (redis-cli -a ...)
+  playbooks/update-redis-5-sentinel.yml:29   redis_sentinel_password
+  playbooks/templates/redis_sentinel_check_master.sh.j2:11   redis_password=
+  playbooks/vars/redis/generic-sentinel.yml:10,15,20,25   auth_pass
+
+# JumpCloud usage check: grep -rn 'jumpcloud' -i roles playbooks group_vars
+  playbooks/vars/openvpn/openvpn-settings-ldap.yml:16   openvpn_ldap_server: ldap.jumpcloud.com
+  playbooks/vars/openvpn/openvpn-settings-ldap.yml:17   openvpn_ldap_bind_dn: uid=vpn-bind,ou=Users,...
+  playbooks/vars/openvpn/openvpn-settings-ldap.yml:19   openvpn_ldap_base_dn: ...
+  group_vars/all/all.yml:9-12   (the three jumpcloud_* definitions)
+
+READ: the three jumpcloud_* variables are DEFINED in group_vars/all/all.yml but consumed
+by NO role. The JumpCloud agent install was removed in 2023-10-13
+("Deprecate JumpCloud instalation and implement ec2-instance-connect on 4shark.users").
+They are dead config pointing at live-or-not secrets in the vault.
+The only remaining JumpCloud coupling is the OpenVPN LDAP config, which is itself dead.
+
+Vault file shape (header only — contents NOT decrypted):
+  group_vars/all/vault.yml line 1: $ANSIBLE_VAULT;1.1;AES256
+  29 lines total.
+
+################################################################################
+# 6. COMMITTED KEY MATERIAL (category only — no values read or printed)
+################################################################################
+# git ls-files roles/4shark.common_users/files/
+roles/4shark.common_users/files/4shark_deployer.pem      <-- private key, git-TRACKED
+roles/4shark.common_users/files/4shark_deployer.pub
+roles/4shark.common_users/files/authorized_keys
+
+The .pem is consumed at roles/4shark.common_users/tasks/main.yml:16-20:
+  - name: Deployment Key
+    copy: src=../files/4shark_deployer.pem dest="/home/{{ app_user }}/.ssh/id_rsa" ...
+  - name: Deployer Key - Root
+    copy: src=../files/4shark_deployer.pem dest=/root/.ssh/id_rsa owner=root mode=0400
+
+The file content was NOT read for this spike (an attempt to read it was correctly
+denied by the permission system). Classification is from filename + usage: a file
+copied to `~/.ssh/id_rsa` and to `/root/.ssh/id_rsa` is an SSH private key by definition.
+
+################################################################################
+# 7. PACKER TEMPLATE / PLAYBOOK FILENAME MISMATCH
+################################################################################
+# ls playbooks/ | grep -i aws-ami
+aws-ami-4shark-wp.yml
+aws-ami-ubuntu-python-node.yml
+
+# grep -n 'playbook_file' packer/*.json
+packer/aws-ami-4shark-wp.json:21:            "playbook_file": "playbooks/aws-ami-4shark-wp.yaml"
+packer/aws-ami-ubuntu-16.04-python.json:21:            "playbook_file": "playbooks/aws-ami-ubuntu-python-node.yaml"
+
+READ: both templates reference ".yaml"; both files on disk are ".yml". The rename
+landed 2018-10-29; packer/ was last touched 2016-12-29. Both builds have been broken
+for ~8 years.
+
+################################################################################
+# 8. EXTERNAL REFERENCES TO THIS REPO
+################################################################################
+# grep -rlniE 'ansible|run_playbook|playbook' ~/.claude/docs ~/.claude/skills ~/.claude/commands
+
+~/.claude/commands/create-integrator.md
+~/.claude/docs/AUTOMATED-DEPENDENCY-UPDATES.md
+~/.claude/docs/COMMAND-SAFETY.md
+~/.claude/docs/LANGUAGE-POLICY.md
+~/.claude/docs/PROJECTS-CATALOG.md
+~/.claude/docs/runbooks/databases/MONGODB-VERSION-UPGRADE.md
+
+Material hits only:
+  ~/.claude/commands/create-integrator.md:128
+    "1. **MongoDB installation**: Run Ansible playbook to install MongoDB on the 3 new EC2 instances"
+    (line 129: "2. **MongoDB replica set**: Configure the replica set (PSA topology)")
+    -> a LIVE documented dependency on this repo's provision-4client-mongodb-server.yml
+
+  ~/.claude/docs/PROJECTS-CATALOG.md:101
+    "| `ansible` | Ansible | Server provisioning and configuration. |"
+    -> catalog entry, would need removal/adjustment
+
+  ~/.claude/docs/runbooks/databases/MONGODB-VERSION-UPGRADE.md:332
+    "- **`ansible-role-mongodb`** — the role that actually installs MongoDB."
+    -> refers to the DEDICATED repo, NOT this one. Not a dependency on this repo.
+
+  AUTOMATED-DEPENDENCY-UPDATES.md / COMMAND-SAFETY.md / LANGUAGE-POLICY.md hits are the
+  generic word "ansible" in policy prose (e.g. the infra-command list), not references
+  to this repository.
+
+# grep for terraform invoking ansible: no provisioner/user_data path found.
+# See ansible_aws_state_1.txt section 5 — coupling is tag-convention only.

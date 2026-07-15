@@ -51,8 +51,9 @@ The app side is **built**, not pending:
 
 1. **Stack shape → dedicated `terraform/app-outbound-maqnelson/` stack.** Precedent: `app-outbound-atento-br` is its own stack with its own state key (`app-outbound-atento-br/providers.tf:24`). It deploys compute *into* the integrator VPC, resolving the network via `module.networking_data` with `networking_environment = "integrator-maqnelson"` (the same way `integrator-maqnelson/main.tf:11-17` resolves its own).
 2. **Task config → extract `modules/shared_001_task_config`.** `modules/atento_001_task_config` exists **precisely because** the Atento outbound needed to share atento-001's env — its own comment: *"reused by app-atento-001 and app-outbound-atento-br"*. Same move. **Done** — no-op plan on shared-001.
-3. **Worker/queue → `MaqnelsonIntegration::Processor` on `payroll_white_shark`,** launched like the Atento outbound: `sidekiq -C config/sidekiq_payroll_white_shark.yml`. Engineer's call: the lane is a free choice ("tanto faz") because **no company in shared-001 uses a suffix today** — they all sit on the bare `commission` queue. `white_shark` is picked over `tiger_shark` so the lane names stay visually distinct from the atento-001 stack's in dashboards and logs; both are free in this database (the unique index is per-database, and the stacks have separate ones).
-   - **Blocked on the queue-suffix split below** — assigning the suffix before the split hands Maqnelson a dedicated commission lane for free.
+3. **Worker/queue → `MaqnelsonIntegration::Processor` on `payroll_tiger_shark`,** launched like the Atento outbound: `sidekiq -C config/sidekiq_payroll_tiger_shark.yml`. **Engineer's call (2026-07-15): reuse the Atento lane rather than introduce a new one** — "vamos de tiger shark, igual ta no ambiente atento hoje". The lane is free in shared-001 (no company uses a suffix today; they all sit on the bare `commission` queue), and reusing it means the sidekiq config and the HireFire dyno already exist — zero new app code for the lane itself. The name is shared with the Atento stack but nothing else is: each reads its own environment's Redis, so neither sees the other's jobs.
+   - **A superseded earlier decision** picked `white_shark` to keep the lane visually distinct from atento-001's in dashboards and logs. That distinctness was not worth a second lane to maintain; the Redis separation already guarantees isolation.
+   - **Was blocked on the queue-suffix split below — no longer.** The split shipped (Phase 4, releases 3.52.0 + 3.53.0), so the payroll lane is now assignable without handing Maqnelson a commission lane for free. Phase 7 sets it.
 
 ## The queue-suffix problem — one variable governs two domains
 
@@ -67,7 +68,7 @@ So `commission_queue_suffix` routes the commission workers (`base_queue_name :co
 - **The suffix is the dedicated-lane mechanism.** `db/schema.rb:532` — `t.index ["commission_queue_suffix"], name: "index_companies_on_commission_queue_suffix", unique: true`. One company owns a suffix exclusively; `NULL` (the shared-001 default today) means the bare queue.
 - **It is a commission-domain concept.** `app/app/workers/partial_commission/finalizer.rb:21-24` groups companies by `commission_queue_suffix` and fans commission work out per suffix.
 
-**The consequence:** setting a suffix on Maqnelson's company to give the outbound its `payroll_white_shark` queue **also** moves their commission jobs to `commission_white_shark` — a dedicated commission lane the customer is not paying for.
+**The consequence:** setting a suffix on Maqnelson's company to give the outbound its `payroll_tiger_shark` queue **also** moves their commission jobs to `commission_tiger_shark` — a dedicated commission lane the customer is not paying for.
 
 **The column is not the problem.** `commission_queue_suffix` is correctly named and correctly scoped: it is the commission pipeline's lane, and 24 of the 25 base queue names are that pipeline. The defect is `queue.rb:23` reading it for `:payroll` too. So the fix is a **new column for payroll** (Phase 4), not a rename and not a generalization.
 
@@ -84,10 +85,12 @@ This is a **prerequisite**, not a follow-up — the giveaway happens the moment 
 | Internal DNS override (`dev-nexus.maqnelson.com.br`) | ✅ Applied (2 added, 0 changed, 0 destroyed) — PR #698 open |
 | `modules/shared_001_task_config` (extract from app-shared-001) | ✅ Done, no-op plan on shared-001 — PR #699 open |
 | Split the tenant queue suffix (commission vs payroll) | ✅ Done — PRs #5226 / #5228 / #5230; shipped in 3.52.0 (column) + 3.53.0 (routing) |
-| Outbound compute stack (in the integrator VPC) | ⬜ To do |
-| `sidekiq_payroll_white_shark.yml` | ⬜ To do |
+| Outbound infrastructure — terraform stack (5.1) | ✅ Applied (22 added, 0 changed, 0 destroyed) — PR [#702](https://github.com/4shark/terraform/pull/702) merged |
+| Outbound infrastructure — app config: sa-east-1 dual-push (5.2) | ✅ Done — PR [#5233](https://github.com/4shark/app/pull/5233) merged; needs a release to populate the sa-east-1 mirror (the build only runs on `master`) |
+| Outbound infrastructure — terraform: switch the lane to `payroll_tiger_shark` (5.3) | ✅ Applied (1 added, 1 changed, 1 destroyed) and verified on AWS — PR [#704](https://github.com/4shark/terraform/pull/704) merged |
+| Outbound infrastructure — `deploy-shared-001` payroll caller (5.4) | ✅ Done — PR [#5234](https://github.com/4shark/app/pull/5234) merged |
+| Contract diff vs Thiago's reduced version | ✅ Done — PR [#5235](https://github.com/4shark/app/pull/5235) open; auth was rewritten on their side, payments body unchanged |
 | `payroll_integration` record for Maqnelson (hostname + credentials) | ⬜ To do (DB config) |
-| Contract diff vs Thiago's reduced version | ⬜ To do |
 | Homolog end-to-end test (notify Fanini first) | ⬜ To do |
 | Production endpoint switch | ⬜ Later, with Maqnelson |
 
@@ -146,29 +149,131 @@ Steps:
 
 Per `DEPLOYMENT-STRATEGY.md` this is a legitimate phased change: the queue derivation is an in-flight contract, and breaking it orphans enqueued jobs rather than failing loudly.
 
-### Phase 5 — Outbound compute (new stack, into the integrator VPC)
+### Phase 5 — Stand up the outbound infrastructure
 
-Mirror `app-outbound-atento-br/compute.tf`, with three deltas: network points at the integrator VPC, config comes from `shared_001_task_config`, and **no VPN/VGW is created** (it already exists).
+**One phase, one outcome: the outbound exists and is able to run.** The lane it consumes (`payroll_tiger_shark`) is inert until Phase 7 sets the company's record, so nothing here processes a job — but nothing here may be missing either, or the infra comes up green and silently does nothing.
 
-- Scaffold `terraform/app-outbound-maqnelson/` (`providers.tf` sa-east-1 + cross-region alias to shared-001; `locals.tf`; `main.tf`; `compute.tf`; `iam.tf`; `output.tf`; `stack.tm.hcl`; `README.md`).
-- `main.tf`: resolve the integrator VPC via `module.networking_data` (`networking_environment = "integrator-maqnelson"`); a **dedicated** `aws_security_group` for the outbound tasks (egress all, so traffic to `192.168.82.10` follows the private RT to the VGW; ingress from the management VPN SGs for debugging). Do **not** instantiate `modules/app_outbound` (its VPN/DNS assumptions do not fit) and do **not** touch the VPC's default SG (owned by the integrator module).
-- `compute.tf`: ECS cluster, worker service running `sidekiq -C config/sidekiq_payroll_white_shark.yml`, runner service (`desired_count = 0`, for `bin/ecs run`), autoscaling Lambda + EventBridge scheduler; tasks in the **integrator VPC private subnets**; env/secrets from `module.task_config`.
-- `locals.tf` tags: `Project = "app-outbound"`, `Environment = "outbound-maqnelson"`, `Client = "maqnelson"` (mirror `app-outbound-atento-br/locals.tf:17-21`).
-- `plan`, apply-before-merge.
+**The lane is `payroll_tiger_shark` — the same one Atento uses (engineer's call, 2026-07-15).** No new lane is introduced: the sidekiq config and the HireFire dyno already exist in the app and need no change. The lane is shared by name only — each stack reads its own environment's Redis (`shared-001` here, `atento-001` there), so the two never see each other's jobs, and no other `shared-001` service consumes `payroll_tiger_shark` (verified: `grep payroll` over `terraform/app-shared-001/` is empty), so this stack is its only consumer.
 
-### Phase 6 — App: sidekiq payroll config + contract diff
+`app-outbound-atento-br` is the reference for every piece. It is a complete, working instance of exactly this shape: an ECS Fargate cluster in sa-east-1 running one Sidekiq worker service against a dedicated payroll queue, scaled by a Lambda that reads the app's HireFire endpoint, pulling its image from a regional ECR mirror. Read it before writing — the deltas below are the only differences.
 
-- Create `app/config/sidekiq_payroll_white_shark.yml` mirroring `sidekiq_payroll_tiger_shark.yml` (queue `payroll_white_shark`, concurrency from `ApplicationConfiguration.sidekiq_threads`).
-- Diff the implemented contract (`processor.rb:29-40`) against Thiago's reduced-attribute version from the 2026-07-14 e-mail + Postman collection. The current body already matches the e-mailed contract — expect a small attribute diff, not a rewrite.
+**The three deltas vs the Atento outbound:**
+
+1. **Network** — the tasks run in the **integrator-maqnelson VPC**, not a VPC of their own. Resolve it via `module.networking_data` with `networking_environment = "integrator-maqnelson"`.
+2. **No VPN, no VGW, no zone association** — they already exist (Phases 1 and 2). Do **NOT** instantiate `modules/app_outbound`: it creates `aws_vpn_gateway`, `aws_customer_gateway`, `aws_vpn_connection`, `aws_vpn_connection_route`, `aws_route53_zone_association`, and `aws_default_security_group` — every one of them either already exists or is owned by the integrator module. It would collide on all six.
+3. **Config source** — `module.task_config` points at `../modules/shared_001_task_config` (Phase 3), not `atento_001_task_config`; the cross-region provider alias, the SSM parameters, the HireFire host, and the ECR image all resolve to **shared-001** instead of atento-001.
+
+**Because the Atento outbound's default SG comes from `modules/app_outbound`, which we are not instantiating, this stack declares its own** — a dedicated `aws_security_group` for the outbound tasks (egress all, so traffic to the Nexus host follows the private RT to the VGW; ingress from the management VPN SGs for debugging). Never touch the VPC's default SG — it belongs to the integrator module.
+
+#### 5.1 — Terraform: `terraform/app-outbound-maqnelson/`
+
+Scaffold the stack, file-for-file against the reference:
+
+| File | What it carries |
+|---|---|
+| `providers.tf` | sa-east-1 + a cross-region alias to shared-001 (us-east-1) for the SSM reads; S3 backend at `app-outbound-maqnelson/terraform.tfstate` |
+| `locals.tf` | names (`cluster_name`, `service_name`, `task_family`, `container_name`, `lambda_name`), the shared-001 image, the lambda artifact version, and the tags |
+| `main.tf` | `module.networking_data` → `integrator-maqnelson`; the dedicated `aws_security_group`; the dns remote state |
+| `ecr.tf` | the sa-east-1 mirror of `shared-001-app` (see 5.2 — the workflow must push to it) |
+| `compute.tf` | ECS cluster; worker service (`sidekiq -C config/sidekiq_payroll_tiger_shark.yml`, `desired_count = 0`); runner service (`desired_count = 0`, for `bin/ecs run`); autoscaling Lambda; EventBridge scheduler at `rate(1 minute)`; tasks in the integrator VPC's private subnets |
+| `iam.tf` | the Lambda role + the EventBridge scheduler role |
+| `monitoring_data.tf` | the rollbar project id from the monitoring remote state |
+| `variables.tf` | `payroll_jobs_per_process` / `payroll_maximum_capacity` / `payroll_minimum_capacity` |
+| `output.tf`, `stack.tm.hcl`, `README.md` | the stack declaration and its docs |
+
+`plan`, then **apply-before-merge**.
+
+**✅ Done.** Applied: **22 added, 0 changed, 0 destroyed** — the zero-destroy is the evidence that no pre-existing network resource of `integrator-maqnelson` was touched. Verified in AWS: `app-outbound-maqnelson-cluster` is `ACTIVE` with its 2 services at `desired_count = 0`. PR [#702](https://github.com/4shark/terraform/pull/702) open, awaiting the engineer's merge.
+
+Three findings the implementation forced, none of which the plan had anticipated:
+
+- **No module needed changing, and nothing was made optional.** `modules/integrator` does not create the VPC — it *receives* `vpc_id` and creates the VPN, Redis, the default SG and the zone association. The VPC comes from a separate `networking` stack that publishes its ids to SSM, and `modules/networking_data` is pure `data "aws_ssm_parameter"` — it creates nothing. So deploying into the integrator's VPC is simply "read the same SSM ids and do not call `modules/app_outbound`" — the composition already supported it.
+- **`data "terraform_remote_state" "dns"` was dropped from `main.tf`.** The reference stack carries it only to pass `internal_zone_id` into `modules/app_outbound`, which does the zone association. Not instantiating that module — and the zone already associated in Phase 2 — makes it dead code.
+- **The management VPN SG ids are reusable as-is.** `integrator-maqnelson/main.tf:38` already passes the same two ids, which proves they are referenceable from inside that VPC; every integrator stack uses them.
+
+#### 5.2 — App: the sa-east-1 dual-push on `build-shared-001`
+
+`.github/workflows/build-image.yaml` — mirrors the `build-atento-001` job: an `ECR_REGISTRIES` override listing both regions plus the sa-east-1 configure/login step pair. The tag-composition loop already iterates the registry list, so no other step changes. Before this, `build-shared-001` published only to us-east-1 and the sa-east-1 mirror from 5.1 would stay empty — the Fargate task would have no image to pull.
+
+**This is the only app change the lane needs.** The sidekiq config and the HireFire dyno were originally scoped here as new `white_shark` pieces; reusing the Atento lane (see the phase preamble) removed both — they already exist.
+
+#### 5.3 — Terraform: point the stack at `payroll_tiger_shark`
+
+The 5.1 stack was applied against the then-planned `white_shark` lane. Two references change: the worker service's `command` (`config/sidekiq_payroll_tiger_shark.yml`) and the Lambda's `PROCESS_NAME` (`worker_payroll_tiger_shark`), plus the README/variables prose. Plan is clean — `1 to add, 1 to change, 1 to destroy`: the Lambda updates in-place and the task definition gets a new revision (ECS task defs are immutable, so terraform models a revision bump as replace). The service is at `desired_count = 0`, so no running task is disrupted.
+
+#### 5.4 — App: the `deploy-shared-001` payroll caller — GAP FOUND 2026-07-15
+
+**The terraform task definition is only the bootstrap; the service never adopts a new revision on its own.** `modules/ecs_service/main.tf:152` carries `ignore_changes = [task_definition]` (CodeDeploy owns it during deploys), so `terraform apply` creates the revision and the service stays pinned to the old one. The deploy is what moves it — and `deploy-payroll-worker.yaml:202` does not inherit terraform's command, it builds its own from a `sidekiq_config_file` input. **The config file name therefore lives in three places: the sidekiq yml, the terraform command, and the deploy caller's input.**
+
+`deploy-shared-001.yaml` has no payroll job at all (`grep payroll|sa-east-1|deploy-payroll-worker` → empty). The Atento equivalent is `deploy-atento-001.yaml:1001-1011`, which passes cluster/service/family/container/ecr_repo/`sidekiq_config_file`/environment into the reusable `deploy-payroll-worker.yaml`.
+
+Without this caller the outbound worker sits on its bootstrap revision forever and no deploy ever carries code to it — the same green-and-does-nothing failure the rest of Phase 5 exists to close.
+
+**Resolved: mirror Atento in full — all four jobs (engineer's call, 2026-07-15).** PR #5234.
+
+| Job | Role |
+|-----|------|
+| `deploy-payroll` | Calls the reusable `deploy-payroll-worker.yaml` with this stack's cluster/service/family/container/ECR and `sidekiq_config_file: sidekiq_payroll_tiger_shark.yml` |
+| `deploy-runner-payroll` | Refreshes the runner task def so `bin/ecs run` picks up current code — needed by the Phase 8 homolog test |
+| `rollback-main-on-payroll-failure` | Main-app succeeded, payroll failed → roll main-app's workers back |
+| `rollback-payroll-on-main-failure` | Payroll succeeded, main-app failed → roll payroll back |
+
+Both deploy jobs take `needs: validate-secrets` only, so a failure on one track never cancels the other. The `validate` job gains both in its `needs` and status checks; `capture-pre-deploy-state` needed no change (its `state` output already exists and the rollback job consumes it as-is).
+
+**The cross-track rollback carries a shared-environment consequence, accepted deliberately.** In `atento-001` the environment is dedicated, so rolling the whole main-app back when payroll fails affects one client. `shared-001` serves many: the same job means a failure of this one outbound worker rolls back the Sidekiq workers of **every** client in the environment. The alternative — deploy jobs only, letting the outbound sit one version behind until the next deploy — was surfaced and declined in favour of never letting the two tracks diverge on code version.
+
+**Verified against the reference before merge:** with cluster and environment names normalized, all four jobs are byte-identical to their `atento-001` counterparts; every `needs` resolves to a real job; the inputs passed to the reusable workflow match its declared contract (no missing required, no undeclared extras).
+
+**Known debt — the payroll jobs are single-client, not a list (deferred by the engineer, 2026-07-15: "a gente resolve a lista quando for o momento").** The main workers already scale by list: `SIDEKIQ_SERVICES` (a JSON env) feeds `deploy-sidekiq` through `matrix: worker: ${{ fromJSON(needs.setup.outputs.sidekiq_services) }}` with `fail-fast: false`, so adding a worker is one JSON entry. The payroll jobs are hardcoded — inherited from `atento-001`, where a single outbound is a sound premise because the environment is dedicated. **`shared-001` is multi-client, so the premise does not hold here**: a second client's outbound would today mean duplicating all four jobs (~265 lines of it being the rollback pair).
+
+Converting the two deploy jobs to a matrix is mechanical (same shape as `deploy-sidekiq`). **The rollback pair is not** — `rollback-main-on-payroll-failure` guards on `needs['deploy-payroll'].result`, which under a matrix becomes the aggregate result across all clients. "One client's outbound failed" would then roll back the main app exactly as "the only client's outbound failed" does today. That is a semantics change on top of the shared-environment consequence already accepted above, and needs an explicit decision — not a refactor.
+
+#### Ordering inside the phase
+
+The Terraform apply is safe first: every service is created at `desired_count = 0`, so nothing tries to pull an image that is not there yet.
+
+1. ✅ **5.1** Terraform stack — PR #702 merged; apply verified on AWS (cluster `app-outbound-maqnelson-cluster` ACTIVE, 2 services).
+2. ✅ **5.2** App dual-push — PR #5233 merged into `develop`.
+3. ✅ **5.3** Terraform lane switch — PR #704 merged; applied (`1 added, 1 changed, 1 destroyed`).
+4. ✅ **5.4** Deploy caller — PR #5234 merged.
+5. ⬜ **Release** — the build only runs on `master`, so the sa-east-1 mirror stays empty until 5.2/5.4 ship in a release. Merging into `develop` does not populate it. **This is the only step left in Phase 5.**
+6. **Phase released** once the mirror carries the image, a deploy has moved the service onto a `tiger_shark` task definition, and the HireFire endpoint answers for `worker_payroll_tiger_shark`.
+
+**Verified on AWS after the 5.3 apply (2026-07-15):** task definition at revision 2 with `config/sidekiq_payroll_tiger_shark.yml` in its command; Lambda `PROCESS_NAME = worker_payroll_tiger_shark`; the service still points at revision **1** with `desiredCount: 0` — expected, and the live demonstration of the `ignore_changes` behaviour documented above. The deploy from 5.4 is what moves it, and the first run of that deploy happens at the release in step 5.
+
+### Phase 6 — Contract diff vs the customer's reduced version ✅ DONE
+
+**PR [#5235](https://github.com/4shark/app/pull/5235) open.** Source of truth: the Postman collection `Nexus — Premiação Comercial`, attached to Thiago's 2026-07-14 e-mail (the e-mail body itself carries no contract — only the attachment does). The Gmail MCP cannot download attachments; the engineer saved it to `~/Downloads/`.
+
+**The prior expectation in this plan was wrong.** It said "the current body already matches the e-mailed contract — expect a small attribute diff". The *payments body* does match, exactly. But **authentication was rewritten on their side and no longer works**:
+
+| | Implemented before | Collection (2026-07-14) |
+|---|---|---|
+| Auth URL | `hostname.sub('/pagamentos', '/auth/token')` → `/api/v1/premiacao/auth/token` | `POST /api/v1/entrar` |
+| Auth body | `{ username:, password: }` | `{ "email": "", "senha": "" }` |
+| Payments body | `{ mes_competencia, ano_competencia, pagamentos[{ usuario_id_externo, tipo_pagamento_id_externo, premio_valor }] }` | **identical** |
+
+The `.sub` derivation is structurally unreachable: `/entrar` is a sibling of `/premiacao`, not of `/pagamentos`. No substitution on the payments URL produces it.
+
+**Resolved by moving to the host-only convention the base model already defines.** `payroll_integration.rb:24-30` exposes `def host; hostname.split(':').first; end` / `def port; hostname.split(':').last; end` — that only makes sense if `hostname` is `host:port`. With a full URL stored, `host` returns `"https"`. This integration was the sole divergent one; `fpw_integration/execute_consumer.rb:70` already builds `URI.parse("http://#{hostname}/lg.com.br/svc/...")`. Both Maqnelson paths are now explicit in the worker. Verified ACCEPT (0.88) by `code-policy-verifier`, which confirmed the change *removes* pre-existing Convention Drift rather than adding any.
+
+**Still open — the token response field.** `processor.rb:72` assumes `access_token`. The collection cannot confirm it: no response example, empty test script, `token` collection variable blank, and the string `access_token` appears nowhere in the 95KB file. Left as-is deliberately — inventing tolerance for several field names without evidence is worse than letting the Phase 8 run answer it. **Ask Thiago, or discover it in homologation.**
+
+**Also found, no action:** the collection exposes 6 read endpoints we do not consume (list/detail/deactivate `lotes`, payment detail, payment version history). The `PATCH /lotes/{id}/inativar` suggests re-send has an official path — worth knowing when re-processing comes up.
+
+**Trap that will recur — Brakeman fingerprints are content-addressed, so editing an ignored line breaks its ignore.** The first CI run of PR #5235 failed on `Brakeman (Security)` with two `File Access — Model attribute used in file name` warnings on the two lines the fix touched. It was **not** a new vulnerability: `config/brakeman.ignore` already carried both as engineer-triaged false positives (`hostname` is an HTTP endpoint, not a filesystem path — the sibling FPW integration has three identical ignores). Brakeman fingerprints a warning by the *code of the line*; changing the line changes the fingerprint, the ignore entry orphans (surfacing as `Obsolete Ignore Entries` in the report), and the warning resurfaces red.
+
+**The fix belongs in the same PR, never a separate one** — the new fingerprints only match code that exists on that branch, so an ignore-only PR against `develop` would land already-obsolete entries and leave the original PR red until both merged. The ignore file must move with the line it ignores. Procedure: run `bundle exec brakeman -f json`, read the `fingerprint` of each surfaced warning, replace the obsolete entry's `fingerprint`/`line`/`code` in `config/brakeman.ignore`, keep (and re-word, if the code's meaning shifted) the `note`, and confirm `Security Warnings: 0` with no obsolete entries. Do not add new suppressions this way — only re-anchor decisions the team already made.
 
 ### Phase 7 — `payroll_integration` record + payroll lane for Maqnelson (DB config)
 
-- Set the company's **payroll lane** to `_white_shark` (the new attribute from Phase 4). The commission lane stays `NULL` — the customer keeps the shared `commission` queue they pay for.
+- **Payroll lane → `_tiger_shark`** (the new attribute from Phase 4). ✅ **Already set by the engineer on 2026-07-15** — the value is inert until the `payroll_integration` record below exists. The commission lane stays `NULL` — the customer keeps the shared `commission` queue they pay for.
 
 - Create/point the company's `payroll_integration` (type `MaqnelsonIntegration`) with:
-  - `hostname` = the homologation request URL — **must end in `/pagamentos`** so `processor.rb:42` derives the token URL correctly.
-  - `user_name` / `user_password` = the Nexus access credentials from Maqnelson's e-mail. These live **only** in the record — never in code, Terraform, or a PR.
+  - `hostname` = **the host alone — no scheme, no path.** For homologation: `dev-nexus.maqnelson.com.br`. **This changed in Phase 6 (PR #5235)** — the old instruction ("the full request URL, must end in `/pagamentos`") is dead: the worker now owns both paths, matching the base model's `host`/`port` contract and the sibling FPW integration. A full URL here would break `payroll_integration.host`, which returns `hostname.split(':').first`.
+  - `user_name` / `user_password` = the Nexus access credentials from Maqnelson's e-mail. These live **only** in the record — never in code, Terraform, or a PR. Note the worker now sends them as `email` / `senha`; the column names are unchanged.
 - Because the password transited e-mail, flag it to Maqnelson for rotation once wired.
+- **The path spelling lost its accents**: the collection uses `/api/v1/premiacao/pagamentos` (plain ASCII), not `premiação` as `SPIKE.md:14` recorded from the older source. This is now hardcoded in the worker, so it is no longer a data-entry risk — but the SPIKE's value is stale, do not copy from it.
 
 ### Phase 8 — Homologation end-to-end test
 
@@ -195,7 +300,9 @@ Mirror `app-outbound-atento-br/compute.tf`, with three deltas: network points at
 - **`hostname` must end in `/pagamentos`** — the token URL is derived by string substitution (`processor.rb:42`); a hostname without that suffix silently breaks auth.
 - **No fixed source IP** — Fargate assigns the task IP at startup. Accepted by Deivid. If Maqnelson ever demands a fixed source IP, that is a new design problem — surface it, do not improvise.
 - **Credential hygiene** — the Nexus password transited e-mail; treat as compromised-pending-rotation.
-- **Timeline** — 20/07 is the commitment. The split (Phase 4) is now on the critical path and is the least-bounded piece; if it slips, the fallback is to ship the outbound on the bare `payroll` queue (no lane, no giveaway) and add the lane after — worth deciding early rather than at the deadline.
+- **Timeline** — 20/07 is the commitment. The split (Phase 4) is **done and deployed**, so its fallback (ship on the bare `payroll` queue, add the lane later) is no longer needed. Phase 5 is now the critical path and the least-bounded piece.
+- **Infra that comes up green and does nothing** — the outbound's failure mode is silence, not error. The autoscaling Lambda reads a HireFire dyno by name; the worker consumes a queue named in a sidekiq config; the task pulls an image from a regional mirror; the service only leaves its bootstrap task definition when a deploy caller moves it. Any one of the four missing and the stack still applies cleanly, the service still sits at `desired_count = 0`, and nothing ever runs. This is why every one of them is inside Phase 5 rather than a later step — they were missed twice, each time because "the infra" was read as "the terraform".
+- **The lane name lives in three places, and terraform owns only one of them** — the sidekiq yml, the terraform task-definition `command`, and the deploy caller's `sidekiq_config_file` input. `modules/ecs_service/main.tf:152` puts `task_definition` in `ignore_changes`, so terraform's revision is a bootstrap the running service never adopts; `deploy-payroll-worker.yaml:202` rebuilds the command from its own input. A change applied in terraform alone looks successful and changes nothing about what the service actually runs. Any future lane change must move all three together.
 
 ## Out of scope
 

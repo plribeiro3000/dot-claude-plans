@@ -1,0 +1,243 @@
+# diff -r ~/Projects/4Shark/ansible/roles/4shark.mongodb/ ~/Projects/4Shark/ansible-role-mongodb/
+#   --exclude='.git' --exclude='.claude' --exclude='.github'
+# Captured 2026-07-15.
+#
+# "<" = the copy inside the ansible repo (roles/4shark.mongodb)
+# ">" = the dedicated repo (ansible-role-mongodb)
+#
+# CONCLUSION: the in-repo copy is a STALE FORK. Every difference favours the
+# dedicated repo. Nothing exists in the in-repo copy that the dedicated repo lacks,
+# except rc.local (which the dedicated repo replaced with a proper systemd unit).
+
+Only in ansible-role-mongodb: .ansible-lint
+Only in ansible-role-mongodb: .yamllint
+Only in ansible-role-mongodb: CHANGELOG.md
+Only in ansible-role-mongodb: README.md
+Only in ansible-role-mongodb: VERSION
+
+diff -r roles/4shark.mongodb/defaults/main.yml ansible-role-mongodb/defaults/main.yml
+4d3
+< mongodb_version: "4.0"
+5a5,41
+> # mongodb_version has NO default on purpose — the consuming build declares it
+> # (see README), and the role fails loudly when it is missing. The fleet runs one
+> # MongoDB series at a time and migrates as a whole, so a default here would only
+> # ever be a stale copy of that decision: it goes out of date the moment the fleet
+> # moves, and its punishment is silent — a host provisioned on the wrong series,
+> # discovered when it fails to join the replica set.
+> #
+> # The Ubuntu codename keeps a default: it tracks the base image, not the fleet's
+> # MongoDB series, and the build overrides it when baking a different LTS.
+> #
+> # Everything version-specific is DERIVED from mongodb_version below, so the key,
+> # the keyring and the repo path cannot drift out of sync with the series being
+> # installed. Keep the series on a MongoDB major (5.0, 6.0, 7.0, 8.0): those are
+> # the series MongoDB publishes a signing key for.
+> mongodb_ubuntu_codename: "focal"
+>
+> mongodb_gpg_key_url: "https://www.mongodb.org/static/pgp/server-{{ mongodb_version }}.asc"
+> mongodb_gpg_keyring: "/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg"
+> mongodb_gpg_key_tmp_path: "/tmp/mongodb-server-{{ mongodb_version }}.asc"
+>
+> # The packages `mongodb-org` pulls in, held at their installed version so an
+> # unrelated `apt-get upgrade` on the host cannot bump mongod and restart it.
+> # MongoDB does NOT hold them by default — "apt-get will upgrade the packages when
+> # a newer version becomes available" — and an out-of-order restart across members
+> # costs the replica set its quorum. A real version upgrade releases the hold
+> # deliberately, one member at a time (see the MongoDB version upgrade runbook).
+> mongodb_held_packages:
+>   - mongodb-database-tools
+>   - mongodb-mongosh
+>   - mongodb-org
+>   - mongodb-org-database
+>   - mongodb-org-database-tools-extra
+>   - mongodb-org-mongos
+>   - mongodb-org-server
+>   - mongodb-org-shell
+>   - mongodb-org-tools
+>
+10,16c46
+< mongodb_conf_logappend: "true"
+<
+< mongodb_shell: {}                                 # Define mongo shell commands to run
+<                                                   # Syntax: mongodb_shell:
+<                                                   #          dbname:
+<                                                   #           - db.setProfilingLevel(1, 50)
+<
+---
+> mongodb_conf_replSetName: ""
+
+Only in roles/4shark.mongodb: files
+
+diff -r roles/4shark.mongodb/handlers/main.yml ansible-role-mongodb/handlers/main.yml
+1a2
+>
+3c4,7
+<   service: name=mongod state=restarted enabled=yes
+---
+>   systemd:
+>     name: mongod
+>     state: restarted
+>     daemon_reload: true
+
+Only in ansible-role-mongodb: meta
+Only in ansible-role-mongodb: renovate.json
+
+diff -r roles/4shark.mongodb/tasks/main.yml ansible-role-mongodb/tasks/main.yml
+3c3,15
+< - name: Install GPG
+---
+> # Fails before the first package is touched. Without this, a missing
+> # mongodb_version surfaces further down as an undefined-variable error inside a
+> # templated repo path, which names the symptom instead of the omission.
+> - name: Require the MongoDB series to be declared by the consuming build
+>   assert:
+>     that:
+>       - mongodb_version is defined
+>       - mongodb_version | length > 0
+>     fail_msg: >-
+>       mongodb_version is required and has no default: pass the MongoDB series
+>       the fleet runs (e.g. mongodb_version=8.0). The role never guesses it.
+>
+> - name: Install MongoDB prerequisites
+5,7c17,21
+<     name: "gnupg"
+<     state: "present"
+<     update_cache: "yes"
+---
+>     name:
+>       - gnupg
+>       - numactl
+>     state: present
+>     update_cache: true
+10,13c24,28
+< - name: Add MongoDB Repository APT Key
+<   shell:
+<     cmd: curl -fsSL https://pgp.mongodb.com/server-{{ mongodb_version }}.asc | sudo gpg -o /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg --dearmor
+<     creates: /usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg
+---
+> - name: Download MongoDB Repository APT Key
+>   get_url:
+>     url: "{{ mongodb_gpg_key_url }}"
+>     dest: "{{ mongodb_gpg_key_tmp_path }}"
+>     mode: "0644"
+14a30,34
+> - name: Dearmor MongoDB Repository APT Key
+>   command: gpg -o {{ mongodb_gpg_keyring }} --dearmor --yes {{ mongodb_gpg_key_tmp_path }}
+>   args:
+>     creates: "{{ mongodb_gpg_keyring }}"
+>
+17c37
+<     repo: "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-{{ mongodb_version }}.gpg ] https://repo.mongodb.org/apt/ubuntu bionic/mongodb-org/{{ mongodb_version }} multiverse"
+---
+>     repo: "deb [ arch=amd64,arm64 signed-by={{ mongodb_gpg_keyring }} ] https://repo.mongodb.org/apt/ubuntu {{ mongodb_ubuntu_codename }}/mongodb-org/{{ mongodb_version }} multiverse"
+19c39
+<     update_cache: "yes"
+---
+>     update_cache: true
+25c45
+<     update_cache: "yes"
+---
+>     update_cache: true
+28,33c48,52
+< - name: Install Numactl
+<   apt:
+<     name: "numactl"
+<     state: "present"
+<     update_cache: "yes"
+<     cache_valid_time: "{{ apt_cache_valid_time }}"
+---
+> - name: Hold MongoDB packages at the installed version
+>   dpkg_selections:
+>     name: "{{ item }}"
+>     selection: "hold"
+>   loop: "{{ mongodb_held_packages }}"
+35,38c54,57
+< - name: MongoDB rc.local
+<   copy:
+<     src: "../files/rc.local"
+<     dest: "/etc/rc.local"
+---
+> - name: Install disable-thp systemd unit
+>   template:
+>     src: "disable-thp.service.j2"
+>     dest: "/etc/systemd/system/disable-thp.service"
+40c59,60
+<     mode: "0755"
+---
+>     group: "root"
+>     mode: "0644"
+41a62,68
+> - name: Enable and start disable-thp service
+>   systemd:
+>     name: disable-thp
+>     enabled: true
+>     state: started
+>     daemon_reload: true
+>
+46a74
+>     group: "mongodb"
+53a82
+>     group: "mongodb"
+60a90
+>     group: "mongodb"
+63a94,99
+> - name: Enable and start mongod
+>   systemd:
+>     name: mongod
+>     enabled: true
+>     state: started
+>
+66d101
+<
+
+Only in ansible-role-mongodb/templates: disable-thp.service.j2
+
+diff -r roles/4shark.mongodb/templates/mongod.conf.j2 ansible-role-mongodb/templates/mongod.conf.j2
+10c10
+<    fork: false
+---
+>   fork: false
+15c15
+<   logAppend: {{ mongodb_conf_logappend }}
+---
+>   logAppend: true
+21a22,24
+> # Authentication intentionally disabled — access control enforced at VPC/Security Group level.
+> # Each client runs in an isolated VPC (star topology); no cross-client network access is possible.
+>
+23,24c26,27
+<    slowOpThresholdMs: 100
+<    mode: 'slowOp'
+---
+>   slowOpThresholdMs: 100
+>   mode: 'slowOp'
+
+################################################################################
+# SUMMARY OF THE DELTA
+################################################################################
+The in-repo roles/4shark.mongodb is behind the dedicated ansible-role-mongodb on
+every axis:
+
+1. Version default: in-repo pins `mongodb_version: "4.0"` (roles/4shark.mongodb/defaults/main.yml:4).
+   MongoDB 4.0 reached end of life in April 2022. The dedicated repo removed the
+   default entirely and asserts the caller declares it.
+2. Ubuntu codename: in-repo HARDCODES `bionic` (18.04) in the apt repo path.
+   The dedicated repo templates it via `mongodb_ubuntu_codename` (default focal).
+3. Package holds: in-repo has none. The dedicated repo holds all nine mongodb-org
+   packages via dpkg_selections, which is what stops an `apt-get upgrade` from
+   restarting mongod out of order and costing the replica set its quorum.
+4. THP hardening: in-repo copies a legacy /etc/rc.local. The dedicated repo installs
+   a proper systemd unit (disable-thp.service).
+5. Service management: in-repo uses the old `service:` module; the dedicated repo uses
+   `systemd:` with daemon_reload.
+6. Hygiene: the dedicated repo has .ansible-lint, .yamllint, README, CHANGELOG,
+   VERSION, meta/, renovate.json. The in-repo copy has none of these.
+
+NOTE: roles/4shark.mongodb8 (defaults/main.yml:5 `mongodb_version: "8.2"`,
+defaults/main.yml:8 `mongodb_ubuntu_codename: "noble"`) is a THIRD, separate copy of
+the same capability living in the same repo — the 8.x-series sibling of 4shark.mongodb.
+So the MongoDB provisioning capability currently exists in three places:
+  - ansible/roles/4shark.mongodb   (stale, 4.0, bionic)
+  - ansible/roles/4shark.mongodb8  (8.2, noble — used by provision-4client-mongodb-server.yml)
+  - ansible-role-mongodb           (dedicated repo, versioned, consumed by the mongodb golden-AMI build)

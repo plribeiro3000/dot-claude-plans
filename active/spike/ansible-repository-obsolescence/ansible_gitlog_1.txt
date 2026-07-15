@@ -1,0 +1,85 @@
+# Last commit per item — ~/Projects/4Shark/ansible (branch develop)
+# Captured 2026-07-15 via:
+#   git -C ~/Projects/4Shark/ansible log -1 --format='%ad | %an | %s' --date=short -- <path>
+#
+# Author legend: "Paulo Ribeiro" / "Leon Waldman" / "Roni" / "Eduardo Santos" = human.
+#                "4shark-renovate[bot]" / "dependabot[bot]" = automated dependency bump.
+
+## PLAYBOOKS
+
+aws-ami-4shark-wp.yml                | 2023-10-16 | Leon Waldman   | Fix 4shark.users on all playbooks
+aws-ami-ubuntu-python-node.yml       | 2020-01-28 | Leon Waldman   | Fix Playbooks remove raw call
+provision-4client-app-server.yml     | 2025-05-14 | Paulo Ribeiro  | feat(*): Provision 4client Out Servers
+provision-4client-mongodb-server.yml | 2026-05-14 | Paulo Ribeiro  | fix(mongodb): detect mongo shell binary at runtime
+provision-4client-out.yml            | 2025-05-14 | Paulo Ribeiro  | feat(*): Provision 4client Out Servers
+provision-4client-without-vpn.yml    | 2025-03-06 | Paulo Ribeiro  | chore(*): Upgrade Elasticache Default version
+provision-4client.yml                | 2025-03-06 | Paulo Ribeiro  | chore(*): Upgrade Elasticache Default version
+provision-4shark-wp.yml              | 2019-06-15 | Leon Waldman   | Hard-coded region on provision-4shark-wp
+provision-aws-elasticache-cluster.yml| 2019-06-16 | Leon Waldman   | Small fixes and renaming on AWS VPC and ElastiCache provisioning
+provision-aws-vpc-cidr-16.yml        | 2024-06-17 | Roni           | feat:adding network options
+provision-aws-vpc-cidr-24.yml        | 2024-11-14 | Eduardo Santos | criando rede atento em us-east-1
+provision-generic-node.yml           | 2023-10-16 | Leon Waldman   | Fix 4shark.users on all playbooks
+provision-integrator-ruby.yml        | 2026-02-23 | Paulo Ribeiro  | feat(integrator): Integrator server setup with chruby
+provision-integrator-server.yml      | 2026-03-03 | Paulo Ribeiro  | feat(integrator): improve provisioning reliability and flexibility
+provision-openvpn.yml                | 2020-01-28 | Leon Waldman   | Fix Playbooks remove raw call
+provision-pritunl.yml                | 2026-02-27 | Paulo Ribeiro  | feat(vpn): add pritunl role and provisioning playbook
+provision-rds-instance.yml           | 2022-09-05 | Paulo Ribeiro  | Merge pull request #32 from 4shark/fix-docs
+provision-redis-5-master-slave.yml   | 2024-11-29 | Paulo Ribeiro  | fix(*): Redis Provisioning
+provision-redis-5-sentinel.yml       | 2023-10-16 | Leon Waldman   | Fix 4shark.users on all playbooks
+remove-redis-5-pair-from-sentinel.yml| 2023-10-11 | Leon Waldman   | User fix and Unimaq VPC
+update-openvpn.yml                   | 2022-06-13 | Leon Waldman   | Update `vpn-bind` user password and minor refactor in the `update-openvpn.yml` playbook
+update-redis-5-sentinel.yml          | 2019-07-17 | Leon Waldman   | Add role 4shark.redis (forked from DavitWittman.redis)
+
+## OWN ROLES
+
+4shark.chruby               | 2026-03-03 | Paulo Ribeiro | feat(integrator): improve provisioning reliability and flexibility
+4shark.cloudwatch_agent     | 2026-05-13 | Paulo Ribeiro | refactor(mongodb): replace Datadog with CloudWatch Agent and standardize FQDN
+4shark.common_packages      | 2023-10-13 | Leon Waldman  | Deprecate JumpCloud instalation and implement ec2-instance-connect on 4shark.users and helper script
+4shark.common_users         | 2023-10-13 | Paulo Ribeiro | remove(*): `Liberta` VPC
+4shark.deploy_user          | 2023-10-09 | Leon Waldman  | Add 4shark.deploy_user and replace 4shark.users by it on provision-4client-app-server.yml
+4shark.engineers            | 2026-02-23 | Paulo Ribeiro | feat(integrator): Integrator server setup with chruby
+4shark.integrator_packages  | 2026-02-23 | Paulo Ribeiro | feat(integrator): Integrator server setup with chruby
+4shark.integrator_setup     | 2026-04-08 | Paulo Ribeiro | fix(integrator): disable cron job by default
+4shark.mongodb              | 2026-05-13 | Paulo Ribeiro | fix(mongodb): use signed-by instead of trusted=yes for apt repository
+4shark.mongodb8             | 2026-02-25 | Paulo Ribeiro | feat(mongodb): MongoDB 8.2 server provisioning for 4client
+4shark.mssql_odbc           | 2026-02-25 | Paulo Ribeiro | feat(mssql-odbc): Add Microsoft ODBC driver role for integrator servers
+4shark.openvpn              | 2018-10-19 | Leon Waldman  | Fix OpenVPN Role
+4shark.pritunl              | 2026-03-25 | Paulo Ribeiro | fix(pritunl): ensure dnsmasq starts after Pritunl
+4shark.redis                | 2024-11-29 | Paulo Ribeiro | fix(*): Redis Provisioning
+4shark.users                | 2026-03-03 | Paulo Ribeiro | feat(integrator): improve provisioning reliability and flexibility
+
+## PACKER
+
+packer/ (whole directory)   | 2016-12-29 | Leon Waldman | Initial Commit
+  -> NEVER modified since the initial commit in 2016.
+
+## RENAME EVIDENCE (why the packer templates are broken)
+
+git log --follow -- playbooks/aws-ami-4shark-wp.yml:
+  2023-10-16 | Leon Waldman | Fix 4shark.users on all playbooks
+  2023-10-13 | Leon Waldman | Deprecate JumpCloud instalation and implement ec2-instance-connect on 4shark.users and helper script
+  2023-10-09 | Leon Waldman | Add 4shark.deploy_user and replace 4shark.users by it on provision-4client-app-server.yml
+  2018-10-29 | Leon Waldman | Renamed playbooks from .yaml to .yml      <-- rename happened here
+  2018-10-15 | Leon Waldman | Add 4shark.users Ansible Role
+  2016-12-29 | Leon Waldman | Initial Commit
+
+The playbooks were renamed .yaml -> .yml in 2018-10-29. The packer templates still
+reference the .yaml names and were last touched 2016-12-29, so they have pointed at
+non-existent files for roughly eight years.
+
+## COMMIT VOLUME 2026 (bot vs human)
+
+git -C ~/Projects/4Shark/ansible log --oneline --since='2026-01-01' --no-merges --format='%an' | sort | uniq -c | sort -rn
+
+  135 4shark-renovate[bot]
+   34 Paulo Ribeiro
+    1 dependabot[bot]
+
+Bot share of 2026 non-merge commits: 136/170 = 80%.
+
+## VAULT PASSWORD IN README — when introduced
+
+git log -S'vault_password_file.txt' --format='%ad | %an | %s' --date=short -- README.md | tail -3
+  2018-10-29 | Leon Waldman | Add README.md
+
+The plaintext ansible-vault password has been in README.md since 2018-10-29.

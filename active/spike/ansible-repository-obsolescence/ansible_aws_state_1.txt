@@ -1,0 +1,160 @@
+# Live AWS state — evidence for which Ansible capability still has a running target
+# Captured 2026-07-15, read-only, default (read-only) AWS profile.
+
+################################################################################
+# 1. EC2 instances in sa-east-1 (the only region with Ansible-managed hosts)
+################################################################################
+# aws ec2 describe-instances --region sa-east-1 \
+#   --filters "Name=instance-state-name,Values=running,stopped" \
+#   --query 'Reservations[].Instances[].{Name:Tags[?Key==`Name`]|[0].Value,Type:Tags[?Key==`Type`]|[0].Value,Automation:Tags[?Key==`Automation`]|[0].Value,State:State.Name}'
+
+[
+    { "Name": "4client-redebrasil-mongo005",       "Type": "mongodb", "Automation": "ansible", "State": "stopped" },
+    { "Name": "4client-redebrasil-mongo004",       "Type": "mongodb", "Automation": "ansible", "State": "stopped" },
+    { "Name": "4client-redebrasil-mongo003",       "Type": "mongodb", "Automation": "ansible", "State": "stopped" },
+    { "Name": "integrator-atento-windows-machine", "Type": null,      "Automation": null,      "State": "running" },
+    { "Name": "integrator-commcenter-mongo001",    "Type": "mongodb", "Automation": "ansible", "State": "running" },
+    { "Name": "integrator-almaviva-mongo001",      "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "4shark-vpn-001",                    "Type": null,      "Automation": "ansible", "State": "running" },
+    { "Name": "integrator-atento-mongo001",        "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-maqnelson-mongo001",     "Type": "mongodb", "Automation": "packer",  "State": "stopped" },
+    { "Name": "integrator-almaviva-mongo004",      "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-commcenter-mongo002",    "Type": "mongodb", "Automation": "ansible", "State": "running" },
+    { "Name": "integrator-commcenter-mongo003",    "Type": "mongodb", "Automation": "ansible", "State": "running" },
+    { "Name": "integrator-almaviva-mongo003",      "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-almaviva-mongo002",      "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-atento-mongo002",        "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-maqnelson-mongo003",     "Type": "mongodb", "Automation": "packer",  "State": "stopped" },
+    { "Name": "integrator-atento-mongo003",        "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-maqnelson-mongo002",     "Type": "mongodb", "Automation": "packer",  "State": "stopped" },
+    { "Name": "integrator-almaviva-mongo006",      "Type": "mongodb", "Automation": "packer",  "State": "running" },
+    { "Name": "integrator-almaviva-mongo005",      "Type": "mongodb", "Automation": "packer",  "State": "running" }
+]
+
+READ:
+- "4shark-vpn-001" is RUNNING and tagged Automation=ansible -> the Pritunl path is live.
+- MongoDB fleet is SPLIT: commcenter (3 nodes) + redebrasil (3 nodes, stopped) still tagged
+  Automation=ansible; almaviva/atento/maqnelson already tagged Automation=packer (golden AMI).
+  The golden-AMI migration is IN FLIGHT, not finished.
+- NO redis EC2 instances exist -> the redis-5 playbooks have no target.
+- NO openvpn instance exists (only the single Pritunl VM) -> the OpenVPN path has no target.
+- NO "4client-*-app*" / integrator ruby app servers exist.
+
+################################################################################
+# 2. EC2 tagged Role=application (what provision-4client-app-server / integrator-server built)
+################################################################################
+# aws ec2 describe-instances --region sa-east-1 --filters "Name=tag:Role,Values=application" \
+#   --query 'Reservations[].Instances[].{Name:...,State:...,Launch:LaunchTime}'
+
+[]
+
+READ: empty. Zero application EC2 instances exist. The integrator app-server
+provisioning playbooks have no live target.
+
+################################################################################
+# 3. ECS clusters in sa-east-1 — where the integrator actually runs now
+################################################################################
+# aws ecs list-clusters --region sa-east-1
+
+integrator-commcenter-staging-cluster
+app-outbound-maqnelson-cluster
+app-outbound-atento-br-cluster
+integrator-atento-co-cluster
+integrator-atento-br-cluster
+integrator-commcenter-cluster
+auth-001-cluster
+integrator-atento-co-staging-cluster
+integrator-atento-harvester-cluster
+integrator-atento-cl-cluster
+integrator-atento-mx-staging-cluster
+integrator-redebrasil-cluster
+integrator-almaviva-cluster
+integrator-maqnelson-cluster
+integrator-atento-mx-cluster
+integrator-atento-cl-staging-cluster
+
+READ: every integrator client runs on ECS. This is what superseded the
+provision-integrator-server.yml / provision-integrator-ruby.yml EC2 path.
+
+################################################################################
+# 4. WordPress — the engineer's hypothesis, tested three ways
+################################################################################
+
+## 4a. ASGs in us-east-1
+# aws autoscaling describe-auto-scaling-groups --region us-east-1 --query 'AutoScalingGroups[].AutoScalingGroupName'
+atento-001-runner-asg, atento-001-web-asg, atento-001-worker-cleansing-asg,
+atento-001-worker-commission-asg, atento-001-worker-commission-tiger-shark-asg,
+atento-001-worker-commission-white-shark-asg, atento-001-worker-migration-asg,
+atento-001-worker-system-asg, atento-001-worker-user-asg, beta-001-runner-asg,
+beta-001-web-asg, beta-001-worker-cleansing-asg, beta-001-worker-commission-asg,
+beta-001-worker-commission-tiger-shark-asg, beta-001-worker-commission-white-shark-asg,
+beta-001-worker-migration-asg, beta-001-worker-system-asg, beta-001-worker-user-asg,
+demo-001-runner-asg, demo-001-web-asg, demo-001-worker-cleansing-asg,
+demo-001-worker-commission-asg, demo-001-worker-commission-tiger-shark-asg,
+demo-001-worker-commission-white-shark-asg, demo-001-worker-migration-asg,
+demo-001-worker-system-asg, demo-001-worker-user-asg, setup-runner-asg, setup-web-asg,
+shared-001-runner-asg, shared-001-web-asg, shared-001-worker-cleansing-asg,
+shared-001-worker-commission-asg, shared-001-worker-commission-tiger-shark-asg,
+shared-001-worker-commission-white-shark-asg, shared-001-worker-deal-indexation-asg,
+shared-001-worker-migration-asg, shared-001-worker-system-asg, shared-001-worker-user-asg
+
+READ: "asg-4shark-wp-production" (created by provision-4shark-wp.yml) is ABSENT.
+
+## 4b. The WordPress ELB
+# aws elb describe-load-balancers --region us-east-1 --load-balancer-names elb-4shark-wp-production
+An error occurred (LoadBalancerNotFound) when calling the DescribeLoadBalancers operation:
+There is no ACTIVE Load Balancer named 'elb-4shark-wp-production'
+
+## 4c. The WordPress golden AMI (pinned in group_vars/all/all.yml as aws_4shark_wp_images.production)
+# aws ec2 describe-images --region us-east-1 --image-ids ami-c58e80d2
+An error occurred (InvalidAMIID.NotFound) when calling the DescribeImages operation:
+The image id '[ami-c58e80d2]' does not exist
+
+READ: the WordPress stack is gone in all three dimensions — no ASG, no ELB, no AMI.
+The engineer's WordPress hypothesis is confirmed by live state.
+
+################################################################################
+# 5. Terraform coupling to Ansible
+################################################################################
+# grep -n 'aws_instance' terraform/modules/pritunl/main.tf
+   2:  ami           = var.ami_id
+  17:      Automation = "ansible"
+  23:    Automation = "ansible"
+  28:    ignore_changes = [ami, user_data, user_data_base64]
+
+# grep -n 'golden\|Automation' terraform/integrator-atento/mongodb.tf
+   5: # MongoDB 5.0 (golden AMI). One shared set backs all four country integrations
+  19: # Ubuntu 20.04 + MongoDB 5.0 nodes (golden AMI ami-0e4d77e66719fceb1), named
+  29:   ami           = "ami-0e4d77e66719fceb1"
+  48:      Automation = "packer"
+  67:    ignore_changes  = [ami, user_data, user_data_base64]
+
+READ: Terraform does NOT invoke Ansible (no provisioner, no user_data calling a playbook).
+The coupling is by CONVENTION only — Terraform creates a bare EC2 and tags it
+Automation=ansible, then a human runs the playbook by hand against its IP.
+The pritunl module is the one module still tagged Automation=ansible.
+
+# terraform/vpn/main.tf (lines 10-24) — the live VPN stack uses the pritunl module:
+module "pritunl" {
+  source = "../modules/pritunl"
+  name_prefix   = "4shark-vpn-001"
+  ...
+}
+READ: no OpenVPN module exists in terraform/. Pritunl replaced it.
+
+################################################################################
+# 6. Terraform stacks that replace the Ansible provisioning playbooks
+################################################################################
+terraform/networking/           -> vpc_almaviva.tf, vpc_atento.tf, vpc_commcenter.tf,
+                                   vpc_maqnelson.tf, vpc_management.tf, vpc_onboarding.tf,
+                                   vpc_app_*.tf, peering.tf, transit_gateway.tf
+                                   (replaces provision-aws-vpc-cidr-16/24.yml and the
+                                    VPC/peering/NAT halves of provision-4client*.yml)
+terraform/modules/rds_instance/ -> main.tf, outputs.tf
+                                   (replaces provision-rds-instance.yml)
+terraform/modules/integrator/elasticache.tf
+                                -> (replaces provision-aws-elasticache-cluster.yml and the
+                                    self-managed redis-5 playbooks)
+terraform/modules/pritunl/      -> (provisions the VM that provision-pritunl.yml configures)
+terraform/mongodb/              -> the golden-AMI build stack
+terraform/vpn/                  -> the live VPN stack (pritunl module)

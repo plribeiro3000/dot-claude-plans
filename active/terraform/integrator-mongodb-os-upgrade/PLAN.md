@@ -23,6 +23,58 @@ There are no automated backups, no upgrade procedures, and no documented process
 
 **Rollout strategy (adopted 2026-07-08):** phased across the fleet, one hop at a time — take **all productive environments to MongoDB 5.0 first** (Step 1), validate each, and only then plan the subsequent hops (OS upgrade → 6.0 → …). Environments are done **one at a time**, prioritizing whichever is **closest to its next integration window** so there is room to migrate several in a day without colliding with a running integration.
 
+### RESUME POINT — 2026-07-15 EOD (almaviva MIGRATED to noble and serving; the fleet PAUSES here to build the automation; the other 3 run ON it)
+
+**READ `TASKS.md` FIRST — it is the executable half and it is current.** This file explains why; that one is how, command by command, with every trap found while running.
+
+**The plan for the remaining fleet CHANGED today (engineer, 2026-07-15). Do NOT continue maqnelson/atento/commcenter by hand.**
+
+1. **almaviva by hand** — done through Phase C.4. The engineer's `bin/ecs run` gate (C.5) and the teardown (D) remain.
+2. **PAUSE — build the operator binary + the spike that decides its shape**, from `TASKS.md` § Harvest. That file is the specification: it was written *before* each command ran and corrected the moment each one taught something, precisely so the binary is not reconstructed from a transcript (the failure that made the version-hop skill slip twice).
+3. **A NEW SESSION runs the other three THROUGH the automation** — end to end, the agent resolving what comes up rather than asking, with backup taken and rollback available. Every gap a run exposes is fixed **in the binary**, not worked around.
+
+**almaviva is on Ubuntu 24.04 and serving, with zero downtime.** All-new PSA: `mongo004` PRIMARY / `mongo005` SECONDARY / `mongo006` ARBITER, `8.0.26` / FCV `8.0` — byte-identical to what it ran before, which is the whole thesis of Step 6: the OS moved, the version did not. The deploy's `Migrate` job connected over the new URL and wrote, **with every focal node powered off** — the hidden-dependency question answered by behaviour. Shipped: `terraform` **#703** (the three noble nodes + DNS) and **#705** (the four `compute.tf` references repointed, which un-broke the daily-shutdown cycle before tonight's 00:50 UTC start). Both merged and applied.
+
+**What today's execution proved that no amount of planning had:**
+
+- **The promote recipe was NOT idempotent across generations, and it would have failed on all four environments.** `priority: 2` produced a **tie** — `ok: 1`, no election, the old primary stayed. Cause: the node being retired had itself been promoted to `2` by Step 2. MongoDB only elects on a *strictly higher* priority. The fix is MongoDB's own documented shape ([Force a Member to Become Primary](https://www.mongodb.com/docs/manual/tutorial/force-member-to-be-primary/)): **others → `0.5`, target → `1`** — which ends at `1`, so the next generation runs identically and never ties. The fleet's `2 / 1 / 0` convention is retired in favour of `1 / 0.5 / 0`. **maqnelson, atento and commcenter all still carry `priority: 2` and will hit this.**
+- **`ok: 1` proves nothing.** Two reconfigs returned it while electing nobody. Only `rs.status()` settles it — and only after a sleep, because `rs.reconfig` returns before the election resolves.
+- **`rs.reconfigForPSASet` is direction-specific** — it requires `votes: 0` in the *current* config, so a demote must use plain `rs.reconfig`. The first draft of the procedure had this backwards and would have failed on contact.
+- **The MONGODB URL is not in Terraform** — `ssm.tf` writes `PLACEHOLDER` + `ignore_changes = [value]`. A PR "changing the URL" has an empty diff; `put-parameter` is the only path.
+
+**The known gap: Phase D is not exercised.** Its traps are documented from Step 2 but have not been seen in this shape, and every phase so far taught something the plan did not predict. Either run almaviva's teardown before building the binary, or build it knowing D is its weakest section.
+
+<details><summary>Earlier RESUME POINT — 2026-07-15 midday (Step 6 started; image proven; superseded)</summary>
+
+### RESUME POINT — 2026-07-15 (Step 6 STARTED — image done and proven; almaviva's new nodes are UP; the per-command procedure now lives in TASKS.md)
+
+**The command-level procedure moved to `TASKS.md` (engineer, 2026-07-15).** Every command Step 6 executes is written there, in the form it runs, *before* it runs — and corrected as it runs. It is the specification the operator binary is built from, so the next migration is a transcription of something proven 12 times instead of a design recalled from a transcript. Read `TASKS.md` to execute; read this file to understand why.
+
+**The image half of Step 6 is DONE and PROVEN.** `mongodb` #16 flipped the fleet's two locals to `noble` / `24.04` and the post-merge build produced **`ami-0244451ea895c4e3c`** — tags `MongoDBVersion=8.0` / `UbuntuRelease=24.04` / `Version=8.0-20260715103934`. That AMI is the proof that 8.0 has a `noble` apt repo; the `curl` against `dists/` was evidence, a built image is the fact. Two findings:
+- **Canonical publishes noble under `hvm-ssd-gp3`, NOT `hvm-ssd`.** The old filter returned **0 images** for `noble` — the build would have died at "no AMI found" with no hint why. Caught by checking the account before committing. The family is now pinned, not wildcarded: if Canonical moves the path again this fails loudly rather than resolving to whatever a glob matched.
+- **This plan's "Step 6 deletes all three" focal workarounds was WRONG** — only the `ansible-core` 2.18 pin was ever release-specific (it existed because focal ships Python 3.8; noble ships 3.12.3, verified at packages.ubuntu.com). `apt_cache_valid_time: 0` and `cloud-init status --wait` describe how **Ubuntu cloud images** boot, not how focal boots. They were kept, with corrected comments. Deleting them would have been optimisation against races whose symptom is a package that resolves on one build and not the next.
+
+**`-replace` in place was evaluated and REJECTED (engineer, 2026-07-15). Do not re-propose it.** The agent proposed forcing each existing node onto the new image with `terraform apply -replace`, recommending it because the hostname would not change — no SSM rewrite, no deploy, no revalidation. The engineer rejected it: *"isso aí não vai destruir a EC2 e subir uma nova?"* It does. The agent's framing was the error — it weighed **work** and never weighed **risk**. What `-replace` actually costs: it destroys a live member to rebuild it, so the set drops to a **single copy of the data** until the replacement finishes its initial sync, and recovery means mounting an orphaned volume by hand. The additive path keeps the old trio up, with its data, throughout — a failure is a step back, not a restore. The plans settled it without argument:
+
+| Approach | terraform plan |
+|---|---|
+| `-replace` in place | 5 to add, 4 to change, **5 to destroy** |
+| new nodes 004/005/006 | 3 to add, 0 to change, **0 to destroy** |
+
+The `-replace` cascade (4 task-definition revisions + 3 IAM/scheduler updates) came from the instance id changing, which flows into `AWS_INSTANCE_IDS`. The additive path defers all of it to teardown, which is where it belongs — after validation. **One fact worth keeping from the rejected branch:** `-replace` *does* use the config's AMI despite `ignore_changes = [ami]` — verified on provider 6.53.0 in the live stack. That is a genuine escape hatch for a node that holds no data; it is not a migration strategy for one that does.
+
+**Numbering advances to 004/005/006 — it does not reuse 001/002/003.** Step 2 could reuse numbers because the *prefix* changed (`4client-` → `integrator-`), so old and new coexisted without collision. Step 6 has no prefix change: two instances cannot share a Name tag, and the `dns` stack's `data "aws_instance"` resolves by it. The old names free up only at teardown, which is after the cutover that needs the new nodes to exist. Accepted cost: the fleet is 004/005/006 permanently, and the SSM+deploy dance returns.
+
+**almaviva Phase A is partially done — terraform #703 merged and applied.** 004/005/006 are running on the noble AMI with DNS records; `mongod` is up but carries **no `replSetName`**, so they are not members of anything yet. The old trio is stopped (daily-shutdown steady state) and untouched. Exact instance ids and IPs: `TASKS.md` § Progress.
+
+**Scope: 4 environments, almaviva first** (engineer, 2026-07-15) — the integration execution order. The engineer initially named three; almaviva was the omission, and it is in the fleet like any other.
+
+**STALE IN THIS FILE — the engineer-runs-the-restart handoff.** Lines further down (the § Access boundary and § Operational learnings bullets) still say in the present tense that the agent cannot run `systemctl restart mongod` over ssh and that the engineer must. **That is history.** `validate-bash-command.sh:479` skips the local-database guard when the command's leading token is `ssh`; verified 2026-07-15. The agent runs the whole procedure. Those bullets cost a real round-trip this session — the agent asked "is the SSH mine or yours?" twice when the answer was already written at line 85.
+
+</details>
+
+<details><summary>Earlier RESUME POINT — 2026-07-14 EOD (go-forward maintenance shipped; superseded)</summary>
+
 ### RESUME POINT — 2026-07-14 EOD (GO-FORWARD MAINTENANCE SHIPPED; the OPERATOR SKILL is the one thing still owed; Step 6 = OS hop is tomorrow)
 
 **Tomorrow is Step 6: the OS hop, Ubuntu 20.04 → 24.04 (`noble`) by re-provision** (engineer, 2026-07-14). **NOT 26.04** — the engineer asked for "the latest" and it was proved impossible: `curl` against `repo.mongodb.org/apt/ubuntu/dists/` returns 200 for `noble` and **404 for `resolute` (26.04)** — MongoDB publishes no packages for 26.04, so an image built on it has no MongoDB to install. 24.04 is the target and Step 6 below is unchanged.
@@ -54,6 +106,8 @@ Consequence: **the golden image now bakes MongoDB 8.0 on focal — matching the 
 **STILL OWED — the operator skill (`mongodb-upgrade.sh`). This is the one deliverable the engineer asked for that has NOT been built, and it slipped once already (2026-07-14) because it lived only in session memory and never in this plan. It is now § Operator skill below, as a first-class open item.** The version hops this session were run as ~90 hand-issued ssh commands; the skill is what turns the next one into "faz upgrade". A **version** upgrade is IN PLACE over SSH (that is why the skill is SSH-driven) — it is NOT the re-provision Step 6 uses.
 
 **Also owed (small):** `terraform` CHANGELOG carries an entry written in the wrong style (`Version gate blocking a pull request that declares a reused or out-of-sequence release version` — explains instead of naming the subject; see `~/.claude/docs/CHANGELOG.md` § "Entries are simple, direct, and succinct"). It is in `## [Unreleased]` on `develop`, fixable in a small PR.
+
+</details>
 
 <details><summary>Earlier RESUME POINT — 2026-07-14 midday (version-hop phase complete; go-forward workstream still open; superseded)</summary>
 
@@ -165,7 +219,19 @@ The new nodes are born under the ADR-010 standard `integrator-<client>-mongoNNN`
 - **Pattern (from `skills/integrators/scripts/integrator-services.sh` + `skills/apps/`)**: skill folder = `SKILL.md` + optional `environments.json` + `scripts/<one-script>.sh`; long `--flag value` parsing; `set -euo pipefail`; usage comment block at the top; region as a constant; **discovery by resource TAG, never hardcoded names**; JSON output.
 - **The subcommand surface is settled by the research (2026-07-14): `status` / `snapshot` / `hop --to <X.0>` / `verify`.** The spike closed the question that was holding it: patches must NOT auto-apply (that is why `ansible-role-mongodb` #7 holds the packages), so no auto-update mode is needed and none is added. `hop` performs one whole major step — SECONDARY → ARBITER re-provision → PRIMARY → `setFCV` — which is the unit that actually recurs.
 
-### Operator skill (`mongodb-upgrade.sh`) — OWED, NOT BUILT
+### Operator skill — THE WORK OF THE PAUSE (engineer, 2026-07-15)
+
+**This section is now the session's main deliverable, not a side item.** The fleet stops here. The binary is built, then maqnelson/atento/commcenter are migrated **by running it**.
+
+**There are TWO jobs, not one — this is settled by execution, not opinion.** A **version** upgrade is *in place, inside the instance* (apt repo → install → restart → `setFCV`), which is what `MONGODB-VERSION-UPGRADE.md` covers. An **OS** upgrade is a *re-provision*: new nodes stand up beside the set, join, take over, old ones retire. They share the `rs.*` vocabulary and nothing else — different inputs, different failure modes, different rollback shape. `mongodb-upgrade.sh hop --to <X.0>` is the first; the re-provision is a **candidate second binary**, and the decision belongs to the engineer once its shape is proven. Do not force it in as a fifth subcommand because both say "mongo".
+
+**The specification for the re-provision half already exists and is battle-tested: `TASKS.md`.** It carries every command in the literal form it ran, the reason each one exists, the order, the vote-count at each step, and 17 findings — most of which are things that returned success while doing nothing. Build from that file, not from this one, and not from a transcript.
+
+**The bar for the next session (engineer, 2026-07-15):** run one environment **end to end without asking permission**, resolving whatever comes up, with backup taken and rollback available. See `TASKS.md` § Harvest for what that requires the binary to own — the backup gate, the per-phase rollback story, verification that discriminates, and abort-rather-than-improvise. **One boundary it cannot cross:** `gh pr merge` is hook-blocked unconditionally. The automation reaches *PR opened and applied*; the merge stays the engineer's. Design for that stop, not around it.
+
+<details><summary>The original version-hop skill scope (2026-07-14) — still valid for the in-place half</summary>
+
+#### Operator skill (`mongodb-upgrade.sh`) — OWED, NOT BUILT
 
 **This is the deliverable the engineer asked for on 2026-07-14 and it is still not written. It slipped once already, because it lived in session memory instead of in this plan — which is precisely why it is a first-class section now.** The engineer's words: *"Cadê as binárias que eu falei para fazer a migração? Porque a migração é UPDATE IN PLACE, então tem que fazer comando SSH."*
 
@@ -185,6 +251,8 @@ The new nodes are born under the ADR-010 standard `integrator-<client>-mongoNNN`
 **The procedure it automates is already written and battle-tested** — every step, trap and recovery is in `~/.claude/docs/runbooks/databases/MONGODB-VERSION-UPGRADE.md` and in the § Version-upgrade per-node procedure / § ARBITER RE-PROVISION bullets above. The skill is a transcription of a proven procedure, not a new design. It must carry, at minimum: the `sleep ~15s` after a primary restart before `setFCV` (the restart IS a graceful stepdown; `setFCV` too early returns `not primary`); the arbiter re-provision on every hop with the PSA reconfig dance (`votes:0/priority:0` → `rs.addArb` → `rs.reconfigForPSASet`); and `sudo find /data/db -mindepth 1 -delete` — **never** `sudo rm -rf /data/db/*`, whose glob expands as `ubuntu` before `sudo` and silently matches nothing.
 
 **Proving it:** the next real use is the fleet's 8.0 → 9.0 hop, which does not exist yet. So it gets exercised against a scratch set, or its first production use is 9.0 with the engineer watching.
+
+</details>
 
 ### Version-upgrade automation gaps — measured 2026-07-14, both repos — BOTH CLOSED 2026-07-14
 
@@ -268,7 +336,7 @@ Retiring a terraform-managed `4client-*` trio is a cross-stack, ordered, irrever
 
 **Access boundary (corrected 2026-07-13 — DIRECT SSH, no ephemeral task):** the agent's machine reaches the mongo nodes directly over the VPN — `ssh -i ~/.ssh/kp-4shark.pem ubuntu@<node-private-ip>` works and is instant. This is how Step 1 (4.0→5.0) was done; the ephemeral-ECS-task path (SSM key + runner task-def + `run-task`) is NOT needed — it only added latency, and is dropped. The agent drives node config + `rs.*` directly via `ssh ... "mongosh --quiet --eval '...'"`.
 
-- **One hook caveat:** `validate-bash-command.sh` blocks `systemctl restart mongod` in the agent's Bash even inside an `ssh ... "..."` remote command (false positive — the local-DB-safety guard can't tell it is remote prod mongo). So the `mongod` restart after a config change is run by the ENGINEER; everything else (`rs.add`/`rs.status`/`stepDown`/`remove`/mongosh queries) the agent runs directly. **Follow-up:** refine the hook to not match inside an `ssh` remote command.
+- **~~One hook caveat~~ — RESOLVED 2026-07-14, this bullet is HISTORY.** It used to read: `validate-bash-command.sh` blocks `systemctl restart mongod` even inside an `ssh ... "..."` remote command, so the restart is run by the ENGINEER. **No longer true** — `validate-bash-command.sh:479` now negates the local-database guard when the command's leading token is `ssh` (that guard governs the engineer's own machine per `LOCAL-DATABASES.md`; a remote host was always out of its scope). The agent runs every step, restart included. Verified 2026-07-15.
 - **commcenter facts:** set name `commcenter`; new node IPs mongo001 `10.1.3.18` (1a), mongo002 `10.1.3.105` (1b), mongo003 arbiter `10.1.3.119` (1b); old node IPs mongo003 `10.1.3.20` (1a, was primary), mongo004 `10.1.3.125` (1b, secondary), mongo005 arbiter `10.1.3.72` (1b).
 - **Cleanup from the abandoned ephemeral-task attempt (commcenter only):** delete the SSM param `/integrator-commcenter/mongo-ssh-key` (holds the prod SSH key — hygiene) and deregister the `integrator-commcenter-runner:31` task-def revision. Not created for the other environments (direct SSH from the start).
 
@@ -361,7 +429,7 @@ Retiring a terraform-managed `4client-*` trio is a cross-stack, ordered, irrever
 - **Verify each environment's ACTUAL MongoDB version and FCV first** — the fleet is heterogeneous (commcenter was 4.4, almaviva was 4.0). The number of hops to 5.0 differs per environment.
 - **The 4.2 → 4.4 hop leaves packages half-configured**: `mongodb-org-database-tools-extra` postinst fails on the first pass (`apt-get install` exits 100, packages in `iU` state). Always run `sudo apt-get -f install -y -o Dpkg::Options::=--force-confold` right after the install to complete configuration, and assert `dpkg -l | grep mongodb | grep -c '^iU'` is 0. (The 4.0→4.2 and 4.4→5.0 hops did not hit this, but the `-f install` step is harmless and worth keeping on every hop.)
 
-- **Access is DIRECT SSH over the VPN** — `ssh -i ~/.ssh/kp-4shark.pem ubuntu@<node-private-ip>` reaches each mongo node from the agent's (VPN-connected) machine, instantly (this is how Step 1 was done). The mongo boxes have no SSM agent and no public 22, but the VPN CIDR is allowed by the SG, so direct SSH works. The `ssh -i` reads the key from disk — no key value in the session. **Do NOT use an ephemeral ECS task** (tried 2026-07-13 — pure latency). **Hook caveat:** the agent's Bash cannot run `systemctl restart mongod` (even over ssh — the local-DB guard is a false positive for remote prod mongo), so the `mongod` restart after a `mongod.conf` change is engineer-run; the agent runs all `mongosh`/`rs.*` directly.
+- **Access is DIRECT SSH over the VPN** — `ssh -i ~/.ssh/kp-4shark.pem ubuntu@<node-private-ip>` reaches each mongo node from the agent's (VPN-connected) machine, instantly (this is how Step 1 was done). The mongo boxes have no SSM agent and no public 22, but the VPN CIDR is allowed by the SG, so direct SSH works. The `ssh -i` reads the key from disk — no key value in the session. **Do NOT use an ephemeral ECS task** (tried 2026-07-13 — pure latency). ~~**Hook caveat:** the agent's Bash cannot run `systemctl restart mongod`...~~ — **RESOLVED 2026-07-14; the agent runs every step including the restart.** See the § Access boundary bullet above.
 - **SSH to the mongo nodes is slow to connect** (>15s) — use `ConnectTimeout` ≥ 20 and **pin the jump task to the target node's own subnet/AZ** (cross-AZ SSH timed out repeatedly). Node subnets differ within a replica set.
 - **`apt-get install mongodb-org` keeps the server package back** on a major-version jump (the metapackage upgrades but `mongodb-org-server`/`-shell`/`-mongos`/`-tools` stay at the old version). Name the component packages explicitly: `apt-get install -y -o Dpkg::Options::=--force-confold mongodb-org mongodb-org-server mongodb-org-shell mongodb-org-mongos mongodb-org-tools`. Keep `mongod.conf` via `--force-confold`.
 - **Per-environment schedulers**: check each client's EventBridge schedules (`integrator-<client>-scale-up-web/worker`, `ECS-integrator-<client>-cron-integration-cron-schedule`) so no integration runs mid-upgrade. commcenter was effectively NOT on active daily-shutdown (`AWS_INSTANCE_IDS` empty, start-mongodb scheduler disabled) — verify this per client, it may differ.
@@ -540,14 +608,10 @@ For each member:
 
 **Library note:** Ubuntu 24.04 ships OpenSSL 3.0 (`libssl3`); MongoDB 8.0 supports it — no issue. The `libssl1.1` constraint only ever blocked MongoDB ≤5.0, long past by this step.
 
-**Procedure — re-provision one replica-set member at a time (same shape as Step 2), keeping quorum for 0-downtime:**
-1. Provision a fresh Ubuntu 24.04 instance running MongoDB 8.0, apt repo pinned to the `noble` codename:
-   ```bash
-   echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-8.0.gpg ] https://repo.mongodb.org/apt/ubuntu noble/mongodb-org/8.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-8.0.list
-   ```
-2. `rs.add()` the new node; wait for initial sync to `SECONDARY`.
-3. `rs.remove()` the old 20.04 member it replaces (for the primary, `rs.stepDown()` first).
-4. Repeat per member (SECONDARY → ARBITER → PRIMARY order); verify the replica set is healthy on 24.04.
+**Procedure — see `TASKS.md`, which is the executable version of this step.** It carries every command in the form it runs, the per-environment table, and the progress state. Two corrections it makes to the sketch that used to live here:
+
+- **It is NOT "one member at a time".** All three new nodes are stood up together and the two data nodes sync **in parallel** — the engineer's Step 2 decision (2026-07-10), and the reason "fastest" and "safest" are not in tension here. Only the **two DATA nodes** join the set (peak 5 members, never 6); the arbiter is swapped 1:1 at the very end so the voting count never goes even and the set never holds two arbiters.
+- **No apt repo line is needed.** The old sketch above carried a `sources.list.d` command copied from the version-hop procedure. It does not belong: the golden image already ships MongoDB 8.0 installed and its repo configured for `noble`. Step 6 changes the OS **only** — the version is already 8.0 on both sides. The one thing a fresh node genuinely needs is its `replSetName`, which the image deliberately omits (one image, many clients, different set names).
 
 ---
 
