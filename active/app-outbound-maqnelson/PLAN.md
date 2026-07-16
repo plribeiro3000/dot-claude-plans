@@ -7,6 +7,36 @@
 
 ---
 
+## ⏭️ NEXT — the release runbook (all code is merged; this is the engineer's part)
+
+**Both code PRs are merged** ([#5236](https://github.com/4shark/app/pull/5236) columns, [#5235](https://github.com/4shark/app/pull/5235) models + workers). `develop` is at `af05ca391`. What follows is one operation on `atento-001`, in this order. Full detail in **Phase 6.3 / 6.4**.
+
+| # | Step | Gate before the next step |
+|---|------|---------------------------|
+| 1 | **Disable the outbound autoscaling Lambda** (`atento-001`) — the worker sits at `0/0`, so it stays there and anything triggered queues in Redis | Lambda confirmed off |
+| 2 | Cut the release → deploy `atento-001` | Deploy green |
+| 3 | **Backfill `scheme` + `path`** — the script in 6.3, via `bin/ecs run`. One row | It printed `OK`, **and the assembled URL matches `execute_consumer.rb:70`** — `http://<hostname>/lg.com.br/svc/servicodeeventosdofuncionario`. If it differs, STOP |
+| 4 | **Run the verification** — the second script in 6.3 | **Prints nothing.** Any `STILL NULL` line means step 5 would break payroll |
+| 5 | **Re-enable the Lambda** — the queue drains against populated configuration | Worker scales, jobs succeed |
+
+**Why the Lambda and not the deploy's own lock:** `deploy-payroll-worker.yaml:98` takes a Redis autoscaling lock with a 900s TTL — that covers the deploy, not the deploy-plus-backfill window, which can run an hour. Engineer's call, and it is the right one.
+
+**Why this is one release and not two:** see 6.4. Shipping the columns and the code together needs the window closed operationally; shipping them in two releases costs two full cycles against a Monday deadline.
+
+**Then Phase 7** (`shared-001`, no record exists yet — created directly in the new shape):
+
+| Column | Value |
+|---|---|
+| `hostname` | `dev-nexus.maqnelson.com.br` — **host only**, no scheme, no path |
+| `scheme` | `https` |
+| `path` | `/api/v1/premiacao/pagamentos` — **no accent**, the collection uses plain ASCII |
+| `authentication_path` | `/api/v1/entrar` |
+| `email` / `user_password` | from Maqnelson's e-mail — **record only**, never code/Terraform/PR. Flag the password for rotation: it transited e-mail |
+
+**Two things still unproven, and homologation is what proves them:** the token field in the login response (`processor.rb:72` assumes `access_token`; the collection has no response example and the string appears nowhere in it — a 401 on the payments POST after a successful login is this), and the workers' behaviour generally — **this project has no worker specs**, so the 3829 green model examples prove the validations, not the request.
+
+---
+
 ## Context from the meeting — "4shark - VPN - api", 2026-07-14 08:00
 
 Participants: Paulo Ribeiro (4Shark); Deivid Pereira, Paulo Fanini, Thiago Alves (Maqnelson).
@@ -89,7 +119,7 @@ This is a **prerequisite**, not a follow-up — the giveaway happens the moment 
 | Outbound infrastructure — app config: sa-east-1 dual-push (5.2) | ✅ Done — PR [#5233](https://github.com/4shark/app/pull/5233) merged; needs a release to populate the sa-east-1 mirror (the build only runs on `master`) |
 | Outbound infrastructure — terraform: switch the lane to `payroll_tiger_shark` (5.3) | ✅ Applied (1 added, 1 changed, 1 destroyed) and verified on AWS — PR [#704](https://github.com/4shark/terraform/pull/704) merged |
 | Outbound infrastructure — `deploy-shared-001` payroll caller (5.4) | ✅ Done — PR [#5234](https://github.com/4shark/app/pull/5234) merged |
-| Contract diff vs Thiago's reduced version | ✅ Done — PR [#5235](https://github.com/4shark/app/pull/5235) open; auth was rewritten on their side, payments body unchanged |
+| Parameterize the payroll endpoints + align with the reworked contract (6) | ⬜ **Planned, not started.** Supersedes PR [#5235](https://github.com/4shark/app/pull/5235) (hardcoded scheme + paths — rejected). Expand/contract: PR A (migrations) → engineer populates Atento's `request_url` → PR B (models + workers). Scope now includes FPW |
 | `payroll_integration` record for Maqnelson (hostname + credentials) | ⬜ To do (DB config) |
 | Homolog end-to-end test (notify Fanini first) | ⬜ To do |
 | Production endpoint switch | ⬜ Later, with Maqnelson |
@@ -241,21 +271,156 @@ The Terraform apply is safe first: every service is created at `desired_count = 
 
 **Verified on AWS after the 5.3 apply (2026-07-15):** task definition at revision 2 with `config/sidekiq_payroll_tiger_shark.yml` in its command; Lambda `PROCESS_NAME = worker_payroll_tiger_shark`; the service still points at revision **1** with `desiredCount: 0` — expected, and the live demonstration of the `ignore_changes` behaviour documented above. The deploy from 5.4 is what moves it, and the first run of that deploy happens at the release in step 5.
 
-### Phase 6 — Contract diff vs the customer's reduced version ✅ DONE
+### Phase 6 — Parameterize the payroll endpoints (and align with the customer's reworked contract)
 
-**PR [#5235](https://github.com/4shark/app/pull/5235) open.** Source of truth: the Postman collection `Nexus — Premiação Comercial`, attached to Thiago's 2026-07-14 e-mail (the e-mail body itself carries no contract — only the attachment does). The Gmail MCP cannot download attachments; the engineer saved it to `~/Downloads/`.
+**Supersedes PR [#5235](https://github.com/4shark/app/pull/5235)** — that PR fixed the contract but hardcoded `https://` and both paths in the worker. Rejected by the engineer, 2026-07-15: *"quando não for HTTPS você não pode colocar isso fixo... a URL inteira tem que ser dinâmica. O path também tem que estar configurável... esse código vai executar para todo mundo... pode ser que amanhã a Maqnelson mude essa porra, eu não quero ter que fazer um deploy só porque eles mudaram a URL."* Correct: a hardcode is worse than the `.sub` it replaced — the `.sub` was at least changeable via the record.
 
-**The prior expectation in this plan was wrong.** It said "the current body already matches the e-mailed contract — expect a small attribute diff". The *payments body* does match, exactly. But **authentication was rewritten on their side and no longer works**:
+#### 6.1 — What the collection actually changed
+
+Source of truth: the Postman collection `Nexus — Premiação Comercial`, attached to Thiago's 2026-07-14 e-mail (the e-mail body carries no contract — only the attachment does; the Gmail MCP cannot download attachments, the engineer saved it to `~/Downloads/`).
 
 | | Implemented before | Collection (2026-07-14) |
 |---|---|---|
 | Auth URL | `hostname.sub('/pagamentos', '/auth/token')` → `/api/v1/premiacao/auth/token` | `POST /api/v1/entrar` |
 | Auth body | `{ username:, password: }` | `{ "email": "", "senha": "" }` |
-| Payments body | `{ mes_competencia, ano_competencia, pagamentos[{ usuario_id_externo, tipo_pagamento_id_externo, premio_valor }] }` | **identical** |
+| Payments body | `{ mes_competencia, ano_competencia, pagamentos[{ usuario_id_externo, tipo_pagamento_id_externo, premio_valor }] }` | **identical — no change** |
 
-The `.sub` derivation is structurally unreachable: `/entrar` is a sibling of `/premiacao`, not of `/pagamentos`. No substitution on the payments URL produces it.
+The `.sub` derivation is structurally unreachable: `/entrar` is a sibling of `/premiacao`, not of `/pagamentos`.
 
-**Resolved by moving to the host-only convention the base model already defines.** `payroll_integration.rb:24-30` exposes `def host; hostname.split(':').first; end` / `def port; hostname.split(':').last; end` — that only makes sense if `hostname` is `host:port`. With a full URL stored, `host` returns `"https"`. This integration was the sole divergent one; `fpw_integration/execute_consumer.rb:70` already builds `URI.parse("http://#{hostname}/lg.com.br/svc/...")`. Both Maqnelson paths are now explicit in the worker. Verified ACCEPT (0.88) by `code-policy-verifier`, which confirmed the change *removes* pre-existing Convention Drift rather than adding any.
+#### 6.2 — The target shape: every endpoint comes from the record
+
+**Engineer's decision (2026-07-15):** keep `hostname`, keep `user_name`, add `email`; push the base validations down to the subclass that actually needs each one — *"o FPW valida o username, o Maqnelson valida o email, cada um valida o seu"*. Scope extends to FPW: *"talvez seja a hora de repensar esse código do Atento para ele também ser mais esperto — se o Atento mudar URL amanhã, já está tudo parametrizado, não precisa ficar fazendo código."*
+
+**The endpoint is assembled from three columns — `hostname` stays the single source of truth for the host.**
+
+```ruby
+"#{payroll_integration.scheme}://#{payroll_integration.hostname}#{payroll_integration.path}"
+```
+
+**A full-URL column was designed, written, and rejected — twice.** First as `payment_url`: a word absent from the domain (`PayrollRequest` enumerizes its actions as `check`/`execution`/`validation`; `PayrollAuthenticationRequest` is its own model — nothing is called "payment"), and factually wrong for FPW, whose single SOAP endpoint serves all three actions. Renamed to `request_url`, then rejected again on the real defect: **a full URL duplicates the host that `hostname` already holds.** Update one and not the other and the `check_producer` telnet probe silently tests a different host than the request reaches. Three columns keep one source of truth per fact.
+
+| Column | Status | FpwIntegration | MaqnelsonIntegration |
+|---|---|---|---|
+| `hostname` | exists | **`host:port`, required.** Load-bearing — `check_producer.rb:19-23` opens `Net::Telnet.new('Host' => .host, 'Port' => .port)` as a TCP reachability probe. It is NOT an HTTP header, and it CANNOT become a URL. Observed value is `<private-ip>:<port>` | required — same role |
+| `scheme` | **new** | `http` — the value hardcoded in the three consumers today | `https` |
+| `path` | **new** | `/lg.com.br/svc/servicodeeventosdofuncionario` — the value hardcoded today | `/api/v1/premiacao/pagamentos` |
+| `authentication_path` | **new** | unused → NULL — FPW authenticates inside the SOAP envelope, it has no auth endpoint | `/api/v1/entrar` |
+| `user_name` | exists | required (SOAP `<dto:Usuario>`) | unused → NULL |
+| `email` | **new**, encrypted deterministic | unused → NULL | required (login body `email`) |
+| `user_password` | exists | required (SOAP `<dto:Senha>`) | required (login body `senha`) |
+
+**Why `scheme` is not optional:** FPW is `http` and Maqnelson is `https`. With only `hostname` + `path`, the scheme stays a literal in the worker — the exact defect that got the first attempt rejected (*"quando não for HTTPS você não pode colocar isso fixo"*). `path` carries no prefix by the engineer's call: it already lives on `payroll_integration`, so `payroll_integration.path` says enough.
+
+**`scheme` is validated against a whitelist** (engineer's call): `PayrollIntegration::SCHEMES = %w[http https].freeze`, with `validates :scheme, presence: true, inclusion: { in: SCHEMES }` on both subclasses — the shape `FpwIntegration::SOAP_VERSIONS` and `PayrollIntegration::TYPES` already use. The constant sits on the base because both types validate it (unlike `SOAP_VERSIONS`, which is FPW-only and lives there). This makes `htpp` or a trailing space fail at save time instead of surfacing as a connection error mid-payroll.
+
+**A trap found by auditing the diff, not by CI: the three FPW consumers never set `use_ssl`.** Harmless while the scheme was the literal `http://`; a live defect the moment the scheme became configurable — setting `scheme = 'https'` would pass validation and then send the SOAP envelope, credentials included, in plaintext. Fixed in the same PR by adding `http.use_ssl = uri.scheme == 'https'` to all three, matching the Maqnelson processor. **No worker specs exist in this project, so nothing would have caught this** — the model suite (3829 examples) proves the validations, not the request.
+
+**Validation moves (`payroll_integration.rb:9`):** `validates :hostname, presence: true` comes off the base and lands on `FpwIntegration`. The base keeps only `validates :type`. `MaqnelsonIntegration` drops `validates :user_name` and gains `email` + the endpoint columns.
+
+**Worker changes — zero interpolation of literals, zero hardcode:**
+
+```ruby
+# maqnelson_integration/processor.rb
+authentication_uri = URI.parse("#{payroll_integration.scheme}://#{payroll_integration.hostname}#{payroll_integration.authentication_path}")
+uri                = URI.parse("#{payroll_integration.scheme}://#{payroll_integration.hostname}#{payroll_integration.path}")
+authentication_request.body = { email: payroll_integration.email, senha: payroll_integration.user_password }.to_json
+
+# fpw_integration/{check,validate,execute}_consumer.rb — all three carry the identical line today
+- uri = URI.parse("http://#{payroll_integration.hostname}/lg.com.br/svc/servicodeeventosdofuncionario")
++ uri = URI.parse("#{payroll_integration.scheme}://#{payroll_integration.hostname}#{payroll_integration.path}")
+
+# fpw_integration/check_producer.rb — UNCHANGED (telnet probe still needs host/port from hostname)
+```
+
+Scheme, host, port and path all come from the record. A customer moving an endpoint becomes an UPDATE, not a deploy — for both integrations.
+
+#### 6.3 — Data migration for the live Atento records ⚠️ RUN BEFORE THE CODE DEPLOY
+
+**This is the load-bearing step and the reason this phase is expand/contract.** Atento's FPW integration is **live in production**. The moment `execute_consumer` reads `request_url` instead of interpolating `hostname`, a record with `request_url IS NULL` makes `URI.parse(nil)` raise on every payment job. The column must be populated **while the old code is still running**.
+
+**Discovery — RUN, not assumed (2026-07-15).** The engineer ran the read-only discovery script; the earlier version of this section was written on unverified assumptions and is superseded by the observed state:
+
+| Observed | Value | What it settles |
+|---|---|---|
+| Records found | **1** | The migration targets a single row, not a fleet |
+| Type | `FpwIntegration` (id 1, company 1351) | **No `MaqnelsonIntegration` row exists** → Phase 7 creates it directly in the new shape; no Maqnelson data migration |
+| `hostname` shape | `<private-ip>:<port>` — **no scheme, no path** | `hostname` holds the host and nothing else, so `scheme` and `path` are genuinely absent from the record today and must be backfilled. Had a scheme been embedded, the assembled URL would have produced `http://http://…` |
+| `host` / `port` split | resolves cleanly to IP + port | Confirms `hostname` is `host:port` and **must not become a URL** — the `check_producer` telnet probe depends on the split |
+| `user_name` / `user_password` | both present | FPW's SOAP credentials are intact; nothing to backfill there |
+
+**Environment scope — settled (engineer, 2026-07-15): the discovery was run in `atento-001`, and it is the only environment with a payroll integration running.** `payroll_integrations` is per-environment (each of `beta-001` / `demo-001` / `shared-001` / `atento-001` has its own database), so this matters: step 3 below runs **once, in `atento-001`, against one row**. `shared-001` holds no payroll integration yet — Phase 7 creates the Maqnelson one there, already in the new shape.
+
+**Both values are literals the code carries today — nothing external is needed.** `scheme` is the `http` hardcoded in the three consumers; `path` is the `/lg.com.br/svc/servicodeeventosdofuncionario` hardcoded beside it. The backfill copies the code's own constants into the record so the code can stop carrying them.
+
+```ruby
+# Populate scheme and path for every existing FPW record.
+# Both values are lifted verbatim from fpw_integration/execute_consumer.rb:70,
+# so the assembled URL is byte-identical to what the current code builds.
+fpw_scheme = 'http'
+fpw_path = '/lg.com.br/svc/servicodeeventosdofuncionario'
+
+payroll_integration_ids = PayrollIntegration.where(type: 'FpwIntegration').ids
+puts "targeting #{payroll_integration_ids.size} FpwIntegration record(s)"
+
+payroll_integration_ids.each do |payroll_integration_id|
+  payroll_integration = PayrollIntegration.find(payroll_integration_id)
+  updated = payroll_integration.update(scheme: fpw_scheme, path: fpw_path)
+  assembled_url = "#{fpw_scheme}://#{payroll_integration.hostname}#{fpw_path}"
+  puts "#{payroll_integration_id} | #{assembled_url} | #{updated ? 'OK' : payroll_integration.errors.full_messages.join(', ')}"
+rescue StandardError => error
+  puts "#{payroll_integration_id} | ERROR | #{error.message}"
+end
+```
+
+```ruby
+# Verification — must print zero rows before the code deploy proceeds.
+PayrollIntegration.where(type: 'FpwIntegration').where(scheme: nil).or(
+  PayrollIntegration.where(type: 'FpwIntegration').where(path: nil)
+).ids.each do |payroll_integration_id|
+  puts "STILL NULL: #{payroll_integration_id}"
+end
+```
+
+**The backfill prints the assembled URL per row — compare it against `execute_consumer.rb:70` before re-enabling the Lambda.** The whole point is that the URL does not change, only where it comes from. Expected for the single row: `http://<the record's hostname>/lg.com.br/svc/servicodeeventosdofuncionario`. If it differs, stop — the record is not what the discovery showed. The verification above is the separate gate: it must print nothing.
+
+Per `SCRIPT-DISCIPLINE.md`: lowercase variables (never constants — they leak between console runs), per-record iteration with per-record logging, non-bang `update` so one bad row does not halt the loop, and a verification pass that re-reads what the mutation touched. **No Maqnelson data migration exists** — its `payroll_integration` record has not been created yet (that is Phase 7, which will be created directly in the new shape).
+
+#### 6.4 — Ordering: one release, guarded by an autoscaling window (engineer's call, 2026-07-15)
+
+**The two-release expand/contract below was replaced.** The original plan shipped the columns in one release and the code in another. The engineer collapsed it into **one release, with the danger window closed operationally instead of temporally**: *"a desativar lambda é para garantir: se a gente demorar uma hora, que seja pelo menos nessa uma hora, não vai ter um agravante de alguém mandar rodar e cagar toda a integração e os dados."*
+
+**The danger this closes.** With code and columns in the same release, there is a real gap between the deploy landing and the backfill finishing. In that gap the new code reads `scheme`/`path` that are still NULL — `URI.parse("://<host>")` — and **today is a payroll day for the live integration**. Disabling the outbound autoscaling Lambda holds the worker at `desired_count = 0` for the whole operation, so anything triggered in that window queues in Redis instead of running against empty configuration. It drains, correctly, once the Lambda comes back.
+
+**Why the deploy's own lock is not enough.** `deploy-payroll-worker.yaml:98` takes a Redis autoscaling lock (`ecs_scaling:lock:<cluster>`, TTL 900s) as its first job — but that covers the *deploy*, not the deploy-plus-backfill window, which can run an hour. The manual disable is a wider guard, deliberately.
+
+**Two releases were the wrong trade anyway**: two full release/deploy cycles today, against a Monday deadline, to avoid a window that a Lambda toggle closes outright.
+
+| # | Step | Who | Gate before proceeding |
+|---|------|-----|------------------------|
+| 1 | ✅ **PR A — columns only** — [#5236](https://github.com/4shark/app/pull/5236) merged | Claude | ✅ |
+| 2 | ✅ **PR B — models + workers** — [#5235](https://github.com/4shark/app/pull/5235) **merged**, rewritten in place over the superseded approach | Claude | ✅ |
+| 3 | **Disable the outbound autoscaling Lambda** (`atento-001`) — the worker is at `0/0` today, so it stays there | Engineer | Lambda confirmed off |
+| 4 | Merge PR B → cut release → deploy `atento-001` | Engineer | Deploy green |
+| 5 | **Backfill `scheme` + `path`** (6.3 script) and run the verification | Engineer | **Zero rows returned** |
+| 6 | **Re-enable the Lambda** — the queue drains against populated configuration | Engineer | Worker scales, jobs succeed |
+
+**Superseded reasoning, kept so it is not re-derived:** an earlier read of this concluded PR A's deploy was risk-free (true — no code read the columns) and therefore that the Lambda dance was unnecessary. That was right about PR A in isolation and wrong about the operation: PR A alone delivers nothing, and the risk lives in the combined window, which is what the engineer was pointing at.
+
+| # | Step | Who | Gate before proceeding |
+|---|------|-----|------------------------|
+| 1 | ✅ **PR A — migrations only** — [#5236](https://github.com/4shark/app/pull/5236) **merged**. Four `add_column` migrations (nullable): `scheme`, `path`, `authentication_path`, `email`; `db/schema.rb` regenerated. **No model or worker change.** Nothing reads the new columns. | Claude | ✅ |
+| 2 | Merge PR A → release → deploy | Engineer | Columns exist in production |
+| 3 | **Populate `request_url` on every FPW record** (6.3 script, by hand via `bin/ecs run`), then run the verification script | Engineer | **Zero rows returned by the verification query** |
+| 4 | **PR B — models + workers.** Validation moves, `encrypts :email`, Maqnelson processor, the three FPW consumers, specs, `brakeman.ignore` re-anchor, CHANGELOG | Claude | CI green |
+| 5 | Merge PR B → release → deploy | Engineer | FPW keeps working; Maqnelson ready for Phase 7 |
+
+**Step 3 is not optional and cannot be folded into step 5.** A single deploy would ship the reading code and the empty column together, and every Atento payment job would raise until the engineer finished typing.
+
+**Why the migration cannot populate the column itself:** the value depends on `hostname`, which is not encrypted — so a data migration *could* technically do it. It is kept manual because the engineer asked for it (*"posso fazer na mão os comandos"*) and because a data-touching migration on a live table is the shape `RAILS-MIGRATIONS.md` steers away from. If that preference changes, folding step 3 into a data migration inside PR A is viable and would remove the manual gate.
+
+#### 6.5 — Still open: the token response field
+
+`processor.rb:72` assumes `access_token`. The collection cannot confirm it: no response example, empty test script, `token` collection variable blank, and the string `access_token` appears nowhere in the 95KB file. Left as-is deliberately — inventing tolerance for several field names without evidence is worse than letting the Phase 8 run answer it. **Ask Thiago, or discover it in homologation.**
 
 **Still open — the token response field.** `processor.rb:72` assumes `access_token`. The collection cannot confirm it: no response example, empty test script, `token` collection variable blank, and the string `access_token` appears nowhere in the 95KB file. Left as-is deliberately — inventing tolerance for several field names without evidence is worse than letting the Phase 8 run answer it. **Ask Thiago, or discover it in homologation.**
 

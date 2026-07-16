@@ -1,0 +1,54 @@
+{
+  "_comment": "Auxiliary — read-only AWS describe/get output for s3://4shark-terraform-state, collected 2026-07-15 with the default (read-only) profile. Referenced by PLAN-SPIKE.md findings F10-F13. Each block is the verbatim response of the named command.",
+
+  "get-bucket-encryption": {
+    "_command": "aws s3api get-bucket-encryption --bucket 4shark-terraform-state --output json",
+    "_response": {
+      "ServerSideEncryptionConfiguration": {
+        "Rules": [
+          {
+            "ApplyServerSideEncryptionByDefault": {
+              "SSEAlgorithm": "AES256"
+            },
+            "BucketKeyEnabled": true
+          }
+        ]
+      }
+    },
+    "_reading": "SSE-S3 (AES256), NOT SSE-KMS. Encrypted at rest, but decryption is transparent to any principal holding s3:GetObject on the object — there is no separate KMS key policy acting as a second authorization gate. Access control is therefore entirely IAM identity policy."
+  },
+
+  "get-public-access-block": {
+    "_command": "aws s3api get-public-access-block --bucket 4shark-terraform-state --output json",
+    "_response": {
+      "PublicAccessBlockConfiguration": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+      }
+    },
+    "_reading": "All four public-access blocks are on. The bucket cannot be made public by ACL or policy."
+  },
+
+  "get-bucket-policy": {
+    "_command": "aws s3api get-bucket-policy --bucket 4shark-terraform-state --output json",
+    "_response_stderr": "An error occurred (NoSuchBucketPolicy) when calling the GetBucketPolicy operation: The bucket policy does not exist",
+    "_exit_code": 254,
+    "_reading": "No resource policy exists. Combined with SSE-S3 (no KMS key policy), the ONLY thing standing between a principal and the plaintext state is its IAM identity policy. Who currently holds s3:GetObject on this bucket was NOT enumerated in this spike — see PLAN-SPIKE.md open questions."
+  },
+
+  "get-bucket-versioning": {
+    "_command": "aws s3api get-bucket-versioning --bucket 4shark-terraform-state --output json",
+    "_response": {
+      "Status": "Enabled"
+    },
+    "_reading": "Versioning is ENABLED. Consequence for rotation: replacing a datadog_api_key writes a new state object version, but every PRIOR object version still contains the OLD key value in plaintext-readable form. Rotating the key in Datadog makes the old value useless, so this is not a live exposure — but a rotation done because a key LEAKED does not erase that key's value from S3 history. Only lifecycle expiration of noncurrent versions, or explicit version deletion, does."
+  },
+
+  "_not_researched": [
+    "Which IAM principals currently hold s3:GetObject on 4shark-terraform-state — not enumerated. This is the actual blast radius of the state-exposure trade-off and is answerable with read-only IAM calls, but was out of the scope reached in this spike.",
+    "Whether CloudTrail data events are enabled for this bucket (HashiCorp's 'Use audit logs to track state access over time' recommendation). Not checked.",
+    "Whether a noncurrent-version expiration lifecycle rule exists on the bucket. Not checked — relevant to how long an old key value persists in object history."
+  ]
+}

@@ -2,6 +2,8 @@
 
 **Date:** 2026-06-30 · **Derived from:** `PLAN.md` (same folder; read it for the architecture + the shared-001 record) · **Repos:** `terraform`, `pgbouncer`, `app`, `dot-claude`
 
+> **EXECUTED — historical record.** atento-001 was migrated and its pets decommissioned; the Datadog sidecar shipped with the build as planned here and was retrofitted to every other stack. Both open items below were resolved (the outbound reaches the pooler over the existing peering + a cross-region Cloud Map zone association). **Read `PLAN.md` for the final state** — the names in this runbook predate the `pgbouncer` → `connection_pooler` rename, so the module, cluster, service, DNS name and secrets all read differently here than in the code today.
+
 Second (and last) productive stack. Mirrors the **validated** shared-001 flow, with two atento-only differences and the Datadog work folded into the build.
 
 ## Settled decisions (baked in)

@@ -220,6 +220,8 @@ statement {
 
 **Finding:** Options D and E are the most secure. Option E is the best long-term approach for EC2-hosted workloads. If IAM users are truly required (legacy compatibility), Option D avoids exposing secrets in state.
 
+> **SUPERSEDED (2026-07-15) on the Option D half.** Option E (IAM roles, no key at all) still stands and is still the best path where the workload can use it. But **Option D is no longer the answer when a key IS required** — the engineer chose Terraform-created keys (Option A's shape). Option D's "Rotation is manual (but doesn't require Terraform)" is the line that priced this wrong: manual rotation is not a lighter rotation, it is the *absence* of one — a key nobody can rotate on demand is the failure the current standard exists to prevent. The state exposure Option D avoids is accepted knowingly in exchange. See `~/.claude/docs/THIRD-PARTY-KEY-STANDARD.md` and the `deploy-credentials-split` spike.
+
 **Key constraint on Terraform access key resource:** The `aws_iam_access_key` resource's `secret` attribute is marked as `sensitive` in Terraform but is still stored in the state file in plaintext. There is no way to avoid this with the current Terraform AWS provider. PGP encryption is the only built-in mitigation (`pgp_key` input), but it requires a PGP key setup and complicates the workflow.
 
 ### Q5: Module Design Recommendation
@@ -314,8 +316,17 @@ The S3 bucket is created via the existing `modules/s3_bucket` module, separately
 **For IAM roles (recommended path):** No secrets to manage. The instance metadata service provides temporary credentials automatically.
 
 **If IAM users are used:**
-- Do NOT create `aws_iam_access_key` via Terraform (secrets appear in state file)
-- Create IAM users via Terraform, create access keys via AWS CLI, store in SSM Parameter Store as SecureString
+
+> **SUPERSEDED (2026-07-15) — the recommendation below is inverted. Keys ARE created via Terraform.** This spike weighed state-file exposure against out-of-band creation and chose out-of-band. The engineer has since decided the opposite, and the reason is the cost this spike did not price: **a key created out of band has no rotation** — only a person remembering. Rotation being a real, runnable operation outweighs the state exposure, which is accepted knowingly rather than treated as a gap. The bullets below are kept as the original record; do not follow them.
+>
+> The state exposure is also unavoidable, not a consequence of the choice: this spike documents it itself at line 223 — *"There is no way to avoid this with the current Terraform AWS provider"*. Choosing out-of-band creation does not remove the secret from state; it removes the rotation.
+>
+> **Current rule:** `~/.claude/docs/THIRD-PARTY-KEY-STANDARD.md` — Terraform creates and manages the key, ownership is a service account (never a person), rotation is `apply -replace`, revocation only after nothing uses it. The standard is written for third-party service keys (Datadog, Rollbar), and the same trade-off decision applies to IAM access keys — see `~/Projects/4Shark/dot-claude-plans/active/spike/deploy-credentials-split/SPIKE.md`, which supersedes this spike on the access-key branch and reaches the same conclusion (its Pattern B: keys created directly by Terraform, mirroring the `onboarding`/`auth-001`/`mongodb` stacks that already do this today).
+>
+> What still holds from this section: the recommendation to prefer **IAM roles** where the workload can use them (no key at all is better than a rotatable key). The inversion applies only to the case where an access key is a given.
+
+- ~~Do NOT create `aws_iam_access_key` via Terraform (secrets appear in state file)~~ — **inverted, see above**
+- ~~Create IAM users via Terraform, create access keys via AWS CLI, store in SSM Parameter Store as SecureString~~ — **inverted, see above**
 - Ansible can retrieve SSM parameters at deployment time and inject them as environment variables
 
 ### 6. atento-mx IAM Isolation
@@ -332,7 +343,7 @@ This investigation reveals two decision points that require engineer input befor
 
 **Decision 1 — IAM Role vs IAM User:**
 - **Option A (recommended):** Migrate to IAM roles with instance profiles. Requires modifying the EC2 instance resource in `modules/integrator/app.tf` to accept an `iam_instance_profile` variable, and handling the migration of existing instances carefully (lifecycle ignore_changes + manual attach).
-- **Option B (short-term):** Keep IAM users. Create IAM users via Terraform, create access keys out-of-band (AWS CLI), store in SSM Parameter Store. Less disruption but leaves technical debt.
+- **Option B (short-term):** Keep IAM users. Create IAM users via Terraform, **and the access keys via Terraform too** (`aws_iam_access_key`), so rotation is `apply -replace`. Less disruption than Option A, but leaves technical debt. **CORRECTED 2026-07-15** — this option originally said "create access keys out-of-band (AWS CLI)"; the engineer inverted that. Keys are Terraform-created so rotation exists; the key value in state is an accepted trade-off, not a gap. See `~/.claude/docs/THIRD-PARTY-KEY-STANDARD.md`.
 
 **Decision 2 — Scope of first implementation:**
 - Implement for all client accounts at once, or start with one (e.g., commcenter) as a pilot?

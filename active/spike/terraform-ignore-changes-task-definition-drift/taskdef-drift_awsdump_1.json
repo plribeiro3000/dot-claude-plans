@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "collected_at": "2026-07-15",
+    "profile": "default (read-only)",
+    "purpose": "Raw read-only AWS state supporting the SPIKE findings on ignore_changes=[task_definition] drift. Preserved so the spike can be revised without re-querying AWS.",
+    "commands_run": [
+      "aws ecs list-clusters --region us-east-1",
+      "aws ecs list-services --cluster beta-001-cluster --region us-east-1",
+      "aws ecs describe-services --cluster beta-001-cluster --services beta-001-web-service beta-001-worker-system-service beta-001-worker-user-service --region us-east-1 --query 'services[].{name:serviceName,taskDefinition:taskDefinition,controller:deploymentController.type,desired:desiredCount,running:runningCount}'",
+      "aws ecs list-task-definitions --family-prefix beta-001-worker-system --status ACTIVE --sort DESC --max-items 3 --region us-east-1",
+      "aws ecs describe-task-definition --task-definition beta-001-worker-system:213 --region us-east-1"
+    ],
+    "note_on_state": "Collected AFTER the incident was resolved by a full app deploy on all four stacks. Running revision == latest revision at collection time, so this dump shows the CONVERGED state, not the divergence itself. It is evidence for WHICH RESOURCES a live revision references (Q4) and for the deployment-controller split (Q1), not for the drift being present today."
+  },
+
+  "clusters_us_east_1": [
+    "onboarding-cluster",
+    "default",
+    "setup-cluster",
+    "beta-001-cluster",
+    "atento-001-cluster",
+    "demo-001-cluster",
+    "atento-001-connection-pooler",
+    "shared-001-cluster",
+    "beta-001-connection-pooler",
+    "demo-001-connection-pooler",
+    "shared-001-connection-pooler"
+  ],
+
+  "services_beta_001_cluster": [
+    "beta-001-worker-migration-service",
+    "beta-001-worker-system-service",
+    "beta-001-worker-cleansing-service",
+    "beta-001-worker-commission-service",
+    "beta-001-worker-commission-tiger-shark-service",
+    "beta-001-web-service",
+    "beta-001-runner-service",
+    "beta-001-worker-commission-white-shark-service",
+    "beta-001-worker-user-service"
+  ],
+
+  "running_task_definitions_and_controllers": [
+    {
+      "name": "beta-001-web-service",
+      "taskDefinition": "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-web:221",
+      "controller": "CODE_DEPLOY",
+      "desired": 1,
+      "running": 1
+    },
+    {
+      "name": "beta-001-worker-system-service",
+      "taskDefinition": "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-worker-system:213",
+      "controller": "ECS",
+      "desired": 0,
+      "running": 0
+    },
+    {
+      "name": "beta-001-worker-user-service",
+      "taskDefinition": "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-worker-user:212",
+      "controller": "ECS",
+      "desired": 0,
+      "running": 0
+    }
+  ],
+
+  "_finding_controller_split": "Only the web service uses CODE_DEPLOY. Both worker services use the plain ECS deployment controller. The ecs_service module applies ignore_changes=[task_definition] UNCONDITIONALLY to every service, while its inline comment justifies it with 'CodeDeploy gerencia a task definition durante deployments' (modules/ecs_service/main.tf:155). The justification names a mechanism that applies to web only.",
+
+  "latest_active_revisions_beta_001_worker_system": [
+    "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-worker-system:213",
+    "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-worker-system:212",
+    "arn:aws:ecs:us-east-1:405749097490:task-definition/beta-001-worker-system:211"
+  ],
+
+  "live_task_definition_beta_001_worker_system_213": {
+    "family": "beta-001-worker-system",
+    "executionRoleArn": "arn:aws:iam::405749097490:role/ecsTaskExecutionRole",
+    "taskRoleArn": "arn:aws:iam::405749097490:role/ecsTaskExecutionRole",
+    "secrets": [
+      { "name": "AWS_ACCESS_KEY_ID", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/AWS_ACCESS_KEY_ID" },
+      { "name": "AWS_SECRET_ACCESS_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/AWS_SECRET_ACCESS_KEY" },
+      { "name": "CURRENCY_API_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/CURRENCY_API_KEY" },
+      { "name": "DATA_DOG_API_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/DATA_DOG_API_KEY" },
+      { "name": "DATA_DOG_APPLICATION_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/DATA_DOG_APPLICATION_KEY" },
+      { "name": "DATABASE_URL", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/DATABASE_URL" },
+      { "name": "GRAPHQL_INTROSPECTION_TOKEN", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/GRAPHQL_INTROSPECTION_TOKEN" },
+      { "name": "HIREFIRE_TOKEN", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/HIREFIRE_TOKEN" },
+      { "name": "MONGO_URL", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/MONGO_URL" },
+      { "name": "NEW_RELIC_LICENSE_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/NEW_RELIC_LICENSE_KEY" },
+      { "name": "RAILS_MASTER_KEY", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/RAILS_MASTER_KEY" },
+      { "name": "REDIS_LOCK_URL", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/REDIS_LOCK_URL" },
+      { "name": "REDIS_URL", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/REDIS_URL" },
+      { "name": "ROLLBAR_CLIENT_ACCESS_TOKEN", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/ROLLBAR_CLIENT_ACCESS_TOKEN" },
+      { "name": "ROLLBAR_SERVER_ACCESS_TOKEN", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/ROLLBAR_SERVER_ACCESS_TOKEN" },
+      { "name": "SECRET_KEY_BASE", "valueFrom": "arn:aws:ssm:us-east-1:405749097490:parameter/beta-001/SECRET_KEY_BASE" }
+    ],
+    "logConfiguration": {
+      "logDriver": "awslogs",
+      "options": {
+        "awslogs-group": "/ecs/beta-001-worker-system",
+        "awslogs-region": "us-east-1",
+        "awslogs-stream-prefix": "ecs"
+      }
+    },
+    "image": "405749097490.dkr.ecr.us-east-1.amazonaws.com/beta-001-app:latest",
+    "volumes": []
+  },
+
+  "_finding_referenced_resource_classes": {
+    "note": "This is the Q4 enumeration, read off a real live revision.",
+    "ssm_parameters": "16 secrets, each a distinct SSM parameter ARN. This is the class that fired in the incident. DD_API_KEY is ABSENT (destroyed by terraform #711 and the revision re-registered clean); DATA_DOG_API_KEY is PRESENT and is a different, live variable.",
+    "execution_role": "arn:aws:iam::405749097490:role/ecsTaskExecutionRole — referenced by ARN. NOT declared as an aws_iam_role resource anywhere in the terraform repo (grep found only hardcoded ARN string references and one aws_iam_role_policy attached to it). Terraform cannot destroy the role itself.",
+    "log_group": "/ecs/beta-001-worker-system — IS terraform-managed (aws_cloudwatch_log_group.this in modules/ecs_service/main.tf:1-10). awslogs-create-group is NOT set, so the group must pre-exist.",
+    "ecr_image": "beta-001-app:latest — pulled at launch.",
+    "volumes": "empty on this task definition; the module supports them (modules/ecs_service/main.tf:56-62)."
+  },
+
+  "_not_researched": [
+    "Whether any noncurrent/aged ACTIVE revision on any family still references /<stack>/DD_API_KEY (only the current running revision was checked, per family, on one stack).",
+    "The atento-001, demo-001 and shared-001 clusters were NOT dumped — only beta-001. The four stacks are assumed structurally identical because they share the ecs_service module, but this was not verified per-stack.",
+    "Whether the KMS key mrk-fa0cda243274491784fc7b39bead5a03 (referenced by app-demo-001/ssm.tf:68 for kms:Decrypt) is terraform-managed. A grep for aws_kms_key found only audit/kms.tf (cloudtrail) and modules/cross_region_backup — this key matches neither, but its ownership was not positively confirmed."
+  ]
+}

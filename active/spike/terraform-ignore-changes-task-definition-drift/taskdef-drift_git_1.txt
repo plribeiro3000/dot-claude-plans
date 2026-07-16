@@ -1,0 +1,126 @@
+RAW GIT EVIDENCE — the lifecycle history of modules/ecs_service
+Collected 2026-07-15 from ~/Projects/4Shark/terraform (read-only: git log / git show).
+Preserved so the SPIKE's README-vs-code divergence finding can be re-checked without re-running git.
+
+=============================================================================
+COMMANDS RUN
+=============================================================================
+
+  git -C ~/Projects/4Shark/terraform log --oneline -20 -- modules/ecs_service/main.tf
+  git -C ~/Projects/4Shark/terraform log -S 'container_definitions' --oneline -- modules/ecs_service/main.tf
+  git -C ~/Projects/4Shark/terraform show 5f0a472 -- modules/ecs_service/main.tf
+  git -C ~/Projects/4Shark/terraform show 13d32a0 -- modules/ecs_service/main.tf
+
+=============================================================================
+COMMITS TOUCHING modules/ecs_service/main.tf (newest first)
+=============================================================================
+
+021a6dc style: normalize formatting with terraform fmt -recursive
+13d32a0 feat(integrator-almaviva): bring environment variables under Terraform management
+71aac16 feat(integrators): provision ECS Fargate infrastructure for almaviva and shared modules
+df8be22 feat(beta-001): migrate app-beta-001 to dedicated VPC
+5f0a472 fix(ecs): prevent Terraform from overwriting CI/CD task definition revisions
+4f04e25 feat(ecs): add runner capacity provider for ephemeral tasks
+28b2733 feat(*): ECS setup
+
+=============================================================================
+COMMITS THAT CHANGED THE STRING 'container_definitions' (git log -S)
+=============================================================================
+
+13d32a0 feat(integrator-almaviva): bring environment variables under Terraform management
+5f0a472 fix(ecs): prevent Terraform from overwriting CI/CD task definition revisions
+28b2733 feat(*): ECS setup
+
+=============================================================================
+COMMIT 5f0a472 — ADDED ignore_changes = [container_definitions]
+=============================================================================
+
+5f0a472681ced2b9fea30c25825513e15f549ad1
+Paulo Ribeiro
+Fri Feb 20 09:46:09 2026 -0300
+
+fix(ecs): prevent Terraform from overwriting CI/CD task definition revisions
+
+ CHANGELOG.md                | 6 ++++++
+ modules/ecs_service/main.tf | 8 ++++++++
+ 2 files changed, 14 insertions(+)
+
+diff --git a/modules/ecs_service/main.tf b/modules/ecs_service/main.tf
+index 8a2edd8..11d11ca 100644
+--- a/modules/ecs_service/main.tf
++++ b/modules/ecs_service/main.tf
+@@ -61,6 +61,14 @@ resource "aws_ecs_task_definition" "this" {
+       host_path = try(volume.value.host_path, null)
+     }
+   }
++
++  # CI/CD pipeline (GitHub Actions) registers new revisions with full
++  # environment variables injected from GitHub Environment secrets/vars.
++  # Without this, every terraform apply creates a revision with only
++  # Terraform-managed env vars, overwriting the "latest" in the family.
++  lifecycle {
++    ignore_changes = [container_definitions]
++  }
+ }
+
+ resource "aws_ecs_service" "this" {
+
+=============================================================================
+COMMIT 13d32a0 — REMOVED it, leaving the empty `lifecycle {}` seen today
+=============================================================================
+
+13d32a05c19266f7ea0b84bb82e4b84626b8a291
+Paulo Ribeiro
+Fri Mar 20 17:07:23 2026 -0300
+
+feat(integrator-almaviva): bring environment variables under Terraform management
+
+All ECS services (web, worker, runner) and the scheduled task now declare
+their environment variables and SSM secrets via Terraform. Removed
+ignore_changes on container_definitions so Terraform has full ownership
+of task definition content. Startup commands for web (puma) and worker
+(sidekiq) are also declared to match the running task definitions.
+
+diff --git a/modules/ecs_service/main.tf b/modules/ecs_service/main.tf
+index e8505c6..7544a4e 100644
+--- a/modules/ecs_service/main.tf
++++ b/modules/ecs_service/main.tf
+@@ -61,13 +61,7 @@ resource "aws_ecs_task_definition" "this" {
+     }
+   }
+
+-  # CI/CD pipeline (GitHub Actions) registers new revisions with full
+-  # environment variables injected from GitHub Environment secrets/vars.
+-  # Without this, every terraform apply creates a revision with only
+-  # Terraform-managed env vars, overwriting the "latest" in the family.
+-  lifecycle {
+-    ignore_changes = [container_definitions]
+-  }
++  lifecycle {}
+ }
+
+ # Track load balancer target group ARNs to force service replacement
+
+=============================================================================
+WHAT THIS RESOLVES
+=============================================================================
+
+The README says (README:7-9):
+
+  "Container definitions are marked `ignore_changes` so that GitHub Actions can inject full
+   environment variables when registering new task definition revisions without Terraform
+   overwriting them on the next apply."
+
+and (README:159-160):
+
+  "`container_definitions` is ignored in `lifecycle` — changes to environment variables
+   or secrets must go through the CI/CD pipeline (GitHub Actions), not Terraform."
+
+Both describe the state created by 5f0a472 (2026-02-20) and REMOVED by 13d32a0 (2026-03-20).
+The README has been stale for ~4 months. The code of record is the empty `lifecycle {}` at
+modules/ecs_service/main.tf:64, and 13d32a0's message states the intent explicitly:
+"Removed ignore_changes on container_definitions so Terraform has full ownership of task
+definition content."
+
+This is NOT a cosmetic doc bug. It inverts who owns the task definition CONTENT, which is
+the premise of any reasoning about what a `terraform plan` on this module means.
