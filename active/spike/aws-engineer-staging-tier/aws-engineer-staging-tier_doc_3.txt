@@ -1,0 +1,74 @@
+Source: https://docs.aws.amazon.com/systems-manager/latest/userguide/sysman-paramstore-access.html
+Fetched: 2026-07-16
+Prompt used: quote verbatim path-prefix scoping, KMS decrypt requirement for SecureString,
+hierarchical path access caveat, and the default-KMS-key caveat.
+
+=== BEGIN FETCHED CONTENT ===
+
+# Restricting access to Parameter Store parameters using IAM policies
+
+When using IAM policies to restrict access to Systems Manager parameters, we recommend that you
+create and use restrictive IAM policies. For example, the following policy allows a user to call
+the DescribeParameters and GetParameters API operations for a limited set of resources. This means
+that the user can get information about and use all parameters that begin with prod-*.
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        { "Effect": "Allow", "Action": ["ssm:DescribeParameters"], "Resource": "*" },
+        { "Effect": "Allow", "Action": ["ssm:GetParameters"],
+          "Resource": "arn:aws:ssm:{{us-east-1}}:{{111122223333}}:parameter/prod-*" }
+    ]
+}
+
+**Important**
+If a user has access to a path, then the user can access all levels of that path. For example, if
+a user has permission to access path /a, then the user can also access /a/b. Even if a user has
+explicitly been denied access in IAM for parameter /a/b, they can still call the
+GetParametersByPath API operation recursively for /a and view /a/b.
+
+## Denying permissions
+
+**Note**
+The default AWS Key Management Service (AWS KMS) key has Decrypt permission for all IAM principals
+within the AWS account. If you want to have different access levels to SecureString parameters in
+your account, we don't recommend that you use the default key.
+
+## Allowing only specific parameters to run on nodes
+
+If you choose the SecureString parameter type when you create your parameter, Systems Manager uses
+AWS KMS to encrypt the parameter value. AWS KMS encrypts the value by using either an AWS managed
+key or a customer managed key.
+
+The following example allows nodes to get a parameter value only for parameters that begin with
+prod-. If the parameter is a SecureString parameter, then the node decrypts the string using AWS
+KMS.
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        { "Effect": "Allow", "Action": ["ssm:GetParameters"],
+          "Resource": ["arn:aws:ssm:{{us-east-1}}:111122223333:parameter/prod-*"] },
+        { "Effect": "Allow", "Action": ["kms:Decrypt"],
+          "Resource": ["arn:aws:kms:{{us-east-1}}:111122223333:key/4914ec06-e888-4ea5-a371-5b88eEXAMPLE"] }
+    ]
+}
+
+## IAM permissions for using AWS default keys and customer managed keys
+
+Parameter Store SecureString parameters are encrypted and decrypted using AWS KMS keys. You can
+choose to encrypt your SecureString parameters using either an AWS KMS key or the default KMS key
+provided by AWS.
+
+When using a customer managed key, the IAM policy that grants a user access to a parameter or
+parameter path must provide explicit kms:Encrypt permissions for the key.
+
+By contrast, all users within the customer account have access to the default AWS managed key. If
+you use this default key to encrypt SecureString parameters and don't want users to work with
+SecureString parameters, their IAM policies must explicitly deny access to the default key.
+
+If you require fine-grained access control over the SecureString parameters in your account, you
+should use a customer managed key to protect and restrict access to these parameters. We also
+recommend using AWS CloudTrail to monitor SecureString parameter activities.
+
+=== END FETCHED CONTENT ===

@@ -4,12 +4,38 @@
 > `mongodb` repo with the role COPIED in) is superseded — see `PLAN-SPIKE.md` for
 > the original research. The pivot and all decisions below were driven live by the
 > engineer.
+>
+> Revised 2026-07-16: the series is `8.0`, not `8.2` (see "Version and OS are both
+> pinned by upstream constraints" below); Phase 3 is DONE for every active client.
+
+## Version and OS are both pinned by upstream constraints — neither is a free choice
+
+**Series `8.0`, not `8.2`.** MongoDB's rapid/minor releases (8.1, 8.2, 8.3) are not
+for self-managed deployments — only the X.0 LTS line is. `mongodb_version` therefore
+tracks the LTS line and nothing else, enforced mechanically: `renovate.json`'s
+`allowedVersions` constrains the `endoflife-date` datasource to X.0, and majors sit
+behind dependency-dashboard approval. Verbatim from `mongodb/packer/mongodb.pkr.hcl:45-54`:
+*"it offers rapid/minor releases (8.1, 8.2, 8.3), which MongoDB directs self-managed
+deployments away from ... `allowedVersions` in renovate.json constrains this to the X.0
+LTS line"*. The current value is `default = "8.0"` (`mongodb.pkr.hcl:51-54`).
+
+**Ubuntu `noble` / 24.04, and 24.04 is a ceiling — not a waypoint.** MongoDB publishes
+an apt repo for `noble` and returns 404 for `resolute` (26.04), so a node built on 26.04
+would have no MongoDB to install at all. Verbatim from `mongodb/packer/mongodb.pkr.hcl:71-75`:
+*"24.04 is the ceiling, not a waypoint: MongoDB publishes an apt repo for `noble` and
+returns 404 for `resolute` (26.04) ... Do not advance these past `noble` until that repo
+exists."* Unlike `mongodb_version`, the codename is NOT a build input — every node runs
+the same image, so there is nothing to choose between.
+
+**Consequence:** the fleet is at the newest series and OS it can be at. The next move is
+gated on upstream, not on us — a new X.0 LTS line, or MongoDB publishing an apt repo for
+a newer Ubuntu LTS. Neither is a decision to schedule; both are events to react to.
 
 ## HARD RULE — no `8` in any identifier
 
 The major version does NOT belong in any name. The role tracks MongoDB
 generically; the installed series lives ONLY in the `mongodb_version` variable
-(default `"8.2"`). So, everywhere:
+(default `"8.0"`). So, everywhere:
 
 - repo: `ansible-role-mongodb` (NOT `ansible-role-mongodb8`)
 - role: `4shark.mongodb` (NOT `4shark.mongodb8`)
@@ -44,9 +70,14 @@ installed name is an open item — see Open questions.
 Consumers (integrator stacks, the Pritunl VPN Mongo VM) select the AMI by tag via
 a `data "aws_ami"` lookup — never a hardcoded id.
 
-## Current state (2026-07-10)
+## Current state (2026-07-16)
 
 Done:
+- **Phase 3 (integrator fleet cutover) — COMPLETE for every active client.** All 12 nodes
+  of `almaviva`, `atento`, `commcenter` and `maqnelson` run the golden AMI
+  `ami-0244451ea895c4e3c` (`mongodb-8.0-20260715103934`, Ubuntu 24.04 + MongoDB 8.0),
+  verified against both the stacks' `mongodb.tf` and the live `describe-instances` state.
+  `redebrasil` is deliberately excluded — see "Phase 3" below.
 - `mongodb` build repo created + scaffolded. The initial scaffold COPIED the role;
   that was later undone and replaced by a `requirements.yml` pull (see Remaining
   step 1 and Execution progress below — both DONE).
@@ -87,16 +118,16 @@ for now — they still serve the current fleet until Phase 3 cuts it over.
 1. ✅ **`mongodb` build repo** — DONE. The copied role was removed; `ansible/requirements.yml`
    pulls `ansible-role-mongodb` (pinned to `main`) and the Packer ansible provisioner
    installs-then-uses it. main is a clean orphan (ivonoide init dropped).
-2. ✅ **VALIDATE** — DONE. Real Packer builds produced bootable MongoDB 8.2 AMIs
+2. ✅ **VALIDATE** — DONE. Real Packer builds produced bootable MongoDB 8.0 AMIs
    (mongod installed, THP disabled via the baked systemd unit, config in place); the
    pipeline runs in production (build on push-to-main). See "Execution progress" below.
 3. ⏸ **Cut `v1.0.0`** — **deferred by the engineer** ("deixa a tag de fora"). The role
    stays pinned to `main` for now. When cut (explicit tag OK required), flip the pin
    from `main` → `v1.0.0` and enable Renovate on the tag.
-4. **Phase 2 / Phase 3** — Phase 2 (Pritunl Mongo VM adopts the AMI) is in progress
-   under the VPN migration plan (`~/Projects/4Shark/dot-claude-plans/active/pritunl-ecs/PLAN.md`,
-   its PR 2.3). Phase 3 (integrator fleet cutover) + the ansible-monorepo legacy cleanup
-   ride along later.
+4. **Phase 2** — Pritunl Mongo VM adopts the AMI. In progress under the VPN migration plan
+   (`~/Projects/4Shark/dot-claude-plans/active/pritunl-ecs/PLAN.md`, its PR 2.3).
+5. ✅ **Phase 3** — integrator fleet cutover. DONE for every active client (see Phase 3
+   below). The ansible-monorepo legacy cleanup is the remaining tail.
 
 ## Execution progress (2026-07-10)
 
@@ -117,8 +148,10 @@ for now — they still serve the current fleet until Phase 3 cuts it over.
 - **Instance right-sized back to `t3a.micro`** after the diagnosis proved CPU was never
   the bottleneck; `enable_unlimited_credits = true` keeps the short package-install burst
   from throttling. Micro + unlimited + pipelining ≈ the same speed as a larger instance
-  (~10 min total, ~7 of which is the AWS-side EBS snapshot). First production AMI:
-  `mongodb-8.2-20260710180906`.
+  (~10 min total, ~7 of which is the AWS-side EBS snapshot).
+- **AMI retention is working as designed** — prune-to-3 leaves exactly the three most recent
+  (`mongodb-8.0-20260715103934`, `-20260714205131`, `-20260714204001` as of 2026-07-16);
+  every earlier build, including the first, has already aged out.
 - **Supply-chain governance**: `mongodb` and `ansible-role-mongodb` were added to
   `main_branch_repositories_with_min_age_check` in the identity stack (terraform#680), so
   their merges now require the `Verify Minimum Age` check they already produce.
@@ -130,15 +163,34 @@ the Pritunl migration) references the golden AMI via the tag-filtered
 `data "aws_ami"` lookup; single-node standalone `mongod`, 20GB root, born at size.
 Depends on steps 1–4. Closes the `4shark.pritunl` MongoDB-install duplication.
 
-## Phase 3: Integrator production Mongo fleet rolling cutover — separate high-risk track
+## Phase 3: Integrator production Mongo fleet rolling cutover — ✅ COMPLETE (active clients)
 
-Unchanged from the prior plan. 15 VMs (5 clients × 3-node PSA), manual
-runbook-driven per replica set: secondaries first, wait for `SECONDARY`, step down
-+ replace primary last. Data nodes 60GB → 40GB (new instances only — EBS cannot
-shrink in place); arbiters stay 20GB. Backup per set; `ignore_changes = [ami]`
-revisited one stack at a time; maintenance window per client. Disk sizing anchored
-on measured CloudWatch `disk_used_percent` (data nodes ~5.5–11GB of 60GB; arbiters
-~3–5.6GB of 20GB). Depends on Phase 2 burn-in.
+**Executed 2026-07-14/15**, ahead of Phase 2 rather than after it (the ordering the
+prior plan assumed — "depends on Phase 2 burn-in" — did not hold; the fleet cutover ran
+first and IS the burn-in the Pritunl Mongo VM now inherits).
+
+**Scope delivered: 12 nodes, 4 clients × 3-node PSA** — `almaviva`, `atento`,
+`commcenter`, `maqnelson` — all on `ami-0244451ea895c4e3c` (`mongodb-8.0-20260715103934`),
+Ubuntu 24.04 + MongoDB 8.0. Method was the planned one: node replacement per replica set,
+secondaries first, primary last (the `/mongodb-reprovision` skill owns the replica-set
+dance). Data nodes `t3.small`, arbiters `t3.micro`.
+
+**`redebrasil` is out of scope by decision, not by omission** — the client cancelled. Its
+three nodes (`4client-redebrasil-mongo003/004/005`, still on the pre-migration Ubuntu 18.04
+AMI `ami-0bd91caaa9bc42cf3`, all `stopped`) are awaiting the client's written deletion
+request, at which point the data and the stack are removed. Migrating them would be effort
+spent on infrastructure scheduled for deletion. Its `terraform/integrator-redebrasil/mongodb.tf`
+still references the 18.04 AMI — correct, since those nodes are frozen pending erasure, not
+pending migration. The erasure itself follows `~/.claude/docs/runbooks/compliance/LGPD-DATA-ERASURE.md`.
+
+**Open discrepancy against this plan's own decision (flagged, not resolved):** the decision
+table below says *"AMI reference in Terraform | `data "aws_ami"` by tag, not hardcoded id"*,
+but all four migrated stacks pin the literal id (`ami = "ami-0244451ea895c4e3c"` —
+`terraform/integrator-almaviva/mongodb.tf:34,77,120` and the same shape in the other three).
+With `ignore_changes = [ami]` still in place the hardcoded id is inert (Terraform will not act
+on it either way), so this is not drift that threatens the fleet — but the next AMI adoption
+has no automatic path, and the stated decision is not what is deployed. Reconcile or retract
+the decision; do not leave the plan claiming a mechanism the code does not use.
 
 ## Technical decisions (current)
 
@@ -146,7 +198,9 @@ on measured CloudWatch `disk_used_percent` (data nodes ~5.5–11GB of 60GB; arbi
 |---|---|
 | Role location | Split into its own repo `ansible-role-mongodb` (community-standard for versioned sharing across projects; galaxy cannot pull a monorepo subdir role) |
 | Build ↔ role coupling | The `mongodb` build pulls the role via `requirements.yml` + `ansible-galaxy` at a pinned tag; Renovate bumps the tag |
-| Naming | No major version in ANY identifier; version lives in `mongodb_version` (default 8.2) |
+| Naming | No major version in ANY identifier; version lives in `mongodb_version` (default 8.0) |
+| Series tracked | `8.0` — the X.0 LTS line only; rapid releases (8.1/8.2/8.3) are not for self-managed deployments, enforced by `allowedVersions` in `renovate.json` |
+| Ubuntu | `noble` / 24.04 — a ceiling, not a waypoint: MongoDB's apt repo 404s for `resolute` (26.04). Not a build input; every node runs the same image |
 | Repo models | `mongodb` and `ansible-role-mongodb`: main-only, tags. `ansible`: HubFlow (unchanged) |
 | AMI reference in Terraform | `data "aws_ami"` by tag, not hardcoded id, not SSM |
 | AMI lifecycle | Immutable per build, tagged build-date + git commit; retain 3 most recent |
@@ -159,8 +213,10 @@ on measured CloudWatch `disk_used_percent` (data nodes ~5.5–11GB of 60GB; arbi
   take the `4shark.mongodb` name; whether its two playbook consumers
   (`provision-4client.yml`, `provision-4client-without-vpn.yml`) are still live is
   unresolved. Until resolved, the new role's installed name is provisional.
-- Phase 2 burn-in duration before Phase 3.
-- Terraform Policy stance on `-replace` for stateful production resources (Phase 3).
+- ~~Phase 2 burn-in duration before Phase 3.~~ Moot — Phase 3 ran first; the fleet IS the burn-in.
+- ~~Terraform Policy stance on `-replace` for stateful production resources (Phase 3).~~ Moot — Phase 3 replaced nodes via the reprovision runbook, not via `-replace`.
+- The `data "aws_ami"` vs hardcoded-id discrepancy surfaced by Phase 3 (see Phase 3 above) — reconcile or retract.
+- When the tag pin flips from `main` to `v1.0.0` (step 3), whether Renovate's role-tag bump and the AMI rebuild it triggers should be gated behind the same 7-day min-age the rest of the fleet uses.
 
 ## Session lesson (recorded)
 

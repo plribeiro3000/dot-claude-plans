@@ -1,0 +1,37 @@
+Source: https://docs.aws.amazon.com/IAM/latest/UserGuide/access_policies_boundaries.html
+Fetched: 2026-07-16
+Prompt used: quote verbatim the permissions-boundary definition, what it does NOT do, and how it
+combines with identity-based policies / SCPs.
+
+=== BEGIN FETCHED CONTENT (relevant excerpt) ===
+
+# Permissions boundaries for IAM entities
+
+AWS supports permissions boundaries for IAM entities (users or roles). A permissions boundary is
+an advanced feature for using a managed policy to set the maximum permissions that an
+identity-based policy can grant to an IAM entity. An entity's permissions boundary allows it to
+perform only the actions that are allowed by both its identity-based policies and its permissions
+boundaries.
+
+When you use a policy to set the permissions boundary for a user, it limits the user's permissions
+but does not provide permissions on its own.
+
+## Evaluating effective permissions with boundaries
+
+Within an account, the permissions for an entity can be affected by identity-based policies,
+resource-based policies, permissions boundaries, AWS Organizations SCPs, or session policies.
+
+**Identity-based policies with boundaries** — Identity-based policies are inline or managed
+policies that are attached to a user, group of users, or role. Identity-based policies grant
+permission to the entity, and permissions boundaries limit those permissions. The effective
+permissions are the intersection of both policy types. An explicit deny in either of these
+policies overrides the allow.
+
+**AWS Organizations SCPs** — SCPs are applied to an entire AWS account. They limit permissions for
+every request made by a principal within the account. An IAM entity (user or role) can make a
+request that is affected by an SCP, a permissions boundary, and an identity-based policy. In this
+case, the request is allowed only if all three policy types allow it. The effective permissions are
+the intersection of all three policy types. An explicit deny in any of these policies overrides
+the allow.
+
+=== END FETCHED CONTENT ===

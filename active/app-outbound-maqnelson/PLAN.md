@@ -7,21 +7,58 @@
 
 ---
 
-## ⏭️ NEXT — the release runbook (all code is merged; this is the engineer's part)
+## ⏭️ NEXT — Phase 8, the homologation test
 
-**Both code PRs are merged** ([#5236](https://github.com/4shark/app/pull/5236) columns, [#5235](https://github.com/4shark/app/pull/5235) models + workers). `develop` is at `af05ca391`. What follows is one operation on `atento-001`, in this order. Full detail in **Phase 6.3 / 6.4**.
+**The infrastructure on 4Shark's side is ready for the first test.** Code, deploy pipeline, IAM and DB configuration are all closed and verified (details below). The remaining work is the end-to-end test against Maqnelson's homologation API, and its first step is not technical.
 
-| # | Step | Gate before the next step |
-|---|------|---------------------------|
-| 1 | **Disable the outbound autoscaling Lambda** (`atento-001`) — the worker sits at `0/0`, so it stays there and anything triggered queues in Redis | Lambda confirmed off |
-| 2 | Cut the release → deploy `atento-001` | Deploy green |
-| 3 | **Backfill `scheme` + `path`** — the script in 6.3, via `bin/ecs run`. One row | It printed `OK`, **and the assembled URL matches `execute_consumer.rb:70`** — `http://<hostname>/lg.com.br/svc/servicodeeventosdofuncionario`. If it differs, STOP |
-| 4 | **Run the verification** — the second script in 6.3 | **Prints nothing.** Any `STILL NULL` line means step 5 would break payroll |
-| 5 | **Re-enable the Lambda** — the queue drains against populated configuration | Worker scales, jobs succeed |
+| # | Step | Owner | Status |
+|---|------|-------|--------|
+| 1 | **Notify Fanini that we are ready and ask for a test window** — the protocol agreed in the 2026-07-14 meeting | Engineer | ✅ **Sent 2026-07-16 via Zendesk** (not e-mail — the thread lives in the ticket) |
+| 2 | **Maqnelson releases the test window** | **Maqnelson** | ⏳ **BLOCKED ON THEM — this is where the project sits right now** |
+| 3 | Trigger the payment integration; the Lambda scales the worker on its own (verified `ENABLED`) | Engineer | ⬜ |
+| 4 | Confirm 2xx and that `PayrollRequest` / `PayrollAuthenticationRequest` rows record success | Engineer | ⬜ |
+| 5 | **Cross-check with Maqnelson on both sides**; confirm the integrator's DB access (`192.168.90.0/26`) is unaffected | Both | ⬜ |
+| 6 | Report to Fanini by **Monday 2026-07-20**: "ready for production", or the blocking bugs + estimate | Engineer | ⬜ |
 
-**Why the Lambda and not the deploy's own lock:** `deploy-payroll-worker.yaml:98` takes a Redis autoscaling lock with a 900s TTL — that covers the deploy, not the deploy-plus-backfill window, which can run an hour. Engineer's call, and it is the right one.
+**Which payment gets tested — asked, not assumed.** The follow-up on the ticket offers Maqnelson the choice of a specific payment id. **If they do not pick one, 4Shark picks the payment covering the widest set of scenarios.**
 
-**Why this is one release and not two:** see 6.4. Shipping the columns and the code together needs the window closed operationally; shipping them in two releases costs two full cycles against a Monday deadline.
+**What was communicated, precisely:** the infrastructure on 4Shark's side is ready for the **first test**. That is the whole claim — it is not a claim that the integration is validated or ready for use, and it was never framed as one. The test is what moves it from "ready to test" to anything further.
+
+**The two things homologation exists to prove, still unproven:**
+
+1. **The token response field.** `processor.rb:72` does `JSON.parse(...)['access_token']`. The collection cannot confirm it — no response example, empty test script, blank `token` variable, and the string appears nowhere in its 95KB. **A 200 on login followed by a 401 on the payments POST is exactly this symptom** (`access_token` came back `nil`, the Bearer header was built empty). Worth asking Thiago before the run — it is a 30-second question that can save a cycle.
+2. **The workers' behaviour at all.** This project has **no worker specs**, so the 3829 green model examples prove the validations, not the request. Homologation is the first time this code makes a real HTTP call.
+
+**Also owed, not technical: the Nexus password transited e-mail — flag it to Maqnelson for rotation now that the integration is wired.**
+
+---
+
+## ✅ DONE — the release runbook (executed 2026-07-16)
+
+**Release 3.55.0 shipped and the operation completed.** Every step of the runbook below ran and was verified; the danger window is closed.
+
+| # | Step | Outcome |
+|---|------|---------|
+| 1 | Disable the outbound autoscaling Lambda (`atento-001`) | ✅ `DISABLED` via the scheduler API at ~14:42 UTC; worker confirmed `0/0`, zero pending |
+| 2 | Cut the release → deploy `atento-001` | ✅ **3.55.0** tagged on the `chore(release)` commit; all four environments deployed green |
+| 3 | Backfill `scheme` + `path` | ✅ `targeting 1`, record id 1 → `OK`. Assembled URL matched `execute_consumer.rb:70` exactly (scheme `http`, `hostname` as `host:port`, the same path) |
+| 4 | Run the verification | ✅ Returned `[]` — zero `STILL NULL` |
+| 5 | Re-enable the Lambda | ✅ `ENABLED`, `rate(1 minute)`, same target and retry policy as before — no residual drift |
+
+**The Lambda toggle is fully reverted** — the schedule is byte-identical to its pre-operation state, so the `app-outbound-atento-br` stack carries no drift from this work.
+
+### What the release surfaced — a gap the plan never had (fixed same day)
+
+**The `shared-001` deploy user had no sa-east-1 access at all**, and it only surfaced when the 5.2 dual-push ran on `master` for the first time: `Build Shared-001` failed with `403 Forbidden` pushing to the sa-east-1 ECR mirror. `Build Atento-001` passed, which is what kept the Atento operation unblocked and made this a separate track.
+
+Two grants were missing in `app-shared-001/iam_deploy_user.tf`, both of which `app-atento-001` already had (it is the only stack that used `additional_clusters` — it was added for the Atento outbound):
+
+1. `ecr_repository_arns` was **us-east-1 only** → the build's 403.
+2. `additional_clusters` was **absent** → the `deploy-payroll` job would have failed afterwards on `UpdateService` against the sa-east-1 outbound cluster. **This had not failed yet** — it was found by reading the Atento stack rather than by fixing only the visible error.
+
+**The `iam_deploy` module needed no change** — it already supports both natively (`main.tf:87-92` builds region-aware cluster ARNs). Only the call site was missing them. **Nothing in the app needed fixing**: the two build jobs are identical in shape, and every other permission the payroll deploy uses is wildcard or global in the module, so ECR + clusters is the complete set.
+
+Fixed in **PR [terraform#723](https://github.com/4shark/terraform/pull/723)** (merged, applied). Verified: policy `shared-001-deploy-shared-001` at `v8` carries the sa-east-1 ECR repos and the four outbound-cluster ARNs.
 
 **Then Phase 7** (`shared-001`, no record exists yet — created directly in the new shape):
 
@@ -119,9 +156,10 @@ This is a **prerequisite**, not a follow-up — the giveaway happens the moment 
 | Outbound infrastructure — app config: sa-east-1 dual-push (5.2) | ✅ Done — PR [#5233](https://github.com/4shark/app/pull/5233) merged; needs a release to populate the sa-east-1 mirror (the build only runs on `master`) |
 | Outbound infrastructure — terraform: switch the lane to `payroll_tiger_shark` (5.3) | ✅ Applied (1 added, 1 changed, 1 destroyed) and verified on AWS — PR [#704](https://github.com/4shark/terraform/pull/704) merged |
 | Outbound infrastructure — `deploy-shared-001` payroll caller (5.4) | ✅ Done — PR [#5234](https://github.com/4shark/app/pull/5234) merged |
-| Parameterize the payroll endpoints + align with the reworked contract (6) | ⬜ **Planned, not started.** Supersedes PR [#5235](https://github.com/4shark/app/pull/5235) (hardcoded scheme + paths — rejected). Expand/contract: PR A (migrations) → engineer populates Atento's `request_url` → PR B (models + workers). Scope now includes FPW |
-| `payroll_integration` record for Maqnelson (hostname + credentials) | ⬜ To do (DB config) |
-| Homolog end-to-end test (notify Fanini first) | ⬜ To do |
+| Parameterize the payroll endpoints + align with the reworked contract (6) | ✅ **Done and released in 3.55.0.** PRs [#5236](https://github.com/4shark/app/pull/5236) (columns) + [#5235](https://github.com/4shark/app/pull/5235) (models + workers) merged; Atento's live FPW record backfilled and verified on 2026-07-16 |
+| Deploy user grants for the outbound region (`shared-001`) | ✅ **Done** — PR [terraform#723](https://github.com/4shark/terraform/pull/723) merged and applied. Not in the original plan; surfaced by the 5.2 dual-push failing on `master` |
+| `payroll_integration` record for Maqnelson (hostname + credentials) | ✅ **Done 2026-07-16** — `MaqnelsonIntegration` id 1 on company 97, created directly in the new shape. Pre-flight, creation and verification all green |
+| Homolog end-to-end test (notify Fanini first) | ⬜ **To do — this is now the critical path.** Everything upstream is live |
 | Production endpoint switch | ⬜ Later, with Maqnelson |
 
 ---
@@ -266,8 +304,8 @@ The Terraform apply is safe first: every service is created at `desired_count = 
 2. ✅ **5.2** App dual-push — PR #5233 merged into `develop`.
 3. ✅ **5.3** Terraform lane switch — PR #704 merged; applied (`1 added, 1 changed, 1 destroyed`).
 4. ✅ **5.4** Deploy caller — PR #5234 merged.
-5. ⬜ **Release** — the build only runs on `master`, so the sa-east-1 mirror stays empty until 5.2/5.4 ship in a release. Merging into `develop` does not populate it. **This is the only step left in Phase 5.**
-6. **Phase released** once the mirror carries the image, a deploy has moved the service onto a `tiger_shark` task definition, and the HireFire endpoint answers for `worker_payroll_tiger_shark`.
+5. ✅ **Release** — shipped as **3.55.0** (2026-07-16). Its first `master` build exposed the missing sa-east-1 deploy-user grants (see the runbook section above); after PR terraform#723, the re-run went green.
+6. ✅ **Phase 5 CLOSED — verified, not assumed.** The mirror carries `3.55.0-53b541e` + `latest`; the `deploy-shared-001` run moved the worker service off its bootstrap revision (**1 → 3**), and its `Deploy Payroll Worker (sa-east-1)` job passed — which is the live proof that the `additional_clusters` grant is correct. The service sits at `desired_count = 0`, which is right: the lane stays inert until Phase 7 creates the `payroll_integration` record.
 
 **Verified on AWS after the 5.3 apply (2026-07-15):** task definition at revision 2 with `config/sidekiq_payroll_tiger_shark.yml` in its command; Lambda `PROCESS_NAME = worker_payroll_tiger_shark`; the service still points at revision **1** with `desiredCount: 0` — expected, and the live demonstration of the `ignore_changes` behaviour documented above. The deploy from 5.4 is what moves it, and the first run of that deploy happens at the release in step 5.
 
@@ -430,7 +468,21 @@ Per `SCRIPT-DISCIPLINE.md`: lowercase variables (never constants — they leak b
 
 **The fix belongs in the same PR, never a separate one** — the new fingerprints only match code that exists on that branch, so an ignore-only PR against `develop` would land already-obsolete entries and leave the original PR red until both merged. The ignore file must move with the line it ignores. Procedure: run `bundle exec brakeman -f json`, read the `fingerprint` of each surfaced warning, replace the obsolete entry's `fingerprint`/`line`/`code` in `config/brakeman.ignore`, keep (and re-word, if the code's meaning shifted) the `note`, and confirm `Security Warnings: 0` with no obsolete entries. Do not add new suppressions this way — only re-anchor decisions the team already made.
 
-### Phase 7 — `payroll_integration` record + payroll lane for Maqnelson (DB config)
+### Phase 7 — `payroll_integration` record + payroll lane for Maqnelson (DB config) — ✅ DONE 2026-07-16
+
+**Executed and verified in `shared-001`** via the three-script pattern (pre-flight → creation → verification):
+
+- **Pre-flight** confirmed company 97 is Maqnelson, `payroll_queue_suffix` = `"_tiger_shark"`, `commission_queue_suffix` = `nil` (the shared commission queue they pay for — no dedicated lane given away), and **no pre-existing `payroll_integration`** (so this was a create, not an update, and the unique index on `company_id` was never at risk).
+- **Created**: `MaqnelsonIntegration` id 1 — `hostname` = the host alone, `scheme` = `https`, `path` = `/api/v1/premiacao/pagamentos`, `authentication_path` = `/api/v1/entrar`, `email` + `user_password` from Maqnelson's e-mail (entered by the engineer in the console; the values never entered the session).
+- **Verification** re-read from the database and assembled both URLs exactly as `processor.rb:42` and `:76` do:
+  - `https://dev-nexus.maqnelson.com.br/api/v1/entrar`
+  - `https://dev-nexus.maqnelson.com.br/api/v1/premiacao/pagamentos`
+
+**The lane is no longer inert.** `Lambda-app-outbound-maqnelson-worker-payroll-schedule` verified `ENABLED` at `rate(1 minute)`, so the full chain is closed: record exists → job routes to `payroll_tiger_shark` → the Lambda scales the worker → the task pulls from the sa-east-1 mirror → traffic exits through the VPN.
+
+**⚠️ The password transited e-mail — flag it to Maqnelson for rotation now that the integration is wired.** This is still owed.
+
+#### Original instructions (kept for reference)
 
 - **Payroll lane → `_tiger_shark`** (the new attribute from Phase 4). ✅ **Already set by the engineer on 2026-07-15** — the value is inert until the `payroll_integration` record below exists. The commission lane stays `NULL` — the customer keeps the shared `commission` queue they pay for.
 
@@ -440,10 +492,10 @@ Per `SCRIPT-DISCIPLINE.md`: lowercase variables (never constants — they leak b
 - Because the password transited e-mail, flag it to Maqnelson for rotation once wired.
 - **The path spelling lost its accents**: the collection uses `/api/v1/premiacao/pagamentos` (plain ASCII), not `premiação` as `SPIKE.md:14` recorded from the older source. This is now hardcoded in the worker, so it is no longer a data-entry risk — but the SPIKE's value is stale, do not copy from it.
 
-### Phase 8 — Homologation end-to-end test
+### Phase 8 — Homologation end-to-end test — ⬜ THE CRITICAL PATH
 
-- **Notify Fanini first**, stating the total being sent (agreed protocol).
-- Scale the worker up, trigger the payment integration, confirm 2xx and that `PayrollRequest` / `PayrollAuthenticationRequest` rows record success.
+- **Notify Fanini first** (agreed protocol). ✅ **Sent 2026-07-16 via Zendesk**, with a follow-up offering Maqnelson the choice of a specific payment id to test. **Now waiting on Maqnelson to release the window.** The volume is stated when the window is confirmed and the payment is chosen — not in the request for the window itself.
+- Trigger the payment integration, confirm 2xx and that `PayrollRequest` / `PayrollAuthenticationRequest` rows record success. **No manual scale-up needed** — the autoscaling Lambda is `ENABLED` and the lane went live with the Phase 7 record.
 - **Cross-check with Maqnelson on both sides.** Confirm the integrator's DB access (`192.168.90.0/26`) is unaffected.
 
 ### Phase 9 — Report by Monday 2026-07-20

@@ -24,6 +24,8 @@ Key extracted content:
 
 Caveat: WebFetch uses an intermediate model to process fetched HTML against the prompt, so these are the tool's rendering of the source, not a raw HTML dump. Treated as reliable because the tool explicitly labeled the additionalContext paragraph as a direct quote and the surrounding synthesis is internally consistent with 4Shark's own CLAUDE.md § Documentation Loading Model, which independently states the 10,000-character cap and the additionalContext/next-turn mechanism.
 
+**REVISED scope note (round 4, see entries 24–26 below): this round-1 fetch's prompt did not surface `MessageDisplay`, a hook event that DOES exist in this same documentation and CAN reshape the on-screen render (though not the transcript quoted above). The "No hook can modify Claude's generated message text in the transcript or conversation history" claim remains correct as stated — it is scoped to the transcript — but round 1 did not carve out the on-screen-display exception because its fetch prompt did not ask about it. See SPIKE.md Finding 27.**
+
 ---
 
 ## 2. GitHub issue #2880 — anthropics/claude-code
@@ -97,6 +99,8 @@ URL: https://code.claude.com/docs/en/output-styles
 > The built-in Explanatory and Learning styles produce longer responses than Default by design, which increases output tokens.
 
 Significance: no built-in output style ships to make Default *more* concise than it already is; the only built-in verbosity-adjacent styles (Explanatory, Learning) go the opposite direction (more verbose, by design).
+
+**See entries 24–25 below (round 4) for the full re-fetch of this document — the system-prompt mechanism, the CLAUDE.md comparison table, and the custom-output-style creation flow.**
 
 ---
 
@@ -242,7 +246,7 @@ This is under "Strategy 6: Progressive Disclosure": *"Information should arrive 
 
 Also under "Strategy 8: Build a Session Dashboard": *"A dashboard that lists all active sessions with their status, progress, and severity indicators lets you assess the entire fleet in one glance."* And: *"You never need to understand everything about every session to make a decision."*
 
-Significance: the "one-line summary" the author describes is a **session status line in a dashboard/overview**, not the chat transcript text of an individual session's response. Round-1 Finding 9 applied this quote to "summary-first inside a streaming chat message" — that application over-reaches what the source supports. The source does NOT address where a summary belongs within a single streamed chat message.
+Significance: the "one-line summary" the author describes is a **session status line in a dashboard/overview**, not the chat transcript text of an individual session. Round-1 Finding 9 applied this quote to "summary-first inside a streaming chat message" — that application over-reaches what the source supports. The source does NOT address where a summary belongs within a single streamed chat message.
 
 ---
 
@@ -319,3 +323,183 @@ URL: https://code.claude.com/docs/en/statusline (fetched via WebFetch; oversized
 > The command runs once per refresh tick with all visible subagent rows passed as a single JSON object on stdin.
 
 Significance: this is a genuine "third shape" that sidesteps the summary-position-within-scrolling-text question entirely — both the main status line and the per-subagent status rows occupy a **fixed screen position** (a bar/row rendered outside the scrolling message stream), updated on an independent refresh cycle, so a takeaway placed there does not compete with scroll position at all.
+
+---
+
+# Revision round 4 — custom output styles (Gap 1) and hook-surface re-check (Gap 2)
+
+Two narrowly-scoped follow-ups requested by the engineer after round 3. This section documents every source fetched for both.
+
+---
+
+## 24. code.claude.com/docs/en/output-styles — full re-fetch, system-prompt mechanism and CLAUDE.md comparison
+
+URL: https://code.claude.com/docs/en/output-styles (fetched twice in this round with different targeted prompts; identical content returned both times — self-check per Citation Discipline rule 5 satisfied)
+
+> Output styles change how Claude responds, not what Claude knows. They modify the system prompt to set role, tone, and output format.
+
+> A custom output style adds your instructions to the system prompt and lets you choose whether to keep Claude Code's built-in software engineering instructions. Keep them when you're changing how Claude communicates but still coding, like always answering with a diagram. Leave them out when Claude isn't doing software engineering at all, like a writing assistant or data analyst.
+
+> Output styles directly modify Claude Code's system prompt.
+>
+> * All output styles have their own custom instructions added to the end of the system prompt.
+> * All output styles trigger reminders for Claude to adhere to the output style instructions during the conversation.
+> * Custom output styles leave out Claude Code's built-in software engineering instructions, such as how to scope changes, write comments, and verify work, unless `keep-coding-instructions` is set to `true`.
+
+> Output style is part of the system prompt, which Claude Code reads once at session start. Changes take effect after `/clear` or a new session.
+
+Comparison table ("Comparisons to related features"):
+
+> | Feature | How it works | Use it when |
+> | Output styles | Modifies the system prompt | You want a different role, tone, or default response format every turn |
+> | CLAUDE.md | Adds a user message after the system prompt | Claude should always know your project conventions and codebase context |
+> | `--append-system-prompt` | Appends to the system prompt without removing anything | You want a one-off addition for a single invocation |
+> | Agents | Runs a subagent with its own system prompt, model, and tools | You want a separately scoped helper for a focused task |
+> | Skills | Loads task-specific instructions when invoked or relevant | You have a reusable workflow |
+
+Frontmatter reference:
+
+> `keep-coding-instructions` | Keep Claude Code's built-in software engineering instructions | Default: `false`
+
+Significance: this is the primary source for SPIKE.md Findings 22 and 23. It directly answers "does a custom output style replace or append" (both — its own text is always appended to the end of the system prompt, but Claude Code's built-in coding instructions are dropped by default unless explicitly kept) and "how does it compare structurally to CLAUDE.md" (different location in the prompt construction — system prompt itself vs. a separate user message after it — with no documented claim about relative enforcement strength).
+
+---
+
+## 25. github.com/drona23/claude-token-efficient — benchmark/SUMMARY.md
+
+URL: https://github.com/drona23/claude-token-efficient/blob/main/benchmark/SUMMARY.md
+
+> N=5, single session, no statistical controls. Directional signal only.
+
+The document compares:
+1. Baseline vs. minimal CLAUDE.md profile: ranging from -1% (haiku) to -18% (sonnet)
+2. Baseline vs. compressed CLAUDE.md profile: ranging from -22% (haiku) to -62% (opus)
+
+Explicitly does NOT contain any comparison between a CLAUDE.md-only approach and an output-style-based approach — confirmed by a direct, targeted re-fetch that searched specifically for such a comparison and for a "Caveman" style claim (see entry 26).
+
+Significance: the only benchmark located in this research that discloses its own methodology (even if minimal — "N=5, single session, no statistical controls"), but it tests CLAUDE.md against itself in two formulations, not a custom output style against CLAUDE.md. Sustains SPIKE.md Finding 24 (no comparative evidence found) and is the source used to check and reject the "Caveman" claim in Finding 25.
+
+---
+
+## 26. WebSearch synthesis claim — "Caveman" output style, ~65% token reduction — checked and rejected
+
+An initial WebSearch synthesis pass, when asked to compare CLAUDE.md vs. output-style token efficiency, produced:
+
+> The "Caveman" style (ultra-concise output) achieves roughly 65% fewer tokens over a full work session for significant savings in both cost and context window usage.
+
+A direct, targeted WebFetch of `github.com/drona23/claude-token-efficient/blob/main/benchmark/SUMMARY.md` (the document this synthesis appeared to be describing, per entry 25 above), searching explicitly for this exact claim, returned:
+
+> There is no mention of alternative prompt styling approaches or terse output formats in this document for me to quote.
+
+Significance: per Citation Discipline rule 1 (quote-or-drop) and rule 4 (UNVERIFIED tag), this specific numeric claim is REJECTED — it does not verify against its apparent source. Recorded here (mirroring the "AI Brain Fry" treatment in entry 13 above / SPIKE.md Finding 7) to document that the check was performed. This claim does not sustain SPIKE.md Finding 25 as a positive claim — it sustains it only as a documented, checked-and-rejected candidate.
+
+---
+
+## 27. news.ycombinator.com — HN discussion on CLAUDE.md token-reduction effectiveness
+
+URL: https://news.ycombinator.com/item?id=47581701
+
+> the file loads into context on every message, so on low-output exchanges it is a net token increase
+
+> Every single API call to Claude sends the whole context, including prompts, meaning that all this extra text in CLAUDE.md is sent over and over and over again every time you prompt Claude to do something.
+
+> I made a test which runs several different configurations against coding tasks from easy to hard... across 30 tests, this does perform worse
+
+> I too included the last bit about user prompts overriding system prompt, but like any good LLM, it doesn't always follow instructions.
+
+Caveat: informal public forum comments, undisclosed methodology (task set, scoring, sample composition beyond "30 tests"), single commenters. Used only as anecdotal corroboration in SPIKE.md Finding 26, not as a standalone sustaining source for any option.
+
+---
+
+## 28. code.claude.com/docs/en/hooks — targeted re-fetch, MessageDisplay capability
+
+URL: https://code.claude.com/docs/en/hooks (fetched three separate times in this round with progressively narrower prompts; identical substance returned each time — self-check per Citation Discipline rule 5 satisfied)
+
+Fetch 1 (broad capability table for all non-tool hook events):
+
+> `MessageDisplay`: While assistant message text is displayed
+>
+> `MessageDisplay` | `displayContent` replaces the displayed text on screen. Display-only: the transcript and what Claude sees keep the original
+
+Fetch 2 (targeted specifically at MessageDisplay's trigger, fields, and restrictions):
+
+> **Trigger Condition**: MessageDisplay: While assistant message text is displayed. This hook fires during the streaming display of the assistant's response text.
+>
+> **Available Output Fields**: `displayContent` replaces the displayed text on screen. Display-only: the transcript and what Claude sees keep the original
+>
+> **Matcher Support**: `UserPromptSubmit`, `PostToolBatch`, `Stop`, `TeammateIdle`, `TaskCreated`, `TaskCompleted`, `WorktreeCreate`, `WorktreeRemove`, `MessageDisplay` | no matcher support | always fires on every occurrence
+>
+> **Stop and SubagentStop**: `Stop`, `SubagentStop` | Top-level `decision` | `decision: "block"`, `reason`. Stop and SubagentStop also accept `hookSpecificOutput.additionalContext` for non-error feedback that continues the conversation
+
+Fetch 3 (single exact sentence, character-for-character):
+
+> `displayContent` replaces the displayed text on screen. Display-only: the transcript and what Claude sees keep the original
+
+Fetch 4 (use-case search — redaction, verbosity, summarization):
+
+> The documentation does not provide specific use case examples for the `MessageDisplay` hook event, including redaction of API keys, secrets, or hostnames. The hook is only briefly mentioned in the lifecycle table and decision control reference.
+
+Fetch 5 (PreCompact capability, requested explicitly by the round-4 brief):
+
+> PreCompact fires before context compaction occurs during a Claude Code session. The matcher filters on what triggered compaction: `manual` | Manual compaction, `auto` | Auto compaction. The documentation contains no explicit statement that PreCompact can access, inspect, modify, or gate the assistant's generated response text. PreCompact is compaction-focused and receives only compaction-related metadata (the trigger type: `manual` or `auto`). There is no mention of assistant message content, response text, or the ability to modify Claude's generated output in the PreCompact section.
+
+Significance: primary source for SPIKE.md Findings 27, 29, and 30. `MessageDisplay` is confirmed real and shipped, display-only, with no documented use case naming verbosity/summarization. `PreCompact` is confirmed to carry no response-text access. `Stop`/`SubagentStop` re-confirmed unchanged from round 1's Finding 1. Note: the more granular claims from the WebSearch-synthesis pass (entry 29 below) — specific JSON input field names (`session_id`, `turn_id`, `delta`, etc.), the "redact API keys" use case, and streaming-chunk-batch execution timing — did NOT independently verify against this direct-fetch primary source and are NOT used to sustain any SPIKE.md Finding; they are recorded separately in entry 29 as UNVERIFIED-against-primary-source.
+
+---
+
+## 29. WebSearch synthesis — MessageDisplay introduction version, JSON fields, and use case (secondary, lower-confidence)
+
+A WebSearch pass (not a direct WebFetch of Anthropic's own documentation) produced the following claims:
+
+> The new MessageDisplay hook event was introduced in v2.1.152.
+
+> MessageDisplay is display-only: the replacement text changes only what is rendered on screen. The transcript and what Claude sees keep the original text, so Claude never sees the replacement, and verbose mode shows the original.
+
+> MessageDisplay hooks receive JSON input including fields like session_id, transcript_path, cwd, hook_event_name, turn_id, message_id, index, final, and delta, and can return displayContent to replace the delta on screen.
+
+> MessageDisplay doesn't support matchers and fires for every assistant message that streams text; messages with no text, such as tool-call-only responses, don't trigger it. In non-interactive runs, including Agent SDK queries and claude -p, MessageDisplay runs once per assistant message instead of once per batch of lines.
+
+> MessageDisplay can be used to redact API keys or internal hostnames from Claude's responses.
+
+Caveat: the "display-only, transcript unchanged" claim independently corroborates the directly-fetched hooks.claude.com quote (entry 28) and is treated as verified via that separate primary-source confirmation. The version number (v2.1.152), the specific JSON field list, the streaming-batch-vs-once-per-message execution detail, and the "redact API keys" use case were NOT independently confirmed by direct WebFetch of code.claude.com/docs/en/hooks (a targeted follow-up fetch explicitly searching for these details found none of them — see entry 28, Fetch 2 and Fetch 4). These specific sub-claims are flagged lower-confidence / search-synthesis-only and are used in SPIKE.md only where explicitly marked as coming from a secondary source (Finding 28's version/date claim, sourced instead to entry 30 below, a directly-fetched secondary article, not this search synthesis).
+
+---
+
+## 30. dev.classmethod.jp — "Claude Code v2.1.152 Major Updates"
+
+URL: https://dev.classmethod.jp/en/articles/20260524-claude-code-updates-v2-1-152/
+
+> A new hook event `MessageDisplay` has been added, allowing you to transform or hide the text of displayed assistant messages.
+
+> Claude Code v2.1.152 was released on May 26, 2026.
+
+Caveat: this is a secondary, third-party source (a Japanese developer blog), fetched directly (not search-synthesis) — the article itself discloses no further detail on MessageDisplay beyond this brief description. Used in SPIKE.md Finding 28 specifically for the version/date claim, with the caveat that Anthropic's own changelog was independently attempted (entry 31 below) and did not corroborate or contradict this — it simply did not surface the entry in the portion returned.
+
+---
+
+## 31. Anthropic's own CHANGELOG.md — direct fetch attempted, MessageDisplay entry not surfaced
+
+URL (rendered GitHub page): https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md — returned a GitHub-interface error page, no changelog content extracted.
+
+URL (raw): https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md — fetched successfully; searched explicitly for "MessageDisplay" and related terms.
+
+> No matching entries were found. The changelog contains no references to "MessageDisplay" or hooks designed to transform assistant message display. While there are numerous entries discussing hooks (SessionStart, Setup, PreToolUse, PostToolUse, SubagentStart, Stop, SubagentStop, Notification), none specifically address message verbosity control or assistant-text transformation capabilities.
+
+URL (plain-text view, scoped to versions 2.1.208–2.1.211): https://github.com/anthropics/claude-code/blob/main/CHANGELOG.md?plain=1 — also did not surface a MessageDisplay entry in the portion returned; the tool explicitly noted the content was truncated and versions below 2.1.208 were not covered by that fetch.
+
+Significance: this is a genuine gap, not a negative finding — the changelog file is approximately 437KB (per GitHub's own file-size metadata surfaced on the rendered-page fetch attempt), well past what a single WebFetch pass reliably processes in full (the same intermediate-model-truncation caveat documented for entry 1 above). The absence of a MessageDisplay entry in what WAS returned does not establish it is absent from the file entirely — it establishes only that this round's fetch attempts did not locate it. Finding 28's version/date claim is therefore sourced to the secondary dev.classmethod.jp article (entry 30), not to this attempted direct fetch of the primary changelog.
+
+---
+
+## 32. WebSearch — GitHub issue titles, response-text-gating feature requests beyond #2880
+
+Search query used: "github anthropics/claude-code issue feature request verbosity control response length hook 2026"
+
+Issue titles returned (not independently WebFetched in full):
+
+> [FEATURE] Add verbosity control for MCP tool call display · Issue #14684
+> [Feature Request] MCP Tool Output Verbosity Control · Issue #12728
+> [FEATURE] /Context is too verbose · Issue #48798
+> [Feature Request] Add diffDisplay setting to control Edit tool output verbosity · Issue #21520
+
+Significance: none of these titles, on their face, address gating or reshaping the assistant's own final generated chat response text — they target MCP tool-result display, the `/context` command's own output, and Edit-tool diff display. Used in SPIKE.md Finding 31 as a titles-only, lower-confidence negative result: no new feature request beyond #2880 (entry 2 above) was found targeting the specific mechanism this spike investigates.

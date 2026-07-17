@@ -1,0 +1,64 @@
+SOURCE: https://docs.aws.amazon.com/systems-manager/latest/userguide/secure-string-parameter-kms-encryption.html
+FETCHED: 2026-07-16
+TOPIC: AWS Systems Manager — AWS KMS encryption for Parameter Store SecureString parameters
+
+---
+
+## Setting permissions to encrypt and decrypt parameter values
+
+To encrypt a standard SecureString parameter value, the user needs kms:Encrypt permission. To
+encrypt an advanced SecureString parameter value, the user needs kms:GenerateDataKey permission.
+To decrypt either type of SecureString parameter value, the user needs kms:Decrypt permission.
+
+If you are using customer managed keys to encrypt your SecureString parameter values, you can use
+IAM policies and key policies to manage encrypt and decrypt permissions. However, you cannot
+establish access control policies for the default aws/ssm KMS key.
+
+## Parameter Store encryption context
+
+An encryption context is a set of key-value pairs that contain arbitrary nonsecret data. When you
+include an encryption context in a request to encrypt data, AWS KMS cryptographically binds the
+encryption context to the encrypted data. To decrypt the data, you must pass in the same
+encryption context.
+
+Parameter Store uses the following encryption context in its cryptographic operations:
+- Key: PARAMETER_ARN
+- Value: The Amazon Resource Name (ARN) of the parameter that is being encrypted.
+
+The format of the encryption context is as follows:
+"PARAMETER_ARN":"arn:aws:ssm:{{region-id}}:{{account-id}}:parameter/{{parameter-name}}"
+
+If the parameter is in a Parameter Store hierarchical path, the path and name are included in the
+encryption context. For example, this encryption context is used when encrypting and decrypting
+the MyParameter parameter in the /ReadableParameters path in an example AWS account and region:
+"PARAMETER_ARN":"arn:aws:ssm:us-east-2:111122223333:parameter/ReadableParameters/MyParameter"
+
+You can also include the encryption context in an IAM policy. For example, you can permit a user
+to decrypt only one particular parameter value or set of parameter values.
+
+The following example IAM policy statement allows the user to get the value of the MyParameter
+parameter and to decrypt its value using the specified KMS key. However the permissions apply
+only when the encryption context matches specified string. These permissions do not apply to any
+other parameter or KMS key, and the call to GetParameter fails if the encryption context does not
+match the string.
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": ["ssm:GetParameter*"],
+            "Resource": "arn:aws:ssm:{{us-east-1}}:{{111122223333}}:parameter/{{MyParameter}}"
+        },
+        {
+            "Effect": "Allow",
+            "Action": ["kms:Decrypt"],
+            "Resource": "arn:aws:kms:{{us-east-1}}:{{111122223333}}:key/{{key-id}}",
+            "Condition": {
+                "StringEquals": {
+                    "kms:EncryptionContext:PARAMETER_ARN":"arn:aws:ssm:{{us-east-1}}:{{111122223333}}:parameter/{{MyParameter}}"
+                }
+            }
+        }
+    ]
+}

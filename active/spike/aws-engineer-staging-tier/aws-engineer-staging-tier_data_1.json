@@ -1,0 +1,30 @@
+Command: aws sts get-caller-identity (default read-only profile)
+Fetched: 2026-07-16
+{
+    "UserId": "AIDAV46EH4QJNSZ32KHSL",
+    "Account": "405749097490",
+    "Arn": "arn:aws:iam::405749097490:user/paulo@4shark.com.br"
+}
+
+Command: aws organizations describe-organization (default read-only profile)
+Fetched: 2026-07-16
+{
+    "Organization": {
+        "Id": "o-h56v3gbles",
+        "Arn": "arn:aws:organizations::405749097490:organization/o-h56v3gbles",
+        "FeatureSet": "ALL",
+        "MasterAccountArn": "arn:aws:organizations::405749097490:account/o-h56v3gbles/405749097490",
+        "MasterAccountId": "405749097490",
+        "MasterAccountEmail": "paulo@4shark.com.br",
+        "AvailablePolicyTypes": [
+            {
+                "Type": "SERVICE_CONTROL_POLICY",
+                "Status": "ENABLED"
+            }
+        ]
+    }
+}
+
+Interpretation: the account the identity/ stack (and every app-* stack) is applied into
+(405749097490) is the SAME account as MasterAccountId — i.e. this is the AWS Organization's
+management (root) account, with SCPs enabled (FeatureSet ALL, SERVICE_CONTROL_POLICY ENABLED).

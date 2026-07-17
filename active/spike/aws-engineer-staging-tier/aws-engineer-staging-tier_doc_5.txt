@@ -1,0 +1,40 @@
+Source: https://docs.aws.amazon.com/organizations/latest/userguide/orgs_manage_policies_scps.html
+Fetched: 2026-07-16
+Prompt used: quote verbatim any statement on whether SCPs affect the organization's management
+account, and the SCP definition/requirements.
+
+=== BEGIN FETCHED CONTENT (relevant excerpt) ===
+
+# Service control policies (SCPs)
+
+Service control policies (SCPs) are a type of organization policy that you can use to manage
+permissions in your organization. SCPs offer central control over the maximum available
+permissions for the IAM users and IAM roles in your organization. SCPs are available only in an
+organization that has all features enabled. SCPs aren't available if your organization has enabled
+only the consolidated billing features.
+
+SCPs do not grant permissions to the IAM users and IAM roles in your organization. No permissions
+are granted by an SCP. An SCP defines a permission guardrail, or sets limits, on the actions that
+the IAM users and IAM roles in your organization can perform.
+
+**SCPs don't affect users or roles in the management account**
+SCPs don't affect users or roles in the management account. They affect only the member accounts
+in your organization. This also means that SCPs apply to member accounts that are designated as
+delegated administrators.
+
+## SCP effects on permissions
+
++ SCPs affect only IAM users and roles that are managed by accounts that are part of the
+organization. SCPs don't affect resource-based policies directly. They also don't affect users or
+roles from accounts outside the organization.
++ SCPs affect only member accounts in the organization. They have no effect on users or roles in
+the management account.
+
+## Tasks and entities not restricted by SCPs
+
+You can't use SCPs to restrict the following tasks:
++ Any action performed by the management account
++ Any action performed using permissions that are attached to a service-linked role
+...
+
+=== END FETCHED CONTENT ===

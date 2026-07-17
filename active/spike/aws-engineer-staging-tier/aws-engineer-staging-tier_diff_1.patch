@@ -1,0 +1,99 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index e8162e9..8c0ce96 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -35,6 +35,7 @@ Entries from previous years are archived in the [changelogs](changelogs) folder.
+ - Ubuntu 24.04 MongoDB nodes for the almaviva integrator replica set
+ - Ubuntu 24.04 MongoDB nodes for the maqnelson integrator replica set
+ - Read-only MongoDB team for the beta environment, with self-service network access
++- Read-only MongoDB credential for the beta environment
+ 
+ ### Changed
+ 
+diff --git a/app-beta-001/mongodb.tf b/app-beta-001/mongodb.tf
+index b940888..08bf7f2 100644
+--- a/app-beta-001/mongodb.tf
++++ b/app-beta-001/mongodb.tf
+@@ -24,6 +24,25 @@ module "mongodb_atlas" {
+       manage_password = true
+       password        = data.aws_ssm_parameter.mongo_password.value
+     }
++
++    # The read-only twin of the application credential above: same shape, minus
++    # every write action. `readAnyDatabase` rather than `read` on a single
++    # database because it is the only one of the two that carries listDatabases
++    # on the cluster, and `bin/mongodb_pull` invokes `mongodump` with no --db —
++    # which lists every database before dumping. Scoped `read` would fail the
++    # tool with "not authorized on admin to execute command { listDatabases }".
++    # The blast radius is this project's cluster, which an engineer reaches only
++    # by holding a role on this project.
++    (local.mongo_readonly_username) = {
++      roles = [
++        {
++          role_name     = "readAnyDatabase"
++          database_name = "admin"
++        }
++      ]
++      manage_password = true
++      password        = random_password.mongo_readonly.result
++    }
+   }
+ 
+   ip_access_list_entries = {
+@@ -82,3 +101,41 @@ resource "aws_ssm_parameter" "mongo_url" {
+   type  = "SecureString"
+   value = local.mongo_url
+ }
++
++# =============================================================================
++# Read-only MongoDB credential for engineers
++# =============================================================================
++# Lets an engineer pull this environment's data (bin/mongodb_pull) without the
++# application's read-write credential. Same home as that credential — SSM — so
++# there is one place where this environment's MongoDB secrets live.
++#
++# Rotation is `terraform apply -replace=random_password.mongo_readonly`: the
++# password regenerates and both SSM parameters follow in the same apply.
++
++resource "random_password" "mongo_readonly" {
++  length = 32
++
++  # A MongoDB connection string carries the password inline, where reserved
++  # characters (@ : / ?) would need percent-encoding. Alphanumeric sidesteps
++  # that entirely; 62^32 leaves no meaningful strength on the table.
++  special = false
++}
++
++locals {
++  mongo_readonly_username = "beta-001-readonly"
++
++  # Same shape as local.mongo_url above — inject "<user>:<password>@" after the
++  # scheme and append the database. This is what an engineer passes to
++  # `bin/mongodb_pull -u`.
++  mongo_readonly_url = "${replace(
++    module.mongodb_atlas.connection_string_standard_srv,
++    "mongodb+srv://",
++    "mongodb+srv://${local.mongo_readonly_username}:${random_password.mongo_readonly.result}@"
++  )}/${var.mongo_database}"
++}
++
++resource "aws_ssm_parameter" "mongo_readonly_url" {
++  name  = "/beta-001/MONGO_READONLY_URL"
++  type  = "SecureString"
++  value = local.mongo_readonly_url
++}
+diff --git a/app-beta-001/providers.tf b/app-beta-001/providers.tf
+index 2d58eb9..633f5e0 100644
+--- a/app-beta-001/providers.tf
++++ b/app-beta-001/providers.tf
+@@ -37,6 +37,10 @@ terraform {
+       source  = "mongodb/mongodbatlas"
+       version = "2.13.0"
+     }
++    random = {
++      source  = "hashicorp/random"
++      version = ">= 3.0"
++    }
+     rediscloud = {
+       source  = "RedisLabs/rediscloud"
+       version = "2.18.0"

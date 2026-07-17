@@ -1,0 +1,94 @@
+Source: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_identity-management.html
+Fetched: 2026-07-16
+Prompt used: quote verbatim what this page says about IAM users vs IAM Identity Center for
+human/workforce access, and long-lived access keys vs temporary credentials.
+
+=== BEGIN FETCHED CONTENT ===
+
+# Compare IAM identities and credentials
+
+The identities managed in AWS Identity and Access Management are IAM users, IAM roles, and IAM
+groups. These identities are in addition to your root user that AWS created along with your AWS
+account.
+
+We strongly recommend that you do not use the root user for your everyday tasks, even the
+administrative ones. Instead, provision additional users and grant them the permissions required
+to perform the necessary tasks. You can add users either by adding people to your IAM Identity
+Center directory, federating an external identity provider with either IAM Identity Center or IAM
+or creating least privilege IAM users.
+
+As a best practice, AWS recommends that you require human users to assume an IAM role to access
+AWS so that they're using temporary credentials. If you are managing identities in the IAM
+Identity Center directory or using federation with an identity provider you are following best
+practices.
+
+## Principals
+
+IAM grants IAM users and the root user long-term credentials and IAM roles temporary credentials.
+users in AWS IAM Identity Center, OIDC and SAML federated principals assume IAM roles when they
+sign-in to AWS, which grants them temporary credentials. As a best practice, we recommend that you
+require human users and workloads to access AWS resources using temporary credentials.
+
+## Difference between IAM users and users in IAM Identity Center
+
+**IAM users** aren't separate accounts; they're individual users within your account. Each user
+has their own password for access to the AWS Management Console. You can also create an individual
+access key for each user so that the user can make programmatic requests to work with resources in
+your account.
+
+IAM users and their access keys have long-term credentials to your AWS resources. The primary use
+for IAM users is to give workloads that can't use IAM roles the ability to make programmatic
+requests to AWS services using the API or CLI.
+
+Note: For scenarios in which you need IAM users with programmatic access and long-term
+credentials, we recommend that you update access keys when needed.
+
+Workforce identities (people) are **users in AWS IAM Identity Center** that have different
+permission needs depending on the role they're performing and can work in various AWS accounts
+across an organization. If you have use cases that require access keys, you can support those use
+cases with users in AWS IAM Identity Center. People who sign-in through the AWS access portal can
+obtain access keys with short-term credentials to your AWS resources. For centralized access
+management, we recommend that you use AWS IAM Identity Center (IAM Identity Center) to manage
+access to your accounts and permissions within those accounts.
+
+The main difference between these two types of users is that users in IAM Identity Center
+automatically assume an IAM role when they sign-in to AWS before they access the management
+console or AWS resources. IAM roles grant temporary credentials each time the user signs-in to
+AWS.
+
+## Different methods to provide user access
+
+| Type of user access | When is it used? |
+|---|---|
+| Single sign-on access for people, such as your workforce users, to AWS resources using IAM
+Identity Center | IAM Identity Center provides a central place that brings together administration
+of users and their access to AWS accounts and cloud applications. ... Security best practices
+recommend granting your human users limited credentials to AWS resources. |
+| Long-term credentials for designated IAM users in your AWS account | You might have specific use
+cases that require long-term credentials with IAM users in AWS. ... As a best practice in
+scenarios in which you need IAM users with programmatic access and long-term credentials, we
+recommend that you update access keys when needed. |
+
+## Support programmatic user access
+
+Users need programmatic access if they want to interact with AWS outside of the AWS Management
+Console. The way to grant programmatic access depends on the type of user that's accessing AWS:
++ If you manage identities in IAM Identity Center, the AWS APIs require a profile, and the AWS
+Command Line Interface requires a profile or an environment variable.
++ If you have IAM users, the AWS APIs and the AWS Command Line Interface require access keys.
+Whenever possible, create temporary credentials that consist of an access key ID, a secret access
+key, and a security token that indicates when the credentials expire.
+
+| Which user needs programmatic access? | Option |
+|---|---|
+| Workforce identities (People and users managed in IAM Identity Center) | Use short-term
+credentials to sign programmatic requests to the AWS CLI or AWS APIs (directly or by using the AWS
+SDKs). |
+| IAM users | Use short-term credentials to sign programmatic requests to the AWS CLI or AWS APIs
+(directly or by using the AWS SDKs). |
+| IAM users | Use long-term credentials to sign programmatic requests to the AWS CLI or AWS APIs
+(directly or by using the AWS SDKs). (Not recommended) |
+| Federated principals | Use an AWS STS API operation to create a new session with temporary
+security credentials that include an access key pair and a session token. |
+
+=== END FETCHED CONTENT ===

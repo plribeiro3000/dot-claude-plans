@@ -1,0 +1,43 @@
+SOURCE: https://docs.aws.amazon.com/wellarchitected/latest/security-pillar/sec_protect_data_rest_encrypt.html
+FETCHED: 2026-07-16
+TOPIC: AWS Well-Architected Framework, Security Pillar — SEC08-BP02 Enforce encryption at rest
+
+---
+
+# SEC08-BP02 Enforce encryption at rest
+
+Encrypt private data at rest to maintain confidentiality and provide an additional layer of
+protection against unintended data disclosure or exfiltration.
+
+Common anti-patterns:
+- Not using encrypt-by-default configurations.
+- Providing overly permissive access to decryption keys.
+- Not monitoring the use of encryption and decryption keys.
+- Storing data unencrypted.
+- Using the same encryption key for all data regardless of data usage, types, and classification.
+
+Level of risk exposed if this best practice is not established: High
+
+## Implementation guidance
+
+Map encryption keys to data classifications within your workloads. This approach helps protect
+against overly permissive access when using either a single, or very small number of encryption
+keys for your data (see SEC07-BP01 Understand your data classification scheme).
+
+AWS Key Management Service (AWS KMS) integrates with many AWS services to make it easier to
+encrypt your data at rest. [...] When using AWS KMS, consider how tightly the data needs to be
+restricted. Default and service-controlled AWS KMS keys are managed and used on your behalf by
+AWS. For sensitive data that requires fine-grained access to the underlying encryption key,
+consider customer managed keys (CMKs). You have full control over CMKs, including rotation and
+access management through the use of key policies.
+
+### Implementation steps
+
+- Create and configure AWS KMS keys with policies that limit access to the appropriate principals
+  for each classification of data: For example, create one AWS KMS key for encrypting production
+  data and a different key for encrypting development or test data. You can also provide key
+  access to other AWS accounts. Consider having different accounts for your development and
+  production environments. If your production environment needs to decrypt artifacts in the
+  development account, you can edit the CMK policy used to encrypt the development artifacts to
+  give the production account the ability to decrypt those artifacts. The production environment
+  can then ingest the decrypted data for use in production.

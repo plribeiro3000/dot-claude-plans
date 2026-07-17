@@ -20,38 +20,51 @@ Research backing this plan (do not re-run — decisions below are already settle
   "Outcome" section first**: the option analysis in the body mischaracterized the terminal flag as
   the highest-cost option, and the Outcome records what actually shipped and why it is cheap.
 
-## RESUME HERE — 2026-07-15
+## FEATURE DONE — 2026-07-16
 
-**Phases 1–4 are done. Phase 5's code is merged into `develop`. Only the release + deploy (item 11) is
-left, and the release is already cut and waiting.**
+**Every phase is complete. The feature is live in production, verified, and there is nothing left to
+do on it.** Do not reopen this plan for the unseeded countries — see § Scope below.
 
-`release/3.54.0` is cut from `develop` and pushed; **PR #5232 — `[3.54.0] - 2026-07-15` → `master`** is
-open. `config/version.rb` is at `3.54.0` and the CHANGELOG's `## [Unreleased]` rolled into
-`## [3.54.0] - 2026-07-15` (dated tomorrow deliberately — the engineer merges it first thing).
+Release 3.54.0 shipped: PR #5232 merged, `/merge-cleanup` ran `hubflow.sh release finish 3.54.0
+"v3.54.0"` (tag `3.54.0` → the `chore(release): 3.54.0` commit `2dcd193c4`), and all four environments
+deployed successfully on 2026-07-15 between 10:13 and 10:27 UTC. The first per-country
+`anonymization:company` run was **2026-07-16 05:03 UTC** — go-live, zero failures in all four.
 
-Tomorrow, in order:
+**Verification, 2026-07-16 ~14:20 UTC, one run after go-live:**
 
-1. **Merge PR #5232** — engineer only; the merge is never the agent's call.
-2. **Run `/merge-cleanup`** from the **main working tree** of `app` (never a worktree — `git hf` checks
-   out `master` and `develop`, impossible from a linked worktree). It detects the `release/*` branch and
-   runs `bash ~/.claude/scripts/hubflow.sh release finish 3.54.0 "<tag-message>"`, which tags `master`
-   at the `chore(release): 3.54.0` commit, back-merges into `develop`, and deletes the branch. Match the
-   tag-message convention from the previous tag first (`git tag -n1 3.53.0`). Invoking `/merge-cleanup`
-   on a release branch IS the tag authorization — it does not ask again.
-3. **Deploy** `shared-001`, then `atento-001` (DEPLOY-REFERENCE.md). **Check the Sidekiq queue depth
-   before each** — hold if it is heavy (app/CLAUDE.md). Single normal deploy; nothing here needs phasing.
-4. **Watch the first `anonymization:company` cron run after the deploy.** That run is the go-live. Two
-   consequences, both intended and already accepted:
-   - **Brazil 2008 → 1855 fires as one irreversible batch** — every Brazilian account disabled in the
-     newly-exposed 1855–2008-day band becomes eligible on that first run (LGPD art. 12: cannot be undone).
-   - **The terminal flag self-backfills on the same run** — every already-anonymized company is selected,
-     observed complete, and self-marks. That first run IS the backfill, by design.
+| Environment | `anonymized_total` | Finalizers | BR band 1855–2008 | `eligible_not_flagged` |
+|---|---|---|---|---|
+| beta-001 | 6 | 6 (on 07-15, see Phase 5) | 2/2 flagged | 10 (see below) |
+| demo-001 | 36 | 36 | 4/4 flagged | 0 |
+| shared-001 | 4 | 4 | 3/3 anonymized, 1 flagged | 2 |
+| atento-001 | 0 | 0 | no eligible cohort | 0 |
 
-After that run, the feature is live and Phase 5 is complete — and **that is the trigger for Phase 6**:
-closing the silent-retention gap (an account whose country has a NULL window is never anonymized, and
-nothing says so). That is the agreed next thing to look at once today's plan is finished; its shape is
-still undecided and is the engineer's call. Everything else is in § Open follow-ups — none of it blocks
-the release.
+What this proves:
+
+- **The BR band is the feature working.** Those are the accounts the window change (2008 → 1855) made
+  eligible — the whole point of the feature. beta 2/2 and demo 4/4 flagged; shared's other 2 (companies
+  92 and 93) reported `users@0 documents@0 actions@0` — fully anonymized, waiting only for the flag,
+  which lands the next run by design (learning 9). Nothing was left un-anonymized anywhere.
+- **Finalizers == `anonymized_total` in every environment** (6=6, 36=36, 4=4). The `Finalizer`'s
+  non-bang `company.save` is NOT silently swallowing validation failures — a `done` with no row change
+  would show as a shortfall here, and there is none. Closed.
+- **beta's `eligible_not_flagged@10` is NOT this feature** — it is a pre-existing `DocumentRedactor`
+  bug (1692 errors/week in beta in the week *before* this release). The terminal flag is correctly
+  refusing to mark companies whose documents still hold PII. Tracked as follow-up 1, separate work.
+
+## Scope — the retention window applies to countries that HAVE one, and that is the whole feature
+
+**In scope and DONE: every country with a seeded `anonymizing_window_days`** — BR (1855), MX (3680),
+CO (3680). The per-country resolution is verified working for all of them.
+
+**Out of scope, permanently, for this plan: countries with no window** (AR / CL / GT / PA / PE). There
+is no engineering work to do there — the window is a legal figure 4Shark does not have yet, and the
+producers' `Country.where.not(anonymizing_window_days: nil)` correctly skips what it cannot compute.
+When legal returns a figure, seeding it is a one-row `countries` update shipped as its own migration
+(the Phase 1 item 5 shape) — a new, trivial task, not unfinished business from this one.
+
+**Engineer's explicit decision, 2026-07-16**: do not track the unseeded countries here and do not treat
+them as an open item. This plan is closed on what it could control.
 
 ## Settled decisions (engineer-approved)
 
@@ -303,7 +316,7 @@ same. Two demo multi-territory accounts were handled specially:
   `[AR,BR,CO,MX,PE]` vs 8 branch countries `[AR,BR,CL,CO,GT,MX,PA,PE]`) is left as a separate
   follow-up, NOT corrected in this pass.
 
-### Phase 5 — Contract (Release + Deploy: mandatory column + activate per-country resolution + terminal flag)
+### Phase 5 — Contract (mandatory column + per-country resolution + terminal flag) — DONE (release 3.54.0, deployed + verified in production 2026-07-16)
 
 By now every bound account has a country (Phase 4) and new accounts are born with one (Phase 3), so
 the producers resolve per account with NO nil handling.
@@ -378,13 +391,24 @@ merge commit). The code landed in two PRs that were first merged into that featu
   `Producer`/`Consumer`/`Finalizer` fourth leg, and `Company#enable` clearing the flag.
 - Item 10 (tests + changelog) is covered across both.
 
-**Item 11 (release + deploy) is the only one left, and it is IN PROGRESS** — `release/3.54.0` is cut
-from `develop` and **PR #5232 (`[3.54.0] - 2026-07-15` → `master`) is open**, awaiting the engineer's
-merge on 2026-07-15. **§ RESUME HERE carries the exact sequence** from that merge through go-live
-(merge → `/merge-cleanup` runs `hubflow.sh release finish` → deploy `shared-001`/`atento-001` after the
-queue check → watch the first cron run). Per the gate decision, the producers iterate only countries
-with a seeded window, so AR/CL/GT/PA/PE accounts are not anonymized until their
-`anonymizing_window_days` is seeded (a one-row `countries` update per country, once legal confirms).
+**Item 11 (release + deploy) is DONE.** PR #5232 (`[3.54.0] - 2026-07-15` → `master`) merged;
+`/merge-cleanup` ran `hubflow.sh release finish 3.54.0 "v3.54.0"`, tagging `master` at the
+`chore(release): 3.54.0` commit (`2dcd193c4`) and back-merging into `develop`. All four environments
+deployed 2026-07-15 10:13–10:27 UTC, all `success`. First per-country cron run 2026-07-16 05:03 UTC —
+**zero failures in all four environments**. The verification numbers are in § RESUME HERE.
+
+Per the gate decision, the producers iterate only countries with a seeded window
+(`Country.where.not(anonymizing_window_days: nil)`) — correct by construction: a window 4Shark does not
+have is not a window the code can apply. See § Scope for why the unseeded countries are not an open
+item on this plan.
+
+**One incident, self-recovered, worth keeping (learning 10):** on 2026-07-15 05:04 UTC — *before* the
+3.54.0 deploy — beta was already running code that referenced `companies.anonymized` while its database
+had no such column, and three producers failed in a retry loop with
+`PG::UndefinedColumn` (44 errors, `retry_count` 0→7, 05:04–10:01 UTC). The 10:20 deploy ran the
+ephemeral migration; Sidekiq's own retries then drained cleanly at 12:56 UTC (Producer → 15 Consumers →
+6 Finalizers, all `done`). Nothing was lost — the retry was the whole recovery — but beta ran ~7h with
+code ahead of its schema, and how that happened was never established.
 
 **Deploy shape — still a single normal deploy, now for two reasons.** The per-country change only
 alters the cron selection query (decision 8). The flag work adds a column and a NEW fan-out
@@ -394,31 +418,6 @@ that would force expand/contract per DEPLOYMENT-STRATEGY. The ephemeral migratio
 `anonymized` column (default false, so existing rows are backfilled by Postgres, not by a data
 migration) before the new code goes live; a worker still running old code during the rollover simply
 does not fire the fourth leg that day.
-
-### Phase 6 — Close the silent-retention gap (starts when Phase 5 is live)
-
-**Trigger: the moment item 11 is done** — release merged, deployed, first `anonymization:company` run
-observed. Everything planned for 2026-07-14 ends there; **this is the next thing to look at.**
-
-**The gap.** Every producer iterates only `Country.where.not(anonymizing_window_days: nil)`. An account
-whose retention jurisdiction country has a NULL window is therefore **never anonymized — and nothing
-says so.** Today that is AR / CL / GT / PA / PE (Phase 1 item 5 left them unseeded on purpose, pending
-legal). Before this feature the single global window guaranteed every disabled account was eventually
-processed; that safety net is now gone **by design**, and nothing replaced it.
-
-**Why it matters.** LGPD storage limitation makes the window a **maximum**, not an option — "we retain
-it until someone remembers to seed the country" is not a defensible position. And the failure is
-**silent**: no error, no job, no log line; it surfaces only at an LGPD verification, which is the worst
-possible moment to discover it. Raised as a Medium finding by the PR #5223 review.
-
-**Shape NOT decided — the engineer's call.** Options surfaced, none chosen:
-- a periodic check that flags any country referenced by a disabled company but lacking a window;
-- a guard at write/seed time — a country cannot be used as a retention jurisdiction until it has a window;
-- accept it explicitly and track the unseeded countries out-of-band until legal confirms.
-
-**Seeding the five countries does NOT close this.** Follow-up 1 removes today's *instance* of the gap;
-the gap itself is structural — a country added tomorrow, or a jurisdiction pointed at an unseeded
-country, reopens it. Phase 6 is about the class of problem, not the current five.
 
 ## Learnings (from execution — read before touching this feature again)
 
@@ -463,28 +462,122 @@ country, reopens it. Phase 6 is about the class of problem, not the current five
 8. **The schema.rb conflict on a rebase is mechanical: take the highest `version:`.** It is the max
    migration timestamp across the merged tree, and it conflicted on every replayed commit. The rest of
    the file auto-merged correctly both times.
+9. **The terminal flag ALWAYS lags one run behind the anonymization — by design, not a bug.**
+   `Company::Anonymizer#perform` fires all four legs simultaneously (`app/workers/company/anonymizer.rb:8-11`),
+   so `Company::Anonymizer::Producer` fans out its Consumers ~1.7s after everything starts while the
+   *other three legs' per-record consumers are still running*. The Consumer therefore observes pending
+   work mid-flight and returns early; the company is flagged on the **next** daily run. Verified
+   2026-07-16 on shared-001: companies 92 and 93 reported `users@0 documents@0 actions@0` (nothing left
+   to anonymize) yet were still unflagged. **Consequence for anyone reading the numbers**: on the day of
+   a window change, `eligible_not_flagged` shows an alarming count that is just the lag. Do not
+   investigate it as a stall until it fails to drop on the following run.
+10. **Never infer which code version is running in production from the deploy timestamp — read the
+    log.** On 2026-07-16 this session asserted the 07-15 05:01 cron run had used old code, reasoning
+    that the 3.54.0 deploy only finished at 10:20. The worker log said otherwise: `class=Company::
+    Anonymizer::Producer` at 05:04, a class that exists only in 3.54.0. Beta was already on new code
+    against an un-migrated database and 44 jobs were failing — the exact opposite of the conclusion.
+    The deploy timestamp bounds when code *could* have arrived by one path; it proves nothing about
+    what is actually loaded.
+11. **The anonymization pipeline does NOT log under one greppable name — `DocumentRedactor` does not
+    match `Anonymizer`.** Filtering CloudWatch for `"Anonymizer"` silently omits
+    `Company::DocumentRedactor::Producer`/`Consumer`, which is one of the three legs the terminal flag
+    waits on — so the filter hides precisely the leg most likely to be blocking. This session made that
+    exact mistake twice before catching it. The four legs are `Company::UserAnonymizer`,
+    `Company::DocumentRedactor::Producer`, `Company::ActionAnonymizer::Producer`, and
+    `Company::Anonymizer::Producer`; a diagnostic filter must name each, or use the queue
+    (`queue=anonymizing`) instead of the class name.
 
-## Open follow-ups (none block the release)
+## Process correction — DONE (record only, nothing open)
 
-1. **Seed `anonymizing_window_days` for AR / CL / GT / PA / PE** — pending client/legal confirmation
-   (the internet-sourced figures in § Per-country values were deliberately not trusted for PII
-   retention). Until each is seeded, accounts bound to that country are **never anonymized**: the
-   producers iterate only `Country.where.not(anonymizing_window_days: nil)`. Each confirmed value is a
-   one-row `countries` update shipped as its own migration, matching Phase 1 item 5. **Feeds Phase 6
-   but does not close it** — seeding these five removes today's instance of the silent-retention gap,
-   not the gap itself.
-2. **Demo "Conta Global" (#488) territory/branch divergence** — its `business_territory` (5 countries)
-   does not match its 8 `company_branches`. It got a representative country (BR) in the backfill so it
-   would not block; the divergence itself was deliberately left alone (learning 2 explains why the two
-   are not derivable from each other). Demo-only, non-productive `holding_dashboard` feature.
+**`Company::DocumentRedactor::Consumer` — DONE 2026-07-16. Code shipped (PR #5241, merged to
+`develop`) AND the data fixed + verified in beta.** A pre-existing bug the per-country terminal flag
+made visible; fixing it was what made the anonymization pipeline whole, not a side task. Recorded here
+so the investigation is not repeated — there is nothing left to do.
 
+   **The data fix ran and is verified (beta-001, 2026-07-16):** 18/18 documents saved `text/csv`, zero
+   `FAILED` — so `content_type` was the ONLY validation those 2019-era rows broke. Verification:
+   `still_nil@0`, `in_scope_total@18`, all `text/csv`, `all_valid@true`. The `text/csv` inference was
+   corroborated, not guessed: all 8 in-scope documents that still had a file in S3 returned exactly
+   `text/csv`, and the 10 with no attachment took the same value.
+   **Expected next**: the 05:00 UTC run redacts the 18 and the 10 companies flag on the run AFTER that
+   (the one-day lag is by design — learning 9). The beta error count may rise before it zeroes: with
+   #5241 each bad document is its own job, so failures show as N individual jobs rather than one
+   aborted loop. Nothing to do about that; it is the fix working.
+
+   **The failure**: `StateMachines::InvalidTransition: Cannot transition status via :redact from :final
+   (Reason(s): Content type is not included in the list)`. **1692 occurrences in beta-001 in the week
+   BEFORE the 3.54.0 deploy** (2026-07-09 → 07-15) — three years older than this feature.
+
+   **Root cause — two independent parts:**
+   - **The data**: `validates :content_type, inclusion: { in: CONTENT_TYPES }` was added to `Document`
+     on **2023-06-27** (`96ce21e50`, tag 2.67.3), with no `allow_nil`. Rows created before that date
+     with a NULL `content_type` became invalid at rest. Nothing re-saved them for three years, so
+     nothing re-validated them — the redactor is the first code to call save on them, and it fails on
+     100%. NOT a GraphQL problem: `create_document_graphql_mutation.rb` has
+     `argument :content_type, String, required: false` **by design** — GraphQL is transport, the model
+     is the guard, and per-4Shark convention validation belongs in the model so the user gets a real
+     message instead of a syntax error. Nothing to change there.
+   - **The loop** (fixed by #5241): `Consumer#perform(company_id)` looped over that company's documents
+     calling `redact!`; one raise aborted the whole `each`, so every remaining document was skipped
+     permanently. Every sibling leg already fans out to the leaf record (`Company::UserAnonymizer` →
+     one job per user; `Company::ActionAnonymizer::Producer` → one job per action) — DocumentRedactor
+     was the only one stopping at the company. #5241 makes it `perform(document_id)`, no loop.
+
+   **What #5241 does NOT do — read this before assuming it is done.** It isolates the failure; it does
+   **not** fix the data. Every in-scope document is still `content_type` nil and still fails validation
+   after the release — now as N individual failing jobs instead of one aborted loop, so the **error
+   count goes UP, not down**, until the data is fixed. The code fix is prevention (a future company
+   with 1 bad + 50 good documents no longer loses the 50); it resolves nothing today.
+
+   **The real scope, measured correctly 2026-07-16** — mirroring what the Producer actually selects
+   (`disabled` + `without_anonymization` + past window, per country):
+   - **beta-001: 18 documents, 100% `content_type` nil, across 10 companies** — exactly the 10 in
+     `eligible_not_flagged`. Zero valid documents in scope (the `text/csv` ones already redacted fine
+     in past runs and left the selection). CO and MX select no companies.
+   - **demo / shared / atento: ZERO documents with `content_type` nil.** The bug cannot fire in
+     production — that is why they show 0 `InvalidTransition`, and it is why this was NOT a hotfix.
+
+   **How the data fix was done (the shape to reuse if this ever recurs)**: read the real content_type
+   from S3 via `attachment.file.content_type` and save it; for a document with no attachment, infer
+   `text/csv` — both `IDENTITY_TYPES` (`UserDocument`, `UserIdentifierActionDocument`) are client-upload
+   flows (each has `upload_url`/`upload_headers` + its own create mutation) and `DocumentUploader`'s
+   `content_type_allowlist` is `%r{text/(csv|plain)}`, so a client-uploaded identity document is a CSV
+   by construction. The engineer's rule: client-uploaded → certainly CSV; system-generated → CSV or XLS
+   depending on the resource (shared-001 holds 50 `application/vnd.ms-excel` + 5 `text/plain`, so the
+   generated case is real — but it was out of scope here, since neither IDENTITY_TYPE is generated).
+   The mutation guarded the S3 value (`CONTENT_TYPES.include?(s3_content_type) ? s3_content_type :
+   'text/csv'`) precisely because S3 returns `application/octet-stream` when the upload sent no header
+   — saving that raw would have recreated the same bug. It never triggered: every S3 read came back
+   `text/csv`.
+   **Order matters**: the content_type must be fixed BEFORE any `redact!`, because the transition runs
+   validations — you cannot write a `:redacted` tombstone on an invalid row.
+   **Do NOT hand-write `:redacted`**: once the content_type is valid, the daily cron redacts them
+   through the normal path. That is why the engineer's earlier "(c) mark the 12 orphans redacted"
+   decision went unused — fixing the data made the pipeline do it, with no manual LGPD-state writes.
+
+   **Why 10 of the 18 had no attachment — UNCONFIRMED reading, not a fact.** The likely explanation is
+   that the upload never happened: the `Document` row is created first, the presigned URL is handed to
+   the client, and if the client never PUT the CSV the row stays orphaned — which would also explain
+   the nil content_type (no upload → no header). An earlier theory that the redactor's loop destroyed
+   those attachments was **refuted** by shared/atento showing `no_file` on VALID `text/csv` documents,
+   which the loop would never have touched. Nobody verified the upload theory; do not treat it as
+   established.
+
+   **Do NOT reopen these — they were investigated and closed:**
+   - The destroy-attachment-before-transition order is **intentional and documented**
+     (`app/models/document.rb:80-85`): `:redacted` MEANS the file is already gone and only the
+     tombstone remains. Do not "fix" it by reordering.
+   - The stale-args risk (jobs enqueued with `company_id` being read as `document_id` by the new
+     signature) was real but is **resolved** — the engineer cleared the retry and dead sets in every
+     environment on 2026-07-16, before the new code could reach any worker.
 ## Risks
 
-- **Brazil reduction is irreversible** (2008 → 1855). Anonymization cannot be undone (LGPD art. 12).
-  Accepted by the engineer (all-at-once, aligning the system with the already-documented window).
-  This takes effect in **Phase 5**, when the producers start resolving per country — the first
-  `anonymization:company` run after that release anonymizes Brazilian accounts in the newly-exposed
-  1855–2008-day band. Phases 1–4 (structure, deploy, write-path, backfill) have no such effect.
+- **Brazil reduction is irreversible** (2008 → 1855) — **MATERIALIZED 2026-07-16, as accepted.**
+  Anonymization cannot be undone (LGPD art. 12). The first per-country `anonymization:company` run
+  anonymized the Brazilian accounts in the newly-exposed 1855–2008-day band: beta 2, demo 4, shared 3
+  (2 of shared's still awaiting only the flag — learning 9); atento had no eligible cohort. All
+  verified. This risk is now history, not a pending exposure — recorded because the count is the
+  audit trail of what that one run erased.
 - **Colombia/Panama legal basis is the weakest** (SPIKE-v2 Finding 7). Colombia 20y is the largest
   *mandatory* figure but covers a subset (SG-SST); Panama 9y is a composite. If legal review later
   revises these, it is a one-row data change in `countries` (the whole point of Option B).

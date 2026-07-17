@@ -1,0 +1,65 @@
+{
+  "ecs_beta_key_describe": {
+    "KeyMetadata": {
+      "AWSAccountId": "405749097490",
+      "KeyId": "6bf5847f-4e49-4ee8-b786-afd9abe84419",
+      "Arn": "arn:aws:kms:us-east-1:405749097490:key/6bf5847f-4e49-4ee8-b786-afd9abe84419",
+      "CreationDate": "2025-10-17T09:28:57.880000-03:00",
+      "Enabled": true,
+      "Description": "",
+      "KeyUsage": "ENCRYPT_DECRYPT",
+      "KeyState": "Enabled",
+      "Origin": "AWS_KMS",
+      "KeyManager": "CUSTOMER",
+      "CustomerMasterKeySpec": "SYMMETRIC_DEFAULT",
+      "KeySpec": "SYMMETRIC_DEFAULT",
+      "EncryptionAlgorithms": [
+        "SYMMETRIC_DEFAULT"
+      ],
+      "MultiRegion": false,
+      "CurrentKeyMaterialId": "552cd4e641f8822145b7681cd1fd656ea9afed814d61fe020c777bfbfe737798"
+    }
+  },
+  "ecs_beta_key_policy": {
+    "Policy": "{\n  \"Version\" : \"2012-10-17\",\n  \"Id\" : \"key-consolepolicy-3\",\n  \"Statement\" : [ {\n    \"Sid\" : \"Enable IAM User Permissions\",\n    \"Effect\" : \"Allow\",\n    \"Principal\" : {\n      \"AWS\" : \"arn:aws:iam::405749097490:root\"\n    },\n    \"Action\" : \"kms:*\",\n    \"Resource\" : \"*\"\n  }, {\n    \"Sid\" : \"Allow access for Key Administrators\",\n    \"Effect\" : \"Allow\",\n    \"Principal\" : {\n      \"AWS\" : [ \"AIDAV46EH4QJOM3O7JG3E\", \"AIDAV46EH4QJD5WK7FUJY\" ]\n    },\n    \"Action\" : [ \"kms:Create*\", \"kms:Describe*\", \"kms:Enable*\", \"kms:List*\", \"kms:Put*\", \"kms:Update*\", \"kms:Revoke*\", \"kms:Disable*\", \"kms:Get*\", \"kms:Delete*\", \"kms:TagResource\", \"kms:UntagResource\", \"kms:ScheduleKeyDeletion\", \"kms:CancelKeyDeletion\", \"kms:RotateKeyOnDemand\" ],\n    \"Resource\" : \"*\"\n  }, {\n    \"Sid\" : \"Allow use of the key\",\n    \"Effect\" : \"Allow\",\n    \"Principal\" : {\n      \"AWS\" : [ \"AIDAV46EH4QJOM3O7JG3E\", \"AIDAV46EH4QJD5WK7FUJY\" ]\n    },\n    \"Action\" : [ \"kms:Encrypt\", \"kms:Decrypt\", \"kms:ReEncrypt*\", \"kms:GenerateDataKey*\", \"kms:DescribeKey\" ],\n    \"Resource\" : \"*\"\n  }, {\n    \"Sid\" : \"Allow attachment of persistent resources\",\n    \"Effect\" : \"Allow\",\n    \"Principal\" : {\n      \"AWS\" : [ \"AIDAV46EH4QJOM3O7JG3E\", \"AIDAV46EH4QJD5WK7FUJY\" ]\n    },\n    \"Action\" : [ \"kms:CreateGrant\", \"kms:ListGrants\", \"kms:RevokeGrant\" ],\n    \"Resource\" : \"*\",\n    \"Condition\" : {\n      \"Bool\" : {\n        \"kms:GrantIsForAWSResource\" : \"true\"\n      }\n    }\n  } ]\n}",
+    "PolicyName": "default"
+  },
+  "ecs_beta_key_rotation": {
+    "KeyRotationEnabled": false,
+    "KeyId": "arn:aws:kms:us-east-1:405749097490:key/6bf5847f-4e49-4ee8-b786-afd9abe84419"
+  },
+  "master_key_describe": {
+    "KeyMetadata": {
+      "AWSAccountId": "405749097490",
+      "KeyId": "mrk-fa0cda243274491784fc7b39bead5a03",
+      "Arn": "arn:aws:kms:us-east-1:405749097490:key/mrk-fa0cda243274491784fc7b39bead5a03",
+      "CreationDate": "2026-03-03T13:16:03.546000-03:00",
+      "Enabled": true,
+      "Description": "4Shark master encryption key - all environments and services",
+      "KeyUsage": "ENCRYPT_DECRYPT",
+      "KeyState": "Enabled",
+      "Origin": "AWS_KMS",
+      "KeyManager": "CUSTOMER",
+      "CustomerMasterKeySpec": "SYMMETRIC_DEFAULT",
+      "KeySpec": "SYMMETRIC_DEFAULT",
+      "EncryptionAlgorithms": [
+        "SYMMETRIC_DEFAULT"
+      ],
+      "MultiRegion": true,
+      "MultiRegionConfiguration": {
+        "MultiRegionKeyType": "PRIMARY",
+        "PrimaryKey": {
+          "Arn": "arn:aws:kms:us-east-1:405749097490:key/mrk-fa0cda243274491784fc7b39bead5a03",
+          "Region": "us-east-1"
+        },
+        "ReplicaKeys": [
+          {
+            "Arn": "arn:aws:kms:sa-east-1:405749097490:key/mrk-fa0cda243274491784fc7b39bead5a03",
+            "Region": "sa-east-1"
+          }
+        ]
+      },
+      "CurrentKeyMaterialId": "d19ca3a990c17d13bf6f5a585b475d77648f1caeb1019f391005d303b6c816e1"
+    }
+  }
+}

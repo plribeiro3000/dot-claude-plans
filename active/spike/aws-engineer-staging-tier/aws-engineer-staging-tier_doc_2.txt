@@ -1,0 +1,51 @@
+Source: https://docs.aws.amazon.com/IAM/latest/UserGuide/introduction_attribute-based-access-control.html
+Fetched: 2026-07-16
+Prompt used: quote verbatim the ABAC definition, ABAC-vs-RBAC comparison, and any caveats.
+
+=== BEGIN FETCHED CONTENT ===
+
+# Define permissions based on attributes with ABAC authorization
+
+Attribute-based access control (ABAC) is an authorization strategy that defines permissions based
+on attributes. AWS calls these attributes tags. You can attach tags to IAM resources, including
+IAM entities (IAM users or IAM roles) and to AWS resources. You can create a single ABAC policy or
+small set of policies for your IAM principals. You can design ABAC policies that allow operations
+when the principal's tag matches the resource tag. ABAC's attribute system that provides both high
+user context and granular access control. Because ABAC is attribute-based, it can perform dynamic
+authorization for data or applications that grants or revokes access in real time. ABAC is helpful
+in environments that are scaling and in situations where identity or resource policy management
+has become complex.
+
+## Comparison of ABAC to the traditional RBAC model
+
+The traditional authorization model used in IAM is role-based access control (RBAC). RBAC defines
+permissions based on a person's job function, or role, which is distinct from an IAM role. IAM
+does include managed policies for job functions that align permissions to a job function in an
+RBAC model.
+
+In IAM, you implement RBAC by creating different policies for different job functions. You then
+attach the policies to identities (IAM users, IAM groups, or IAM roles). As a best practice, you
+grant the minimum permissions necessary for the job function. This results in least privilege
+access. Each job function policy lists the specific resources that identities assigned that policy
+can access. The disadvantage to using the traditional RBAC model is that when you or your users add
+new resources to your environment, you have to update the policies to allow access to those
+resources.
+
+**ABAC provides the following advantages over the traditional RBAC model:**
++ ABAC permissions scale with innovation. It's no longer necessary for an administrator to update
+existing policies to allow access to new resources.
++ ABAC requires fewer policies. Because you don't have to create different policies for different
+job functions, you create fewer policies. Those policies are easier to manage.
++ Using ABAC, teams can dynamically respond to change and growth. Because permissions for new
+resources are automatically granted based on attributes you don't have to manually assign policies
+to identities.
++ Granular permissions are possible using ABAC. When you create policies, it's a best practice to
+grant least privilege. Using traditional RBAC, you write a policy that allows access to specific
+resources. However, when you use ABAC, you can allow actions on all resources if the resource's
+tag matches the principal's tag.
++ Use employee attributes from your corporate directory with ABAC. You can configure your SAML or
+OIDC provider to pass session tags to IAM. When your employees federate into AWS, IAM applies
+their attributes to their resulting principal. You can then use ABAC to allow or deny permissions
+based on those attributes.
+
+=== END FETCHED CONTENT ===

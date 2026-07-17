@@ -1,0 +1,63 @@
+SOURCE: https://aws.amazon.com/blogs/database/options-for-changing-aws-kms-encryption-key-for-amazon-rds-databases/
+FETCHED: 2026-07-16
+TOPIC: AWS Database Blog — Options for changing AWS KMS encryption key for Amazon RDS databases
+(fetched via summarization tool; quotes below are as returned by the fetch, verbatim per the tool)
+
+---
+
+"Amazon RDS doesn't currently support in-place conversion of unencrypted instances to encrypted
+instances, even with a managed blue/green deployment approach."
+
+"A downside is that it requires a downtime period of at least 30 minutes, depending on the size
+of your database."
+
+The article presents the snapshot-and-restore method (create snapshot -> copy snapshot with new
+KMS key -> restore from copied snapshot -> repoint application) as the option for workloads that
+can tolerate downtime, and separately presents lower-downtime options for production.
+
+---
+
+SOURCE: https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_update-encryption-key.html
+FETCHED: 2026-07-16
+TOPIC: AWS Secrets Manager — Change the encryption key for a secret
+
+---
+
+You can change the encryption key for your secret. [...] When you change the encryption key,
+Secrets Manager re-encrypts AWSCURRENT, AWSPENDING, and AWSPREVIOUS versions with the new key. To
+avoid locking you out of the secret, Secrets Manager keeps all existing versions encrypted with
+the previous key. That means you can decrypt AWSCURRENT, AWSPENDING, and AWSPREVIOUS versions with
+the previous key or the new key. If you don't have kms:Decrypt permission to the previous key,
+when you change the encryption key, Secrets Manager can't decrypt the secret versions to
+re-encrypt them. In this case, the existing versions are not re-encrypted.
+
+To make it so AWSCURRENT can only be decrypted by the new encryption key, create a new version of
+the secret with the new key.
+
+If you deactivate the previous encryption key, you will not be able to decrypt any secret versions
+except AWSCURRENT, AWSPENDING, and AWSPREVIOUS. If you have other labelled secret versions that
+you want to retain access to, you need to recreate those versions with the new encryption key.
+
+AWS CLI example:
+aws secretsmanager update-secret --secret-id MyTestSecret --kms-key-id arn:aws:kms:us-west-2:123456789012:key/EXAMPLE1-90ab-cdef-fedc-ba987EXAMPLE
+
+---
+
+SOURCE: https://docs.aws.amazon.com/cli/latest/reference/ssm/put-parameter.html
+FETCHED: 2026-07-16
+TOPIC: AWS CLI reference — ssm put-parameter (--overwrite, --key-id)
+
+---
+
+--overwrite: "Overwrite an existing parameter. The default value is false."
+
+--key-id: "The Key Management Service (KMS) ID that you want to use to encrypt a parameter. Use a
+custom key for better security. Required for parameters that use the SecureString data type. If
+you don't specify a key ID, the system uses the default key associated with your Amazon Web
+Services account, which is not as secure as using a custom key."
+
+NOTE: this CLI reference page does not explicitly document changing the KMS key of an existing
+parameter. The mechanism (re-running put-parameter with --overwrite and a new --key-id, which
+triggers a fresh Encrypt call per the SecureString encryption workflow documented in doc_3.txt)
+is inferred from the documented Encrypt/PutParameter mechanics, not stated by AWS as an explicit
+"rekey" operation. Flagged as inferred, not an AWS-stated guarantee.

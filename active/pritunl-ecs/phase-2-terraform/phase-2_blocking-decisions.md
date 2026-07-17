@@ -6,19 +6,32 @@
 
 **Question:** How to provision the dedicated Mongo VM (new role 2A vs conditional in `4shark.pritunl` 2B)?
 
-**Resolution:** **Neither.** The MongoDB golden-AMI pipeline (repo `mongodb` + `ansible-role-mongodb` + Packer, built/merged/validated 2026-07-10) bakes MongoDB 8.2 into a versioned AMI. PR 2.3's Mongo VM launches from that AMI via a `data "aws_ami"` tag lookup — **no Ansible role runs on the VM at all**, so the 2A/2B question is moot and the 8.0→8.2 drift is closed at the image.
+**Resolution:** **Neither.** The MongoDB golden-AMI pipeline (repo `mongodb` + `ansible-role-mongodb` + Packer, built/merged/validated 2026-07-10) bakes MongoDB into a versioned AMI. PR 2.3's Mongo VM launches from that AMI via a `data "aws_ami"` tag lookup — **no Ansible role runs on the VM at all**, so the 2A/2B question is moot.
 
-**Grounding:** `~/Projects/4Shark/dot-claude-plans/active/mongodb-golden-ami/PLAN.md` (its Phase 2 IS this Pritunl Mongo VM adoption); the golden-AMI build/role/IAM are all merged.
+**Corrected 2026-07-16:** the AMI is **MongoDB 8.0 on Ubuntu 24.04**, not 8.2 — `mongodb_version` tracks the X.0 LTS line only (`mongodb/packer/mongodb.pkr.hcl:45-54`), and 24.04 is a ceiling because MongoDB's apt repo 404s for 26.04 (`:71-75`). This resolution originally claimed the image "closes the 8.0→8.2 drift"; **there is no drift and no version change** — the combined VM runs 8.0 today (`ansible/roles/4shark.pritunl/defaults/main.yml:6`) and the AMI installs 8.0. What the image closes is the *provisioning*, not a version gap.
+
+**Grounding:** `~/Projects/4Shark/dot-claude-plans/active/mongodb-golden-ami/PLAN.md` (its Phase 2 IS this Pritunl Mongo VM adoption; its Phase 3 — the 12-node integrator fleet cutover — is **complete** as of 2026-07-14/15, so this AMI now backs four production replica sets); the golden-AMI build/role/IAM are all merged.
 
 ---
 
-## SPIKE-3: MongoDB security group scoping ✅ RESOLVED — CIDR (3B), per 4Shark convention
+## SPIKE-3: MongoDB security group scoping ✅ RESOLVED — SG-based (3A), per the Network Access Model
 
-**Question:** SG-to-SG reference (3A) vs narrowed CIDR (3B) for Mongo-VM ingress?
+> **REVERSED 2026-07-16.** This item previously resolved to "3B — CIDR-scoped", on three claims that are all false. The governing document is `terraform/docs/NETWORK-ACCESS-MODEL.md` — the repo's own canonical standard for exactly this decision — and it mandates the opposite. The original reasoning is preserved below the correction so the error is legible, not silently rewritten.
 
-**Resolution:** **3B — CIDR-scoped** ingress from the management VPC's private subnet where the Pritunl instance runs.
+**Question:** SG reference (3A) vs narrowed CIDR (3B) for Mongo-VM ingress?
 
-**Grounding:** 4Shark's documented convention is CIDR ingress, not SG-to-SG: `~/.claude/docs/runbooks/migrations/VPC-CROSS-VPC-CONNECTIVITY.md:40` ("Security group on destination — ingress from source VPC CIDR"); `terraform/auth-001/security_groups.tf:11-23,41-47` scopes even RDS by VPC CIDR (`10.255.0.0/16`). There is **zero SG-to-SG precedent** in the repo, and `~/.claude/docs/runbooks/migrations/VPC-DEPOSED-SG-DEPENDENCY.md` documents how SG-to-SG references add a `DependencyViolation` fragility during migrations. Community generally favors SG-to-SG for precision, but 4Shark's consistent, documented practice is CIDR — apply the convention. (Scoping to the subnet CIDR rather than a `/32` also survives instance replacement, addressing the fragility the PLAN flagged for CIDR.)
+**Resolution:** **3A — SG-based.** The Mongo VM's security group allows MongoDB's port from the **Pritunl instance's security group**, by reference. Not a CIDR.
+
+**Grounding:** `terraform/docs/NETWORK-ACCESS-MODEL.md` is the canonical standard and states the rule in its decision table (`:45`): a source that is *"An AWS resource in the **same region + reachable VPC**"* → **"SG-based (default)"**. The Pritunl ECS instance and the Mongo VM are both in the management VPC in `sa-east-1` — precisely that row. CIDR is explicitly the fallback, used *"only where a security group cannot express the source"* (`:26`), which does not apply here. The doc also settles that this is not an open judgement call: *"This was once decided case by case; it is now a fixed standard"* (`:3`).
+
+**Why the original three claims were wrong:**
+1. **"Zero SG-to-SG precedent in the repo"** — false, and the cause was a bad grep. The search looked for `source_security_group_id` / `referenced_security_group_id`; the codebase expresses SG references as an inline `ingress { security_groups = [...] }` block, which that pattern never matches. Real precedents: RDS ingress 5432 from the pooler SG + app cluster SG (`app-shared-001/rds.tf:18-24`), OpenSearch 443 from the app cluster SG, the pooler 6432 from the app cluster SG (`modules/connection_pooler/main.tf`), the app ECS instances from the ALB SG (`modules/ecs_cluster/main.tf`). SG-based is the fleet's normal shape, not a novelty.
+2. **`VPC-CROSS-VPC-CONNECTIVITY.md:40` mandates CIDR** — misapplied. That runbook governs **cross-VPC** connections, and gives the reason in the next line (`:51`): *"not just an EC2 SG reference, which doesn't cross VPC boundaries"*. It is a constraint about crossing a boundary this case does not cross.
+3. **`VPC-DEPOSED-SG-DEPENDENCY.md` documents SG-to-SG `DependencyViolation` fragility** — that runbook never mentions SG-to-SG references. Its `DependencyViolation` comes from ENIs on instances stuck in `Terminating:Wait` holding a deposed SG during an ASG replacement. Unrelated mechanism.
+
+**The `auth-001` observation was real but is not the standard.** `auth-001/security_groups.tf:41-47` does scope RDS by VPC CIDR — but `NETWORK-ACCESS-MODEL.md` is what the fleet was brought onto ("Every data and compute store in the fleet has been brought onto this model", `:3`), and one stack's older shape does not override it. Copying the loosest existing example is not "applying the convention".
+
+**The real trade-off SG-based carries** (`NETWORK-ACCESS-MODEL.md:69`): SG allows are identity-pinned, so if the Pritunl instance is ever rebuilt with a **new** SG, this allow stops covering it — the failure that caused the `app-atento-001` outage. That is a known operational gotcha to respect at cutover (re-check this allow whenever the Pritunl SG changes), not a reason to fall back to CIDR.
 
 ---
 

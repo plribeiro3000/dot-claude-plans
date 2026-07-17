@@ -7,6 +7,10 @@
 > **2026-07-15 correction record.** The `output-verifier` flagged a confirmed citation-integrity failure in the original F7 (this SPIKE's issue #165 status was misstated as "Open" when it was actually `closed`/`state_reason: completed`, resolved by PR #217, milestone v6.0.0). The coordinator independently re-confirmed via `gh api`. This revision corrects F7 in place, investigates what the resolving PR actually did (new F17–F20 below), re-examines every derivation that leaned on "the community has no settled answer" (F5, F6 re-scoped), adds a new trade-off row and new uncertainties, and preserves the full raw evidence in auxiliary `taskdef-drift_v6release_1.md`. Nothing was silently deleted — corrected text says so inline.
 >
 > **2026-07-15 follow-up record (same day, second pass).** The engineer authorized closing two specific open uncertainties from the previous revision: Uncertainty 2 (what `data.aws_ecs_service.task_definition` actually returns — Option C depended entirely on it) and Uncertainty 7 (is `track_latest` + an un-ignored `task_definition` safe against a `CODE_DEPLOY`-controller service). Both are now resolved from primary sources — the AWS provider's own Go implementation (not just its docs) for Uncertainty 2, and a previously-surfaced-but-never-fetched issue (`hashicorp/terraform-provider-aws#12703`) plus a cross-tool corroboration (`aws/aws-cdk#7040`) for Uncertainty 7. New findings F21 and F22 below carry the resolutions; F8 and F18 are corrected in place with pointers to them; the trade-off table and uncertainty list are updated accordingly. Full raw evidence (Go source excerpts, `gh api` JSON, AWS doc quotes) is preserved in new auxiliary `taskdef-drift_followup_1.md`.
+>
+> **2026-07-16 empirical record (third pass) — the class of evidence changes here.** Every prior pass reasoned from documentation and source code. This one records an **experiment against real infrastructure**: the engineer authorized applying `track_latest = true` (the mechanism of Trade-off row I) to three productive stacks — `beta-001`, `demo-001`, `atento-001` — as step 1 of a two-step plan, after which it was reverted. Two things the previous passes could only reason about are now **observed**; one trade-off row is **invalidated as described**; and the experiment surfaced a **pre-existing defect that has nothing to do with `track_latest`** and is the most consequential finding in this document (F24). This pass: adds **F23–F25**; corrects **Trade-off row I** and **Suggested Option 5** in place (original text preserved inline); resolves **Uncertainty 5** in place; and adds one new uncertainty this spike **cannot** close. Raw evidence — plan/apply output, state diffs, the S3 revert mechanics, and every re-verified code citation — is preserved in new auxiliary `taskdef-drift_apply_1.md`.
+>
+> **The code state today:** `track_latest` is **not** in the repository — `grep -rn "track_latest" ~/Projects/4Shark/terraform --include='*.tf'` returns no matches and `develop` is clean (aux `taskdef-drift_apply_1.md`, E1). F23 and F25 describe an experiment that was run and undone. **F24's defect is still live and predates the experiment entirely** — reverting `track_latest` did not touch it.
 
 ## Investigation question
 
@@ -52,6 +56,7 @@ Five questions, refined from the engineer's brief:
 - [`taskdef-drift_excerpt_1.tf`](./taskdef-drift_excerpt_1.tf) — the nine code blocks this spike reasons about, verbatim with line labels, including the full `ignore_changes` inventory.
 - [`taskdef-drift_v6release_1.md`](./taskdef-drift_v6release_1.md) — the correction investigation: issue #165's real status, PR #217's body, the pre-v6 `max(latest, current)` idiom source, provider PR #30154 (`track_latest`), the v6.0.0 module's two-branch split, and confirmation 4Shark does not consume the community module. Sustains F17–F20.
 - [`taskdef-drift_followup_1.md`](./taskdef-drift_followup_1.md) — the follow-up investigation: the AWS provider's Go source for the `aws_ecs_service` data source and resource update path (E1, E2, E8), the AWS API reference quotes for `Service.taskDefinition` and `Deployment.status`/`taskDefinition` (E3, E5), the `task_definition` resource-argument text that the data source's doc string was garbled from (E4), the full `gh api` fetch of issue #12703 with comments and events (E6), the cross-tool `aws/aws-cdk#7040` corroboration (E7), the confirmed-silent `terraform-aws-modules/terraform-aws-ecs#169` (E9), and the genuinely-unresolved AWS blue/green tutorial sub-question (E10). Sustains F21–F22.
+- [`taskdef-drift_apply_1.md`](./taskdef-drift_apply_1.md) — the empirical evidence from the 2026-07-16 `track_latest` apply-and-revert on `beta-001`/`demo-001`/`atento-001`: the enabling apply's plan/apply output (E2), the permanently-dirty next plan (E3), the state before/after diff (E4), why the revert could not go through `terraform apply` (E5), the S3 object-version restore and its pre-flight (E6), the config-vs-GHA `command` divergence traced across all four app stacks (E7–E8), and commit `13d32a0`'s real scope (E9). Sustains F23–F25. Provenance is labeled per item: `[MAIN-TRACE]` (the coordinator's own tool results, not re-derivable now that the change is reverted) vs `[VERIFIED-HERE]` (re-read against the live repo during this pass).
 
 ---
 
@@ -546,6 +551,205 @@ No special-casing anywhere in `resourceServiceUpdate` for `deployment_controller
 
 ---
 
+### F23 — OBSERVED (Uncertainty 5): `track_latest` alone is inert for the apply that enables it, and NOT inert in steady state — the next plan is permanently dirty
+
+> **This finding is the first in this document sustained by an experiment rather than by documentation.** It resolves Uncertainty 5, which the previous pass explicitly recorded as "reasoned about in F17/row I but **not observed** against a real `terraform apply`". It is now observed, on three productive stacks. The answer is split: the premise's first half holds, its second half does not.
+
+**Evidence — half one: the enabling apply IS a silent no-op (premise confirmed).** With `track_latest = true` added to `aws_ecs_task_definition.this` only, and the service's `ignore_changes` untouched, the plan on each of `beta-001` / `demo-001` / `atento-001`:
+
+```
+Plan: 0 to add, 9 to change, 0 to destroy.
+```
+
+Every change was of one shape, with no `aws_ecs_service` resource in any change set:
+
+```
+  ~ track_latest = false -> true
+    # (17 unchanged attributes hidden)
+```
+
+Applied to all three:
+
+```
+Apply complete! Resources: 0 added, 9 changed, 0 destroyed.
+```
+
+Verified after: **no new task definition revision was registered by the apply.** The only new revision on the account, `atento-001-worker-user:33`, was registered hours earlier by `registeredBy: arn:aws:iam::405749097490:user/app-atento-001` — the GitHub Actions deploy user. Every service stayed `desired == running` on its existing pointer.
+
+**Evidence — half two: the NEXT plan reports a permanent replacement of every task definition (premise falsified).** With `track_latest = true` now in **both** config and state, the next plan on `beta-001`:
+
+```
+Plan: 7 to add, 0 to change, 7 to destroy.
+```
+
+Every task definition shows `must be replaced`. Verbatim:
+
+```
+# module.ecs_services["beta-001-runner-service"].aws_ecs_task_definition.this must be replaced
+  ~ container_definitions = jsonencode(
+      ~ [
+          ~ {
+              - command          = [
+                  - "sleep",
+                  - "infinity",
+                ]
+              - mountPoints      = []
+                name             = "beta-001-runner"
+              - systemControls   = []
+              - volumesFrom      = []
+            }
+        ] # forces replacement
+    )
+  ~ revision = 82 -> (known after apply)
+```
+
+**Evidence — the mechanism, from state.** Before the apply, state held Terraform's own revision with Terraform's own content; after, it holds GHA's revision and GHA's content. A byte-level diff of the two S3 state object versions (`serial` 128 → 129, `lineage` identical, 14 resources before and after — nothing created or lost) shows the changed fields are exactly `track_latest`, `arn`, `revision`, `container_definitions`. Example: `beta-001-runner` `arn: .../beta-001-runner:80 -> .../beta-001-runner:82`.
+
+**Source:** the coordinator's own tool results from the 2026-07-16 session, preserved verbatim in auxiliary `taskdef-drift_apply_1.md` (E2, E3, E4), labeled `[MAIN-TRACE]`. Not re-derivable — the change has since been reverted (E1).
+
+**Significance.** This **contradicts the premise of the two-step approach** the apply was step 1 of. That premise was: applying `track_latest` alone is inert, and it would make a later un-ignore of `task_definition` a no-op. The first clause is true and now proven. The second is false: `track_latest = true` re-points Terraform's state at the latest ACTIVE revision (GHA's) — which is precisely what F17 documents it to do — and Terraform then compares its own config against **what AWS actually has** instead of against its own stale state entry. The steady-state result is a permanent `N to add / N to destroy` on every task definition, on every plan, forever. **Note carefully what this does and does not indict:** `track_latest` behaved exactly as documented. The permanent diff is not a defect in the argument — it is the argument working correctly and, in doing so, exposing F24. Whether the diff would persist if the two sides actually matched is a different question, and F24 is why they do not.
+
+---
+
+### F24 — `track_latest` did not create a divergence; it REVEALED one that has always been there. Terraform's declared task definition content does not match what runs in production, on every app service, on every app stack
+
+> **This is the finding that matters most in this document, and it is not about `track_latest` at all.** The experiment is what surfaced it; reverting the experiment did not fix it. It is live right now.
+
+**Evidence — Terraform's side declares no `command`, and renders it as `null`.** The module's variable, `modules/ecs_service/variables.tf:132-136`:
+
+```hcl
+variable "command" {
+  description = "Container command"
+  type        = list(string)
+  default     = []
+}
+```
+
+The module's render, `modules/ecs_service/main.tf:30`:
+
+```hcl
+      command     = length(var.command) > 0 ? var.command : null
+```
+
+An undeclared `command` therefore renders as **`null`** in `container_definitions`. And **no app service declares one.** Scanning the service blocks of all four app stacks (everything before the `scheduled_tasks` map) for a `command =` key returns **zero matches** in `app-beta-001`, `app-demo-001`, `app-atento-001`, and `app-shared-001` (aux `taskdef-drift_apply_1.md`, E7). The only `command =` keys in those files belong to `scheduled_tasks`, which use `modules/ecs_scheduled_task` — the module with no trap (F12). (`enable_execute_command` is a different key and is not a match.)
+
+Representative, `app-atento-001/terraform.tfvars:217-233` — verbatim, including the block's own comment:
+
+```hcl
+  # desired_count = 0 permanently — task def exists only to provide image, network
+  # config, env vars and secrets for ephemeral debug tasks started via bin/ecs run.
+  "atento-001-runner-service" = {
+    task_family                  = "atento-001-runner"
+    container_name               = "atento-001-runner"
+    image                        = "405749097490.dkr.ecr.us-east-1.amazonaws.com/atento-001-app:latest"
+    task_cpu                     = 2048
+    task_memory                  = 2048
+    container_cpu                = 0
+    container_memory             = null
+    container_memory_reservation = null
+    container_port               = null
+    desired_count                = 0
+
+    execution_role_arn     = "arn:aws:iam::405749097490:role/ecsTaskExecutionRole"
+    task_role_arn          = "arn:aws:iam::405749097490:role/ecsTaskExecutionRole"
+    enable_execute_command = true
+```
+
+**Evidence — GHA's side injects the `command` at deploy time.** The action declares it as an input, `app/.github/actions/deploy-ecs/action.yaml:5-6`:
+
+```yaml
+  command:
+    description: 'Container command as JSON array (e.g., ["bundle", "exec", "puma", "-C", "config/puma.rb"])'
+```
+
+and patches it into the task definition before registering the revision, `action.yaml:87-97`:
+
+```yaml
+        # Set container command from input
+        jq --arg NAME "$CONTAINER_NAME" \
+           --argjson CMD '${{ inputs.command }}' \
+          '(.containerDefinitions[] | select(.name == $NAME)).command = $CMD' \
+          final-task.json > final-task-cmd.json
+        mv final-task-cmd.json final-task.json
+
+        TASK_DEF_ARN=$(aws ecs register-task-definition \
+          --cli-input-json file://final-task.json \
+          --query 'taskDefinition.taskDefinitionArn' \
+          --output text)
+```
+
+Every caller supplies one. `app/.github/workflows/deploy-beta-001.yaml` — the stack whose plan F23 quotes:
+
+```
+:363   command: '["bundle", "exec", "puma", "-C", "config/puma.rb"]'
+:527   command: '["sleep", "infinity"]'          # the runner
+:817   command: '["bundle", "exec", "sidekiq", "-C", "config/${{ matrix.worker.configuration_file }}"]'
+```
+
+Line `:527`'s `["sleep", "infinity"]` is the exact literal the F23 plan proposes to **remove** from `beta-001-runner`. The same shape holds on `deploy-shared-001.yaml` (`:388` puma, `:552` and `:1039` `sleep infinity`, `:842` the sidekiq worker matrix).
+
+**Source:** `modules/ecs_service/variables.tf:132-136`; `modules/ecs_service/main.tf:30`; `app-atento-001/terraform.tfvars:217-233`; `app/.github/actions/deploy-ecs/action.yaml:5-6, 87-97`; `app/.github/workflows/deploy-beta-001.yaml:363, 527, 817`; `app/.github/workflows/deploy-shared-001.yaml:388, 552, 842, 1039`. All re-read directly during this pass — full excerpts and the cross-stack scan in auxiliary `taskdef-drift_apply_1.md` (E7, E8), labeled `[VERIFIED-HERE]`.
+
+**Significance — three consequences, in order of severity.**
+
+1. **Terraform's config and production have ALWAYS differed on `container_definitions`, and Terraform could not see it.** With `track_latest = false` (the default, and the state today), Terraform compares its config against **its own last-registered revision** — not against what the services actually run. The comparison was always self-referential, so it was always clean. `track_latest` did not introduce the gap; it removed the blindfold. This is F2's mechanism one layer deeper: F2 established that Terraform *owns* the content; F24 establishes that **what it owns is not what runs**.
+
+2. **An apply that registered Terraform's own revision today would produce a task definition with no command.** For the runner that means losing `["sleep", "infinity"]` — the container would start on the image's own default, not the command the service depends on. This is not hypothetical drift; it is the concrete content of the plan diff in F23. It is also precisely why the revert did not go through `terraform apply` (F25).
+
+3. **It falsifies the stated rationale of commit `13d32a0`**, which F2 already cites for the removal of `ignore_changes = [container_definitions]`. Verbatim, via `git -C ~/Projects/4Shark/terraform log -1 --format=%B 13d32a0`:
+
+> "Removed ignore_changes on container_definitions so Terraform has full ownership of task definition content."
+
+**Terraform does not have full ownership. It only stopped looking.** But the commit is more defensible than that sentence alone suggests, and the detail is load-bearing — its full body continues:
+
+> "Startup commands for web (puma) and worker (sidekiq) are also declared to match the running task definitions."
+
+and its subject is scoped: `feat(integrator-almaviva): bring environment variables under Terraform management`. Those commands **are** declared in that stack — `integrator-almaviva/compute.tf:130` (`["bundle", "exec", "puma", "-C", "config/puma.rb"]`), `:171` (`["bundle", "exec", "sidekiq"]`). So the "full ownership" claim was **locally true for `integrator-almaviva`** and silently false for the four app stacks: the commit removed `ignore_changes` from the **shared** `modules/ecs_service`, carrying its premise to stacks it never audited and which never declared a command. The failure is not that the author overreached in their own stack — it is that a shared module made a per-stack claim global. (Aux E9.)
+
+---
+
+### F25 — For a state-only change, the safe revert is S3 object-version restore, not `terraform apply` — the revert plan would have armed the #711 bomb
+
+**Evidence — why the plan path was rejected.** With `track_latest` removed from config but state still holding GHA's revision (F23's state diff), the revert plan produces an `N to add / N to destroy` on the task definitions. In AWS API terms those are not abstractions:
+
+- the `N to destroy` is a **`DeregisterTaskDefinition`** against the revisions the services are actually running;
+- the `N to add` is a **`RegisterTaskDefinition`** built from Terraform's config — the config that, per F24, carries no `command`.
+
+Combined with F1 and F3 (the service's pointer is ignored, so Terraform would never move the services onto the new revision), that is the #711 shape exactly: a freshly-registered revision nothing runs, and live services pinned to a pointer Terraform cannot see. Reverting via plan would have **deliberately armed the bomb this spike exists to document**.
+
+**Evidence — the path used instead.** Per stack, the pre-apply state object version was restored directly:
+
+```
+aws s3api copy-object --copy-source '<bucket>/<key>?versionId=<pre-apply-version-id>' ...
+```
+
+with a pre-flight before any write: download both object versions, diff them, and confirm `serial`, `lineage`, resource count, and the changed-field set matched expectations (F23's state diff) — only then copy the old version forward. Result on all three stacks:
+
+```
+No changes. Your infrastructure matches the configuration.
+```
+
+All services `desired == running`; **zero ECS mutation API calls** across the whole revert — no `RegisterTaskDefinition`, no `DeregisterTaskDefinition`, no `UpdateService`.
+
+**Evidence — why no lock had to be invalidated.** `app-beta-001/providers.tf:46-51`:
+
+```hcl
+  backend "s3" {
+    bucket       = "4shark-terraform-state"
+    key          = "app-beta-001/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+  }
+```
+
+`use_lockfile = true` with no `dynamodb_table` argument — locking is S3-native (a lock object beside the state), so there is no DynamoDB digest entry that a hand-restored state object would leave stale and inconsistent.
+
+**Source:** the revert mechanics and verification are the coordinator's own tool results, preserved in auxiliary `taskdef-drift_apply_1.md` (E5, E6) as `[MAIN-TRACE]`; the backend configuration is `app-beta-001/providers.tf:46-51`, re-read during this pass (E6a, `[VERIFIED-HERE]`).
+
+**Significance.** This is a reusable operational finding independent of the `track_latest` question, and it generalizes to a rule with a stated precondition: **when an apply changed only Terraform's state and not the infrastructure, the revert is a state operation — and routing it through `terraform apply` can be strictly more dangerous than the change being reverted.** The asymmetry is the point: the forward apply mutated nothing in AWS (F23, half one), so the "undo" has nothing in AWS to undo — but a plan-driven revert does not know that, and computes a mutation from a config that does not match reality (F24). The preconditions that made the object restore safe are what make it a rule rather than an anecdote: (a) the forward change was verified state-only; (b) both object versions were diffed on `serial`/`lineage`/resource-count/changed-fields **before** the write; (c) the backend uses S3-native locking, so there is no external digest to desynchronize. **Not verified:** whether this holds for a backend using the `dynamodb_table` locking mode — no 4Shark stack was checked for that, and the DynamoDB digest question is not addressed by any evidence here.
+
+---
+
 ## Trade-offs surfaced
 
 Options for **Q1** (ownership) and **Q3** (safe destroy). Every row is sustained by the Findings named; "do nothing" is included because it is defensible.
@@ -560,7 +764,19 @@ Options for **Q1** (ownership) and **Q3** (safe destroy). Every row is sustained
 | **F. Split the module — ignore only where an external deployer really owns the pointer** | F4 shows the current ignore is applied far wider than its stated justification. A narrower ignore shrinks the trap's surface. | The workers *also* have an out-of-band deployer (GHA, F4) — so the narrowing may buy little in practice on its own; combines naturally with row I (narrow to web/CodeDeploy only, adopt `track_latest` for the rest). Needs per-service analysis. | F4 |
 | **G. Family-tracking, as `ecs_scheduled_task` does** | Proven inside this repo; no divergence window can exist (F12). | ECS services must name a concrete revision; whether the EventBridge family-tracking trick transfers to a *service* is **unverified** and probably not available — `track_latest` (row I) is the provider-native equivalent for services specifically. | F12 |
 | **H. Fix the README (F2)** | Cheap, uncontroversial, removes an actively misleading document that inverts ownership. | Changes no behaviour. Does not prevent recurrence on its own. | F2 |
-| **I. Add `track_latest = true` to `aws_ecs_task_definition.this`, drop `task_definition` from the service's `ignore_changes` — for plain-`ECS`-controller services only** | Provider-native, purpose-built for exactly this scenario (F17); field-tested by the community module's default path as of v6.0.0 (F18); directly portable to 4Shark's own hand-rolled module without adopting any external module (F20); matches the worker services' actual shape (F4 — plain `ECS` controller, external GHA registrar). | **Untested by this spike against a real apply** — whether the resulting plan/apply behaves as a silent no-op (already-correct) or an immediate, visible redeploy attempt is inferred from the documented argument semantics (F17), not observed. **Confirmed NOT applicable to the `CODE_DEPLOY`-controlled web service** (F22) — the AWS API itself rejects any `UpdateService` call carrying a `task_definition` change against a `CODE_DEPLOY` service, independent of `track_latest`; this is no longer a suspected gap but a confirmed boundary. Module maintainers' own position: residual tracking issues are "a limitation of the AWS ECS service/API," not something this argument fully closes (F18, S11). | F17, F18, F20, F22 |
+| **I. Add `track_latest = true` to `aws_ecs_task_definition.this`, drop `task_definition` from the service's `ignore_changes` — for plain-`ECS`-controller services only** — **CORRECTED 2026-07-16, see below the table** | Provider-native, purpose-built for exactly this scenario (F17); field-tested by the community module's default path as of v6.0.0 (F18); directly portable to 4Shark's own hand-rolled module without adopting any external module (F20). | **The mechanism was applied to three productive stacks and produces permanent replacement drift on every task definition (F23).** Not because the argument misbehaves — because the two sides it compares do not match (F24). **Confirmed NOT applicable to the `CODE_DEPLOY`-controlled web service** (F22). Module maintainers' own position: residual tracking issues are "a limitation of the AWS ECS service/API," not something this argument fully closes (F18, S11). | F17, F18, F20, F22, **F23, F24** |
+
+> **Row I — correction record (2026-07-16). The row is not withdrawn; its premise and its cons are both wrong as originally written, in opposite directions.**
+>
+> **Original text, preserved verbatim** (pros): *"Provider-native, purpose-built for exactly this scenario (F17); field-tested by the community module's default path as of v6.0.0 (F18); directly portable to 4Shark's own hand-rolled module without adopting any external module (F20); **matches the worker services' actual shape (F4 — plain `ECS` controller, external GHA registrar)**."* (cons): *"**Untested by this spike against a real apply** — whether the resulting plan/apply behaves as a silent no-op (already-correct) or an immediate, visible redeploy attempt is inferred from the documented argument semantics (F17), not observed. **Confirmed NOT applicable to the `CODE_DEPLOY`-controlled web service** (F22) […]"*
+>
+> **What the evidence changed:**
+>
+> 1. **The con "untested by this spike against a real apply" is retired — it is now tested (F23), and neither predicted outcome occurred.** The row offered a binary: "a silent no-op (already-correct)" or "an immediate, visible redeploy attempt". The observed answer is **both, in sequence, and a third thing after**: the enabling apply is a silent no-op (0 added, 9 changed, 0 destroyed, no new revision, no service touched), and the *steady state* is a permanent `7 to add / 7 to destroy` on every plan thereafter. The row's framing assumed the question resolved at the moment of the apply. It resolves one plan later.
+> 2. **The pro "matches the worker services' actual shape" is correct about the shape and wrong about the consequence.** The premise holds — the workers *are* plain-`ECS`-controller services with an external GHA registrar, exactly what `track_latest` targets (F4, F17). But the shapes `track_latest` makes Terraform compare are not the ones the row assumed: it compares Terraform's **rendered config** against **AWS's latest ACTIVE revision**, and those diverge on `container_definitions` because the config declares no `command` and GHA injects one (F24). The row implicitly assumed the two would agree once the revision pointer was correct. They do not, and never did.
+> 3. **The `CODE_DEPLOY` con stands unchanged** (F22) — it was already confirmed in the previous pass and this experiment did not touch the web service.
+>
+> **What this does NOT establish:** that row I is unusable. The permanent drift is a symptom of F24, not of `track_latest`. Whether the row becomes viable once F24 is addressed — and what "addressed" means — is exactly the open question in Uncertainty 9, which this spike cannot close. The row is neither ruled in nor ruled out; the evidence relocated the obstacle from the argument to the config.
 
 Options for **Q5** (mechanical guard):
 
@@ -581,15 +797,37 @@ Highest-value first, among what remains open after this and the previous revisio
 2. **Do any other ACTIVE revisions still reference `/<stack>/DD_API_KEY`?** Only the current running revision of three services on one stack (`beta-001`) was checked. A service scaled to zero, or a rollback to an older revision, could still hit the destroyed parameter. `demo-001`'s workers were at 0 desired at collection time (`PLAN.md:33`) — a stack where nothing tried to start is a stack where the bomb is armed but silent.
 3. **Are the other three stacks structurally identical?** Assumed (shared module), verified only on `beta-001`.
 4. **Is the KMS key `mrk-fa0cda…` terraform-managed?** Grep says probably not; not positively confirmed (aux `awsdump_1._not_researched`).
-5. **What actually happens on the apply that first surfaces a divergence under option I, for the plain-`ECS`-controller worker services** — does the plan show the service needing an update (and, if applied, does it then attempt an immediate redeploy onto the corrected-but-possibly-still-broken revision), or does it silently resolve because `track_latest` already reflects the true latest at plan time? Reasoned about in F17/row I but **not observed against a real `terraform apply`**. (Note: this question is scoped to worker/plain-`ECS` services only — the `CODE_DEPLOY`/web case is now resolved by F22, not merely "moot for workers", but a confirmed boundary.)
+5. ~~**What actually happens on the apply that first surfaces a divergence under option I, for the plain-`ECS`-controller worker services?**~~ **RESOLVED 2026-07-16 — observed, not reasoned. See F23.** Both halves of the question are now answered, and they answer differently: the **enabling apply IS a silent no-op** (`0 to add, 9 to change, 0 to destroy`; no new revision registered; no service touched) — but the **steady state is NOT** (`7 to add, 0 to change, 7 to destroy` on the very next plan, every task definition `must be replaced`, permanently). The original question's framing — "does the plan show the service needing an update, or does it silently resolve because `track_latest` already reflects the true latest at plan time?" — contained a false dichotomy: `track_latest` does reflect the true latest, and that is exactly *why* it does not silently resolve, because Terraform's config does not match that latest (F24). Applied to `beta-001`, `demo-001`, and `atento-001`, then reverted (F25).
 6. **`precondition` / `postcondition` as a blocking alternative to `check`** was not evaluated.
 7. **Whether the ignore is genuinely needed per-service** (option F) — requires per-service analysis of what GHA does to workers vs. what CodeDeploy does to web.
 8. **Whether CodeDeploy itself rewrites the ECS service's top-level `taskDefinition` field during/after a blue/green swap, and if so how often** — genuinely unresolved (F22's closing caveat, S26); does not change F22's conclusion (the AWS API rejects a Terraform-initiated change regardless), but would determine the theoretical frequency of the failure if the ignore were ever removed on the web service.
+9. **Why does the config-vs-GHA `container_definitions` divergence exist at all (F24) — is the GHA injection the INTENDED design, with Terraform's config deliberately partial, or is the config meant to be complete and has silently rotted?** **This is the question that decides what the real fix is, and this spike cannot close it — no source found states the intent either way.** The two readings lead to opposite remediations and are not distinguishable from the evidence gathered:
+   - **If the injection is intended** (Terraform owns the task definition's *skeleton*; the deployer owns the *runtime command*, which legitimately varies per workflow — note `deploy-beta-001.yaml:817` builds the command from a `${{ matrix.worker.configuration_file }}` matrix, i.e. one Terraform-declared family backs N distinct worker commands), then the config is correct as written, `track_latest` is simply incompatible with this design, and the fix (if any) lies elsewhere — possibly a *narrower* `ignore_changes` on `container_definitions[*].command` rather than on the whole field or the whole pointer.
+   - **If the config is meant to be complete**, then it has rotted since commit `13d32a0` (F24, consequence 3) — that commit declared commands in `integrator-almaviva` while removing `ignore_changes` from the shared module, and the app stacks were never brought up to the premise. The fix is to declare the commands in the app stacks' tfvars, which would then make row I's mechanism behave as it was assumed to.
+   
+   **What was NOT done, and would likely settle it:** a targeted archaeology pass — `git log -S 'command' -- app-*/terraform.tfvars` and the history around `13d32a0`'s module change — was not run (aux `taskdef-drift_apply_1.md`, E10). This is answerable; it simply was not in this pass's authorized scope. **Until it is answered, F24 is a confirmed divergence with an unknown intent — and "unknown intent" is precisely why no option here is ranked.** Note also that the matrix-driven worker command above is evidence *bearing on* the first reading but is not a statement of intent; treating it as one would be the inference this spike declines to make.
+
+   ---
+
+   **RESOLVED 2026-07-16 (fourth pass, recorded by main) — the FIRST reading is correct: the GHA injection is the intended design. The config is deliberately partial and did NOT rot.** The archaeology pass this entry named as out of scope was run. Three pieces of evidence, each verified against the live repo:
+
+   - **`command` has NEVER been declared under `ecs_services` in any app stack, in the entire history.** Restricted to the mainline — `git log --oneline origin/develop -S'    command ' -- app-shared-001/terraform.tfvars app-atento-001/terraform.tfvars app-beta-001/terraform.tfvars app-demo-001/terraform.tfvars` — the search returns **exactly one** commit: `618eaa4` (`refactor(app): rename environment directories to follow app- prefix convention`), and `git show 618eaa4 --stat` confirms it is a **pure rename** (`{atento-001 => app-atento-001}/terraform.tfvars | 0` — zero lines changed); it matches only because `-S` counts occurrences and the file moved path. So on `develop`, across the whole history, **no commit has ever added, removed, or altered a `command` declaration in an app stack's tfvars at all.** Not removed at some point — never present. This falsifies the second reading ("config rotted") outright.
+
+     **Correction — the original write-up of this bullet cited the wrong commit, and the `output-verifier` caught it.** It ran the search with `--all` (every ref, including unmerged branches), which returned a second commit, `cc8d586` (`feat(app): add security event archiver scheduled task to shared-001 and atento-001`), and cited its diff — `command             = ["bundle", "exec", "rails", "cron:security_event:archiver"]` inside the `scheduled_tasks = {` block — as the key evidence. **The diff quote is verbatim and the commit is real, but `cc8d586` lives on `origin/feature/security-event-archiver-cron` and is NOT merged** (`git merge-base --is-ancestor cc8d586 origin/develop` → exit 1). A reader checking the live tree finds no `security_event` anywhere — which is exactly what the verifier found, and why it returned REJECT on suspicion of fabricated evidence. Both were right: the citation was real but pointed at an unmerged branch, presented as if it were mainline history. The `develop`-only search above replaces it, and the conclusion is **strengthened** rather than weakened: one pure-rename commit is a stronger negative than two commits needing interpretation.
+   - **The split is deliberate and visible within a single file.** `app-shared-001/terraform.tfvars` declares `command` **7 times**, every one under `scheduled_tasks`; **zero** under `ecs_services`. A cron task has a fixed command Terraform declares; a service has a per-deploy command it does not.
+   - **The coupling that makes it necessary — and it RETRACTS this entry's own cardinality hypothesis.** `deploy-shared-001.yaml` gives each worker its own `configuration_file` (`sidekiq_commission_tiger_shark.yml`, `sidekiq_deal_indexation.yml`, `sidekiq_commission_without_deal_indexation.yml`, …) and the deploy passes `command: '["bundle", "exec", "sidekiq", "-C", "config/${{ matrix.worker.configuration_file }}"]'`. **Each family maps to exactly ONE command** — so "one Terraform-declared family backs N distinct worker commands" (first reading, above) is **wrong as stated** and is retracted. The real reason is coupling: the referenced file lives in the ***app* repo**, so declaring the command in Terraform would bind the infrastructure repo to the application's internal config layout. The conclusion the hypothesis supported survives; the reasoning behind it does not.
+
+   **What this repositions (the load-bearing consequence).** If GHA is the *legitimate* owner of the service's `container_definitions` content, then `ignore_changes = [container_definitions]` — added by `5f0a472` (`fix(ecs): prevent Terraform from overwriting CI/CD task definition revisions`) — **was correct for the app stacks**. `13d32a0` removed it with a rationale true for `integrator-almaviva` (where the commands *are* declared, `compute.tf:130,171`) and the removal leaked through the **shared module** into the app stacks, where it is not true. It went unnoticed for ~4 months because `track_latest = false` made Terraform compare its config against its own stale revision instead of against reality. **F24 therefore documents a divergence that is BY DESIGN; what is defective is that the guard protecting that contract was removed for the app stacks.** The remediation shape stays the engineer's call and is not decided here.
 
 **Resolved in this revision (were open in the previous revision):**
 
 - ~~Uncertainty 2: what does `data.aws_ecs_service.task_definition` actually return?~~ **Resolved** — see F21. It is a direct passthrough of `DescribeServices`'s `taskDefinition` field (the service's on-record configured value), traced through the provider's own Go source; the ambiguous doc string is a copy-paste artifact from the resource argument's description, not a description of the data source's behavior. Option C is confirmed workable for the #711 shape.
 - ~~Uncertainty 7: is `track_latest` + an un-ignored `task_definition` safe against a `CODE_DEPLOY`-controller service?~~ **Resolved — no.** See F22. Confirmed at the AWS ECS API level (`InvalidParameterException`, HTTP 400), reproduced by two independent tools (Terraform, AWS CDK) across provider versions 2020–2024, and never fixed (the load-bearing issue, #12703, was closed by stale-bot inactivity, not a maintainer decision). Trade-off rows E and I are updated accordingly.
+
+**Resolved in the third pass (2026-07-16), by experiment rather than by research:**
+
+- ~~Uncertainty 5: what actually happens on the apply that first surfaces a divergence under option I?~~ **Resolved — see F23.** The enabling apply is a silent no-op; the steady state is a permanent `N to add / N to destroy`. Observed on three productive stacks, then reverted (F25). Trade-off row I and Suggested Option 5 are corrected in place accordingly.
+- **New, and not previously suspected: F24.** The experiment revealed that Terraform's declared `container_definitions` has never matched what production runs, on every app service on every app stack — a defect independent of `track_latest`, still live after the revert. Its cause is now **Uncertainty 9** above, which this spike cannot close.
 
 **Resolved in the previous revision (carried forward for continuity):**
 
@@ -606,7 +844,7 @@ These are groupings of the table rows, not a ranking. Several combine; none is p
 - **Option 2 — Plan-time visibility.** Add C (`check` block) — no longer gated on an unresolved uncertainty; F21 confirms the data source's `task_definition` attribute is workable for detecting the #711 shape. Makes the plan stop being silent. Still advisory (cannot block, F8) and does not, on its own, confirm every running task during an in-progress rollout (F21's residual caveat).
 - **Option 3 — Process.** Adopt B (expand/contract for any destroy of a launch-resolved resource) and decide whether it belongs in `DEPLOYMENT-STRATEGY.md` as a fourth trigger, in `TERRAFORM-POLICY.md`, or in a new home — F13 shows it currently has no owner.
 - **Option 4 — Mechanical.** Q (flag/inject at the apply boundary) or S (post-apply/CI check). P (block) is ruled out by ADR-004's criterion unless the engineer overrides that criterion deliberately.
-- **Option 5 — Structural, worker services only.** I (`track_latest`, un-ignore `task_definition`) for the plain-`ECS`-controller worker services specifically — the shape it is purpose-built for and the shape that actually fired in the incident (F4, F17, F18). Carries uncertainty 5 above (untested against a real apply — the plain-`ECS` rollout behavior). The `CODE_DEPLOY` interaction question no longer applies to this option's scope (workers are not `CODE_DEPLOY`-controlled) and is resolved regardless by F22.
+- **Option 5 — Structural, worker services only. CORRECTED 2026-07-16 — the option's obstacle moved, and it is no longer where this option assumed.** *Original text, preserved verbatim: "I (`track_latest`, un-ignore `task_definition`) for the plain-`ECS`-controller worker services specifically — the shape it is purpose-built for and the shape that actually fired in the incident (F4, F17, F18). Carries uncertainty 5 above (untested against a real apply — the plain-`ECS` rollout behavior). The `CODE_DEPLOY` interaction question no longer applies to this option's scope (workers are not `CODE_DEPLOY`-controlled) and is resolved regardless by F22."* — **What changed:** uncertainty 5 is resolved (F23), and the answer is that this option, applied as written, leaves every task definition in permanent replacement drift. **The blocker is not `track_latest`; it is F24** — Terraform's config declares no `command` while GHA injects one, so the two sides `track_latest` makes Terraform compare cannot agree. This option is therefore **not viable as written, and not refuted either**: it is *gated on* F24 being resolved first, and F24's resolution depends on Uncertainty 9 (is the GHA injection intended?), which is unanswered. If the config is meant to be complete, declaring the commands would plausibly unblock this option; if the injection is intended by design, this option is incompatible with that design and a narrower ignore (e.g. on `container_definitions[*].command` only) would be the shape to evaluate instead — **neither path is evaluated here, and neither is recommended.**
 - **Option 6 — Structural, full scope, INCLUDING the web service.** D, E, F, or G for the `CODE_DEPLOY`-controlled web service specifically. **D carries uncertainty 1 (untested).** **E and I are now confirmed (F22), not merely suspected, to fail against the web service** — any Terraform-initiated `task_definition` change on a `CODE_DEPLOY`-controller service is rejected by the AWS ECS API itself, independent of `track_latest`. F and G remain unevaluated/unverified for this scope respectively.
 - **Option 7 — Do nothing (A).** Defensible: the trap fired once, the recovery was understood and took ~1h, and web never went down. The cost of every other option is nonzero.
 
@@ -619,3 +857,5 @@ These are groupings of the table rows, not a ranking. Several combine; none is p
 > **2026-07-15 revision.** The `output-verifier` flagged a citation-integrity failure in the original F7 (issue #165 status misstated as "Open"; actually `closed`, `state_reason: completed`, milestone v6.0.0). The coordinator independently re-confirmed via `gh api` and directed a full investigation, not just a string fix. This revision: corrected F7 in place with the real status and citation; investigated PR #217 and provider PR #30154 to determine what v6.0.0 actually resolved (F17–F20, new); confirmed the `max(latest, current)` idiom exists (reversing the original "not found" conclusion, F19); re-examined F5 and F6 to state precisely what each still supports on its own, independent of #165's corrected status; added Trade-off row I and re-worded row E's/F's/G's cons to reference it; added uncertainties 7–8 and resolved/reversed the former uncertainty 7; and preserved the full raw evidence (issue/PR JSON, pre-v6 and v6 module source, provider docs) in new auxiliary `taskdef-drift_v6release_1.md`. Nothing from the original findings was silently removed — every correction is marked inline with what changed and why.
 >
 > **2026-07-15 follow-up revision (same day, second pass).** The engineer authorized closing two specific uncertainties from the previous revision. This pass: added F21 (Uncertainty 2 — `data.aws_ecs_service.task_definition` traced through the AWS provider's own Go source, confirmed a direct `DescribeServices` passthrough, the doc-string ambiguity explained as a copy-paste artifact) and F22 (Uncertainty 7 — `track_latest` + un-ignored `task_definition` confirmed unsafe against a `CODE_DEPLOY`-controller service, via a previously-surfaced-but-unfetched issue, `#12703`, now fetched directly via `gh api`, plus a cross-tool corroboration from `aws/aws-cdk#7040`); corrected F8 and F18 in place with pointers to the resolving findings, preserving their original text; updated Trade-off rows C, E, and I with the new evidence; renumbered and restructured the uncertainties list to move both resolved items into a dedicated "Resolved in this revision" section while keeping the previous revision's resolutions in their own section for continuity; updated Suggested Options 2, 5, and 6 to reflect the resolutions; and added new auxiliary `taskdef-drift_followup_1.md` with the full raw evidence (Go source excerpts, `gh api` JSON for #12703 with comments and events, the cross-tool issue, and the AWS API doc quotes), plus corresponding entries S17–S26 in `taskdef-drift_sources_1.md`. One sub-question was deliberately left unresolved and recorded as such rather than forced (F22's closing caveat, uncertainty 8) — whether CodeDeploy itself rewrites the service's top-level `taskDefinition` field was not found addressed in any AWS doc fetched, and this is stated plainly rather than papered over, per the citation discipline's preference for an honest "not found" over a manufactured answer.
+>
+> **2026-07-16 empirical revision (third pass).** The engineer authorized applying `track_latest = true` to `aws_ecs_task_definition.this` on three productive stacks (`beta-001`, `demo-001`, `atento-001`) as step 1 of a two-step plan; it was applied and then reverted. This is the first pass in this document whose central evidence is an experiment rather than documentation, and the provenance is labeled accordingly throughout the new auxiliary: `[MAIN-TRACE]` for the coordinator's own tool results (plan/apply output, state diffs — **not re-derivable, the change is reverted**) and `[VERIFIED-HERE]` for every code citation, each re-read against the live repo during this pass. This revision: added **F23** (Uncertainty 5 resolved by observation — the enabling apply IS inert, the steady state is NOT, contradicting the two-step plan's premise), **F24** (the finding that matters most, and the one nobody was looking for — `track_latest` did not create a divergence, it revealed that Terraform's declared `container_definitions` has never matched production on any app service on any app stack, which also falsifies commit `13d32a0`'s "full ownership" claim while showing *why* that commit was locally defensible), and **F25** (the safe revert for a state-only change is S3 object-version restore, because the revert *plan* would have armed the #711 bomb — a reusable operational finding with its preconditions stated); corrected **Trade-off row I** and **Suggested Option 5** in place with their original text preserved verbatim and the correction reasoned rather than asserted; resolved **Uncertainty 5** in place; and added **Uncertainty 9**, which this spike explicitly **cannot** close — whether the GHA `command` injection is the intended design or the config has rotted, the question that decides what F24's real fix is. Per the citation discipline, three errors in the commissioning briefing were caught by re-reading the sources rather than trusted: `deploy-shared-001.yaml:828` is actually **:842**; the uncertainty resolved is **#5**, not #8 (#8 is the unrelated CodeDeploy question and remains open); and the `command` divergence is **not scoped to the runner** — it holds for every service in every app stack, which makes F24 materially larger than briefed. Nothing was rewritten: the document was reconstructed segment-wise from the pre-existing file so every untouched line is byte-identical, and the result was mechanically diffed against a backup to confirm only the intended additions and the three marked corrections changed. Per the engineer's standing instruction, no option is ranked and no recommendation is made — F24's remediation in particular is deliberately left open, because its intent is unknown and guessing it is the failure mode this spike was created to document.
