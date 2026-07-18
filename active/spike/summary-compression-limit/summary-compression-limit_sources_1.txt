@@ -1,0 +1,89 @@
+Fetch-status ledger -- summary-compression-limit
+
+Full list of sources consulted during this spike, including ones dropped as
+unverified. Kept alongside SPIKE.md so a revision does not need to re-run the same
+searches.
+
+=== Used and verified (cited in SPIKE.md) ===
+
+1. Wikipedia -- Cognitive load
+   https://en.wikipedia.org/wiki/Cognitive_load
+   Fetch: WebFetch. Status: Verified -- intrinsic/extraneous/germane definitions
+   quoted.
+
+2. Wikipedia -- Expertise reversal effect
+   https://en.wikipedia.org/wiki/Expertise_reversal_effect
+   Fetch: WebFetch, then explicit self-check re-fetch. Status: Verified twice.
+
+3. JSU Online -- Cognitive Theory of Multimedia Learning
+   https://www.jsu.edu/online/faculty/cognitive-theory-of-multimedia-learning.html
+   Fetch: WebFetch, then explicit self-check re-fetch. Status: Verified twice
+   (coherence principle quote confirmed; segmenting principle quote confirmed with
+   the source's own grammatical quirk preserved as-is).
+
+4. LITFL -- Cognitive Theory of Multimedia Learning
+   https://litfl.com/cognitive-theory-of-multimedia-learning/
+   Fetch: WebFetch. Status: Verified -- corroborating, independent source for
+   coherence + segmenting principles.
+
+5. Fletcher, C. R., & Bloom, C. P. (1988), "Causal Reasoning in the Comprehension of
+   Simple Narrative Texts," Journal of Memory and Language, 27, 235-244.
+   Fetched via https://www.cl.cam.ac.uk/teaching/1617/R216/Fletcher.pdf
+   Fetch: WebFetch (saved binary) -> Read tool (full 10-page document). Status:
+   Verified -- direct primary-source read; full key passages preserved in
+   summary-compression-limit_excerpt_1.txt.
+
+6. Vodolazova, T., & Lloret, E. (2019), "Towards Adaptive Text Summarization: How
+   Does Compression Rate Affect Summary Readability of L2 Texts?" RANLP 2019.
+   https://aclanthology.org/R19-1145.pdf
+   Fetch: WebFetch (saved binary) -> Read tool (full 10-page document). Status:
+   Verified -- direct primary-source read; full key passages preserved in
+   summary-compression-limit_excerpt_2.txt.
+
+7. Yadav, D., Desai, J., & Yadav, A. K., "Automatic Text Summarization Methods: A
+   Comprehensive Review." https://arxiv.org/pdf/2204.01849
+   Fetch: WebFetch (saved binary) -> Read tool (pages 1-4 of 20). Status: Verified --
+   direct primary-source read; key passage preserved in
+   summary-compression-limit_excerpt_3.txt.
+
+=== Consulted and dropped as UNVERIFIED ===
+
+- Full text of https://aclanthology.org/R19-1145 (HTML abstract page, fetched before
+  the PDF). WebFetch's synthesized summary did not carry a verifiable verbatim quote
+  from the paper body -- superseded by the direct PDF Read (source 6 above), which IS
+  verified. The HTML-page fetch itself is not cited as a separate Finding.
+
+- https://www.tandfonline.com/doi/full/10.1080/0163853X.2019.1605257
+  ("Comprehension Effects of Connectives Across Texts, Readers, and Coherence
+  Relations"). HTTP 403 Forbidden -- paywalled, could not fetch. Would have been
+  directly relevant to spike question 3 (does removing connectives hurt
+  comprehension) had it been accessible. Not cited; no claim made from it.
+
+- https://resolve.cambridge.org/.../coherence_principle.pdf (Mayer's own book
+  chapter, Cambridge). HTTP 429 Too Many Requests on two attempts. Superseded by JSU
+  + LITFL (sources 3 and 4), both independently verified with the same core quotes.
+
+- WebSearch synthesis on "Mayer coherence principle... 23 out of 23 experimental
+  tests, effect size 0.86". This came from a WebSearch result summary (not a direct
+  fetch of a specific page with a confirmable quote location), so per Citation
+  Discipline rule 1 (quote-or-drop) it is NOT cited as a Finding in SPIKE.md. The
+  underlying claim may well be accurate (it traces to Mayer's own meta-analytic
+  reporting), but this spike could not verify it against a specific fetched source
+  and location, so it is omitted rather than asserted.
+
+- WebSearch synthesis on Trabasso & van den Broek (1985) directly (before the
+  Fletcher & Bloom 1988 PDF was fetched). Search-summary only; superseded by the
+  direct Fletcher & Bloom (1988) primary-source read, which quotes and replicates
+  Trabasso & van den Broek's findings with a verifiable citation trail.
+
+- WebSearch synthesis on Grice's maxims / curse of knowledge / pronoun ambiguity.
+  General background search, not fetched directly with a locatable quote; not cited.
+  The curse-of-knowledge material relevant to this spike's topic was already
+  established with verified citations in the prior spike
+  (closing-summary-form/SPIKE.md, Finding 10) and is not re-verified here.
+
+- WebSearch synthesis on "domain knowledge vs task-specific familiarity" in the
+  expertise-reversal literature. Search-summary only, not a direct fetch with a
+  locatable quote distinct from what was already confirmed via the Wikipedia
+  Expertise Reversal Effect page (source 2). Used only to inform the "what remains
+  uncertain" framing in SPIKE.md -- not cited as an independent Finding.

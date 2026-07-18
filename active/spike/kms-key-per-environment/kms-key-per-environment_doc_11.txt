@@ -1,0 +1,34 @@
+SOURCE: https://docs.aws.amazon.com/prescriptive-guidance/latest/aws-kms-best-practices/key-management.html
+FETCHED: 2026-07-16 (original fetch), re-examined 2026-07-17 for axis correction
+TOPIC: AWS Prescriptive Guidance — Key management best practices for AWS KMS, "Choosing a
+centralized or decentralized model"
+
+---
+
+## Choosing a centralized or decentralized model
+
+AWS recommends that you use multiple AWS accounts and manage those accounts as a single
+organization in AWS Organizations. There are two broad approaches to managing AWS KMS keys in
+multi-account environments.
+
+The first approach is a decentralized approach, where you create keys in each account that uses
+those keys. When you store the KMS keys in the same accounts as the resources they protect, it is
+easier to delegate permissions to local administrators who understand access requirements for
+their AWS principals and keys.
+
+The second approach is a centralized approach, where you maintain KMS keys in one or a few
+designated AWS accounts. [...] This centralized model can help minimize the risk of unintended
+deletion of keys or privilege escalation by delegated administrators or users.
+
+In general, we recommend that you start with a decentralized approach unless you can articulate a
+need for a centralized KMS key model.
+
+CORRECTION NOTE (2026-07-17): this section's axis is explicitly MULTI-ACCOUNT key placement
+("There are two broad approaches to managing AWS KMS keys in multi-account environments" — a
+decentralized approach means keys live IN the account that uses them, vs a centralized approach
+where keys live in one shared account accessed cross-account). It is not a statement about how
+many keys to create within a single account. 4Shark runs one AWS account, so this guidance's
+literal question ("which account holds the key?") does not arise here — there is only one
+account. This finding was cited in the original draft of this spike as if it argued for
+"fewer/more keys," which the source does not say. It stays cited here, once, with the corrected
+scope.

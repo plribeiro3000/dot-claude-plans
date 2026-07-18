@@ -1,0 +1,81 @@
+Auxiliary — raw command output from live tests run during this spike revision
+(2026-07-17). Credential VALUES are never included below — only metadata
+(parameter name, type, version, ARN, byte length, and whether the value
+equals the literal string "PLACEHOLDER"). This is the direct evidence behind
+the SPIKE.md credential-path finding.
+
+=============================================================================
+Identity resolved by the default (read-only) AWS profile
+=============================================================================
+Command: aws sts get-caller-identity --output json
+
+{
+    "UserId": "AIDAV46EH4QJNSZ32KHSL",
+    "Account": "405749097490",
+    "Arn": "arn:aws:iam::405749097490:user/paulo@4shark.com.br"
+}
+
+=============================================================================
+SSM GetParameter --with-decryption, default read-only profile, per stack
+=============================================================================
+
+Command (repeated per name below):
+  aws ssm get-parameter --name "<name>" --with-decryption --region us-east-1 --output json
+
+/shared-001/REDIS_SIDEKIQ_URL
+  Result: SUCCESS
+  Type: SecureString
+  Version: 2
+  LastModifiedDate: 2026-03-21T10:57:11.243000-03:00
+  ARN: arn:aws:ssm:us-east-1:405749097490:parameter/shared-001/REDIS_SIDEKIQ_URL
+  ValueLength: 112 bytes
+  ValueIsPlaceholder: false
+
+/atento-001/REDIS_SIDEKIQ_URL
+  Result: SUCCESS (parsed as valid JSON with a non-placeholder decrypted Value)
+
+/beta-001/REDIS_SIDEKIQ_URL
+  Result: FAILURE — "An error occurred (ParameterNotFound) when calling the
+  GetParameter operation:" — expected: beta-001's ssm.tf secret list does not
+  include this name at all (see sidekiq-queue-check-binary_excerpt_2.tf).
+
+/demo-001/REDIS_SIDEKIQ_URL
+  Result: FAILURE — same ParameterNotFound, same reason, for demo-001.
+
+/beta-001/REDIS_URL
+  Result: SUCCESS
+  Name: /beta-001/REDIS_URL
+  Type: SecureString
+  ValueLength: 113 bytes
+
+/demo-001/REDIS_URL
+  Result: SUCCESS
+  Name: /demo-001/REDIS_URL
+  Type: SecureString
+  ValueLength: 113 bytes
+
+Interpretation: on every stack where the relevant parameter name actually
+exists (REDIS_SIDEKIQ_URL for shared-001/atento-001, REDIS_URL for
+beta-001/demo-001, matching the app's own ENV.fetch('REDIS_SIDEKIQ_URL',
+redis_url) fallback), the default read-only AWS profile successfully reads
+and decrypts the SecureString. No AccessDenied, no KMS decrypt failure, on
+any of the four successful reads.
+
+=============================================================================
+redis-cli version and environment (this machine only, not a documented
+team baseline)
+=============================================================================
+Command: redis-cli --version
+  redis-cli 8.0.3
+
+Command: python3 -c "import redis; print(redis.__version__)"
+  ModuleNotFoundError: No module named 'redis'
+  (the Python `redis` client library is NOT installed on this machine)
+
+(Per the prior spike revision's Finding 17, preserved as still true: the Ruby
+`redis` gem is also NOT installed for the system Ruby on this machine.)
+
+Full `redis-cli --help` output is reproduced selectively in
+sidekiq-queue-check-binary_excerpt_4.sh (only the flags relevant to
+connection/TLS/auth/scripting); the flags omitted there are unrelated to
+this binary (--bigkeys, --latency, --cluster, --rdb, etc.).

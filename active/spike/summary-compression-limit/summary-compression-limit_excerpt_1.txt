@@ -1,0 +1,62 @@
+Fletcher, C. R., & Bloom, C. P. (1988). "Causal Reasoning in the Comprehension of
+Simple Narrative Texts." Journal of Memory and Language, 27, 235-244.
+
+Fetched as PDF via WebFetch (redirect saved binary), then read directly with the
+Read tool (full 10-page document). Key passages transcribed below verbatim from the
+Read tool's returned text, preserved here for the "irreducible core" / "what breaks
+first under compression" question (SPIKE.md Findings 7 and, indirectly, the What
+Remains Uncertain section on referential vs causal connections).
+
+--- Abstract (p. 235) ---
+
+"This research represents an attempt to unify two separate approaches to the study of
+text comprehension and recall. The first of these approaches, exemplified by the work
+of Trabasso and his colleagues (Trabasso & Sperry, 1985, Journal of Memory and
+Language, 24, 595-611; Trabasso & van den Broek, 1985, Journal of Memory and
+Language, 24, 612-630) views comprehension as a problem-solving task in which the
+reader must discover a series of causal links that connect a text's opening to its
+final outcome. The second approach, typified by Kintsch and van Dijk (1978,
+Psychological Review, 85, 363-394; van Dijk & Kintsch, 1983, Strategies in discourse
+comprehension. Academic Press, New York) emphasizes the importance of short-term
+memory as a bottleneck in the comprehension process. We combine these two approaches
+by assuming that the most likely causal antecedent to the next sentence is always
+held in short-term memory. This allows a reader to discover the causal structure of a
+text within the constraints of a limited-capacity short-term memory. We show that
+three variables derived from this hypothesis (time in short-term memory, causal
+connections allowed, and referential connections allowed) account for 31% of the
+Variance in the free recall of propositions from eight simple narrative texts."
+
+--- p. 236, on prior research (Trabasso et al. 1984; Trabasso & van den Broek 1985) ---
+
+"Recent research has shown that two properties of causal networks derived in this
+fashion influence how a text will be recalled. First, the more causal connections a
+state has to the rest of the text (either forward or backward), the better it will be
+recalled (Trabasso, Secco, & van den Broek, 1984; Trabasso & van den Broek, 1985).
+Second, states that lie along a causal chain connecting a text's opening to its final
+outcome are recalled (Black & Bower, 1980; Trabasso et al., 1984; Trabasso & van den
+Broek, 1985) better than states not on such a chain. These results support the
+conclusion that the causal structure of a text is an important determinant of how it
+will be understood and remembered."
+
+--- p. 241, Effects of Causal Structure (this study's own regression results) ---
+
+"As Table 4 shows, Causal Chain Status, Causal Connections Possible, and Referential
+Connections Possible each accounted for significant proportions of variance when
+entered into the analysis alone. In addition, both Causal Chain Status and Causal
+Connections Possible uniquely accounted for significant proportions of variance,
+while Referential Connections Possible failed to account for any significant unique
+variance. The interactions of Causal Chain Status with both Referential Connections
+Possible and Causal Connections Possible were not significant. These results
+replicate in detail the effects reported by Trabasso and van den Broek (1985). At the
+same time they extend those findings to a more detailed level of analysis-individual
+propositions."
+
+--- p. 244, Discussion (summary of findings) ---
+
+"Several important findings emerge from this research. First, we have confirmed
+Trabasso and van den Broek's (1985) observation that causal chain status and number
+of causal relations are related to the memorability of a text element. At the same
+time, we have extended this result to the level of individual propositions. ...
+Fourth, and last, we have found clear evidence that causal connections contribute to
+the coherence of a text. The importance of referential connections remains less
+clear."

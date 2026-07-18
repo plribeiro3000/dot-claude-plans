@@ -1,0 +1,19 @@
+COMMAND: grep -n "role\s*=" app-beta-001/ssm.tf app-demo-001/ssm.tf app-shared-001/ssm.tf app-atento-001/ssm.tf setup/ssm.tf onboarding/ssm.tf
+CWD: ~/Projects/4Shark/terraform/
+RUN: 2026-07-17
+
+---
+
+app-atento-001/ssm.tf:43:  role = "ecsTaskExecutionRole"
+app-demo-001/ssm.tf:53:  role = "ecsTaskExecutionRole"
+app-beta-001/ssm.tf:53:  role = "ecsTaskExecutionRole"
+app-shared-001/ssm.tf:39:  role = "ecsTaskExecutionRole"
+setup/ssm.tf:45:  role = "ecsTaskExecutionRole"
+onboarding/ssm.tf:49:  role = "ecsTaskExecutionRole"
+
+SIGNIFICANCE: every stack's SSM read policy (which also carries the kms:Decrypt grant on the
+shared 4shark-master key, per app-*/ssm.tf:67-68 etc.) attaches to the SAME role name,
+"ecsTaskExecutionRole". IAM policies attached to a role accumulate — an ECS task assuming this
+role in any one environment holds the union of every environment's ssm:GetParameter path-prefix
+grant plus kms:Decrypt on the one shared key, regardless of which stack's Terraform state
+attached which statement.

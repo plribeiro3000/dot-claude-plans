@@ -1,0 +1,54 @@
+Vodolazova, T., & Lloret, E. (2019). "Towards Adaptive Text Summarization: How Does
+Compression Rate Affect Summary Readability of L2 Texts?" Proceedings of Recent
+Advances in Natural Language Processing (RANLP 2019), pages 1265-1274.
+https://aclanthology.org/R19-1145.pdf
+
+Fetched as PDF via WebFetch, then read directly with the Read tool (full 10-page
+document). Key passages transcribed below verbatim, preserved for SPIKE.md Finding 8
+(compression rate vs. readability — no consistent pattern found; readability formulas
+used as the proxy, not human comprehension tests).
+
+--- Abstract (p. 1265) ---
+
+"This paper addresses the problem of readability of automatically generated
+summaries in the context of second language learning. For this we experimented with
+a new corpus of level-annotated simplified English texts. The texts were summarized
+using a total of 7 extractive and abstractive summarization systems with compression
+rates of 20%, 40%, 60% and 80%. We analyzed the generated summaries in terms of
+lexical, syntactic and length-based features of readability, and concluded that
+summary complexity depends on the compression rate, summarization technique and the
+nature of the summarized corpus. Our experiments demonstrate the importance of
+choosing appropriate summarization techniques that align with users needs and
+language proficiency."
+
+--- Section 4.1, on the readability features used (p. 1267-1268) ---
+
+"The most recent research on readability assessment uses machine learning based
+approaches in combination with a broad set of linguistic features. Such sets of
+features are usually organized into families that share similar linguistic
+properties. They typically include length-based, syntactic, lexico-semantic and
+discourse-based features, among others."
+
+(The paper's 21 readability features are all computational proxies — Flesch Reading
+Ease, average word length, mean sentence length, Dale-Chall formula, parse tree
+depth, noun/verb/adjective phrase ratios, etc. — none of them is a human comprehension
+test; no human subject read a summary and was scored on understanding in this study.)
+
+--- Section 7, Conclusion and Future Work (p. 1272) — the key negative finding ---
+
+"We further conducted a novel analysis on how different extractive and abstractive
+summarization techniques at different compression rates affect readability of
+simplified L2 learner texts. Our experiments showed how this impact varied depending
+on the system used: 1) frequency-based system SumBasic consistently simplified
+summaries with respect to the original texts across all the compression rates, and
+thus may be considered a competitive baseline, not only in terms of recall but also
+readability; 2) graph-based approaches, especially LexRank, tended to maintain the
+same complexity as the original document; 3) Luhn's classical frequency-based method
+generated more complex summaries; 4) KLSum method based on Kullback-Leibler
+divergence produced complex summaries at higher compression rates, while simplifying
+them at lower compression rates; 5) integration of anaphora resolution, textual
+entailment and word-sense disambiguation led to syntactically more simple, but
+lexically more complex summaries; 6) abstractive summarizer AbL15 oversimplified
+syntactic structures and maintained at the same time a high complexity of lexical
+readability component. Hence no common pattern among the summarization approaches
+was identified with respect to the effect of compression rate on readability."

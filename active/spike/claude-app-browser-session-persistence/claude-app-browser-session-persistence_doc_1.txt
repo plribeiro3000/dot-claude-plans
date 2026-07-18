@@ -1,0 +1,39 @@
+Source: https://code.claude.com/docs/en/desktop
+Fetched: 2026-07-17
+Section: "Desktop application" — Code tab reference, the "Preview your app" and "Browse external sites" subsections.
+
+Excerpt below preserves the original line numbers from the fetched/converted page (as returned by the WebFetch tool), for traceability. Only the sections relevant to the Browser pane investigation are kept; unrelated sections (keyboard shortcuts, Dispatch, plugins, etc.) are omitted.
+
+---
+
+110:* Watch Claude verify its own changes automatically: it takes screenshots, inspects the DOM, clicks elements, fills forms, and fixes issues it finds
+111:* Start or stop servers from the server dropdown in the session toolbar
+112:* Persist cookies and local storage across server restarts by selecting **Persist sessions** in the dropdown, so you don't have to re-login during development
+113:* Edit the server configuration or stop all servers at once
+114:
+115:Claude creates the initial server configuration based on your project. If your app uses a custom dev command, edit `.claude/launch.json` to match your setup. See [Configure preview servers](#configure-preview-servers) for the full reference.
+116:
+117:To clear saved session data, or to turn the Browser off entirely, use the toggles in Settings → Claude Code.
+118:
+119:### Browse external sites
+120:
+121:The Browser pane is a tabbed browser, so you can open documentation, issue trackers, or any other site next to your running app. To open the Browser, press **Cmd+Shift+B** on macOS or **Ctrl+Shift+B** on Windows, or select it from the **Views** menu. When you click an external link in the chat, a chooser offers **Open in app** to use the Browser pane or **Default browser** to use your own; **Cmd**-click on macOS or **Ctrl**-click on Windows opens a link in your system browser directly. You can sign in to sites in the pane, including popup sign-in flows such as Google OAuth.
+
+[... intervening content on layout, panes, terminal, etc. omitted ...]
+
+134:#### Choose between the Browser and the Chrome extension
+135:
+136:The Browser pane uses a clean browser profile, separate from your personal browser, with none of your saved logins or history. Use it for building and testing your app and for sites that don't need your identity. When you want Claude to act as you in your logged-in sessions, use the [Claude in Chrome extension](/en/chrome) instead, which shares your browser's login state.
+
+138:#### Restrict external browsing for your organization
+
+---
+
+Managed-settings table entries (from a second targeted fetch of the same docs page, settings section):
+
+| Key | Description | Example |
+|-----|-------------|---------|
+| `browserExternalPageTools` | (Managed settings only) Set to `"disabled"` to prevent Claude from using tools to read or act on external pages in the desktop app's Browser pane. Users can still navigate to external sites themselves, and local dev server previews are unaffected | `"disabled"` |
+| `disableBrowserExternalNavigation` | (Managed settings only) Set to `true` to turn off external browsing in the desktop app's Browser pane. Neither users nor Claude can navigate to external sites, and localhost dev server previews are unaffected. The value must be the JSON boolean `true`; the string `"true"` is ignored | `true` |
+
+Note: these two keys are explicitly scoped "(Managed settings only)" — per a follow-up fetch of the same settings reference page's precedence explanation: "An individual engineer cannot set these keys themselves in their own ~/.claude/settings.json or project .claude/settings.json. These settings require organization/admin-level deployment" via managed-settings.json / MDM / server-managed settings, and "can't be overridden by user or project settings" (managed settings sit at the top of the precedence order).

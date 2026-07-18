@@ -1,0 +1,29 @@
+SOURCE: https://docs.aws.amazon.com/whitepapers/latest/saas-tenant-isolation-strategies/pool-isolation.html
+FETCHED: 2026-07-17
+TOPIC: AWS Whitepaper — SaaS Tenant Isolation Strategies, Pool isolation
+NOTE: page carries the banner "This whitepaper is for historical reference only. Some content
+might be outdated and some links might not be available."
+
+---
+
+[...] Now, while this model is a perfectly good fit for SaaS providers, you can see how this
+complicates the overall isolation story. With resources being shared, it's unclear what it would
+mean here to implement isolation. We can't lean on the typical networking and IAM constructs to
+create boundaries between tenants.
+
+The key here is that—even though this is a more challenging environment to isolation—you cannot
+use this as a rationale to relax the isolation requirements of your environment. If anything,
+these shared model increases the chance for cross-tenant access and, as such, it represents an
+area that requires you to be especially diligent about ensuring that resources are isolated.
+
+## Pool model pros and cons
+
+### Cons
+
+- Blast radius — Having all of your resources shared also introduces some operational risk. In
+  the silo model, when one tenant had a failure, the impact of that failure could likely be
+  limited to that one tenant. However, in a pooled environment, an outage will likely impact all
+  the tenants of your system.
+- Compliance pushback — the notion of sharing infrastructure can create situations where
+  customers may be unwilling to run in this model, especially where compliance/regulatory rules
+  impose strict constraints on accessibility and isolation.

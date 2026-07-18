@@ -1,0 +1,52 @@
+SOURCE: https://docs.aws.amazon.com/opensearch-service/latest/developerguide/encryption-at-rest.html
+FETCHED: 2026-07-17
+TOPIC: Amazon OpenSearch Service — Encryption of data at rest
+
+---
+
+## Disabling encryption of data at rest
+
+After you configure a domain to encrypt data at rest, you can't disable the setting. Instead, you
+can take a manual snapshot of the existing domain, create another domain, migrate your data, and
+delete the old domain.
+
+## Other considerations
+
+Encrypted OpenSearch Service domains don't support manual key rotation, which involves creating a
+new key and updating any references to the old key.
+
+---
+
+SOURCE: https://docs.aws.amazon.com/ebs/latest/userguide/ebs-encryption.html
+FETCHED: 2026-07-17 (re-fetched directly; supersedes the WebSearch-only citation in the original
+draft of this spike)
+TOPIC: Amazon EBS encryption
+
+---
+
+You cannot change the KMS key that is associated with an existing snapshot or volume. However,
+you can associate a different KMS key during a snapshot copy operation so that the resulting
+copied snapshot is encrypted by the new KMS key.
+
+You can't directly encrypt existing unencrypted volumes or snapshots. To encrypt an unencrypted
+volume, create a snapshot of that volume, and then use the snapshot to create a new encrypted
+volume.
+
+---
+
+SOURCE: https://aws.amazon.com/kms/pricing/
+FETCHED: 2026-07-17 (re-fetched directly; supersedes the WebSearch-only citation in the original
+draft of this spike)
+TOPIC: AWS KMS Pricing
+
+---
+
+Each AWS KMS key that you create in AWS KMS costs $1/month (prorated hourly).
+
+The $1/month charge is the same for symmetric keys, asymmetric keys, HMAC keys, multi-Region keys
+(each primary and each replica multi-Region key)... — each multi-Region replica is billed
+separately at $1/month.
+
+API pricing example given on the page: "1,990,000 requests (2,010,000 total requests - 20,000
+free tier requests) x $0.03 / 10,000 requests" — confirms $0.03 per 10,000 symmetric API requests
+beyond a 20,000/month free tier.

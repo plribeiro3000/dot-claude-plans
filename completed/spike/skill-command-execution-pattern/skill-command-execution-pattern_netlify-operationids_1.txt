@@ -1,0 +1,49 @@
+Source: https://raw.githubusercontent.com/netlify/open-api/master/swagger.yml
+Fetched directly via curl (raw file, 6074 lines) on 2026-07-17. Full operationId list
+extracted with: grep -n "operationId" swagger.yml (180 matches).
+
+Every operationId actually used by ~/.claude/skills/create-app-webclient/SKILL.md,
+with its HTTP method and line number in the fetched swagger.yml:
+
+  line 111:  get    operationId: getSite            (read)
+  line  81:  post   operationId: createSite         (write)
+  line 129:  patch  operationId: updateSite         (write)
+  line 247:  get    operationId: getEnvVars         (read)
+  line 296:  post   operationId: createEnvVars      (write)
+  line 1234: post   operationId: createSiteBuild    (write)
+
+All six match a clean get/create/update verb-prefix split — no ambiguity for the
+operations this skill documents.
+
+Full-API naming pattern (from the complete 180-entry operationId list):
+
+  READ  verbs: get*, list*, show*, search*    (e.g. getSite, listSites, showService,
+              searchSiteFunctions)
+  WRITE verbs: create*, update*, set*, delete*, add*, remove*, cancel*
+              (e.g. createSite, updateSite, setEnvVarValue, deleteSite, addMemberToAccount,
+              removeAccountMember, cancelAccount)
+
+Named exceptions in the full 180-entry list that do NOT follow the get/create/update/
+delete prefix convention and are semantically WRITE operations despite the name:
+
+  enableSite, disableSite, enableSplitTest, disableSplitTest, enableHook
+  purgeCache
+  runSiteDatabaseMigrations
+  resetSiteDatabaseBranch, resetSiteDatabaseBranchComputeSettings (setSiteDatabaseBranchComputeSettings)
+  rollbackSiteDeploy, restoreSiteDeploy, restoreSiteDatabaseSnapshot
+  unlinkSiteRepo
+  notifyBuildStart
+  exchangeTicket
+  configureDNSForSite
+  markDevServerActivity
+  agentRunnerPullRequest, agentRunnerCommitToBranch
+  transferDnsZone
+  lockDeploy, unlockDeploy
+  provisionSiteTLSCertificate
+
+Conclusion: a verb-prefix auto-approve rule (mirroring auto-approve-aws-readonly.sh's
+get-*/describe-*/list-*/batch-get-*/wait check) would classify every operationId the
+create-app-webclient skill currently uses correctly. A BLANKET rule across the entire
+Netlify API would additionally need to exclude the ~20 non-prefixed write verbs listed
+above, the same way auto-approve-aws-readonly.sh's own header documents a curated,
+enumerated scope rather than a blind prefix match.

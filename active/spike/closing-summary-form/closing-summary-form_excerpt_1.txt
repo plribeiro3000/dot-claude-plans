@@ -1,0 +1,61 @@
+SOURCE: Kangas, Brian D. (2012). "Not Waving but Drowning: A Review of Tufte's The
+Cognitive Style of PowerPoint." International Journal of Teaching and Learning in
+Higher Education, Volume 24, Number 3, 421-423. ISSN 1812-9129.
+http://www.isetl.org/ijtlhe/
+
+Fetched via: https://files.eric.ed.gov/fulltext/EJ1000695.pdf (2026-07-17)
+
+This is a peer-reviewed review, published in an academic journal, of Edward Tufte's
+monograph "The Cognitive Style of PowerPoint: Pitching Out Corrupts Within" (2006).
+Tufte is Professor Emeritus at Yale, Department of Graphic Design, author of "The
+Visual Display of Quantitative Information" (1983). The review itself cites a prior
+peer-reviewed source (Shaw, Brown, & Bromiley, 1998, Harvard Business Review) for the
+specific claim about the three logical relationships bullets can express.
+
+Full text saved because the underlying Tufte monograph is a purchased 32-page pamphlet
+not freely available in full online, and the direct PDF (colostate.edu mirror) exceeded
+the fetch tool's size limit. This academic review is the load-bearing citable proxy
+for Tufte's argument used in SPIKE.md Finding 8.
+
+--- KEY PASSAGE (p. 421-422, reproduced verbatim from the fetched PDF) ---
+
+"This multi-slide requirement leads into Tufte's second criticism of PowerPoint – its
+reliance on a rigidly hierarchical single-path structure as a model for organization,
+regardless of actual content. As pointed out elsewhere (e.g., Shaw, Brown, & Bromiley,
+1998), bulleted lists can only communicate three logical relationships – a sequence
+from first to last in time, priority from least to most important or vice versa, and
+simple membership in a category. Most information teachers attempt to convey in the
+classroom, however, does not fit neatly within one of those relationships. The
+correlation/causation example, like many advanced ideas, requires a nuanced discussion
+of necessity and sufficiency to accurately and effectively relate the criteria to the
+concept. Furthermore, even in the few instances where information involves one of the
+three relationships amenable to bulleted lists, it is usually necessary to break up
+the narrative into several slides. This dissection is almost never as much related to
+the material as it is to the number of words that can fit on a PowerPoint slide,
+resulting in arbitrarily-forced minimal fragments comprising the presentation."
+
+--- SUPPORTING PASSAGE (p. 421) — the correlation/causation example ---
+
+"To illustrate that point, he offers a PowerPoint slide included with an Introduction
+to Statistics text which states the following in large bold type: 'Correlation is not
+causation.' Ever the responsible statistician, Tufte points out that 'probably the
+shortest true statement that can be made about correlation and causality is,
+"Empirically observed covariation is a necessary but not sufficient condition for
+causality"' (2006, p. 5). This, as he notes, is too many words to neatly fit on a
+PowerPoint slide, but the forced abbreviation of the fact is not a trivial matter: it
+is altogether unacceptable when the entire enterprise is undertaken to present the
+material to students, and this reckless abridgment of subtle arguments does little to
+benefit the development of nuanced repertoires in students."
+
+--- FULL CITATION LIST FROM THE REVIEW (for traceability) ---
+
+Hineline, P. N. (1980). The language of behavior analysis: Its community, its
+functions, and its limitations. Behaviorism, 24(8), 67-86.
+Orwell, G. (1946). Politics and the English language. Horizon, 13, 252-265.
+Shaw, G., Brown, R., & Bromiley, P. (1998). Strategic stories: How 3M is rewriting
+business planning. Harvard Business Review, 76, 41-50.
+Tufte, E. R. (1983). The visual display of quantitative information. Cheshire, CT:
+Graphics Press.
+Tufte, E. R. (2006). The cognitive style of PowerPoint: Pitching out corrupts within
+(2nd ed.). Cheshire, CT: Graphics.
+Whorf, B. L. (1956). Language, thought, and reality. Cambridge, MA: MIT Press.

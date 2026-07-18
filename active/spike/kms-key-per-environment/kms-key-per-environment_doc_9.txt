@@ -1,0 +1,16 @@
+SOURCE: https://docs.aws.amazon.com/kms/latest/developerguide/resource-limits.html
+FETCHED: 2026-07-17
+TOPIC: AWS KMS Developer Guide — Resource quotas
+
+---
+
+You can have up to 100,000 customer managed keys in each Region of your AWS account. [...]
+
+All AWS KMS resource quotas are adjustable, except for the on-demand rotation resource quota. To
+request a quota increase, see "Requesting a quota increase" in the Service Quotas User Guide.
+
+| Quota name | Default value | Applies to | Adjustable |
+|---|---|---|---|
+| AWS KMS keys | 100,000 | Customer managed keys | Yes |
+| Aliases per KMS key | 50 | Customer created aliases | Yes |
+| Grants per KMS key | 50,000 | Customer managed keys | Yes |

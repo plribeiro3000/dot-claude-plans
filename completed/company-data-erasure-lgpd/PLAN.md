@@ -178,7 +178,17 @@ tool, ~$20 Claude triage) — the output was saved to the engineer's home; no ne
 > + `email-erasure` tool) and moved to keyless + JIT-DWD (plans `email-erasure-rename`,
 > `email-erasure-hardening`).
 
-## 9. Remaining (why this is not yet `completed`)
+## 9. Completion status — COMPLETE (2026-07-17)
+
+**All fronts closed.** App/backend anonymization, integrator teardown, Zendesk (§9), and the e-mail
+erasure (§8, executed 2026-07-17 — 319 deleted / 93 kept, manifests in S3, register row filled, DWD
+revoked) are all done. The formal LGPD confirmation to the client was already sent at the backend stage
+(recorded below, "we send nothing further"). Two runbook-improvement TODOs (the `meajuda` full-delete
+named exception in §8; the §9 Step 4 vs §2 alignment) are spun off as a separate dot-claude follow-up —
+they improve the shared runbook and are NOT part of this client's offboarding. This plan moves to
+`completed/`.
+
+
 
 App/backend ✅ (§8, Phase 1) — formal LGPD response already sent (we send nothing further). Integrator
 ✅ (base + backup deleted on cancellation). `ANTHROPIC_API_KEY` configured. The Aster `plan`/triage
@@ -198,6 +208,14 @@ skips the trash; search tab count lags the index).
 `review.html` (santiago → `review-es.html`). `elisio` (ex-employee → account deletion) and `meajuda`
 (Zendesk intake box) get **no review e-mail** — deleted directly per the runbook §8 no-owner exception
 (#238).
+
+**`elisio` box — DONE (cleared 2026-07-17).** The ex-employee's account was kept active on purpose for
+a period after his departure because he held client-facing responsibilities, so that any mail a client
+still sent to his address would be received rather than bounced. That reason has now lapsed: the account
+was cleared on 2026-07-17, which erases the Aster PII it held via the §8 no-owner exception (ex-employee
+→ account/inbox deletion). Nothing pending for this box. Record it in the manifest/register (Remaining
+item 3) as "elísio → cleared via account deletion 2026-07-17, account previously kept active for
+client-facing continuity."
 
 **OK status (2026-06-11)** — 7 review e-mails were sent on 2026-06-08 (camila, danilo, emerson, ione,
 patrick, paulo, sergio; **santiago was NOT sent** — the batch was 7, not 8):
@@ -280,25 +298,47 @@ approved) → no re-send.
 - ✅ **Danilo** — replied 12:59, "OK". Approved.
 - ✅ **Patrick** — replied 12:44, "meu tem 0 para revisar, pode prosseguir apagando". Approved (his box has no "revisar" items).
 - ✅ **Paulo (own box)** — replied 14:52, "nenhum dos dois e-mails devem ser apagados" (the 2 "revisar" items: "Fluxo de como criar planos e calendário" and "[4shark] Desenvolvimento de Controle de Dados na Base Normatizada"). Confirms **keep** on both — identical to what rule B already classified (keep=2), so the delete set is unchanged: box resolves at **64 delete / 2 keep**.
-- ⏳ **Sérgio — awaiting his final OK (the ONLY open item in the whole workstream). Took three back-and-forth rounds on 2026-07-10 because he never gives a clear per-item verdict — he answers with a hedged opinion + a counter-question instead.** The exchange:
-  1. 12:40 — v2 sent.
-  2. 13:16 (Sérgio) — only *describes* the "revisar" items ("são todos emails de faturamento com a nota em anexo, com exceção de 1 email '[4shark] Desenvolvimento de Controle de Dados na Base Normatizada' que acredito ser de integração"). No decision.
-  3. 14:57 (Paulo) — tries to pin it: "Então não apago nenhum dos itens que foram como revisar, correto?"
-  4. 14:59 (Sérgio) — still no decision: "creio que seria melhor manter esse emails de envio da nota/faturamento. **O que vc acha? o que o LGPD diz sobre esse item?**" — bounces the decision back and asks for guidance.
-  5. 15:05 (Paulo) — reframes to a yes/no: we only delete emails/attachments carrying **personal** sensitive data; the AI marks them and escalates doubts to the box owner; **the final OK is yours**; keep the "revisar" ones if you want; I need only your OK + direction on deleting the AI-marked ones. **← awaiting his reply.**
+- ✅ **Sérgio — replied 21:56 on 2026-07-10, box now closed (updated 2026-07-17).** He took three hedged rounds earlier that day (13:16 / 14:59 — describes the "revisar" items and bounces the call back with a counter-question, never a clean verdict), then Paulo's 15:05 message reframed it to a yes/no: we only delete emails/attachments carrying personal sensitive data, the AI marks them and escalates doubts to the box owner, **the final OK is yours**, keep the "revisar" ones if you want. Sérgio's 21:56 reply, verbatim: *"Podemos manter os e-mails de solicitações de faturamento."* This is read as **consent-with-scope**, not a literal "ok": he exercised exactly the choice Paulo offered (named what to keep, raised no objection to the delete set), and he is the reviewer who proved he objects when he disagrees — his run-1 correction is what forced the whole rework. His reply does not literally name the 57th keep item (`[4shark] Desenvolvimento de Controle de Dados na Base Normatizada`, the integration/dev thread he flagged at 13:16), but rule B already classifies it **keep**, so both the generous and the strict reading produce the same result — it stays. No delete action depends on interpreting his sentence.
 
-  **This is his standing pattern (imprecise, defers the call) — not a substantive disagreement.** Everything he gestures at keeping already agrees with rule B: his box's billing/NFSe e-mails → keep (fiscal), the POC `SCRIPTS ASTER.zip` → keep (4Shark's own). The only thing missing is his explicit final OK, not any classification change.
+**Email erasure — EXECUTED 2026-07-17.** The `delete` ran across all 9 mailboxes (the 8 owner boxes +
+`meajuda`; `elisio` was already cleared via account deletion). **319 e-mails permanently deleted, 93
+kept** — the kept set is the NFSe/faturamento fiscal-retention documents. Per-box deleted counts:
+`meajuda` 30, `camila` 71, `danilo` 16, `paulo` 64, `patrick` 43, `ione` 38, `emerson` 2, `santiago` 2,
+`sergio` 53.
 
-Remaining (PR #15 merged; the email `delete` has NOT run):
-1. **Sérgio's final OK — the sole open item.** Three rounds on 2026-07-10; Paulo's 15:05 message reduced it to a yes/no, awaiting his reply. Danilo + Patrick + Paulo already OK; **meajuda has NOTHING to resolve** (no-owner intake box → full delete, see below). Once Sérgio replies, all owner confirmations are closed and the `delete` can run. ← **current blocker.**
-2. **Grant DWD just-in-time**, then **delete** per account after each owner confirms (+ `elisio` + `meajuda`
-   directly, no-owner exception). Pilot on a seeded test mailbox before any real delete.
-3. **Recordkeeping** — manifests → `s3://4shark-backups/email-erasure/aster/<date>/` + one row in the
-   "Registro de Exclusões LGPD" register (note which boxes were direct-deleted and why).
-4. **Delete the local outputs** (`~/offboarding-aster*`) (runbook §8 Step 5).
-5. **Revoke DWD** (runbook §8 Step 6).
+**Verification method — count reconciliation, not a pilot.** The seeded-test-mailbox pilot was dropped
+as impractical (a client-domain e-mail cannot be forged to seed a fake box). Instead a fresh full-domain
+`plan` (both client domains) was reconciled per-account against the run-4 approved counts: 5 boxes matched
+exactly, 4 came in +1 (`camila`, `danilo`, `meajuda`, `sergio`). The extra item in each was pinpointed by a
+message-id diff and confirmed legitimate Aster PII — three were keep→delete triage flips on 2022–2023 client
+data (the triage is not deterministic run-to-run), and one was a new post-approval item on Sérgio's box: a
+third-party invoice from **Locações Dolce Aroma to Áster Máquinas**, deleted on the DPO's LGPD call (Áster's
+data, no 4Shark retention basis — a third party's nota fiscal is not 4Shark's fiscal record).
 
-Once these are done, this plan moves to `completed`.
+**Incident during the run (resolved).** The first `delete` (`meajuda`) removed all 30 e-mails and then
+crashed writing the manifest, because `--out`'s directory did not exist — an irreversible deletion with no
+record. The manifest was **reconstructed** from the reviewed `plan.json` after a follow-up `plan` confirmed 0
+remaining (`/tmp/aster-manifests/meajuda.json`, `reconstructed: true`). Root cause fixed in **data-privacy
+PR #29 (merged)**: the tool now creates the manifest directory BEFORE the delete loop, so an unwritable
+`--out` aborts before any e-mail is deleted (fail-before-delete).
+
+**Recordkeeping done.** The 9 manifests (proof of action) are in
+`s3://4shark-backups/email-erasure/aster/2026-07-17/`. Local outputs deleted (§8 Step 5) and the
+domain-wide-delegation grant revoked (§8 Step 6). **Authorizing request:** the formal LGPD erasure request
+from **Rodrigo Seabra (Áster Agro), `rodrigo.seabra@asteragro.com.br`, 2026-05-04**, "Distrato" thread
+(Gmail msg `19df36d440c129e0`) — asks for definitive elimination "de seus sistemas, bases de dados, backups
+e quaisquer outros meios" and for the legal basis + retention term of anything kept (answered by the
+NFSe fiscal-retention keep set).
+
+**Sole remaining item — the register row (engineer's Google Sheet).** One row in the **"Registro de
+Exclusões LGPD"**: cliente Áster; pedido 2026-05-04 (Rodrigo Seabra); execução 2026-07-17; 9 caixas +
+`elisio` (via exclusão de conta); 319 apagados / 93 mantidos; S3 path above; owner-OK evidence = the
+"Encerramento Aster (LGPD)" threads; Zendesk (§9) done.
+
+**Classification basis — the `triage_reason` text is NOT authoritative; the delete decision is (engineer-confirmed 2026-07-17).** A groups / metas / indicadores / recebimentos export from the platform carries user rows — name, sometimes CPF — so those files ARE personal data and are correctly in the delete set. The classifier is incoherent in its *justification* on ~103 of the 346 delete items (across all boxes) it wrote `"sem dados pessoais"` while other items of the same file type are correctly labelled `"contém nomes e CPFs"`. The DECISION (delete) is right on all of them; only the classifier's stated reason on those ~103 is wrong, and that reason is a working-file artifact — it lives only in `plan.json` (deleted at §8 Step 5) and in the `review.html` already sent to owners. The durable record does NOT carry it: the manifest logs only id/subject/mailbox/timestamp/`authorized_by`/`request_ref` (§8 Step 3–4) and the register row is client/date/counts/paths/evidence (§8 Step 4) — neither stores a per-item reason. So there is nothing in the kept record to contradict; no register-text fix is needed. The 57 keep items in Sérgio's box stay clean under this same test: 56 are NFSe/faturamento (4Shark's own fiscal doc — PJ data: CNPJ/endereço/valores, no natural-person data) and 1 is the internal dev thread.
+
+Once the register row is added, this plan moves to `completed` — the integrator (base + backup deleted),
+Zendesk (§9), backend/anonymization, and now the email erasure are all closed.
 
 **Runbook gaps surfaced this session are all closed:** keyless/JIT-DWD + post-rename names (#234),
 local-output cleanup step (#235), training register (#236), archived-ticket note (#237), no-owner

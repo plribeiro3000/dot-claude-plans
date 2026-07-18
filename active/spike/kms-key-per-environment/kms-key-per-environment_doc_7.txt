@@ -1,0 +1,50 @@
+SOURCE: https://docs.aws.amazon.com/kms/latest/developerguide/key-policy-default.html
+FETCHED: 2026-07-17
+TOPIC: AWS KMS Developer Guide — Default key policy
+
+---
+
+## Allows access to the AWS account and enables IAM policies
+
+The following default key policy statement is critical.
+- It gives the AWS account that owns the KMS key full access to the KMS key.
+
+  Unlike other AWS resource policies, an AWS KMS key policy does not automatically give
+  permission to the account or any of its identities. To give permission to account
+  administrators, the key policy must include an explicit statement that provides this
+  permission, like this one.
+- It allows the account to use IAM policies to allow access to the KMS key, in addition to the
+  key policy.
+
+  Without this permission, IAM policies that allow access to the key are ineffective, although
+  IAM policies that deny access to the key are still effective.
+
+The following key policy statement is the entire default key policy for KMS keys created
+programmatically:
+
+{
+  "Sid": "Enable IAM User Permissions",
+  "Effect": "Allow",
+  "Principal": {"AWS": "arn:aws:iam::{{111122223333}}:root"},
+  "Action": "kms:*",
+  "Resource": "*"
+}
+
+When the principal in a key policy statement is the account principal, the policy statement
+doesn't give any IAM principal permission to use the KMS key. Instead, it allows the account to
+use IAM policies to delegate the permissions specified in the policy statement. This default key
+policy statement allows the account to use IAM policies to delegate permission for all actions
+(kms:*) on the KMS key.
+
+Reduces the risk of the KMS key becoming unmanageable: unlike other AWS resource policies, an AWS
+KMS key policy does not automatically give permission to the account or any of its principals. To
+give permission to any principal, including the account principal, you must use a key policy
+statement that provides the permission explicitly.
+
+---
+
+## Allows key administrators to administer the KMS key
+
+The default key policy created by the console allows you to choose IAM users and roles in the
+account and make them key administrators. Key administrators have permissions to manage the KMS
+key, but do not have permissions to use the KMS key in cryptographic operations.

@@ -1,0 +1,51 @@
+skill,documented_command,class,mechanism,source
+integrators,integrator-services.sh (discovery),wrapper-allowlisted,allow-list entry,settings.json:85
+integrators,ecs-scale.sh (scale up/down),wrapper-allowlisted,allow-list entry + redirect-ecs-scale.sh rewrites raw form,settings.json:79; redirect-ecs-scale.sh
+integrators,aws ecs describe-services / list-task-definitions (preview prep),auto-approved read,auto-approve-aws-readonly.sh (describe-*/list-*),skills/integrators/SKILL.md:107-111; auto-approve-aws-readonly.sh:149
+integrators,aws ecs run-task (preview AUTO_ACCEPT=false),PROMPTS,mechanically forced ask - no wrapper offered,skills/integrators/SKILL.md:116; validate-bash-command.sh:620-621
+integrators,aws ecs wait tasks-stopped,auto-approved read,auto-approve-aws-readonly.sh (wait),skills/integrators/SKILL.md:119; auto-approve-aws-readonly.sh:149
+integrators,aws logs tail,direct allow-list entry,permissions.allow exact entry,skills/integrators/SKILL.md:122,163-167; settings.json:144
+integrators,aws ecs run-task (actual run AUTO_ACCEPT=true),PROMPTS,same gate - the actual mutating action,skills/integrators/SKILL.md:127; validate-bash-command.sh:620-621
+apps,apps-services.sh,wrapper-allowlisted,allow-list entry,settings.json:71
+apps,ecs-scale.sh,wrapper-allowlisted,allow-list entry + redirect,settings.json:79
+apps,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+authenticators,authenticator-services.sh,wrapper-allowlisted,allow-list entry,settings.json:72
+authenticators,ecs-scale.sh,wrapper-allowlisted,allow-list entry + redirect,settings.json:79
+authenticators,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+connection-poolers,connection-pooler-services.sh,wrapper-allowlisted,allow-list entry,settings.json:73
+connection-poolers,ecs-scale.sh,wrapper-allowlisted,allow-list entry + redirect,settings.json:79
+connection-poolers,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+onboarding,onboarding-services.sh,wrapper-allowlisted,allow-list entry,settings.json:88
+onboarding,ecs-scale.sh,wrapper-allowlisted,allow-list entry + redirect,settings.json:79
+onboarding,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+setup,setup-services.sh,wrapper-allowlisted,allow-list entry,settings.json:93
+setup,ecs-scale.sh,wrapper-allowlisted,allow-list entry + redirect,settings.json:79
+setup,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+harvesters,harvester-services.sh (discovery),PROMPTS - confirmed gap,no allow-list entry found (grep empty),skills/harvesters/SKILL.md:41-48; settings.json (absent)
+harvesters,aws logs tail,direct allow-list entry,permissions.allow exact entry,settings.json:144
+harvesters,aws ecs run-task (one-off manual run),PROMPTS by design,skill explicitly says run directly outside the skill,skills/harvesters/SKILL.md:85-89
+ec2-instances,ec2-instances.sh,wrapper-allowlisted,allow-list entry,settings.json:74
+ec2-instances,start-instance.sh / stop-instance.sh,wrapper-allowlisted,allow-list entry + raw ec2 start/stop mechanically BLOCKED (exit 2),settings.json:96-97; validate-bash-command.sh:569-584
+elevate-aws-access,elevate-aws-access.sh,wrapper-allowlisted,allow-list entry,settings.json:80
+elevate-aws-access,printenv (WSL check),direct allow-list entry,permissions.allow exact entry,settings.json:168
+integration-debug,ecs-runner-profile.sh,wrapper-allowlisted,allow-list entry - internally runs aws ecs describe-*,settings.json:82
+integration-debug,integration-audit-snapshot-fargate.sh / -ec2.sh,wrapper-allowlisted,allow-list entry - internally runs aws ecs run-task (the only existing precedent for wrapping run-task),settings.json:83-84; integration-audit-snapshot-fargate.sh:145
+integration-debug,aws s3 cp / aws logs get-log-events / aws ecs describe-services / aws ecs wait,auto-approved or direct-allowlisted read,auto-approve-aws-readonly.sh + permissions.allow,skills/integration-debug/SKILL.md:13,473
+integration-debug,aws s3 rm (cleanup of PII artifacts),PROMPTS correctly,write/delete op - skill itself flags MFA requirement,skills/integration-debug/SKILL.md:296
+create-app-webclient,netlify api getSite/getEnvVars (reads) and createSite/createEnvVars/updateSite/createSiteBuild (writes),PROMPTS every time - confirmed gap for the reads,no allow-list entry and no auto-approve hook covers netlify (grep empty),skills/create-app-webclient/SKILL.md:21,46-51,55; settings.json (absent)
+create-app-webclient,direnv exec terraform ... plan (raw form as literally documented),auto-approved via redirect despite raw form in doc,redirect-terraform.sh rewrites to terraform.sh wrapper,skills/create-app-webclient/SKILL.md:49; redirect-terraform.sh
+create-app-webclient,terraform apply (dns stack / GA4),PROMPTS correctly,write + apply-before-merge gate + MFA,skills/create-app-webclient/SKILL.md:49-50
+mongodb-reprovision,mongodb-reprovision.sh (all subcommands),wrapper-allowlisted,single allow-list entry covers ~25 internal SSH commands,settings.json:87; skills/mongodb-reprovision/SKILL.md:12-21
+mongodb-reprovision,aws ec2 describe-instances / describe-instance-attribute / describe-snapshots,auto-approved read,auto-approve-aws-readonly.sh (describe-*),skills/mongodb-reprovision/SKILL.md:195,207,215
+mongodb-reprovision,gh workflow run deploy.yaml,direct allow-list entry,blanket Bash(gh:*) entry,settings.json:21; skills/mongodb-reprovision/SKILL.md:177
+mongodb-reprovision,stop-instance.sh (phase C.1),wrapper-allowlisted,allow-list entry,settings.json:97
+migrate-plans-location,migrate-plans-location.sh,wrapper-allowlisted,allow-list entry - exists to dodge the sensitive-file gate (a different gate than the permission prompt),settings.json:86; skills/migrate-plans-location/SKILL.md:8-10
+migrate-ssh-keys,check-ssh-keys.sh,wrapper-allowlisted,allow-list entry,settings.json:77
+migrate-ssh-keys,ssh-keygen -lf / ssh-add -l,PROMPTS - confirmed gap,no allow-list entry and no auto-approve hook covers these binaries (distinct from ssh itself),skills/migrate-ssh-keys/SKILL.md:43,54,56; settings.json (absent)
+migrate-ssh-keys,ssh -T <host> / ssh <host> true (verify),PROMPTS by design,raw ssh:* is explicitly in the always-ask list per Remote Command Execution policy,skills/migrate-ssh-keys/SKILL.md:58; settings.json:290
+pr-triage,pr-triage.sh,wrapper-allowlisted,allow-list entry,settings.json:89
+pr-triage,gh api graphql (mutations - executed by main not the subagent),direct allow-list entry,blanket Bash(gh:*) entry,settings.json:21; skills/pr-triage/SKILL.md:94-107
+runbook,(reads docs only - no Bash execution),not applicable,not applicable,skills/runbook/SKILL.md
+post-mortem,(writes a file via Write tool - no Bash execution),not applicable,not applicable,skills/post-mortem/SKILL.md
+spawn-session,spawn-session.sh,PROMPTS - confirmed gap,no allow-list entry found (grep empty),skills/spawn-session/SKILL.md:17; settings.json (absent)
+spawn-session,stop-sessions.sh,PROMPTS - confirmed gap,no allow-list entry found (grep empty) - same gap as its sibling script,skills/spawn-session/SKILL.md:32; settings.json (absent)

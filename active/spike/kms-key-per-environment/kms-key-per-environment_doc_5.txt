@@ -1,0 +1,23 @@
+SOURCE: https://docs.aws.amazon.com/prescriptive-guidance/latest/multi-tenancy-amazon-neptune/silo-model.html
+FETCHED: 2026-07-17
+TOPIC: AWS Prescriptive Guidance — Silo-model multi-tenancy (Amazon Neptune)
+
+---
+
+Some multi-tenant SaaS environments might require tenants' data to be deployed on fully separated
+resources because of compliance and regulatory requirements. In some cases, large customers
+require dedicated clusters to reduce noisy neighbor impact. In those situations, you can apply
+the silo model.
+
+In the silo model, storage of tenant data is fully isolated from any other tenant data. All
+constructs that are used to represent the tenant's data are considered physically unique to that
+client, meaning that each tenant will generally have distinct storage, monitoring, and
+management. Each tenant will also have a separate AWS Key Management Service (AWS KMS) key for
+encryption. In Amazon Neptune, a silo is one cluster per tenant.
+
+[...]
+
+The Neptune team generally advises against a silo model because of the higher cost incurred by
+idle resources and the additional operational complexities. However, for highly regulated or
+sensitive workloads require this additional isolation, customers might be willing to pay the
+additional cost.

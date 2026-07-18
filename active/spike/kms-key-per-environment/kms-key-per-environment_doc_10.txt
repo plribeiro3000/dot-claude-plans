@@ -1,0 +1,19 @@
+SOURCE: https://aws.amazon.com/blogs/architecture/simplify-multi-tenant-encryption-with-a-cost-conscious-aws-kms-key-strategy/
+FETCHED: 2026-07-17
+TOPIC: AWS Architecture Blog — Simplify multi-tenant encryption with a cost-conscious AWS KMS key
+strategy
+(fetched via summarization tool; quotes below as returned, verbatim per the tool)
+
+---
+
+Section "The challenge of key proliferation":
+"Managing many KMS keys across environments and accounts is error-prone and hard to scale."
+
+Section "A streamlined approach" (the article's own recommended strategy):
+"One KMS key per tenant, maintained in a central AWS account."
+
+NOTE: both quotes are from the SAME article — the "operational complexity" objection is raised
+against an even-finer-grained model (many keys per tenant across services/environments), and the
+article's own remedy is still per-TENANT (not zero-key or account-wide), consolidated into one
+central account rather than distributed per resource. Cited together deliberately, per citation
+discipline — citing only the objection half would misrepresent the source's own conclusion.
