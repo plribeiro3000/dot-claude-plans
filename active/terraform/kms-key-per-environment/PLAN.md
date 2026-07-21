@@ -70,19 +70,27 @@ does not. There are two populations, and the second is out of this design's reac
 | Population | Stacks | Key | Reachable by this design? |
 |---|---|---|---|
 | On `4shark-master` | `app-beta-001`, `app-demo-001`, `app-shared-001`, `app-atento-001`, `setup`, `onboarding` | `mrk-fa0cda24…`, **customer-managed**, us-east-1 | **Yes** — everything below applies |
-| On the AWS default SSM key | `integrator-almaviva`, `integrator-atento`, `integrator-commcenter`, `integrator-maqnelson`, `integrator-redebrasil` | `b16e449a…`, **AWS-managed**, sa-east-1 | **No** |
+| On the AWS default SSM key | `integrator-almaviva`, `integrator-atento`, `integrator-commcenter`, `integrator-maqnelson`, `integrator-redebrasil` | `b16e449a…`, **AWS-managed**, sa-east-1 | **Yes — decided 2026-07-20** (see below) |
 
 The second key is `alias/aws/ssm` for sa-east-1 — `describe-key` returns `"KeyManager": "AWS"` and
 *"Default key that protects my SSM parameters when no other key is defined"*. **An AWS-managed key
 does not accept a custom key policy**, so the two-statement policy below cannot be written for it.
 The five integrators cannot be isolated by editing that key; isolating them means first moving them
-onto customer-managed keys, which is a separate decision with its own migration.
+onto customer-managed keys.
 
-**What is NOT yet established** (do not assume either way without checking): whether those five are
-actually exposed today. Decrypt through an AWS-managed SSM key only happens *via SSM*, so the SSM
-parameter permission may already be the real boundary — in which case the per-stack role split alone
-isolates them and no key work is needed. Answer this before scoping any integrator key work; it
-decides whether that work exists at all.
+**The open question below is now DECIDED — 2026-07-20 — and the driver is access delegation, not
+just decrypt isolation.** The earlier framing asked whether the five were "exposed" today and noted
+that, since an AWS-managed SSM key only decrypts *via SSM*, the per-stack role split alone might
+isolate them and no key work would be needed. That test answered the narrow question "is a secret
+leaking." The engineer's actual goal is broader and it settles the decision toward customer-managed
+keys regardless: **a dedicated key per integrator, with a key policy that names only that integrator's
+role, is what makes per-integrator ACCESS DELEGATION expressible** — granting an engineer who owns one
+client (e.g. Santiago owns Atento) the ability to reach and run only that client's integrator, and
+nothing else. An AWS-managed key cannot carry that policy, so the role split alone cannot express the
+boundary the engineer needs. The key work therefore exists, and its scope is one customer-managed key
+per integrator. (This is the enabler for the restricted-engineer tier tracked in
+`active/spike/aws-engineer-staging-tier/` — this plan builds the keys and policies; the actual IAM
+grant to a specific engineer is that tier's follow-up, not this work.)
 
 ### Six keys — the count falls out, it is not chosen
 
@@ -359,7 +367,14 @@ replicated onto demo with zero new findings.
 
 **Mid-apply lock incident on step 3 (recovered clean).** The first step-3 apply died when the MFA token expired MID-OPERATION: `DeleteRolePolicy` got 403 (rejected — policy NOT deleted), state save got ExpiredToken (S3 state NOT updated), and the state lock release failed, leaving an orphaned lock (`63e4207a-…`, OperationTypeApply, held by this machine). Diagnosis before any write: nothing deleted, nothing forked — AWS and S3 state both still had the policy, so NOT the `state push errored.tfstate` case. Recovery: re-elevate MFA → `force-unlock` the orphaned self-held lock (known ID, no concurrent process) → fresh plan re-confirmed `1 to destroy` (consistency proven) → re-apply succeeded. **Lesson: a mid-apply MFA expiry can strand the lock even when nothing was applied; force-unlock is the correct recovery ONLY after confirming the state was not forked (delete rejected + state save failed = both sides unchanged = consistent). The apply that dies before ANY resource mutates does not need `state push`.**
 
-**Remaining (all non-productive):** the two `app-outbound-*` stacks (the sa-east-1 payroll/outbound workers — name the shared role in task defs, no SSM policy of their own), and the five `integrator-*` stacks (the AWS-managed `alias/aws/ssm` key design decision — the role split alone vs customer-managed keys).
+**The two `app-outbound-*` stacks — COMPLETE — 2026-07-17. This is where the step-3 drops bit twice.** The sa-east-1 payroll/runner workers name the shared role in their task defs but hold no SSM policy of their own — they inject ANOTHER stack's parameters cross-region as `valueFrom` secrets. So a productive stack's step-3 (dropping its `<stack>-ssm-read` from the shared role) orphans its cross-region outbound sibling unless that sibling is cut over first. Both were missed initially:
+
+- **`app-outbound-atento-br`** injects `/atento-001/*`. `app-atento-001`'s step-3 (PR #774) dropped `atento-001-ssm-read` without accounting for it → the payroll worker would fail secret-resolution on next scale-up (latent: desired 0). Caught same session; `atento-001-ssm-read` RESTORED on the shared role (PR #776) to stop the bleed, then the proper split: dedicated role + both task-defs (PR #777, `6 add, 2 destroy`, ssm-read scoped to `/atento-001/*` + MRK), deploy-user PassRole on `app-atento-001`'s deploy user (PR #778, `1 change`). Cutover via targeted `update-service` (payroll→:76, runner→:75 — the services were pinned to old-role revisions by `ignore_changes`, not a full productive deploy). Then re-dropped `atento-001-ssm-read` (PR #779, `1 destroy`) AFTER an exhaustive sweep: all 9 live services + 7 crons + web-migration + pooler (own role) + both outbound services confirmed on dedicated roles.
+- **`app-outbound-maqnelson`** injects `/shared-001/*` (via `../modules/shared_001_task_config`, shared with `app-shared-001`). `app-shared-001`'s step-3 (PR #769, a PRIOR session) had ALREADY dropped `shared-001-ssm-read` → this worker was latently broken since then (desired 0 masked it; service events showed only steady-state, no launch failures). Fixed by the split: dedicated role + both task-defs (PR #780, `6 add, 2 destroy`, ssm-read scoped to `/shared-001/*` + MRK), deploy-user PassRole on `app-shared-001`'s deploy user (PR #781, `1 change`). Cutover via targeted `update-service` (payroll→:6, runner→:5). NO step-3 drop for maqnelson — it never had its own grant on the shared role (it rode `shared-001-ssm-read`, already gone). Audit confirmed maqnelson was the LAST `/shared-001/*` orphan: `shared_001_task_config` is used by only `app-shared-001` (own services verified on the dedicated role) and this stack.
+
+**Lesson: step-3 must sweep every task-def that NAMES the shared role AND reads the dropped prefix, INCLUDING cross-region outbound siblings in another stack.** The productive-stack completions above verified only the same-stack us-east-1 services/crons; the sa-east-1 outbound consumer was the blind spot both times. The proven cutover for a desired-0 service is a targeted `update-service` to the new-role revision — not a full productive deploy (the service is pinned to the old revision by `ignore_changes`, so a precise repoint heals it with zero blast radius).
+
+**Remaining (all non-productive):** only the five `integrator-*` stacks (the AWS-managed `alias/aws/ssm` key design decision — the role split alone vs customer-managed keys). Both `app-outbound-*` stacks are DONE.
 | 2 | `app-demo-001` | **Catch the exceptions** beta could not surface — it holds real client data and clients reach it | Low, visible |
 | 3 | `app-shared-001` | Only the exception-of-the-exception should still be unknown here | Real, many clients |
 | 4 | `setup`, `onboarding` | Same shape as the app stacks | Real |
@@ -401,62 +416,328 @@ anonymization cron, so a silent failure there is not cosmetic.
 **Known open question, to be settled at step 1**: whether `target-alb` is needed on a task role at
 all. Beta is where that costs nothing to find out.
 
-### Phase 3 — Create the six keys with restrictive policies
+### Phases 3–8 — The app estate: module-owned keys, data migration, and naming (RESTRUCTURED 2026-07-20)
 
-Regional keys, two-statement policy as above, each naming its own stack's role from Phase 2. Nothing
-consumes them yet, so this phase carries no migration risk.
+**This supersedes the original per-resource-type Phases 3–8** (create keys → SSM → Secrets Manager →
+RDS snapshot/restore → legacy RDS → retire). The design converged on two decisions taken after the
+integrator work landed: (1) the KEY is created BY THE MODULE, not per-stack — the same forward-lock
+Phase 10 applies to the integrator module, so the app-estate key split and Phase 10 are the SAME act
+for these stacks (`modules/app` / the `onboarding` / `setup` stacks mint `alias/app-<stack>` etc.); and
+(2) RDS and OpenSearch, previously listed as blocked/out-of-scope for having no in-place rekey, get a
+**replace** path — a new resource under the correct key, which also lets the estate's non-standard
+names be corrected in the same move. Runs beta → demo → shared-001 → atento-001 → onboarding → setup,
+verified between each; productive stacks (shared-001, atento-001) on a real window.
 
-### Phase 4 — Move SSM onto the per-stack keys
+**Current encryption state (verified 2026-07-20):** none of `app-*` / `onboarding` / `setup` has a
+dedicated key. Their SSM SecureStrings sit on the AWS-managed `alias/aws/ssm` (no `kms_key_id` set —
+`app-shared-001/ssm.tf:25`), while RDS storage, the connection-pooler Secrets Manager secrets,
+OpenSearch, and Performance Insights sit on the shared multi-region `4shark-master`
+(`mrk-fa0cda243274491784fc7b39bead5a03`, us-east-1). So this is the REAL key split for these stacks
+(create + migrate the data), not the clean `state mv` the integrators got.
 
-Point each `ssm.tf` at its key, rekey the existing parameters
-(`put-parameter --overwrite --key-id` — probed, bumps version), confirm the application still reads
-them. **Beta first** — this is also the phase that unblocks the restricted engineer tier
-(`active/spike/aws-engineer-staging-tier/`). Then one productive stack at a time, verified between
-each.
+**Per-stack playbook — ONE procedure, applied per stack in the order above:**
 
-### Phase 5 — Secrets Manager (pooler userlist)
+1. **Module mints the key. — DONE for app (PR #786, merged 2026-07-20).** `modules/app` creates its own
+   `aws_kms_key` + `alias/app-${var.identifier}` + the two-statement via-SSM policy (account/region from
+   data sources), ARN exported as `kms_key_arn`. Importing `modules/app` is enough — no per-stack file.
+   All four app cluster stacks (`beta-001`, `demo-001`, `shared-001`, `atento-001`) now carry their key,
+   created and unused. **Cycle learning (do NOT re-derive):** the key sits INSIDE `modules/app` even
+   though `modules/app` is a downstream cluster/pooler wrapper — this is safe ONLY because `modules/app`
+   does NOT consume the stack's SSM parameters (the app services live in the stack), so the stack's
+   parameters reference `module.<app>.kms_key_arn` one-directionally with no cycle. A standalone
+   `modules/kms` imported by each stack was tried and REJECTED: it delivers the key but requires a
+   per-stack `kms.tf`, which the engineer explicitly refused ("import the module → get the key,
+   automatic, no file"). **For `onboarding` / `setup`, verify the same before placing the key**: the key
+   goes into their extracted composition module ONLY if that module does not consume their SSM params;
+   if it does, the params must move into the module too (or the key sits upstream of them). New stacks
+   are then born with a correctly-named dedicated key by construction.
+2. **Rekey the rekeyable data onto it** — SSM SecureStrings (`put-parameter --overwrite --key-id`,
+   value-preserving, bumps version — engineer's step, secret values) and the connection-pooler Secrets
+   Manager secrets (`UpdateSecret --kms-key-id`). Keep decrypt on the old key until each re-encryption
+   is confirmed (the documented no-op trap). The dedicated role's `-ssm-read` MUST carry explicit
+   `kms:Decrypt` on the new key — the AWS-managed `alias/aws/ssm` auto-granted it, a customer-managed
+   key does not.
+3. **RDS — blue/green replace (engineer's approach 2026-07-20).** RDS storage encryption key is
+   immutable after creation, so instead of a downtime snapshot/restore: stand up a NEW RDS under the
+   correct key AND the correct name, set it to pull live/real-time data from the original (read replica
+   / logical replication), wait until fully synced, then deploy the app pointing at the new DB; once
+   nothing still reaches the old one, decommission it (cut its connection so the app stops trying the
+   old). Near-zero downtime, and the new instance is created with the standard name.
+4. **OpenSearch — replace in a quiet window (engineer's approach 2026-07-20).** The OpenSearch data does
+   NOT need to persist (no in-place rekey exists, and none is needed): in a window with no processing
+   running, stand up a NEW domain under the correct key and name, point the app at it, tear down the
+   old. The "no processing at the moment" precondition is what makes the data loss safe.
+5. **Retire `4shark-master` for this stack's scope** only once nothing the stack owns references it.
 
-`UpdateSecret --kms-key-id`, four stacks, beta first. Keep decrypt on the old key until the
-re-encryption is confirmed (the documented trap above).
+**Naming standardization — DECIDED 2026-07-20, folded in because the replaces create new resources
+anyway.** The app estate's resource names are inconsistent (part carries the `app` prefix, part does
+not). The standard is the `app` prefix on everything — `app-<name>-001`. Because RDS and OpenSearch are
+recreated (steps 3–4), name the new resources correctly THEN, at no extra cost. **Discovery point:**
+enumerate the current non-conforming names per stack before the replace, so each new resource lands on
+the standard name and nothing is missed. (Naming is a design decision — confirm the exact target names
+with the engineer per stack before creating.)
 
-### Phase 6 — RDS
+**The `app-outbound-*` exception — consume the cluster's key, migrate in lockstep (verified
+2026-07-20).** An outbound application shares the secrets of the app cluster it connects to, so it must
+decrypt on that CLUSTER's key, never mint its own. `modules/app_outbound` therefore takes the connected
+cluster's key (its deterministic `alias/app-<cluster>`) and grants decrypt on it — it does NOT create a
+key. **The mapping is by real connection, NOT by name** (the name misleads): `app-outbound-atento-br`
+connects to `app-atento-001` (decrypts `mrk-fa0cda…`, monitoring `app-atento001-api`), and
+`app-outbound-maqnelson` connects to `app-shared-001` (monitoring `app-shared001-api`) — NOT a
+"maqnelson" cluster. When a cluster moves off `4shark-master` onto its dedicated key, its outbound's
+decrypt grant must repoint to the SAME new key in the same move, or the outbound loses decrypt of the
+cluster's secrets. Sweep every task-def still naming the shared role before dropping any grant — the
+outbound misses (#769/#774) are the standing warning that a desired-0 or cross-region consumer hides
+from a same-stack-only check.
 
-Snapshot + copy under the new key + restore. One maintenance window per instance. Beta first
-(free), then the productive stacks one at a time on a real window.
+### Phase 9 — The five integrators (sa-east-1, customer-managed key per integrator)
 
-**Separable and deferrable indefinitely.** Phases 2–5 close the cross-environment read on their own;
-no engineer tier holds raw RDS storage decrypt (the database is reached by credential, not by KMS).
-If deferred, record it as a decision rather than a loose end.
+> **Status 2026-07-20:** the dedicated key per integrator is already MINTED — `modules/integrator`
+> creates `alias/integrator-<slug>` by construction (`modules/integrator/kms.tf`, Phase 10 done via
+> #785). So step 2 below ("customer-managed key per integrator") is DONE; what remains is the role
+> split (step 1), moving SSM onto the key (step 3), plus the naming + Redis standardizations. Sequenced
+> 4th in the authoritative **Execution order** section above. The population table in § Scope ("on the
+> AWS-managed `alias/aws/ssm`") predates #785 and is stale for the key — the key is customer-managed now.
 
-### Phase 7 — Migrate legacy RDS instances off the old key (was `kms-migration` Task 2)
+The six-stack estate above is DONE (beta, demo, shared-001, atento-001, setup, onboarding, plus the
+two sa-east-1 `app-outbound-*` siblings). The five integrators are the last population, and unlike the
+estate they sit in sa-east-1 on the **AWS-managed** `alias/aws/ssm` key — decided in-scope 2026-07-20
+because the goal is per-integrator access delegation (see § Scope). Each integrator gets the SAME
+expand/contract treatment the app stacks got, plus a key move the app stacks did not need (they were
+already on a customer-managed key; the integrators are not):
 
-Some RDS instances still use a pre-migration key (`64b7af79-...`). Identify them:
+1. **Role split** — each integrator names the account-wide `ecsTaskExecutionRole` in its task defs and
+   carries an `integrator-<slug>-ssm-read` on it (11-of-15 rule, § Two facts). Give each its own
+   `integrator-<slug>-ecs-task-execution-role` (+ `-ssm-read` + `-ecs-exec`), point its task defs at
+   it, cut over, then drop the shared grant — identical to Phase 2, sa-east-1.
+2. **Customer-managed key per integrator** — one regional sa-east-1 key each, two-statement policy
+   (§ The key policy) naming only that integrator's new role. This is what the AWS-managed key could
+   never carry, and what makes "Santiago reaches only Atento" expressible.
+3. **Move SSM onto the key** — rekey each integrator's parameters off `alias/aws/ssm` onto its own key
+   (`put-parameter --overwrite --key-id`, bumps version — Phase 4 mechanics). **Discovery point**: the
+   integrator role's SSM read today is likely `ssm:GetParameters` ALONE — an AWS-managed SSM key
+   auto-grants decrypt to any SSM caller in the account, so no explicit `kms:Decrypt` was ever needed.
+   A customer-managed key does NOT auto-grant; the dedicated role's `-ssm-read` MUST add explicit
+   `kms:Decrypt` on the new key, or the task fails secret resolution on cutover. Verify this before the
+   move, per integrator.
 
-```bash
-aws rds describe-db-instances --query 'DBInstances[*].[DBInstanceIdentifier,KmsKeyId]' --output table --region us-east-1
-aws rds describe-db-clusters --query 'DBClusters[*].[DBClusterIdentifier,KmsKeyId]' --output table --region us-east-1
-```
+**Granularity — DECIDED 2026-07-20: one key per STACK (see SPIKE Finding 16).** A stack that carries
+both a production and a staging cluster (e.g. `integrator-commcenter` + `integrator-commcenter-staging`,
+same stack, same network) gets ONE key, not one per cluster. The two AWS axes disagree on this cell —
+classification (SEC08-BP02) says split prod from test, tenancy says same entity → same key — and the
+tie breaks toward one key because the keys exist for per-integrator access delegation, whose boundary
+is the integrator/stack, not the cluster. Intra-stack prod/staging isolation, if ever wanted, comes
+from SSM encryption-context conditioning (`/commcenter/*` vs `/commcenter-staging/*`, SPIKE Finding 6)
+on the single key, not a second key. **Flip condition, named so it is not re-derived:** the day 4Shark
+wants staging-only (or prod-only) delegation — a principal allowed on an integrator's staging but NOT
+its production — prod and staging need separate keys. Until that is a stated need, one key per stack.
 
-Per instance: manual snapshot → `copy-db-snapshot --kms-key-id <its stack's key>` → restore → point
-Terraform at the new instance → delete the old.
+**Discovery point to settle at step 1, before touching anything — stack-vs-slug count.** The SSM policy
+list names five (`almaviva`, `atento`, `commcenter`, `maqnelson`, `redebrasil`), but sa-east-1 carries
+many more integrator task-def families (`integrator-atento-br/-cl/-co/-mx` + staging + harvesters).
+"One key per stack" still needs the stack unit pinned down: confirm whether a client's jurisdiction
+variants (`atento-br`/`-cl`/`-co`/`-mx`) are ONE Terraform stack or several — read the stacks, do not
+assume. A single `terraform` stack = one key; separate stacks = separate keys, per the rule above.
+- **The same cross-region-sibling sweep the outbounds needed.** Before dropping any
+  `integrator-<slug>-ssm-read` from the shared role, sweep EVERY task-def still naming the shared role
+  that reads that integrator's prefix — the outbound misses (#769/#774) are the standing warning that a
+  desired-0 or cross-region consumer hides from a same-stack-only check.
 
-**Changed from the original plan**: the old plan sent these to `4shark-master`. Under this design
-they go straight to their own stack's key — one window instead of two, and no intermediate wrong
-state. Fold into Phase 6, same windows.
+Order: one integrator (family) at a time, verified between each; start with the one whose access
+delegation is wanted first (Atento, the Santiago driver) unless a lower-risk integrator is preferred as
+the shakedown.
 
-### Phase 8 — Retire `4shark-master`
+### Phase 10 — The module OWNS and auto-creates the key, named after the stack (the forward-lock) — **DONE 2026-07-20**
 
-Only once nothing references it. Deleting a KMS key is irreversible — its own decision, its own PR.
+> **Status 2026-07-20: COMPLETE for all six surfaces, and it ran FIRST, not last.** The original framing
+> ("Runs LAST, after everything migrated") was inverted in execution: the module-owns-key modularization
+> landed BEFORE the data migration — `app` (#786), `integrator` (#785, `state mv`), `onboarding`/`setup`
+> (#788), `auth` (#789), `vpn` (#790). Every surface's module now mints or owns its dedicated key by
+> construction. The prose below is kept as the design record; the data migration it references as
+> "already done" is what the **Execution order** section above now sequences (it is NOT done — the keys
+> exist, the data still has to move onto them).
+
+The engineer's closing requirement, and the reason the whole migration is worth it: once every
+environment is on a dedicated key, **make the key impossible to omit OR misname for the next one.**
+
+**Refined 2026-07-20 — auto-create, do NOT take a parameter.** The earlier framing was "add a required
+KMS-key variable to every application module (`app`, `integrator`, `onboarding`, `setup`)." The engineer
+sharpened it: a parameter can still be passed wrong, and a defaulted one can be omitted — but a key the
+MODULE creates itself cannot be either. So the module owns the key: every application module creates its
+own `aws_kms_key` + `aws_kms_alias` + the two-/three-statement restrictive policy (§ The key policy),
+with the alias **derived from the stack's identity**, which equals the stack folder name by convention
+(`integrator-almaviva` → `alias/integrator-almaviva`, `app-shared-001` → `alias/app-shared-001`). The
+module already receives that identity (`var.environment` / `var.client_name`), so it builds the alias
+internally — the caller passes nothing key-related and cannot get it wrong. This converts the property
+from "achieved by migration" to "guaranteed by construction": every future environment is born with its
+own dedicated, correctly-named key, and the class of problem this whole plan exists to fix (retrofitting
+isolation onto shared-key estates, and the cross-consumer misses that came with it) cannot recur.
+
+**This SUBSUMES the per-stack key files, it does not sit beside them.** The integrator keys created in
+Phase 9 live in each stack's own `kms.tf` (`aws_kms_key.integrator` + alias). When the integrator module
+takes over key creation, those resources MOVE into the module — a `terraform state mv` per stack, the
+alias unchanged (`integrator-<slug>` = the folder), so NO re-encryption and NO parameter churn. The app
+stacks are the other half: they still sit on the shared `4shark-master` key today (their role split is
+done, their KEY split is Phases 3–8, not yet run), so the app module creating `alias/app-<stack>` per
+caller IS that app-stack key split — Phase 10 and Phases 3–8 converge into "the module makes the key."
+Sequence Phase 10 so it lands as the single mechanism that owns every application stack's key, rather
+than bolting a second creation path next to the hand-written `kms.tf` files.
+
+Runs LAST, after all stacks — the five integrators AND the app-stack key migration — are settled, so no
+in-flight stack is forced to satisfy the new module shape mid-migration. **Blast radius is why it is its
+own effort, never folded into a per-stack PR:** it edits the SHARED modules (`app`, `integrator`,
+`onboarding`, `setup`) that every stack instantiates, so a single module change re-plans every stack at
+once. **Discovery points**: (1) whether the deploy user / any non-task reader must be named on the
+module-created key's decrypt statement (the gap that bit Phase 9's PR3 — the module must carry it so it
+is not re-missed); (2) how the `terraform state mv` of the existing integrator keys into the module is
+staged so no plan wants to destroy-and-recreate a live key.
+
+### Phase 11 — Cross-module standardization: all four surfaces forward-lock the key (added 2026-07-20)
+
+Once app / integrator / onboarding / setup are all on dedicated keys, the closing act is to make the
+four SURFACES uniform, so that copying any stack and instantiating its module is BORN with the correct
+dedicated key — no per-stack key file to forget or misname, ever again. This is Phase 10 generalized
+from the integrator to all four.
+
+**Structural finding and resolution (2026-07-20).** The surfaces were not symmetric: `integrator`
+(`modules/integrator`) and `app` (`modules/app`) were composed modules reused by N stacks — the key
+minted INSIDE the module, which is the forward-lock — while `onboarding`, `setup`, `auth-001`, and `vpn`
+were **flat stacks** with no module to hold a minted key.
+
+**Decision — DONE (engineer, 2026-07-20): extract a composed module for every flat stack, so all
+surfaces forward-lock the key inside a module.** An intermediate call placed a stack-level `kms.tf` on
+`onboarding`/`setup` (PR #787, applied), reasoning that single-instance stacks have no next stack to
+forward-lock. The engineer overrode it: extract `modules/onboarding` and `modules/setup` (PR #788,
+applied) so the module owns the key uniformly, then `modules/auth` (PR #789, applied) and `modules/vpn`
+(PR #790, applied). Each extraction is a pure state re-address via `moved {}` blocks (0 destroy); the
+stack becomes a thin caller (providers, variables, the module call, outputs).
+
+- `onboarding` / `setup` — the module MINTS a dedicated key (`alias/onboarding`, `alias/setup`),
+  two-statement via-SSM policy (their secrets are SSM SecureStrings).
+- `auth-001` (Keycloak) — the module ADOPTS the key that already existed by hand (`alias/auth-001`,
+  already used by the Keycloak Secrets Manager secret) instead of minting a new one, and applies a
+  via-**SecretsManager** policy (its secret lives in Secrets Manager, not SSM). Imported into the module,
+  the hardcoded ARN in `secrets.tf` replaced by `aws_kms_key.this.arn`; the redundant minted key from
+  the first apply was scheduled for deletion (PR #789). auth is the one surface where the dedicated key
+  pre-existed — adopt, don't mint.
+- `vpn` (Pritunl) — the module MINTS a dedicated key (`alias/vpn`), but the key is born **UNUSED**: the
+  VPN has no SSM/Secrets Manager secret store to encrypt. Its at-rest sensitive data is the hosts' EBS
+  volumes (the MongoDB data host + the Pritunl instances), which carry no dedicated key today. The key
+  policy is therefore scoped via-**EC2** (the service through which EBS is encrypted) — same two-statement
+  shape and 5-action set as the others, adapted to the VPN's intended future consumer. Actually
+  encrypting the EBS volumes REPLACES them (a volume cannot be encrypted in place), so that is a separate,
+  deliberate operation, deferred and out of scope of PR #790. vpn is the one surface where the key is
+  minted ready but idle.
+
+So the forward-lock now holds by construction for every surface: import the module, get the
+correctly-named dedicated key.
+
+**The `app_outbound` exception, made structural (engineer decision, 2026-07-20).** An outbound must use
+the key of the app cluster it links to, never one named after itself. `modules/app_outbound` takes a
+**required** `app_stack` variable (e.g. `app-atento-001`) and derives the linked cluster's key from it
+— `data "aws_kms_alias"` on `alias/${var.app_stack}`, decrypt granted on its `target_key_arn`. The
+variable being required means an outbound cannot be instantiated without declaring which cluster it
+draws from, and the key follows from that declaration automatically — no separate key argument to get
+wrong, and no key minted for the outbound itself. The verified links seed it: `app-outbound-atento-br`
+→ `app_stack = "app-atento-001"`, `app-outbound-maqnelson` → `app_stack = "app-shared-001"` (by
+connection, not by name).
+
+**Guarantee this phase closes:** for each surface (`app`, `integrator`, `onboarding`, `setup`, `auth`,
+`vpn`), instantiating the module (or copying the stack) produces a correctly-named dedicated key by construction,
+and an outbound is structurally forced to borrow its linked cluster's key — the whole class of "new
+environment born on a shared key, or on a misnamed one" cannot recur.
+
+## Execution order — the data migration, simplest first (engineer, 2026-07-20)
+
+**This section is the authoritative running order from 2026-07-20 forward. It REORDERS the phase
+mechanics above; it does not replace them.** The per-surface playbooks (Phases 3–8 for the app estate,
+Phase 9 for the integrators) keep their step-by-step detail — this section only fixes which surface is
+done in which order, and folds in the two surfaces (`vpn`) and two extra jobs (integrator naming, the
+integrator Redis) that the phase text did not yet carry.
+
+**What is already DONE (do not re-plan it).** The forward-lock — every surface's module MINTS or owns a
+dedicated, correctly-named key by construction (Phases 10–11) — is COMPLETE for all six surfaces:
+`app` (#786), `integrator` (#785), `onboarding`/`setup` (#788), `auth` (#789), `vpn` (#790). So the key
+EXISTS per stack today. What remains is the DATA migration: moving each stack's at-rest data off the
+shared/AWS-managed key onto the dedicated key it already has. `auth` is the one surface where the data
+is already on its key (the Keycloak secret used the adopted key all along — #789), leaving only its RDS
+(separate key, blue/green later). Every other surface still has data to move.
+
+**Codebase hygiene — DONE (#791, merged 2026-07-20).** The whole Terraform estate was audited: every
+data surface gets its key from its module (no discrepancy, forward-lock confirmed). The one-time
+`moved {}` blocks from the modularizations (`onboarding`/`setup`/`auth`/`vpn`) and the already-applied
+one-time `import {}` blocks across the app/integrator/mongodb/`shared-resources` stacks (plus the
+`identity` repo-rename `moved.tf`) were removed as inert scaffolding — each affected stack verified
+`0 changes` before removal. So a fresh session will not find leftover state-move/import blocks to clean.
+
+**The order is simplest-to-hardest, so each surface shakes down the mechanics for the next.** Verify
+each surface end to end before starting the next.
+
+1. **`vpn` — replace the MongoDB host with an encrypted one (simplest: one EC2 machine, no SSM/RDS).**
+   The VPN has no SSM/Secrets Manager store; its at-rest data is the hosts' EBS volumes, and the one that
+   matters is the MongoDB host (`vpn/modules/vpn/mongodb.tf` after #790), which holds every Pritunl org,
+   user and VPN profile. An existing EBS volume cannot be encrypted in place, so the migration is a
+   host replacement: stand up a NEW MongoDB EC2 node with its root volume encrypted under `alias/vpn`,
+   bring the Pritunl data across (Mongo → Mongo — dump/restore or a replica-set join, decided at
+   execution), cut the Pritunl `MONGODB_URI` to the new host, then retire the old node. The Pritunl
+   instances' own EBS can follow the same replace if wanted, but the database host is the data that
+   counts.
+
+2. **`onboarding` — the app-estate playbook, and the easiest of it (the environment is idle).**
+   Onboarding runs at desired 0, so there is no live traffic to protect during the rekey. Apply the
+   Phases 3–8 per-stack playbook: rekey its SSM SecureStrings onto its dedicated key (the role's
+   `-ssm-read` must gain explicit `kms:Decrypt` on the new key — the AWS-managed key auto-granted it, a
+   customer-managed one does not), then the RDS blue/green replace and, if it has one, the OpenSearch
+   replace, then retire `4shark-master` for its scope. **Discovery per stack:** confirm which of RDS /
+   OpenSearch / pooler-secret onboarding actually has before scoping the work.
+
+3. **`setup` — the same app-estate playbook, in use but still simple (single web service, no crons).**
+   Same steps as onboarding; the difference is setup carries live traffic, so the rekey and the RDS
+   cutover happen in an announced window rather than freely.
+
+4. **The five integrators — role split + rekey + naming + Redis, one integrator (family) at a time.**
+   This is Phase 9 (role split → move SSM onto the already-minted `alias/integrator-<slug>` key), PLUS
+   two standardizations folded in because the integrator pieces are being touched anyway:
+   - **Naming standardization** — bring every integrator piece to the current naming standard. **There
+     is no separate canonical naming-standard doc today** — the engineer holds the target convention;
+     confirm the exact target names with the engineer per integrator before renaming (naming is a design
+     decision). Note: `terraform/integrator-module-cleanup/PLAN.md` is a DIFFERENT effort (removing
+     EC2-era legacy code from `modules/integrator`) — it is not the naming standard and does not overlap.
+   - **The Redis is per-client ElastiCache, no longer the standard** — each integrator provisions its
+     own dedicated `aws_elasticache_cluster.redis` (`ec-<client>`, `modules/integrator/elasticache.tf:7`).
+     That per-client self-managed Redis is not the current standard for a new integrator; bring it to the
+     current standard as part of this step. **The target standard is the engineer's to specify** (do not
+     assume it) — capture it before touching the Redis.
+   Order among the five: start with the one whose access delegation is wanted first (Atento — the
+   Santiago driver) unless a lower-risk integrator is preferred as the shakedown. The stack-vs-slug count
+   and the cross-region-sibling sweep from Phase 9 still apply.
+
+5. **`app` — `shared-001` and `atento-001` LAST (hardest: productive, OpenSearch, the outbound siblings).**
+   The full Phases 3–8 playbook on the productive stacks: rekey SSM, RDS blue/green replace, **OpenSearch
+   replace in a quiet window** (`app-shared-001/opensearch.tf`, `app-atento-001/opensearch.tf` — the
+   OpenSearch data need not persist), naming standardization on the recreated resources (the `app-` prefix
+   on everything), the `app-outbound-*` decrypt grant repointed to the cluster's new key in lockstep, then
+   retire `4shark-master`. Productive, so the Sidekiq-queue gate and the announced window apply. `beta-001`
+   and `demo-001` (non-productive) can be done first within this step as the shakedown for the two
+   productive ones, matching the original beta→demo→productive risk order — but the app SURFACE as a whole
+   comes last, after vpn/onboarding/setup/integrators.
+
+**Why this order and not the phase-text order.** The phase mechanics were written app-first (beta → … →
+onboarding → setup, then integrators). The engineer inverted it on 2026-07-20: do the surfaces with the
+least at-risk data and the simplest shape first (`vpn` is one machine; `onboarding` is idle; `setup` is
+one service), so the mechanics are proven on low-stakes surfaces before the productive app estate. The
+per-phase detail above is unchanged and correct; only the sequence is this section's.
 
 ## Out of scope, surfaced here so they are not forgotten
 
 | Item | State |
 |---|---|
-| **OpenSearch** | Cannot rekey in place; AWS documents no migration path and no downtime figure for a key change. Both domains stay on `4shark-master`, which blocks Phase 8 until decided separately. |
+| **OpenSearch** | ~~Blocked~~ — NO LONGER out of scope (2026-07-20). Handled by the replace path in Phases 3–8 step 4: the data need not persist, so a new domain under the correct key/name replaces the old in a quiet window. Folded into the per-stack app-estate migration. |
 | **The six `backup-<stack>-local` key policies** | Right count, wrong policy (account-root `kms:*`, `modules/cross_region_backup/main.tf`). Same fix as Phase 3, different scope. |
 | **`alias/4shark-ecs-beta-key`** (`6bf5847f`, us-east-1) | Orphan. Created 2025-10-17, rotation off, console-default policy, referenced by no repo. Billed ~9 months for nothing. |
 | **`alias/auth002`** (`df7df919`, sa-east-1) | Orphan. Created 2024-12-12, no description, no `auth-002` stack exists. |
 | **`alias/main`** (`64eb0fa9`, sa-east-1) | Legitimate — CloudTrail's key, `audit/kms.tf:116`. Leave alone. |
+| **VPN EBS encryption** | The `alias/vpn` key (PR #790) is minted ready but idle. Using it means encrypting the three VPN hosts' EBS volumes (MongoDB data host + the two Pritunl instances), which REPLACES each volume — a data migration on the MongoDB host (`disable_api_termination`, `delete_on_termination=false`, holds all Pritunl state), taken in a window. Deferred; the key's via-EC2 policy is already in place for it. |
 | **The restricted engineer tier** | `active/spike/aws-engineer-staging-tier/`. This plan makes its scoping possible; it does not build it. |
 
 Both orphans are billed and unrotated. Deleting a KMS key is irreversible — each is its own decision.

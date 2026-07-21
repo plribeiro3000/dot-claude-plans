@@ -357,6 +357,55 @@ a new key shortly after, is duplicate maintenance-window work (Finding 10 confir
 **Significance:** whether Task 2 proceeds as written, is deferred, or is redirected straight at a
 new key is a scope decision this spike surfaces but does not make.
 
+### Finding 16: The intra-stack prod-vs-staging case (added 2026-07-20) — the two axes point opposite ways, and the keys' PURPOSE breaks the tie toward one key per stack
+
+**New question from the engineer:** an integrator stack often carries two ECS clusters in the SAME
+stack, same network — production and staging (e.g. `integrator-commcenter` + `integrator-commcenter-staging`).
+One key for the stack, or one per cluster? Staging here is 4Shark-internal homologation, not the
+client's data; a staging leak is internal-only, and the only thing a shared key costs is that a
+staging compromise could reach production's integration data.
+
+**The two axes established above disagree on this exact cell:**
+- **Classification (Finding 3, SEC08-BP02)** — *"create one AWS KMS key for encrypting production
+  data and a different key for encrypting development or test data"* → prod cluster and staging
+  cluster are literally "production" vs "test", so this axis says TWO keys.
+- **Tenancy (Finding 4 / Finding 7)** — *"use different keys for data that belongs to different
+  entities"* → prod and staging of one integrator are the SAME entity (same client, same 4Shark-internal
+  ownership), so this axis says ONE key.
+
+**What breaks the tie: the keys' purpose at 4Shark is per-integrator ACCESS DELEGATION** (decided
+2026-07-20; the whole reason the integrator keys exist — grant an engineer who owns a client the
+ability to reach only that client's integrator). The delegation boundary is the integrator, i.e. the
+STACK, not the cluster: whoever owns Commcenter owns its prod AND its staging. A per-stack key already
+delivers the isolation that goal needs — Commcenter's key names only Commcenter's role, so no other
+integrator's role can decrypt it (the integrator-to-integrator wall). Splitting prod/staging WITHIN
+one integrator advances the delegation goal by nothing, because delegation is whole-integrator.
+
+**The engineer's risk instinct is correct but aimed at the wrong threat.** KMS-key theft is near-zero
+(it needs a principal the key policy already restricts). The threat that ACTUALLY materialized at
+4Shark is Finding 13 — an over-broad IAM/role grant, held for years. A per-STACK key already contains
+that at the integrator boundary; a second staging key would only narrow it to the intra-integrator
+"a staging-role misconfiguration reaching Commcenter-prod" case — a real but far smaller blast radius,
+and one that Finding 6 can address WITHOUT a second key: SSM encryption-context conditioning on
+`PARAMETER_ARN` (`/commcenter/*` vs `/commcenter-staging/*`) gives path-level prod/staging isolation on
+a single key. Only CRYPTOGRAPHIC prod/staging separation — a staging compromise that cannot decrypt
+prod even under a broad IAM grant — requires the second key.
+
+**Recommendation: one key per STACK.** It matches the delegation boundary the keys exist to serve,
+honours the tenancy axis (same entity → same key), and keeps prod/staging isolation available via IAM
+encryption-context (Finding 6) if ever wanted, without a second key to maintain. The SEC08-BP02
+prod/test pull is real but weaker here because staging is same-entity internal homologation, not a
+distinct client-sensitivity class.
+
+**The one condition that flips it to per-cluster keys — name it so the next session doesn't re-derive
+it:** the day 4Shark wants **staging-only (or prod-only) delegation** — a less-trusted principal who
+may touch an integrator's staging but must NOT touch its production — prod and staging need separate
+keys, because only a key boundary makes "staging yes, prod no" enforceable against an IAM
+misconfiguration. Until that is a stated need, it is speculative and one key per stack is correct.
+
+**Source:** Findings 3, 4, 6, 7, 13 of this spike (no new external fetch — this cell is fully decided
+by the axes already established); engineer's framing of the Commcenter prod/staging case, 2026-07-20.
+
 ## Trade-offs surfaced
 
 | Axis honoured | Requires | Buys | Costs / leaves open | Source |

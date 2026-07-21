@@ -1,0 +1,55 @@
+Raw evidence supporting SPIKE.md Finding 2 (access-history coverage window).
+Collected via: find ~/Projects/4Shark/app/db/migrate -iname "*security_event*" | sort
+Collected via: grep -rn "security_events_module" ~/Projects/4Shark/app/
+
+=== Migration files touching security_events / security_events_module, in chronological order ===
+
+2026/05/20260528120001_create_security_events.rb
+2026/05/20260528120002_add_security_events_company_id_and_id_index.rb
+2026/05/20260528120003_add_security_events_company_id_and_occurred_at_index.rb
+2026/05/20260528120004_add_security_events_event_type_index.rb
+2026/05/20260528120005_add_security_events_module_to_companies.rb
+2026/05/20260529120001_security_event_actions.rb
+2026/05/20260529130001_change_security_events_module_default_to_true.rb
+2026/05/20260529130002_enable_security_events_module_for_all_companies.rb
+2026/06/20260603200012_remove_security_events_module_from_companies.rb
+2026/06/20260611211915_create_security_event_audit_rows.rb
+2026/06/20260611211927_add_security_event_audit_actions.rb
+2026/06/20260616191307_add_identification_fields_to_security_event_audit_rows.rb
+
+=== Content of the four migrations that changed the opt-in gate ===
+
+--- 20260528120005_add_security_events_module_to_companies.rb ---
+add_column :companies, :security_events_module, :boolean, default: false, null: false
+
+--- 20260529130001_change_security_events_module_default_to_true.rb ---
+up:   safety_assured { change_column_default :companies, :security_events_module, true }
+down: safety_assured { change_column_default :companies, :security_events_module, false }
+
+--- 20260529130002_enable_security_events_module_for_all_companies.rb ---
+up: Company.update_all(security_events_module: true)
+
+--- 20260603200012_remove_security_events_module_from_companies.rb ---
+up:   safety_assured { remove_column :companies, :security_events_module }
+down: add_column :companies, :security_events_module, :boolean, default: true, null: false
+
+=== Confirmation the column is absent from the current schema ===
+
+Command: grep -n "security_events_module" ~/Projects/4Shark/app/db/schema.rb
+Result: (no output — zero matches)
+
+Command: grep -rn "security_events_module" ~/Projects/4Shark/app/app/ ~/Projects/4Shark/app/db/schema.rb
+Result: (no output — zero matches; the only remaining reference in the app/ and db/ trees
+         is the doc comment in docs/architecture/SECURITY_EVENTS.md line 5, which describes
+         the original opt-in design, not the current unconditional state)
+
+=== Reading ===
+
+The gate went: added (default false) -> default flipped to true -> every existing company
+backfilled to true -> the column removed entirely. SessionsController#create and
+SessionsController (failure branch) call `SecurityEvent.create(...)` with no company-flag
+check anywhere in the controller (see SPIKE.md Finding 2 for the full excerpt). The capture
+is therefore unconditional for every company today, but the earliest possible row is bounded
+by table creation: 2026-05-28 (migration 20260528120001_create_security_events.rb). Any
+acceptance/signature event that happened before that date has no corresponding login-audit
+row in security_events, regardless of which company it belongs to.
