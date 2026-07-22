@@ -674,8 +674,12 @@ one-time `import {}` blocks across the app/integrator/mongodb/`shared-resources`
 each surface end to end before starting the next.
 
 **Progress (2026-07-21).** Surface 1 `vpn` is **DONE** end to end (encrypted, keyless, old host retired,
-canonical name). **The next surface is 2 `onboarding`**, then 3 `setup`, then 4 the five integrators, then
-5 `app`. Nothing in 2–5 has started; each is still on the shared/AWS-managed key for its data.
+canonical name). **Surfaces 2 `onboarding` and 3 `setup` run IN PARALLEL** (engineer, 2026-07-22) — they
+are independent Terraform stacks (separate state, separate AWS resources, separate per-stack task roles),
+so there is no contention; the only shared object, `4shark-master`, is not retired until the very end, so
+neither touches it, and neither edits `shared-resources/` (the one file both could collide on). After both
+land, 4 the five integrators, then 5 `app`. Nothing in 2–5 has started; each is still on the
+shared/AWS-managed key for its data.
 
 1. **`vpn` — replace the MongoDB host with an encrypted one — DONE (2026-07-21, PRs #793 / #794 / #795 / #796).**
    The VPN has no SSM/Secrets Manager store; its at-rest data is the hosts' EBS volumes, and the one that
