@@ -1,0 +1,38 @@
+{
+  "source": "aws iam get-instance-profile --instance-profile-name mongo-cwagent (read-only default profile, 2026-07-21)",
+  "instance_profile": {
+    "InstanceProfileName": "mongo-cwagent",
+    "Arn": "arn:aws:iam::405749097490:instance-profile/mongo-cwagent",
+    "CreateDate": "2026-05-13T16:32:59+00:00",
+    "Roles": [
+      {
+        "RoleName": "mongo-cwagent",
+        "Arn": "arn:aws:iam::405749097490:role/mongo-cwagent",
+        "AssumeRolePolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Principal": { "Service": "ec2.amazonaws.com" },
+              "Action": "sts:AssumeRole"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "attached_managed_policies": {
+    "source": "aws iam list-attached-role-policies --role-name mongo-cwagent",
+    "AttachedPolicies": [
+      {
+        "PolicyName": "CloudWatchAgentServerPolicy",
+        "PolicyArn": "arn:aws:iam::aws:policy/CloudWatchAgentServerPolicy"
+      }
+    ]
+  },
+  "inline_policies": {
+    "source": "aws iam list-role-policies --role-name mongo-cwagent",
+    "PolicyNames": []
+  },
+  "note": "AmazonSSMManagedInstanceCore is NOT attached to this role. SSM Session Manager cannot register or serve sessions against any instance using this instance profile until that policy (or an equivalent custom policy) is added. This is the SAME single role attached to every Mongo EC2 instance in scope: five integrators (almaviva, atento, commcenter, maqnelson, redebrasil) x 3 nodes each, plus the VPN's Mongo host — 16 instances on one shared instance profile."
+}

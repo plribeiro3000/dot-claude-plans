@@ -673,15 +673,25 @@ one-time `import {}` blocks across the app/integrator/mongodb/`shared-resources`
 **The order is simplest-to-hardest, so each surface shakes down the mechanics for the next.** Verify
 each surface end to end before starting the next.
 
-1. **`vpn` — replace the MongoDB host with an encrypted one (simplest: one EC2 machine, no SSM/RDS).**
+**Progress (2026-07-21).** Surface 1 `vpn` is **DONE** end to end (encrypted, keyless, old host retired,
+canonical name). **The next surface is 2 `onboarding`**, then 3 `setup`, then 4 the five integrators, then
+5 `app`. Nothing in 2–5 has started; each is still on the shared/AWS-managed key for its data.
+
+1. **`vpn` — replace the MongoDB host with an encrypted one — DONE (2026-07-21, PRs #793 / #794 / #795 / #796).**
    The VPN has no SSM/Secrets Manager store; its at-rest data is the hosts' EBS volumes, and the one that
-   matters is the MongoDB host (`vpn/modules/vpn/mongodb.tf` after #790), which holds every Pritunl org,
-   user and VPN profile. An existing EBS volume cannot be encrypted in place, so the migration is a
-   host replacement: stand up a NEW MongoDB EC2 node with its root volume encrypted under `alias/vpn`,
-   bring the Pritunl data across (Mongo → Mongo — dump/restore or a replica-set join, decided at
-   execution), cut the Pritunl `MONGODB_URI` to the new host, then retire the old node. The Pritunl
-   instances' own EBS can follow the same replace if wanted, but the database host is the data that
-   counts.
+   matters is the MongoDB host, which holds every Pritunl org, user and VPN profile. An existing EBS
+   volume cannot be encrypted in place, so this was a host replacement: a NEW MongoDB node was stood up
+   with its root volume encrypted under `alias/vpn` AND made **keyless** — no SSH key pair, reached only
+   through SSM Session Manager under a dedicated instance profile (`vpn-mongo`, carrying
+   `AmazonSSMManagedInstanceCore` alongside the CloudWatch-agent policy), the first Mongo host off SSH
+   keys (#793). The Pritunl database was moved Mongo → Mongo by `mongodump | mongorestore` streamed from
+   the live Pritunl host (the only host that reaches both mongos over 27017), the persistent config
+   verified collection-by-collection; the Pritunl `MONGODB_URI` was cut to the new host (#794); and the
+   old host was retired (#795), and the replacement was renamed to the canonical `aws_instance.mongodb`
+   (via `terraform state mv`, #796). The keyless access uses a dedicated profile rather than the
+   account-shared `mongo-cwagent`, so SSM was NOT turned on for the ~15 integrator Mongo hosts — that
+   follows in its own change if wanted. The two Pritunl instances' own EBS stay unencrypted — always out
+   of scope (see the table below).
 
 2. **`onboarding` — the app-estate playbook, and the easiest of it (the environment is idle).**
    Onboarding runs at desired 0, so there is no live traffic to protect during the rekey. Apply the

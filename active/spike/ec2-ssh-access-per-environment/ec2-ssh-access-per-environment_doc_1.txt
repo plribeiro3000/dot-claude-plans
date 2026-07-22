@@ -1,0 +1,158 @@
+Source: AWS Systems Manager User Guide — "Sample IAM policies for Session Manager"
+URL: https://docs.aws.amazon.com/systems-manager/latest/userguide/getting-started-restrict-access-quickstart.html
+Fetched: 2026-07-21
+
+Purpose of this file: preserve the verbatim IAM policy JSON quoted from the official AWS
+documentation page, used as citation evidence in SPIKE.md for the tag-scoped ssm:StartSession
+mechanism (the AWS-documented analogue to a "per-environment" access grant, without a key pair).
+
+---
+
+QUICKSTART ADMINISTRATOR POLICY (tag-scoped to a specific group of managed nodes):
+
+"These policies provide administrators the ability to start a session to managed nodes that are
+tagged with Key=Finance,Value=WebServers, permission to create, update, and delete preferences,
+and permission to end only their own sessions."
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:StartSession"
+            ],
+            "Resource": [
+                "arn:aws:ec2:*:{{111122223333}}:instance/*"
+            ],
+            "Condition": {
+                "StringLike": {
+                    "ssm:resourceTag/Finance": [
+                        "WebServers"
+                    ]
+                }
+            }
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssmmessages:OpenDataChannel"
+            ],
+            "Resource": [
+                "arn:aws:ssm:*:*:session/${aws:userid}-*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:DescribeSessions",
+                "ssm:GetConnectionStatus",
+                "ssm:DescribeInstanceProperties",
+                "ec2:DescribeInstances"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:CreateDocument",
+                "ssm:UpdateDocument",
+                "ssm:GetDocument",
+                "ssm:StartSession"
+            ],
+            "Resource": "arn:aws:ssm:{{us-east-1}}:{{111122223333}}:document/SSM-SessionManagerRunShell"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:TerminateSession",
+                "ssm:ResumeSession"
+            ],
+            "Resource": [
+                "arn:aws:ssm:*:*:session/${aws:userid}-*"
+            ]
+        }
+    ]
+}
+
+---
+
+QUICKSTART END USER POLICY (no StartSession at all beyond a named, non-tagged instance list;
+included to show the shape of a MORE restrictive tier than the administrator policy above — a
+user with only this policy can start a session on the specific instance(s) named, and can view
+connection status, but the policy carries no ssm:resourceTag condition, so it does not scale to
+"all of environment X" the way the administrator policy's condition does):
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:StartSession"
+            ],
+            "Resource": [
+                "arn:aws:ec2:{{us-east-1}}:{{111122223333}}:instance/{{i-02573cafcfEXAMPLE}}",
+                "arn:aws:ssm:{{us-east-1}}:{{111122223333}}:document/SSM-SessionManagerRunShell"
+            ]
+        },
+        {
+         "Effect": "Allow",
+         "Action": ["ssmmessages:OpenDataChannel"],
+         "Resource": ["arn:aws:ssm:*:*:session/${aws:userid}-*"]
+       },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:DescribeSessions",
+                "ssm:GetConnectionStatus",
+                "ssm:DescribeInstanceProperties",
+                "ec2:DescribeInstances"
+            ],
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:TerminateSession",
+                "ssm:ResumeSession"
+            ],
+            "Resource": [
+                "arn:aws:ssm:*:*:session/${aws:userid}-*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "kms:GenerateDataKey"
+            ],
+            "Resource": "arn:aws:kms:{{us-east-1}}:{{111122223333}}:key/{{key-name}}"
+        }
+    ]
+}
+
+Note on the kms:GenerateDataKey statement: the page's own explanatory note reads:
+
+"The kms:GenerateDataKey permission enables the creation of a data encryption key that will be
+used to encrypt session data. If you will use AWS Key Management Service (AWS KMS) encryption
+for your session data, replace {{key-name}} with the Amazon Resource Name (ARN) of the KMS key
+you want to use... If you won't use KMS key encryption for your session data, remove the
+following content from the policy."
+
+This KMS key is for encrypting the Session Manager SHELL TRANSCRIPT/TRAFFIC (an optional session
+preference), not for decrypting SSM SecureString application parameters. It is a different KMS
+key from the one covered by the kms-key-per-environment PLAN.md (which encrypts SSM SecureString
+values, RDS storage, OpenSearch). AWS's own sample keeps this statement separate from every other
+statement in the policy — it is not merged into a single "environment access" grant.
+
+---
+
+Document custom-restriction note (from the same page):
+
+"SSM-SessionManagerRunShell is the default name of the SSM document that Session Manager creates
+to store your session configuration preferences. You can create a custom Session document and
+specify it in this policy instead. You can also specify the AWS-provided document
+AWS-StartSSHSession for users who are starting sessions using SSH."
+
+This is the session-document restriction mechanism referenced in the investigation question —
+confirmed present in AWS's own sample policies, not just the general Session Manager docs.

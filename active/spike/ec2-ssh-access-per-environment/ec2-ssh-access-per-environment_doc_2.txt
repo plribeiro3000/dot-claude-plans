@@ -1,0 +1,83 @@
+Source: AWS Systems Manager User Guide — "Additional sample IAM policies for Session Manager"
+URL: https://docs.aws.amazon.com/systems-manager/latest/userguide/getting-started-restrict-access-examples.html
+Fetched: 2026-07-21
+
+Example 3: Restrict access based on tags — verbatim:
+
+"You can restrict access to managed nodes based on specific tags. In the following example, the
+user is allowed to start and resume sessions (Effect: Allow, Action: ssm:StartSession,
+ssm:ResumeSession) on any managed node (Resource: arn:aws:ec2:{{region}}:{{987654321098}}:instance/*)
+with the condition that the node is a Finance WebServer (ssm:resourceTag/Finance: WebServer). If
+the user sends a command to a managed node that isn't tagged or that has any tag other than
+Finance: WebServer, the command result will include AccessDenied."
+
+{
+    "Version":"2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "ssm:StartSession"
+            ],
+            "Resource": [
+                "arn:aws:ec2:{{us-east-1}}:{{111122223333}}:instance/*"
+            ],
+            "Condition": {
+                "StringLike": {
+                    "ssm:resourceTag/Finance": [
+                        "WebServers"
+                    ]
+                }
+            }
+        }
+    ]
+}
+
+---
+
+Source: AWS Cloud Operations Blog — "How to grant least privilege access to third-parties on
+your private EC2 instances with AWS Systems Manager"
+URL: https://aws.amazon.com/blogs/mt/how-to-grant-least-privilege-access-to-third-parties-on-your-private-ec2-instances-with-aws-systems-manager/
+Fetched: 2026-07-21, self-check re-fetch confirmed both quotes below present verbatim.
+
+Quote 1 (no SSH keys / bastion needed):
+"AWS Systems Manager Session Manager provides a more secure way to manage your Amazon Elastic
+Compute Cloud (EC2) instances without the need to open inbound ports, maintain bastion hosts, or
+manage SSH keys."
+
+Quote 2 (tag-scoped ABAC, per external party / per tenant):
+"Using ABAC, it's only possible to start a session on the EC2 instances that have the tag value
+associated to the right third-party."
+
+The article tags instances with a key such as ExternalAccessGrantedTo and value Third_Party_A (or
+Third_Party_B), and the IAM policy condition is:
+"ssm:resourceTag/ExternalAccessGrantedTo": "Third_Party_A"
+
+Two-tier shape in the article's design (as summarized during fetch, backed by the two quotes
+above plus the article's use of ec2:DescribeInstances for a listing-only capability distinct from
+ssm:StartSession for the connect capability): a describe/list tier (ec2:DescribeInstances — see
+which instances exist) is granted separately from the session/connect tier (ssm:StartSession,
+gated by the resource-tag condition). This is the same two-action split (Describe* vs
+StartSession) visible in the AWS quickstart policies in doc_1.txt.
+
+---
+
+Source: Xebia blog — "Fine-Grained EC2 Access With SSM, IAM Identity Center, And Tags"
+URL: https://xebia.com/blog/ssm-startsession-tags/
+Fetched: 2026-07-21
+
+Summarized mechanism (deny-based, per-user rather than per-environment, included as a second,
+independent technique for the same family of problem — scoping who can StartSession on which
+instance via tags):
+"We tag each EC2 instance with a User tag and ensure that users can only start a session on
+instances where that tag matches their username."
+
+Policy shape: an explicit Deny on ssm:StartSession when the instance carries a User tag whose
+value does not match the caller's identity, using a condition of the form:
+"StringNotLike": { "aws:userid": ["AROA*:${ssm:resourceTag/User}", ...] }
+
+The article separately notes a companion Deny that blocks ec2:CreateTags / ec2:DeleteTags on the
+User tag itself, so a caller cannot re-tag an instance to grant themselves access — relevant if
+4Shark ever adopts tag-conditioned SSM policies, since the Client tag already on every Mongo
+instance (see SPIKE.md Finding 1) would need the same tag-immutability protection to remain a
+trustworthy access boundary.
