@@ -69,7 +69,7 @@ does not. There are two populations, and the second is out of this design's reac
 
 | Population | Stacks | Key | Reachable by this design? |
 |---|---|---|---|
-| On `4shark-master` | `app-beta-001`, `app-demo-001`, `app-shared-001`, `app-atento-001`, `setup`, `onboarding` | `mrk-fa0cda24…`, **customer-managed**, us-east-1 | **Yes** — everything below applies |
+| On `4shark-master` | `app-beta-001`, `app-demo-001`, `app-shared-001`, `app-atento-001`, `setup`, `onboarding` | `mrk-fa0cda24…`, **customer-managed**, us-east-1 | **Yes** — everything below applies. (Plan-start landscape; `onboarding` has since migrated to `alias/onboarding` — surface 2 DONE 2026-07-22.) |
 | On the AWS default SSM key | `integrator-almaviva`, `integrator-atento`, `integrator-commcenter`, `integrator-maqnelson`, `integrator-redebrasil` | `b16e449a…`, **AWS-managed**, sa-east-1 | **Yes — decided 2026-07-20** (see below) |
 
 The second key is `alias/aws/ssm` for sa-east-1 — `describe-key` returns `"KeyManager": "AWS"` and
@@ -435,6 +435,14 @@ OpenSearch, and Performance Insights sit on the shared multi-region `4shark-mast
 (`mrk-fa0cda243274491784fc7b39bead5a03`, us-east-1). So this is the REAL key split for these stacks
 (create + migrate the data), not the clean `state mv` the integrators got.
 
+**Superseded for `onboarding` — DONE 2026-07-22 (see the surface-2 entry in § Execution order).** This
+2026-07-20 snapshot is stale for onboarding on two counts: it now HAS its dedicated key with its SSM on it,
+and the "SSM on `alias/aws/ssm`" claim was never true for onboarding specifically — its 11 parameters were
+on `4shark-master` (the 2026-07-17 probe had already moved them there), which is what the migration rekeyed
+onto `alias/onboarding`. Onboarding also turned out to have no RDS / OpenSearch / pooler at all (removed when
+it went idle), so "create + migrate the data" reduced to the SSM rekey for it. `setup` is being migrated in a
+parallel session; the snapshot stands for `app-*` until those run.
+
 **Per-stack playbook — ONE procedure, applied per stack in the order above:**
 
 1. **Module mints the key. — DONE for app (PR #786, merged 2026-07-20).** `modules/app` creates its own
@@ -660,8 +668,49 @@ dedicated, correctly-named key by construction (Phases 10–11) — is COMPLETE 
 `app` (#786), `integrator` (#785), `onboarding`/`setup` (#788), `auth` (#789), `vpn` (#790). So the key
 EXISTS per stack today. What remains is the DATA migration: moving each stack's at-rest data off the
 shared/AWS-managed key onto the dedicated key it already has. `auth` is the one surface where the data
-is already on its key (the Keycloak secret used the adopted key all along — #789), leaving only its RDS
-(separate key, blue/green later). Every other surface still has data to move.
+is already on its key (the Keycloak secret used the adopted key all along — #789), leaving only its RDS.
+**auth RDS — REDESIGNED 2026-07-22 (discovery session). Two decoupled efforts, security first.** auth's RDS
+goes onto the SAME `alias/auth-001`, NOT a separate key (the older "(separate key)" note predates the
+one-key-per-stack conclusion the setup RDS confirmed: finest granularity is one application per SDLC stage,
+not one key per service type). Discovery this session (read-only) found two things the earlier note did not
+account for:
+
+- **The RDS storage is on the WRONG key — `alias/auth002` (`6f7b8e40`), not any dedicated key** — and it has
+  NO managed master password, NO Performance Insights, NO enhanced monitoring today (master user `postgres`,
+  password set out of band). So the § "Out of scope" table's claim that `alias/auth002` is an unused orphan is
+  WRONG — it encrypts this RDS's storage and can only be retired AFTER the re-key. (Live `alias/auth002` →
+  `6f7b8e40`; the table's recorded `df7df919` id does not match live — reconcile before any auth002 deletion.)
+- **Keycloak connects to the DB as the RDS master `postgres`** — the application runs with full privilege, a
+  security defect in its own right, and it also blocks adopting managed master password: enabling managed-pw
+  rotates the `postgres` password and the app's stored password (in the manual secret `auth-001-sm`) goes
+  stale → Keycloak breaks. Setup's managed-pw worked only because setup's app uses a dedicated user; auth is
+  the exception.
+
+Therefore the work splits, security first (engineer decision 2026-07-22):
+
+- **Effort 1 (do FIRST — in-place on the current instance, NO re-key, NO Terraform): move Keycloak off the
+  master onto a dedicated LEAST-PRIVILEGE DB user.** Create a minimal-privilege user (only what Keycloak +
+  Liquibase need — DDL on its own schema, DML on its tables; NO superuser, NO cross-database access), transfer
+  the existing schema's ownership to it, update the `auth-001-sm` secret values, rolling-restart Keycloak.
+  No direct DB access → SQL is generated for the engineer to run (three-script pre-flight/mutation/verification
+  per SCRIPT-DISCIPLINE). Grounded by the `keycloak-least-privilege-db-user` spike BEFORE any SQL is written —
+  the privilege set + ownership transfer are not improvised on a productive auth DB.
+- **Effort 2 (AFTER Effort 1): re-key + managed master password + PI + enhanced monitoring.** Mechanism =
+  Option A (pg_dump/restore short-freeze) per the `auth-001-rds-key-migration` spike — the DB is small
+  (~1.8 GB used) so the freeze is a few minutes, and Option A avoids the sequence/DDL/large-object gaps that
+  logical replication and DMS carry. Stand up a NEW instance under `alias/auth-001` (managed-pw + PI +
+  monitoring set at creation), dump→restore, repoint + rolling deploy. With Keycloak already on a dedicated
+  user (Effort 1), adopting managed-pw on `postgres` is now safe (the app-user survives, like setup). PI is
+  KEPT (4Shark/setup pattern; console EOL 2026-07-31 but API/Terraform config preserved and instances
+  auto-migrate to CloudWatch Database Insights — enabling it is not wasted work).
+- **Prerequisite for Effort 2 — DONE as a PR:** broaden `alias/auth-001`'s policy from via-SecretsManager to
+  `ViaService = [secretsmanager, rds]` (rds for PI) AND tighten its admin statement from `kms:*` to the
+  management-only action list (it had inherited the leaky `kms:*` shape when adopted by hand in #789) —
+  **PR #807, open, apply GATED on the engineer's OK.** In-place `PutKeyPolicy`, `0 add, 1 change, 0 destroy`.
+
+Spikes: `active/spike/auth-001-rds-key-migration/SPIKE.md` (RDS re-key mechanism, 3 options, Option A chosen),
+`active/spike/keycloak-least-privilege-db-user/SPIKE.md` (Effort 1 grounding).
+Every other surface still has data to move.
 
 **Codebase hygiene — DONE (#791, merged 2026-07-20).** The whole Terraform estate was audited: every
 data surface gets its key from its module (no discrepancy, forward-lock confirmed). The one-time
@@ -673,13 +722,20 @@ one-time `import {}` blocks across the app/integrator/mongodb/`shared-resources`
 **The order is simplest-to-hardest, so each surface shakes down the mechanics for the next.** Verify
 each surface end to end before starting the next.
 
-**Progress (2026-07-21).** Surface 1 `vpn` is **DONE** end to end (encrypted, keyless, old host retired,
-canonical name). **Surfaces 2 `onboarding` and 3 `setup` run IN PARALLEL** (engineer, 2026-07-22) — they
-are independent Terraform stacks (separate state, separate AWS resources, separate per-stack task roles),
-so there is no contention; the only shared object, `4shark-master`, is not retired until the very end, so
-neither touches it, and neither edits `shared-resources/` (the one file both could collide on). After both
-land, 4 the five integrators, then 5 `app`. Nothing in 2–5 has started; each is still on the
-shared/AWS-managed key for its data.
+**Progress (2026-07-22).** Surface 1 `vpn` is **DONE** end to end (encrypted, keyless, old host retired,
+canonical name). **Surface 2 `onboarding` is DONE** (PR #799, merged 2026-07-22) — see the surface-2 entry
+below for the collapsed scope and the alias-vs-ARN learning. **Surface 3 `setup` is DONE** (2026-07-22) —
+SSM SecureStrings rekeyed onto `alias/setup` (PRs #800 expand / #802 contract) and the **RDS fully migrated**
+onto `alias/setup` (storage + Performance Insights + managed master secret), PR #804. Surfaces 2 and 3 were
+independent Terraform stacks (separate state, separate AWS resources, separate per-stack task roles), so
+there was no contention; the only shared object, `4shark-master`, is not retired until the very end, so
+neither touches it, and neither edits `shared-resources/` (the one file both could collide on). After setup,
+4 the five integrators, then 5 `app`. Surfaces 4–5 have not started; each is still on the shared/AWS-managed
+key for its data.
+
+**READ § "Phase 2 RDS migration — the playbook and the prerequisites, learned on setup" (below) before
+migrating any RDS-bearing stack (`app`, `atento`, `auth`, and `onboarding`'s future RDS).** The setup RDS
+surfaced two non-obvious blockers that WILL recur, plus the mechanism that worked — do not re-derive them.
 
 1. **`vpn` — replace the MongoDB host with an encrypted one — DONE (2026-07-21, PRs #793 / #794 / #795 / #796).**
    The VPN has no SSM/Secrets Manager store; its at-rest data is the hosts' EBS volumes, and the one that
@@ -697,13 +753,28 @@ shared/AWS-managed key for its data.
    follows in its own change if wanted. The two Pritunl instances' own EBS stay unencrypted — always out
    of scope (see the table below).
 
-2. **`onboarding` — the app-estate playbook, and the easiest of it (the environment is idle).**
-   Onboarding runs at desired 0, so there is no live traffic to protect during the rekey. Apply the
-   Phases 3–8 per-stack playbook: rekey its SSM SecureStrings onto its dedicated key (the role's
-   `-ssm-read` must gain explicit `kms:Decrypt` on the new key — the AWS-managed key auto-granted it, a
-   customer-managed one does not), then the RDS blue/green replace and, if it has one, the OpenSearch
-   replace, then retire `4shark-master` for its scope. **Discovery per stack:** confirm which of RDS /
-   OpenSearch / pooler-secret onboarding actually has before scoping the work.
+2. **`onboarding` — DONE 2026-07-22 (PR #799, merged).** The discovery collapsed the scope to almost
+   nothing: `4989a2c` (2026-07-17, "remove idle load balancer, deploy machinery, redis and database") had
+   already DELETED `onboarding/rds.tf` / `redis.tf` / `backup.tf` and gutted `main.tf`, so onboarding has
+   **no RDS, no OpenSearch, no ElastiCache/Redis, no pooler** in Terraform — verified against live AWS
+   (`describe-db-instances` empty; the only OpenSearch domains are `app-shared-001` / `app-atento-001`).
+   The whole surface was therefore just: rekey the 11 SSM SecureStrings off `4shark-master` onto the
+   dedicated `alias/onboarding` (they were on the master, not `alias/aws/ssm` — the 2026-07-17 probe had
+   moved them) and repoint the task role's `kms:Decrypt` from the master ARN to the dedicated key. No RDS
+   blue/green, no OpenSearch replace. `4shark-master` NOT retired (last cross-cutting step); `shared-resources/`
+   untouched.
+   - **The value rekey is value-preserving and out of band** (engineer's step, MFA): `get-parameter
+     --with-decryption` piped into `put-parameter --key-id alias/onboarding --overwrite`, per parameter, so
+     the value is rewritten with itself under the new key and never lost. Then Terraform's `ssm.tf` carries
+     `key_id` so the binding is declared (the module owns the key already).
+   - **LEARNING for setup / app — the alias-vs-ARN trap.** `put-parameter --key-id alias/<stack>` stores the
+     KeyId as the literal alias STRING (`"alias/onboarding"`), not the resolved key ARN. So the Terraform
+     `aws_ssm_parameter.key_id` MUST be `aws_kms_alias.this.name` (the alias), NOT `aws_kms_key.this.arn` —
+     otherwise the plan never reconciles the 11 params and you get a spurious 12-change plan whose apply
+     would overwrite every secret with the `"PLACEHOLDER"` seed (the value rides along in the provider's
+     `PutParameter` on a key_id-only change, and `ignore_changes = [value]` does NOT protect it). The role's
+     `kms:Decrypt` Resource stays the key ARN (`aws_kms_key.this.arn`) — IAM needs a concrete key ARN there,
+     an alias does not authorize decrypt.
 
 3. **`setup` — the same app-estate playbook, in use but still simple (single web service, no crons).**
    Same steps as onboarding; the difference is setup carries live traffic, so the rekey and the RDS
@@ -742,6 +813,72 @@ least at-risk data and the simplest shape first (`vpn` is one machine; `onboardi
 one service), so the mechanics are proven on low-stakes surfaces before the productive app estate. The
 per-phase detail above is unchanged and correct; only the sequence is this section's.
 
+## Phase 2 RDS migration — the playbook and the prerequisites, learned on setup (2026-07-22)
+
+The setup RDS surfaced two non-obvious blockers plus the working mechanism. Every RDS-bearing stack
+(`app`, `atento`, `auth`, `onboarding`'s future RDS) hits the same. Do not re-derive.
+
+**PREREQUISITE 1 — broaden the dedicated key's policy to multi-service BEFORE touching the RDS.** The
+dedicated keys were minted **via-SSM-only** (`kms:ViaService = ssm.<region>.amazonaws.com`) because they
+were created for the SSM SecureStrings. RDS cannot use a via-SSM-only key for the **managed master secret
+(Secrets Manager)** or **Performance Insights** — `modify-db-instance` fails with `KMSKeyNotAccessibleFault`.
+STORAGE encryption slips through (RDS uses a KMS grant, which the account-root admin statement's
+`kms:Create*` permits), which MASKS the problem until managed-pw/PI are enabled. So the key's use-statement
+`ViaService` must become a LIST — `["ssm.<r>...", "rds.<r>...", "secretsmanager.<r>..."]` — before the RDS
+migration. This is the "one key per stack, multi-service via ViaService" the AWS/community key-scope research
+concluded (finest recommended granularity is one application per SDLC stage, NOT one key per service type —
+k9 Security "AWS KMS Key Scope Guide" + AWS Prescriptive Guidance). It is a PREREQUISITE, not cleanup.
+(setup: broadened live via `put-key-policy` + reflected in `modules/setup/kms.tf`, PR #804.)
+
+**PREREQUISITE 2 — `prevent_destroy` in `modules/rds_instance` blocks a Terraform replace.** `kms_key_id`
+is ForceNew, so changing it via TF plans a destroy+create, which `lifecycle { prevent_destroy = true }`
+refuses; and prevent_destroy cannot be a variable (TF requires a literal). Two ways past it: (a) transiently
+flip the module's `prevent_destroy = false` on the branch, apply, revert to true before merge; or (b) — what
+setup used — do the migration by HAND (AWS CLI) so Terraform never issues a destroy, then reconcile state.
+
+**THE MECHANISM THAT WORKED (setup) — manual CLI migration, then reconcile TF state.** All AWS-API, no
+direct DB access, so the agent does it all:
+
+1. Scale the app service to 0 (stop writes; downtime = the window).
+2. `create-db-snapshot` of the current instance.
+3. `copy-db-snapshot --kms-key-id alias/<stack>` — re-encrypts the snapshot under the dedicated key. THIS
+   is where the re-key happens (a restore keeps the snapshot's key; restore does NOT accept a different one).
+   **VERIFY this copy `available` BEFORE deleting anything — it is the rollback.**
+4. `delete-db-instance --skip-final-snapshot` (deletion_protection must already be false — a prior in-place
+   PR). Wait for fully deleted (frees the identifier).
+5. `restore-db-instance-from-db-snapshot` from the ENCRYPTED copy, same identifier. **Restore does NOT
+   accept `--manage-master-user-password`, `--enable-performance-insights`, or `--monitoring-*`** — pass only
+   class / subnet / SGs / param-group / multi-az / public / deletion-protection / engine-lifecycle.
+6. `modify-db-instance --manage-master-user-password --master-user-secret-kms-key-id alias/<stack>
+   --enable-performance-insights --performance-insights-kms-key-id alias/<stack> --monitoring-interval N
+   --monitoring-role-arn ... --apply-immediately`. Requires Prerequisite 1 already done. Non-disruptive.
+7. Scale the app back up. **The endpoint is STABLE across delete+restore of the same identifier** (setup's
+   `setup.cvw5l7p4adp1…` was identical), so the app's DB URL does NOT change — PROVIDED the app connects as a
+   dedicated app-user (creds preserved in the restored data), NOT the managed master (whose password the
+   managed-secret enable rotates). Setup's app-user survived the rotation; confirm this per stack.
+8. Reconcile Terraform: update the stack code to match the now-live infra (the three RDS key args →
+   `aws_kms_key.this.arn`, `kms.tf` ViaService broadened). `terraform plan` refreshes state (same identifier →
+   reads the new instance, kms matches → **no ForceNew replace**) and shows only the mutable attrs the restore
+   left at defaults (`copy_tags_to_snapshot`, `max_allocated_storage`, `performance_insights_retention_period`,
+   re-asserting the master-secret key) as an in-place `1 to change`. Apply → `No changes` → branch is faithful.
+
+**Data preservation:** the snapshot preserves everything; only writes during the window are lost. Confirm the
+acceptable-loss story per stack (setup's is recreated-on-reconnect device registrations).
+
+**Setup cleanup — DONE (2026-07-22).** PR #805 consolidated the RDS's three explicit key references to ONE
+— `modules/rds_instance` now defaults `performance_insights_kms_key_id` + `master_user_secret_kms_key_id` to
+`kms_key_id` via `coalesce`, so the caller passes the key once (the "não pode ter três entradas" rule),
+backward-compatible for every other RDS stack (they pass explicit keys → coalesce returns them) — and
+restored `deletion_protection = true` (dropped in PR #803 for the migration). PR #806 corrected the
+`modules/setup/kms.tf` header comment, which wrongly described setup as a flat stack owning the key at stack
+level; the key is created BY THE MODULE the stack imports (forward-lock), like the app/integrator estates.
+
+**Audited and confirmed (2026-07-22) — this is the reference shape for the next stacks:** the dedicated key
+is defined exactly once (`modules/setup/kms.tf`, in the module, not the stack — `terraform/setup/` carries no
+kms reference at all), and the RDS references it once (`kms_key_id`; PI + managed-secret keys inherit).
+Remaining: delete the two rollback snapshots (`setup-pre-dedicated-key-migration`, `…-encrypted`) once
+confident — non-blocking.
+
 ## Out of scope, surfaced here so they are not forgotten
 
 | Item | State |
@@ -749,12 +886,12 @@ per-phase detail above is unchanged and correct; only the sequence is this secti
 | **OpenSearch** | ~~Blocked~~ — NO LONGER out of scope (2026-07-20). Handled by the replace path in Phases 3–8 step 4: the data need not persist, so a new domain under the correct key/name replaces the old in a quiet window. Folded into the per-stack app-estate migration. |
 | **The six `backup-<stack>-local` key policies** | Right count, wrong policy (account-root `kms:*`, `modules/cross_region_backup/main.tf`). Same fix as Phase 3, different scope. |
 | **`alias/4shark-ecs-beta-key`** (`6bf5847f`, us-east-1) | Orphan. Created 2025-10-17, rotation off, console-default policy, referenced by no repo. Billed ~9 months for nothing. |
-| **`alias/auth002`** (`df7df919`, sa-east-1) | Orphan. Created 2024-12-12, no description, no `auth-002` stack exists. |
+| **`alias/auth002`** (live `6f7b8e40`, sa-east-1) | **NOT an orphan — corrected 2026-07-22.** It encrypts the `auth-001` RDS storage today (`modules/auth/rds.tf` hardcodes its key). Retire only AFTER the auth RDS is re-keyed onto `alias/auth-001` (Effort 2 in § "What is already DONE"). The `df7df919` id recorded earlier does not match live (`6f7b8e40`) — reconcile before any deletion. |
 | **`alias/main`** (`64eb0fa9`, sa-east-1) | Legitimate — CloudTrail's key, `audit/kms.tf:116`. Leave alone. |
 | **VPN EBS encryption** | The `alias/vpn` key (PR #790) is minted ready but idle. Using it means encrypting the three VPN hosts' EBS volumes (MongoDB data host + the two Pritunl instances), which REPLACES each volume — a data migration on the MongoDB host (`disable_api_termination`, `delete_on_termination=false`, holds all Pritunl state), taken in a window. Deferred; the key's via-EC2 policy is already in place for it. |
 | **The restricted engineer tier** | `active/spike/aws-engineer-staging-tier/`. This plan makes its scoping possible; it does not build it. |
 
-Both orphans are billed and unrotated. Deleting a KMS key is irreversible — each is its own decision.
+The remaining orphan (`alias/4shark-ecs-beta-key`) is billed and unrotated (`alias/auth002` is in use — see its row). Deleting a KMS key is irreversible — each is its own decision.
 
 ## Risks
 

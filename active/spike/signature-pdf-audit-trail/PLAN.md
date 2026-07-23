@@ -5,11 +5,77 @@
 
 ---
 
-## Execution status (2026-07-20)
+## Execution status
 
-**Frontend (Phase 1) is IMPLEMENTED and CI-green** — PR [app-webclient#6613](https://github.com/4shark/app-webclient/pull/6613). **Backend (Phase 2) NOT started.**
+**Frontend (Phase 1) is IMPLEMENTED and CI-green** — PR [app-webclient#6613](https://github.com/4shark/app-webclient/pull/6613). **Backend (Phase 2) is IN PROGRESS** — the result-side models (PR #5247) AND the result-side workers + manifest (PR #5253) landed 2026-07-22. Remaining: the worker instance sizing (bigger box, keep 10 threads — see Scale & delivery decisions), the DELIVERY REDESIGN (many ZIPs per plano + root index Excel), the rule-side adaptation (`PlanStatementPortable`), and the terraform `worker_portable_exportation` service + Chromium image.
 
-### Decisions made (this session)
+### 2026-07-22 — Backend Phase 2 started: result-side models merged
+
+- **PR [app#5247](https://github.com/4shark/app/pull/5247) (merged)** delivered the new **result-side** mirrored data layer — `StatementPortable` + `StatementPortableBatch`, their STI attachment/download models (`StatementPortableAttachment`, `StatementPortableBatchAttachment`, `StatementPortableDownload`, `StatementPortableBatchDownload`), the two CarrierWave uploaders, the `Company`/`User`/`Statement` associations, and the two migrations. The batch table was created **company-wide, without `calendar_id`** — the company-scoped shape this plan calls for is baked in from creation, so the result side needs **no** calendar-decoupling step (that step remains only on the reused rule-side `PlanStatementPortableBatch`).
+- Merged green after a rebase onto the Ruby 4.0.6 upgrade. A small unrelated test cleanup rode alongside as PR [app#5251](https://github.com/4shark/app/pull/5251) — removed a state-machine transition spec that does not match the house testing conventions.
+- **Not yet built on the result side**: the `computation` counter on the batch model, and the Producer/Consumer/Finalizer Ferrum pipeline (the worker half of Execution-order step 4). **Still untouched**: the shared infra (step 2), the rule-side adaptation (step 3), and the run (step 5).
+
+### 2026-07-22 — Backend Phase 2 workers merged (result side)
+
+**PR [app#5253](https://github.com/4shark/app/pull/5253)** (branch `feature/portable-exportation-backend`) — result-side Producer/Consumer/Finalizer + manifest. Rubocop-green; **no specs** (chained workers and concrete work_books are not unit-tested in this codebase — the `PlanStatementAudit` triad has zero specs; only `spec/work_books/application_work_book` exists). NOT run locally (postgres was down; and the workers need Chromium + a deployed front to run end-to-end) — CI + review are the gates.
+
+Files: `config/initializers/hire_fire.rb` (added `worker_portable_exportation` dyno, mirrors `worker_deal_indexation`); `app/models/statement_portable_batch.rb` (added `computation` = `Computation.new("statement_portable_batch_#{id}")`, mirrors `Audit#computation` at `audit.rb:115`); `app/workers/statement_portable_batch/{producer,consumer,finalizer}.rb` (triad namespaced under the coordinator model `StatementPortableBatch`, queue `:portable_exportation`); `app/work_books/statement_portable_work_book.rb` + `.../statements_work_sheet.rb` (manifest, following `StatementAuditWorkBook` + `StatementsWorkSheet` — Axlsx, inline i18n titles via `human_attribute_name`, NO header constant, flow inline in `add`). NOTE: `gem 'ferrum'` and `config/sidekiq_portable_exportation.yml` were ALREADY on develop from a prior infra PR (the earlier "infra remains" note was wrong).
+
+**Facts resolved this session (must persist):**
+- **Entry point = `Producer#perform(company_id)`** — the trigger passes a `company_id` (operator/rake); the Producer creates the batch and fans out one Consumer per statement. NOT a batch_id.
+- **Enumeration = ALL statements (`company.statements`)**, NOT `.accepted` — the earlier plan text `Statement.for_company(...).accepted` was WRONG (contradicts the objective "all of them"). Engineer confirmed: export every declaration.
+- **Front URL = `company.primary_webclient_host`** (`db/schema.rb:525`, `null: false`; also `webclient_hosts` array). Consumer navigates to `https://#{host}/statements/#{statement_id}?expand=true`.
+- **Capture auth (FINAL, adopted 2026-07-22, commit `4692ae00`)** = mint `JsonWebToken.encode(user_id: owner.id)` (`json_web_token.rb:6`) → navigate to the SPA's own token-login route `https://#{host}/session/create?token=#{token}`, `wait_for_idle`, THEN navigate to the statement. Supersedes the earlier `localStorage['credentials']` injection (the review flagged the hard-coded localStorage key; the route is the codebase's own pattern per `web_authenticator_configuration.rb:5`). No credential passed/persisted.
+- **Owner** = company's SuperAdmin seat user (`company.users.joins(:seat).find_by(seats: { type: 'SuperAdmin' })`). The batch follows the `Document` owned-resource convention (`app/models/document.rb:16,24`: `belongs_to :owner` optional + `validates :owner_id, presence: true`) — validates presence, trusts the flow to supply the owner, NO defensive seat-fallback + raise.
+- **Trail/manifest** = the `StatementPortableWorkBook` XLSX IS the evidentiary trail, built at the Finalizer from `Acceptment` (actor, forced=reason present, reason name+description, IP=`acceptment.from`, timestamp, SHA256 of each PDF via reading the portable's attachment). SEPARATE file in the ZIP (never appended to the PDF). Consumer stores the PDF on each `StatementPortable`'s attachment; Finalizer bundles all PDFs + the manifest into a ZIP on the batch's attachment.
+- **Sidekiq concurrency (CORRECTED 2026-07-22)** = KEEP the shared `sidekiq_threads` (10 — Sidekiq's recommended default); do NOT lower it. The earlier "must be LOW-concurrency / 1 thread" note is REVERSED — one thread per process does not scale (a huge export would need a huge number of instances). Chromium memory pressure is solved at the INFRASTRUCTURE layer with a bigger ECS instance (≥8 GB vs the standard 4 GB), not fewer threads. See "2026-07-22 — Scale & delivery decisions" below (decision #1).
+
+**Open review findings on #5253 (REAL — fix; NOT false positives):**
+- **Idempotency on retry**: no short-circuit when portable/batch already `final`. Consumer re-captures the PDF and `build_attachment` can duplicate the `has_one` attachment; Finalizer rebuilds the ZIP/attachment. Add early-return-when-final + reuse.
+- **Tmp collision**: PDF tmp path keyed only on `statement_id` collides across concurrent batches/retries — add the Sidekiq `jid`.
+- **Zip append**: `Zip::File.open(zip_path, Zip::File::CREATE)` appends to an existing zip on retry (stale entries) — create clean each run.
+- **PR description**: #5253 body says "accepted" but the code exports ALL — correct the description (code is right per the decision above).
+
+**Review findings resolved this round (commit `4692ae00`, all threads replied + resolved):**
+- **Auth via `/session/create?token=...`** — ADOPTED (engineer's call), replacing the localStorage injection. See the Capture-auth fact above.
+- **File cleanup could raise on retry** — the three `File.delete` (Consumer PDF, Finalizer zip + manifest) swapped for `FileUtils.rm_f` (atomic, never raises on a missing file, so no retry after a successful save+increment). Rubocop `Lint/NonAtomicFileOperation` pointed to this fix.
+- **Memory of `attachment.file.read` (SHA256 in the worksheet, PDF into the zip)** — both loops read ONE PDF at a time and release it each iteration, so the footprint is bounded to a single statement PDF and does NOT grow with batch size. Documented with a code comment at each spot. Storage is Fog/S3; sub-PDF chunked streaming has no codebase precedent (would be a separate spike) — the bounded per-iteration read is the practical minimum here.
+
+**Forced flag — does NOT apply to statements (engineer-confirmed domain fact, 2026-07-22):** the earlier "Trail/manifest" line said `forced=reason present`, which is WRONG for statements. For a statement, **only the owner can give the acknowledgement (ciência)** — a statement is never accepted on the owner's behalf, so `acceptment.user_id != statement.user_id` is always false and there is no forced state to record. Consistent with `Acceptment#acceptment_reason_required?` (`acceptment.rb:65`: `return false if statement?`) — the forced/reason marker belongs to plan_statements, not statements. No forced column added; the two Copilot threads asking for it were resolved as not-applicable. **Resolved (commit `218eeb22`):** the engineer decided to REMOVE the three redundant columns — `actor` (duplicated the User column, since the actor is always the owner) and reason-name / reason-description (always empty for statements). The manifest is now 6 columns: Statement, User, accepted, IP (`acceptment.from`), accepted_at, checksum. No workbook spec exists, so nothing broke.
+
+**Brakeman build fix (commit `2826acd4`):** Brakeman `FileAccess` (Weak) flagged `FileUtils.rm_f(manifest.path)` in the Finalizer — "Model attribute used in file name", because `manifest.path` comes through `StatementPortableWorkBook#generate` (`File.new(Rails.root.join('tmp', "manifest-#{id}.xlsx"))`) and the taint trace loses the id-only shape. The sibling audit finalizers never clean their workbook tmp output (id-keyed, overwritten on retry, bounded), so the manifest cleanup line was removed to match the pattern — the Consumer PDF (`jid`-keyed, unbounded) and the zip (`id`-keyed) cleanups stay via `FileUtils.rm_f`, and neither of those is Brakeman-flagged. **Process note: run `bin/brakeman` + `rubocop` locally before every push — the earlier rounds pushed without the local Brakeman check and CI caught what a local run would have.**
+
+**Review threads resolved (FPs)**: 6 `github-code-quality` "uninitialized local variable" (`actor`/`reason` in `statements_work_sheet.rb`) — Ruby `x = expr if cond` defines the local as nil (sibling `statement_audit_work_book/statements_work_sheet.rb:116` same idiom); plus the owner-nil one (Document convention above).
+
+### 2026-07-22 — Scale & delivery decisions (post-merge, engineer)
+
+Follows the SPIKE `../portable-exportation-scale-limits/SPIKE.md` (memory/disk/upload/concurrency ceilings, source-cited). Verified there: the ZIP build and the S3 upload are both memory-safe (rubyzip streams to disk; fog-aws streams to S3 in 1 MB chunks, no full-body buffer). The real ceilings are the S3 single-PUT 5 GB limit, the container disk, and concurrency. The engineer's decisions:
+
+**1. Concurrency — KEEP ≥10 threads/process; solve memory with a BIGGER INSTANCE, not fewer threads.** REVERSES the earlier low-concurrency note. One thread per process does not scale (a huge export would need a huge number of servers). Sidekiq's recommended default (≥10 threads) stays. Chromium memory is handled at the INFRASTRUCTURE layer: this worker's ECS instance is sized above the standard 4 GB — **8 GB or more**, so 10 concurrent Chromiums do not OOM (tune up empirically). The worker is ephemeral and runs occasionally, so a bigger box only while it runs is acceptable and it has no OOM problem when it runs. Horizontal scale by dyno instances (HireFire by queue depth) still applies on top. So `sidekiq_portable_exportation.yml` stays at `sidekiq_threads` (10); the fix lives in TERRAFORM (instance memory), not the yml.
+
+**2. Delivery — MANY ZIPs in a navigable folder, likely ONE ZIP PER PLANO, with a root Excel index.** A single giant ZIP is rejected: an 8 GB "download this" is a bad deliverable AND hits the 5 GB S3 PUT ceiling. Instead the export produces MULTIPLE ZIPs the customer downloads as a folder and works from locally ("baixa tudo pra sua máquina e trabalha"). Working shape (engineer sketch — exact tree to CONFIRM, see open questions): one ZIP per **plano**, each holding that plano's rule declarations + result declarations (PDFs), organized in a navigable tree (e.g. `2024/ → <planos> → <months> → one file per plano`). At the ROOT, an Excel INDEX lists every plano (one tab) and every declaration (another tab), each row pointing to WHERE its file lives in the tree — so an auditor finds "a 2024 plan" by navigating year → month → plano, or via the index. This turns the manifest into an index/map and MERGES the rule side (`PlanStatement`) and result side (`Statement`) per plano into one deliverable.
+
+**3. Disk — 40 GB ephemeral (4Shark standard).** Set the worker's ephemeral storage to 40 GB (our standard); increment later if an export doesn't fit. The worker is ephemeral: boot → generate the ZIPs on the box → save to S3 → die. (Fargate: `ephemeralStorage.sizeInGiB: 40`; EC2: the EBS volume.)
+
+**4. S3 location — DEFERRED decision, recorded so it is not forgotten.** Today the batch attachment saves to the SAME bucket/path as the project's normal uploads (`ApplicationUploader` → `:fog`). This export is NOT a product feature yet, so that co-location is provisional. At some point decide: **(a)** release it internally so any client can self-download an audit of all their declarations at any time via the platform → then keeping it with the normal uploads is fine; or **(b)** if we will never expose it, MOVE it out of the product uploads into a DEDICATED S3 folder with a lifecycle policy that deletes after N days — mirroring today's `integration-debug` folder (7-day auto-delete). Decide later, not now.
+
+**Domain path (traced 2026-07-22, grounds the tree):** both declaration kinds reach a **Plan** — the common grouper. Rule (`PlanStatement`) is **plan-level**: `belongs_to :plan` directly (`plan_statement.rb:6`), one per user per plan. Result (`Statement`) is **month-level**: reached via `statement.user_commission.commission.plan` (`commission.rb:12`), with the month from `commission.period` (`commission.rb:11`), one per user per commission/month. The year/periods come from the plan's `calendar` (`plan.rb:8,35`).
+
+**Confirmed structure (engineer, 2026-07-22): ONE ZIP per plano.** Tree `<year>/<plano>.zip`; inside each ZIP: a `regras/` folder (the plan-level rule declarations) + one folder per month (`2024-01/`, `2024-02/`, …) holding that month's result declarations. A root **Excel index** lists every plano (one tab) and every declaration (another tab), each row pointing to its location in the tree. Delivery = the set of per-plano ZIPs + the root index as a downloadable folder (presigned S3 URLs — a ZIP-of-ZIPs would re-hit the 5 GB wall, so NOT that).
+
+**Accepted risk + guardrail:** a single very large plano (many users × many months of PDFs) could still exceed 5 GB in one object and hit the PUT ceiling. Engineer accepted this for the one-zip-per-plano grain; add a **guardrail** in the plano Finalizer that logs / fails loudly when a plano's ZIP would exceed 5 GB, and if it ever bites, fall back to the per-plano-per-month split for THAT plano only.
+
+**Still to pin down at build time:** exact columns of the two index tabs and the location-pointer format. **This redesign SUPERSEDES the current one-ZIP-per-batch Finalizer (PR #5253)** and folds in the still-owed rule-side (`PlanStatementPortable`) adaptation — the two sides converge per plano.
+
+**Build sequence (delivery-redesign phase):**
+1. Rule side — adapt/mirror `PlanStatementPortable` capture (the owed rule half) so rule declarations are captured like the result ones.
+2. Restructure the Producer to fan out **per plano** (not per statement across the whole company): one plano = one coordination unit whose Consumers capture that plano's rule + monthly result PDFs.
+3. Rewrite the Finalizer to build **one ZIP per plano** with the `regras/` + `<month>/` tree, plus the 5 GB guardrail.
+4. Build the **root index Excel** (planos tab + declarations tab + location pointers) as a batch-level artifact, separate from the per-plano manifests.
+5. Delivery — hand the operator the set of presigned URLs (per-plano ZIPs + index), not one object.
+6. Terraform (separate PR) — the `worker_portable_exportation` ECS service: 8 GB+ instance, 40 GB ephemeral disk, Chromium image; keep 10 threads.
+
+### Decisions made (2026-07-20 session)
 
 - **Scope**: exactly two declaration kinds — rule (`PlanStatement`) + result (`Statement`). No third type (engineer confirmed).
 - **Evidentiary trail**: delivered as a SEPARATE file, NOT appended to the PDF (appending changes the final image hash).
@@ -40,7 +106,7 @@
 
 ### Remaining
 
-- **Backend (Phase 2 — repo `app`, NOT started)** — see the execution phases below and `SPIKE.md` Rounds 1–5: Ferrum PDF capture; reuse/adapt `PlanStatementPortable` (drop the single-calendar coupling, add a `computation`); new mirrored `StatementPortable`; evidentiary-trail assembly (actor, forced flag, `AcceptmentReason` name + description, IP, timestamp, SHA256) as a separate file; ZIP + XLSX; dedicated low-concurrency Sidekiq queue; Producer → Consumer → Finalizer topology.
+- **Backend (Phase 2 — repo `app`, IN PROGRESS)** — see the execution phases below and `SPIKE.md` Rounds 1–5. **Done (2026-07-22, PR #5247)**: the new mirrored `StatementPortable`/`Batch` models + tables + uploaders (result side). **Remaining**: Ferrum PDF capture; reuse/adapt `PlanStatementPortable` (decouple the single calendar, add a `computation`); the result-side batch `computation`; evidentiary-trail assembly (actor, forced flag, `AcceptmentReason` name + description, IP, timestamp, SHA256) as a separate file; ZIP + XLSX; dedicated low-concurrency Sidekiq queue + HireFire dyno; Producer → Consumer → Finalizer topology; the terraform worker service + Chromium image.
 - **Open decisions**: (a) per-panel domain name — rename model property `expanded` → `open`? (awaiting OK); (b) legal-counsel confirmations — does the CDC information-duty apply to the employee/declaration relationship, and is the hard-gate value worth it (spike: legally uncertain, engineer chose it anyway); (c) two spike open items — whether old forced-acceptance rows predate the reason-required validation, and whether `AcceptmentDocument::Processor` is the ONLY forced-acceptance path.
 
 ### Research artifacts
@@ -127,7 +193,7 @@ flowchart TD
 
 **Rule declaration — reuse + adapt:** reuse `PlanStatementPortable`/`Batch` models, uploaders (S3 paths already per-record), state machines, and the surviving download surface. **Adapt:** remove the single-calendar coupling — `calendar_id` presence validation + the `before_validation :add_plan_statements` callback tie a batch to one calendar, but a company-wide export spans all calendars (make `calendar_id` nullable / scope company-wide; do **not** drop). **Rebuild** the Producer/Consumer/Finalizer fan-out that was deleted in 2022, now Ferrum-based, following the `PlanStatementAudit` triad shape. **Forced handling** in the Consumer as above. **Enumerate** `PlanStatement.for_company(company_id).accepted` (both indexes confirmed present).
 
-**Result declaration — new mirrored models:** create `StatementPortable`/`StatementPortableBatch` mirroring the rule structure (uploaders, state machines, computation); new Producer/Consumer/Finalizer (Ferrum), **no forced branch**; manifest carries the money/points totals (`dealMoney`/`indicatorMoney`/…/`billableMoney`) rather than rule text. **Enumerate** `Statement.for_company(company_id).accepted` (both indexes confirmed present).
+**Result declaration — new mirrored models:** create `StatementPortable`/`StatementPortableBatch` mirroring the rule structure (uploaders, state machines, computation); new Producer/Consumer/Finalizer (Ferrum), **no forced branch**; manifest carries the money/points totals (`dealMoney`/`indicatorMoney`/…/`billableMoney`) rather than rule text. **Enumerate** ALL of the company's statements (`company.statements`) — NOT filtered to accepted; the export covers every declaration (engineer decision, 2026-07-22). Navigate from the object (`company.statements`), not the `Statement.for_company` scope.
 
 ---
 
@@ -162,7 +228,7 @@ Preserve the existing `PlanStatementPortable` data ("manter os dados funcionais"
 1. **Frontend Phase 1** (both pages pre-expansion) + forced-acceptance rendering fix → deploy, verify live.
 2. **Backend shared infra** — `ferrum` gem + `:portable_exportation` queue (`sidekiq_portable_exportation.yml` + `worker_portable_exportation` HireFire dyno) + `computation` on the batch models + `SHA256`. **Terraform (separate PR/repo)**: the `worker_portable_exportation` ECS service + its Chromium image, HireFire min-0.
 3. **Rule pipeline** — adapt `PlanStatementPortable` (calendar decoupling, computation), rebuild the Ferrum fan-out, forced-actor + reason handling.
-4. **Result pipeline** — mirror `StatementPortable`, new Ferrum fan-out, money/points manifest.
+4. **Result pipeline** — mirror `StatementPortable` **(models/tables/uploaders DONE — PR #5247)**; still to do: the new Ferrum fan-out, the batch `computation`, the money/points manifest.
 5. **Run the export** per kind for the customer; Finalizer produces ZIP + XLSX + per-declaration trail; deliver via the surviving download surface (candidate mechanism).
 
 ---
