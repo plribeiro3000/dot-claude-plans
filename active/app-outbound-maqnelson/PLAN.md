@@ -7,7 +7,24 @@
 
 ---
 
-## ⏭️ NEXT — Phase 8, the homologation test
+## 🚧 BLOCKER discovered 2026-07-16 — the outbound has no network path to the database
+
+**The first access test surfaced a blocker that stops the homologation test AND the worker itself.** When the outbound task tried to boot Rails, it failed to resolve the shared-001 database host — `Name or service not known`. Root cause, confirmed live: the outbound stack runs **inside the integrator VPC**, which has no network path to the shared-001 application database in the other region. It only peers to the Management hub, same region. The worker never exercised this because it had never run; the access test is what exposed it.
+
+**The other outbound stack (atento-br) does not hit this** because it runs in its **own dedicated VPC**, cross-region-peered to its database VPC, with its **own site-to-site VPN** to the customer (a VPN Gateway on the outbound VPC, not the integrator's). The integrator-VPC reuse the maqnelson stack chose to avoid duplicating the VPN is exactly what cut it off from the database path.
+
+**Decision (engineer, 2026-07-16): follow the established pattern — give the maqnelson outbound its own dedicated VPC, like atento-br.** This is a multi-stack change, sequenced:
+
+1. ✅ **Networking stack — dedicated VPC. APPLIED 2026-07-16, PR [terraform#815](https://github.com/4shark/terraform/pull/815) open awaiting merge.** The VPC, subnets, TGW attachment for egress, Management peering, SSM/output wiring — a resource-for-resource mirror of the atento-br outbound VPC. Plan was `26 to add, 0 change, 0 destroy`; apply clean, CIDR `10.13.0.0/26` did not conflict. **Merge is the engineer's — not authorized by "pode aplicar".**
+2. ⬜ **Outbound stack repoint** — instantiate the `app_outbound` module (its own VPN + internal-zone association) against the new VPC instead of reusing the integrator VPC. Separate stack, applied after #815.
+3. ⬜ **Cross-region database peering** — the atento-br equivalent is **not in Terraform** (created out of band, never imported), so this is a **manual AWS step**, not a PR resource.
+4. ⚠️ **Customer coordination** — the new dedicated VPN is a fresh tunnel to the customer network; the customer must accept the new tunnel endpoints on their side before it comes up. Deploy-time dependency, timeline outside 4Shark's control.
+
+**Until this is done, Phase 8 (homologation) cannot run** — the worker cannot reach the database. The Zendesk notification to the customer already went out (below), but the test itself is blocked on the network path.
+
+---
+
+## ⏭️ Phase 8, the homologation test (BLOCKED on the network path above)
 
 **The infrastructure on 4Shark's side is ready for the first test.** Code, deploy pipeline, IAM and DB configuration are all closed and verified (details below). The remaining work is the end-to-end test against Maqnelson's homologation API, and its first step is not technical.
 

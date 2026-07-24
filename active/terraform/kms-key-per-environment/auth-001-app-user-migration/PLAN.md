@@ -8,6 +8,35 @@ a rolling restart.
 Grounded by `active/spike/keycloak-least-privilege-db-user/SPIKE.md` (read in full). Every non-obvious step
 below traces to a numbered Finding there. Do not re-derive; if a step looks wrong, check the Finding first.
 
+## STATUS — 2026-07-23 (COMPLETE — Phase 3 done) — this is the pick-up point
+
+**Phase 3 DONE (2026-07-23):** `REVOKE "EVKcRQtsJsyxzQDaNaphGu" FROM postgres` and
+`REVOKE "iDdssfbZVDcejjYwjpkuhBuF" FROM postgres` were run by the engineer in psql on the re-keyed `auth-001`
+instance (Effort 2's snapshot restore carried the rollback memberships forward, so Phase 3 ran there). The
+rollback membership is gone; the dedicated least-privilege users are now fully standalone. **Effort 1 is
+entirely complete.** The block below is retained as history.
+
+
+
+**Effort 1 is DONE and CUT OVER to production with ZERO downtime.** Everything below from 2026-07-22 is history;
+this block is the current state. What happened on 2026-07-23:
+
+- **Staging isolated first** (the hard prerequisite): the dedicated staging role `iDdssfbZVDcejjYwjpkuhBuF` owns
+  the `keycloak_staging` objects; the two staging keys were populated in `auth-001-staging-sm`; the staging
+  task-def was repointed and redeployed. Full isolation confirmed (cross-connect fails both ways; `PUBLIC`
+  CONNECT revoked on both databases).
+- **Production cut over**: `auth-001-sm` `KC_DB_USERNAME`/`KC_DB_PASSWORD` set to `EVKcRQtsJsyxzQDaNaphGu` + its
+  password; `auth-001` rolling-restarted with ZERO downtime (Infinispan/JGroups preserved sessions); clean
+  Liquibase boot + real login verified. Prod now authenticates as `EVKcRQtsJsyxzQDaNaphGu` (owns the 91 `public`
+  tables in `keycloak`), NOT the master `postgres`.
+- **#807 (the auth KMS key policy) applied + merged + cleaned up** — the prerequisite for Effort 2 (the re-key).
+
+**Only Phase 3 remains (deferred by design):** after a stabilization window,
+`REVOKE EVKcRQtsJsyxzQDaNaphGu FROM postgres` and `REVOKE iDdssfbZVDcejjYwjpkuhBuF FROM postgres` (drop the
+rollback membership). Do this only once the new users are proven stable in production. Effort 2 (the RDS re-key)
+is now unblocked and tracked in `../auth-001-rds-rekey/PLAN.md` — which switched to the AWS snapshot/restore
+mechanism (~15 min downtime accepted). Phase 3 is independent of Effort 2 and can run before or after it.
+
 ## STATUS — 2026-07-22
 
 **DB steps DONE and validated; the cutover, Phase 3, and the staging user are PENDING.** The engineer ran
@@ -67,21 +96,54 @@ shared secret read by a shared role — that role can read the whole secret. Rea
 environment AND a SEPARATE (or scoped) task role per environment, so the environment's role can read only its own
 secret. Applies to any future staging/prod split on a shared instance.
 
+**STAGING COMPLETE 2026-07-23 — the whole staging half of Effort 1 is done and validated end to end.** The
+staging Keycloak now authenticates to `keycloak_staging` as its own dedicated least-privilege role
+`iDdssfbZVDcejjYwjpkuhBuF`, reading its own secret `auth-001-staging-sm` through its own scoped task role — no
+credential path reaches production. What remains is entirely on the PRODUCTION side: the cutover, Phase 3, and
+the #807 apply/merge.
+
 **Ordered remaining steps (all before Effort 2):**
-1. Staging DB — run `staging-phase1-mutation.sql` Section C (transfer the 91 `keycloak_staging` tables to the
-   staging role) and verify; the isolation fix touched only CONNECT, not ownership.
+1. Staging DB — Section C (transfer the 91 `keycloak_staging` tables to the staging role) + verify.
+   **DONE 2026-07-23.** The prerequisite grants had to run first (the initial run failed on them): as `postgres`
+   on `keycloak_staging`, `GRANT USAGE, CREATE ON SCHEMA public TO "iDdssfbZVDcejjYwjpkuhBuF"` then
+   `GRANT "iDdssfbZVDcejjYwjpkuhBuF" TO postgres` (the membership Postgres requires to run `ALTER ... OWNER TO`).
+   Then the object-by-object transfer; verification returned a single row, `iDdssfbZVDcejjYwjpkuhBuF` = 91, 0 on
+   `postgres`.
 2. Apply PR #809 — **DONE (applied 2026-07-22: `6 add, 1 change, 1 destroy`).** Created the staging secret
    `auth-001-staging-sm` (empty), the staging role + scoped policy, and repointed the task-def; deploy PassRole
    updated. Service untouched (desired 0). **PR #809 MERGED 2026-07-22** (into develop; branch + worktree cleaned up).
-3. Populate `auth-001-staging-sm` with the staging credentials: `KC_DB_USERNAME` = `iDdssfbZVDcejjYwjpkuhBuF`,
-   `KC_DB_PASSWORD`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`. Staging adopts on next scale-up (desired 0, no restart).
-4. **Production cutover** (only AFTER #809, so it affects prod alone): set `auth-001-sm`
-   `KC_DB_USERNAME`/`KC_DB_PASSWORD` → the prod role's credentials, rolling-restart `auth-001`, verify clean
-   Liquibase boot + login.
-5. Phase 3 — after stabilization, `REVOKE <role> FROM postgres` on both roles (the rollback membership).
-6. Apply PR #807 (independent; needed for Effort 2's RDS re-key).
-7. Cleanup (non-blocking) — remove the now-unused `KEYCLOAK_STAGING_ADMIN`/`KEYCLOAK_STAGING_ADMIN_PASSWORD` keys
-   from `auth-001-sm` once staging is confirmed running on its own secret.
+3. Populate `auth-001-staging-sm` — **DONE 2026-07-23** (the four keys `KC_DB_USERNAME` = `iDdssfbZVDcejjYwjpkuhBuF`,
+   `KC_DB_PASSWORD`, `KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`; the secret was born empty from #809).
+4. Staging redeploy — **DONE 2026-07-23.** `update-service auth-001-staging --task-definition auth-001-staging-web:4
+   --desired-count 1`: the apply had only registered revision `:4` (`ignore_changes = [task_definition]` + desired 0),
+   so the service adopts it only at deploy time. The new task booted clean — Keycloak 26.6.4, `DatabaseIndexChecker`
+   ran, Hibernate connected, no Liquibase/auth error — proving it authenticates as `iDdssfbZVDcejjYwjpkuhBuF`; the
+   service converged to `:4` (old `:3` drained). **OPEN:** return staging `desired_count` to 0 (its resting state,
+   avoids drift if desired_count is Terraform-managed) or leave it up — engineer's call.
+5. **Production cutover — DONE 2026-07-23.** The engineer edited `auth-001-sm` in place (console Key/value,
+   get-modify-put — all keys preserved) so `KC_DB_USERNAME` = `EVKcRQtsJsyxzQDaNaphGu` + `KC_DB_PASSWORD` = its
+   password. Then `update-service auth-001 --force-new-deployment` (task-def `:5` unchanged; ECS injects the secret
+   at task start, so a task cycle picks up the new value). Rolling was zero-downtime by config (`minHealthy 100` +
+   `maxPercent 200` = add-before-remove; circuit breaker with rollback; ALB target group) — never below 2 healthy,
+   circuit breaker never fired. The new tasks bootstrapped clean as `EVKcRQtsJsyxzQDaNaphGu` (Keycloak "Bootstrap
+   completed", no auth/Liquibase error) AND joined the existing Infinispan cluster receiving session state, so no
+   logged-in user dropped. Secret verified post-edit: username correct, all 4 prod keys present, staging keys gone.
+6. Phase 3 — PENDING (**the next step**, after a stabilization window on the new role). `REVOKE <role> FROM postgres`
+   on BOTH roles (`EVKcRQtsJsyxzQDaNaphGu` and `iDdssfbZVDcejjYwjpkuhBuF`) — the rollback membership. Do NOT run it
+   immediately: while it is in place, reverting the cutover is just editing the secret back to `postgres` and
+   redeploying; revoking removes that path, so wait until production is declared stable on the dedicated role.
+7. PR #807 — **APPLIED + MERGED 2026-07-23** (into develop; branch + worktree cleaned up via /merge-cleanup).
+   Rebased onto develop 2026-07-23 (CHANGELOG conflict resolved:
+   kept all three `### Changed` entries — the staging line from #809 plus #807's two key-policy lines; force-pushed).
+   Plan verified drift-free (`0 add, 1 change, 0 destroy` — only `aws_kms_key.this` in-place; staging `desired_count`
+   change did NOT show as drift, so it is not Terraform-managed). Applied the saved plan: `alias/auth-001` admin
+   statement moved from `kms:*` to the explicit management-actions list, and the crypto `kms:ViaService` gained
+   `rds.sa-east-1` alongside `secretsmanager`. **Merge is the engineer's separate call — not done here.** The KMS
+   key-policy change is Effort 2's prerequisite (the key must accept `rds` via-service before the RDS re-key can put
+   the new instance's storage on it).
+8. Cleanup — **DONE 2026-07-23** (during the step-5 edit): the now-unused `KEYCLOAK_STAGING_ADMIN`/
+   `KEYCLOAK_STAGING_ADMIN_PASSWORD` keys were removed from `auth-001-sm`. Verified: the secret now holds only the
+   four production keys (`KC_DB_USERNAME`/`KC_DB_PASSWORD`/`KEYCLOAK_ADMIN`/`KEYCLOAK_ADMIN_PASSWORD`).
 
 ## Why
 

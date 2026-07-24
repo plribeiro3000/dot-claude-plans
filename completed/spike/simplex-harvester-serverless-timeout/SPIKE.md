@@ -325,6 +325,9 @@ The mechanism is not a proactive "pre-warm". When the paused serverless base is 
 ### Pending
 
 1. **~~Cut a release to `master`~~ — DONE (2026-07-22).** Release `1.3.1` shipped via HubFlow (PR #43 merged to master, tag `1.3.1` created, back-merged to develop). The master build completed successfully, so the production ECR images (`integrator-atento-harvester-{mx,co}:latest`) now carry the fix; the next scheduled 03:30 cron run picks them up.
-2. **TASK FOR TOMORROW — verify the production 03:30 run.** After the release ships, check the next scheduled production harvester run (mx 03:30 America/Mexico_City, co 03:30 America/Bogota): confirm no connection timeout at start (no OpenWithBackoff-style stall, no error 35/40), and that the run completes normally. That production run against the actually-pausing Azure serverless base is the definitive proof of the timeout fix. Logs: `/ecs/integrator-atento-harvester-{mx,co}-cron-integration`; Rollbar project `Simplex-Harvester-Atento-*`.
+2. **~~TASK FOR TOMORROW — verify the production 03:30 run.~~ DONE — CONFIRMED FIXED (2026-07-23).** Both production runs completed cleanly against the actually-pausing Azure serverless base, with no connection timeout, no handshake error, and no aborted run:
+   - **MX** — `Inicio` 09:30:51 UTC → `Fin` 09:51:48 UTC (~21 min). No error 35/40, no `Fin (aborted)`.
+   - **CO** — `Inicio` 08:30:35 UTC → `Fin` 08:45:19 UTC (~15 min). No error 35/40, no `Fin (aborted)`.
+   - The integrator downstream consumed both results, corroborating that the harvester ran and wrote successfully. The only log noise is expected per-record source-data handling (duplicate register ids, hierarchy rows with no valid parent falling back to admin) — none of it connection-related.
 
-Once the production run confirms, move this spike to `completed/spike/`.
+**Outcome: the serverless first-connection timeout is resolved in production.** The fix (SqlClient 5.1 upgrade + driver-native ConnectRetry, secret-name correction, Encrypt=false for the legacy TLS-less servers) is validated end-to-end. This spike is complete.

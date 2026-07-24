@@ -733,6 +733,80 @@ neither touches it, and neither edits `shared-resources/` (the one file both cou
 4 the five integrators, then 5 `app`. Surfaces 4–5 have not started; each is still on the shared/AWS-managed
 key for its data.
 
+**Progress (2026-07-23) — `auth-001` DONE end to end, plus a four-surface conformance study with two fixes applied.**
+
+The **`auth-001` RDS re-key is COMPLETE** (full detail in `auth-001-rds-rekey/PLAN.md`). The instance was moved
+off the wrong key `alias/auth002` onto its dedicated `alias/auth-001` (`key/5a64fa33`) via the AWS-native
+mechanism the engineer chose over logical dump/restore: freeze Keycloak → snapshot → `copy-db-snapshot
+--kms-key-id alias/auth-001` (re-encrypt) → rename old → `restore-db-instance-from-db-snapshot` as `auth-001` →
+scale up. Login validated by the engineer; endpoint unchanged (no task-def change). Terraform reconciled
+(`state rm` old + `import` restored into `module.this.aws_db_instance.auth001`, `rds.tf` `kms_key_id → key/5a64fa33`,
+`apply` `0/1/0`, re-plan clean — **PR #811**). Effort 1 Phase 3 (`REVOKE "EVKcRQtsJsyxzQDaNaphGu"/"iDdssfbZVDcejjYwjpkuhBuF"
+FROM postgres`) done in psql on the restored instance. Old instance `auth-001-old` + both migration snapshots
+deleted; local artifacts and the `/tmp` credential file purged. **Downtime lesson for the next RDS re-key:**
+baseline the snapshot BEFORE the freeze (a fast incremental inside the freeze), not during — the restore is the
+unavoidable floor either way. Recorded in the sub-plan.
+
+**Conformance study of the four DONE surfaces (`auth` / `onboarding` / `setup` / `vpn`), plus an integrator
+preview.** (The HTML lived at `/tmp/kms_conformance_auth_20260723.html` — transient; the findings are captured
+here so nothing is lost.) The reference pattern the four should match: the MODULE mints `aws_kms_key.this` +
+`aws_kms_alias` named `alias/<stack>` (the stack folder carries NO `kms.tf`); a two-statement policy (admin =
+account root, an EXPLICIT management-action list, NEVER `kms:*`, no crypto action; crypto = `Principal "*"`
+scoped by `kms:CallerAccount` + `kms:ViaService` to only the services the stack uses); `enable_key_rotation`,
+`deletion_window_in_days = 30`; consumers reference the minted key by `aws_kms_key.this.arn` (never a hardcoded
+ARN); RDS via the shared `../rds_instance` module. **`setup` is the cleanest reference.** Two deviations were
+found AND FIXED 2026-07-23: **(a)** `modules/auth/rds.tf` hardcoded the key ARN instead of referencing
+`aws_kms_key.this.arn` (auth's own `secrets.tf` already did it right) — fixed by **PR #812** (0-change, merged);
+**(b)** `modules/vpn/kms.tf` admin statement used `Action = "kms:*"` — the forbidden shape — fixed to the
+explicit management-action list by **PR #813** (applied `0/1/0`, merged). `onboarding` and the `integrator`
+module already conform.
+
+**One follow-up remains on `auth` (NOT done):** `modules/auth/rds.tf` still hand-rolls `aws_db_instance` instead
+of using the shared `../rds_instance` module (`setup` uses it — `modules/setup/rds.tf:45`). Switching changes the
+resource address, so it is a careful state migration (a `moved` block or `state mv`), not a value edit. Deferred
+— do it before or after the integrators, the engineer's call.
+
+**NEW effort surfaced 2026-07-23 — module parameterization (reopens the four composed modules' "DONE").** The
+rds_instance-switch PR for auth exposed a systemic issue the engineer flagged: the four SINGLETON composed
+modules (`auth`, `onboarding`, `setup`, `vpn`) HARDCODE their environment name, so a second environment (e.g.
+`auth-002`) could not instantiate the module without colliding (`alias/auth-001` already exists). A module must
+carry NOTHING environment-specific — the name is a REQUIRED `var.identifier` the caller passes (the pattern
+`modules/app` and `modules/integrator` already follow). `app`/`integrator` are correct (multi-instance);
+`onboarding`/`setup` have a `var.environment` but still hardcode the name in places; `auth`/`vpn` had no
+`variables.tf` at all. **Decision (engineer, 2026-07-23): parameterize all four via `var.identifier`, one PR per
+module, each proven value-preserving with a 0-change plan.** `auth` is DONE — **PR #814** adds `var.identifier`
+driving every one of ~50 resource names (KMS alias, secrets, subnet, ECS, ALB, ECR, IAM, SGs, logs, DNS) PLUS
+the rds_instance switch; the stack passes `identifier = "auth-001"`, so the plan is `0/0/0` (only a `moved` block
+re-homes the RDS state address); applied and squashed to one commit, awaiting merge. **Remaining: `onboarding`,
+`setup`, `vpn`** get the same treatment (one PR each) BEFORE the integrators. Known cosmetic nit deferred: the
+bare-value form is `"${var.identifier}"` (valid; idiomatic `var.identifier` is a lint, not a fmt, fix).
+
+**Why these four are fixed BEFORE the integrators (engineer, 2026-07-23) — this is the module standard now.**
+The gap was found on `auth`; correcting all four singleton modules first means the integrator work (and every
+future module) is born correct instead of being retrofitted later. **The standard any 4Shark module must follow:
+a module carries NOTHING environment-specific — the name is a REQUIRED `var.identifier` the caller passes,
+driving every resource name; `var.environment` (when present) is for tags and the SSM parameter namespace only;
+defaults are allowed ONLY for genuinely shared values (backup retention, instance size/version, storage type),
+NEVER the name.** The parameterization is always value-preserving — the stack passes the current identifier, so
+the plan is a no-op (0/0/0). Watch out per module: only VALUE strings are parameterized, never the terraform
+resource labels (`resource "x" "setup"`) — those are state addresses; a blind replace_all breaks them, so
+edits are targeted. `Project` tags and GitHub repo names stay hardcoded (they are the project/repo, not the env).
+
+**Progress (2026-07-23):** DONE + merged — `auth` (**#814**, ~50 names + rds_instance switch, 0/0/0),
+`onboarding` (**#816**, 0/0/0, also fixed an SSM path-vs-grant inconsistency), `setup` (**#817**, 0/0/0
+including the production RDS). IN PROGRESS — `vpn`. **`vpn` decision (engineer, 2026-07-23): option B —
+parameterize it via `var.identifier` for uniformity, EVEN THOUGH its "vpn" is the application name (ADR-010, a
+deliberate singleton with no `-001`/`-002`), not an environment identifier.** So vpn gets a new `variables.tf`
++ `identifier` driving the resource names; the many `Role = "vpn"` tags stay (they are the role, like `Project`),
+the terraform resource labels (`resource "x" "vpn"`, `aws_*.vpn` refs) stay (state addresses), targeted edits
+only (~50), 0/0/0 gate. Only after `vpn` are all four a clean reference and the integrator effort (below) begins.
+
+**NEXT (after the three remaining module parameterizations): the five integrators** (execution-order step 4 / Phase 9 below) — the role split, move each integrator's
+SSM SecureStrings onto the already-minted `alias/integrator-<slug>` key, plus the naming and Redis
+standardizations folded in. The customer-managed key per integrator is already minted (Phases 9–10), so the
+key-creation half is done; what remains is the role split + the SSM rekey + the two standardizations, one
+integrator family at a time.
+
 **READ § "Phase 2 RDS migration — the playbook and the prerequisites, learned on setup" (below) before
 migrating any RDS-bearing stack (`app`, `atento`, `auth`, and `onboarding`'s future RDS).** The setup RDS
 surfaced two non-obvious blockers that WILL recur, plus the mechanism that worked — do not re-derive them.

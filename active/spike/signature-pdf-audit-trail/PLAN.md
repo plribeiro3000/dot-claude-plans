@@ -61,19 +61,19 @@ Follows the SPIKE `../portable-exportation-scale-limits/SPIKE.md` (memory/disk/u
 
 **Domain path (traced 2026-07-22, grounds the tree):** both declaration kinds reach a **Plan** — the common grouper. Rule (`PlanStatement`) is **plan-level**: `belongs_to :plan` directly (`plan_statement.rb:6`), one per user per plan. Result (`Statement`) is **month-level**: reached via `statement.user_commission.commission.plan` (`commission.rb:12`), with the month from `commission.period` (`commission.rb:11`), one per user per commission/month. The year/periods come from the plan's `calendar` (`plan.rb:8,35`).
 
-**Confirmed structure (engineer, 2026-07-22): ONE ZIP per plano.** Tree `<year>/<plano>.zip`; inside each ZIP: a `regras/` folder (the plan-level rule declarations) + one folder per month (`2024-01/`, `2024-02/`, …) holding that month's result declarations. A root **Excel index** lists every plano (one tab) and every declaration (another tab), each row pointing to its location in the tree. Delivery = the set of per-plano ZIPs + the root index as a downloadable folder (presigned S3 URLs — a ZIP-of-ZIPs would re-hit the 5 GB wall, so NOT that).
+**Confirmed structure (engineer, 2026-07-23): two standalone audits + one unified all-together delivery. SUPERSEDES the earlier "one ZIP per plano".** The rule-only audit (`PlanStatementPortableBatch`) and the result-only audit (`StatementPortableBatch`) each stay **first-class** — a client may request just one and it delivers on its own (each with its own Producer/Consumer/Finalizer/manifest). The **all-together** case (a cancellation, e.g. RedeBrasil) runs BOTH and delivers them **unified** in one navigable folder tree: root → one folder per **year** → one folder per **month** → one folder per **plano** → and inside each plano folder, that plano's rule declarations AND result declarations, together. A multi-month plan lands in a single month (first or last — a build-time pick, either is acceptable). The tree is what makes it navigable ("all of 2025 in one folder, all of January in one folder, this plano's rule + result in one folder"); the client downloads/zips it. This runs **background-only, operator-triggered on cancellation, always both together — never in the UI**. `plan_id` on both batch tables (PR #5255) is what lets the unified assembly place each declaration under its plano.
 
 **Accepted risk + guardrail:** a single very large plano (many users × many months of PDFs) could still exceed 5 GB in one object and hit the PUT ceiling. Engineer accepted this for the one-zip-per-plano grain; add a **guardrail** in the plano Finalizer that logs / fails loudly when a plano's ZIP would exceed 5 GB, and if it ever bites, fall back to the per-plano-per-month split for THAT plano only.
 
 **Still to pin down at build time:** exact columns of the two index tabs and the location-pointer format. **This redesign SUPERSEDES the current one-ZIP-per-batch Finalizer (PR #5253)** and folds in the still-owed rule-side (`PlanStatementPortable`) adaptation — the two sides converge per plano.
 
-**Build sequence (delivery-redesign phase):**
-1. Rule side — adapt/mirror `PlanStatementPortable` capture (the owed rule half) so rule declarations are captured like the result ones.
-2. Restructure the Producer to fan out **per plano** (not per statement across the whole company): one plano = one coordination unit whose Consumers capture that plano's rule + monthly result PDFs.
-3. Rewrite the Finalizer to build **one ZIP per plano** with the `regras/` + `<month>/` tree, plus the 5 GB guardrail.
-4. Build the **root index Excel** (planos tab + declarations tab + location pointers) as a batch-level artifact, separate from the per-plano manifests.
-5. Delivery — hand the operator the set of presigned URLs (per-plano ZIPs + index), not one object.
-6. Terraform (separate PR) — the `worker_portable_exportation` ECS service: 8 GB+ instance, 40 GB ephemeral disk, Chromium image; keep 10 threads.
+**Build sequence:**
+1. **Standalone rule audit** — build the owed `PlanStatementPortableBatch` process (Producer/Consumer/Finalizer + manifest) mirroring the result triad (#5253), Ferrum-capturing `PlanStatement` PDFs on the `/planStatements/:id?expand=true` route. First-class deliverable (a rule-only request stands on its own). NON-throwaway. The rule manifest carries the forced-acceptance columns the result side lacks (actor, forced flag, reason name + description) plus IP + timestamp + checksum.
+2. **Unified all-together coordinator** — a NEW process (the cancellation trigger) that runs BOTH standalone audits for the company and assembles their PDFs into the `year → month → plano` folder tree (each plano folder holding that plano's rule + result declarations together). The two standalone processes are NOT restructured — the coordinator sits on top. Includes the 5 GB-per-object guardrail and the multi-month-plan month pick.
+3. **Delivery** — the assembled tree handed to the operator via presigned S3 URLs; the client downloads and zips locally.
+4. Terraform (separate PR) — the `worker_portable_exportation` ECS service: 8 GB+ instance, 40 GB ephemeral disk, Chromium image; keep 10 threads.
+
+**Build-time details still open:** whether the unified delivery also carries a root Excel index (the folder tree already provides navigation; the per-audit evidentiary manifest stays regardless), and which month a multi-month plan lands in.
 
 ### Decisions made (2026-07-20 session)
 
