@@ -7,7 +7,9 @@
 
 ## Execution status
 
-**Frontend (Phase 1) is IMPLEMENTED and CI-green** — PR [app-webclient#6613](https://github.com/4shark/app-webclient/pull/6613). **Backend (Phase 2) is IN PROGRESS** — the result-side models (PR #5247) AND the result-side workers + manifest (PR #5253) landed 2026-07-22. Remaining: the worker instance sizing (bigger box, keep 10 threads — see Scale & delivery decisions), the DELIVERY REDESIGN (many ZIPs per plano + root index Excel), the rule-side adaptation (`PlanStatementPortable`), and the terraform `worker_portable_exportation` service + Chromium image.
+> **NEXT SESSION (Monday test): read the `### 2026-07-24 — MONDAY TEST READINESS` entry below** — it is the executable runbook (current state, the one gating naming-fix decision, the two-track test plan, and the step-by-step). Start there.
+
+**Machinery is fully deployed as of 2026-07-24.** Both standalone audits (rule PR #5257 + result PR #5253) are merged; Chromium is baked into the shared image (#5260); the terraform worker is applied on both productive stacks (terraform #828); app release **3.57.0** shipped the Chromium `:latest` to all 4 envs. The feature is ready to test end-to-end. **No code/infra work remains** — the scale-workflow naming fix (app PR [#5265](https://github.com/4shark/app/pull/5265)) is merged to develop, so the queue-scale step targets the right ECS names and each service maps to its exact sidekiq config. Monday is purely operational: run the runbook with a new-front company. (RedeBrasil itself still waits on the old-front token-login route — Track 2.) The **RedeBrasil-specific** run is still blocked on the old-front token-login route, so Monday tests the machinery on a new-front company first. Frontend Phase 1 (PR [app-webclient#6613](https://github.com/4shark/app-webclient/pull/6613)) is live; the unified all-together coordinator (build-sequence step 2) is a later delivery redesign, not needed for the machinery test.
 
 ### 2026-07-22 — Backend Phase 2 started: result-side models merged
 
@@ -74,6 +76,64 @@ Follows the SPIKE `../portable-exportation-scale-limits/SPIKE.md` (memory/disk/u
 4. Terraform (separate PR) — the `worker_portable_exportation` ECS service: 8 GB+ instance, 40 GB ephemeral disk, Chromium image; keep 10 threads.
 
 **Build-time details still open:** whether the unified delivery also carries a root Excel index (the folder tree already provides navigation; the per-audit evidentiary manifest stays regardless), and which month a multi-month plan lands in.
+
+### 2026-07-24 — Rule pipeline merged (#5257) + Chromium baked into the shared image (#5260)
+
+Two PRs landed, closing build-sequence step 1 (the standalone rule audit) and the Chromium prerequisite for capture. The remaining path to a testable feature is now the terraform worker service, a redeploy, and the RedeBrasil old-front login route.
+
+- **PR [app#5257](https://github.com/4shark/app/pull/5257) (merged)** — the **rule-side** standalone audit, mirroring the result triad exactly. Delivered: `PlanStatementPortableBatch::{Producer,Consumer,Finalizer}` (queue `:portable_exportation`, Ferrum-capturing `PlanStatement` PDFs), `computation` on `PlanStatementPortableBatch` (`Computation.new("plan_statement_portable_batch_#{id}")`), and the `PlanStatementPortableWorkBook` + `plan_statements_work_sheet.rb` manifest (the rule manifest keeps the forced-acceptance columns the result side lacks — the `forced` flag via `plan_statement.forced_acceptance?`, since for a plan_statement `accepted? && user_id != acceptment.user_id` CAN be true, unlike a statement). The Consumer mirrors the result-side sibling verbatim: unconditional `save` (NON-bang), `increment_executions` OUTSIDE the `if plan_statement.processing?` block (unconditional — a guarded increment stalls the `Computation` completion), inline tmp `file_path` keyed on `plan_statement_id` + Sidekiq `jid`, and `Finalizer.perform_async(...) if ...computation.done?`.
+- **Association stutter renames rode along in #5257 (Kaizen, the diff exposed them):** `PlanStatementPortableBatch has_many :portables` (was `:plan_statement_portables`), `PlanStatementPortable belongs_to :batch` + `belongs_to :statement` (were `:plan_statement_portable_batch` / `:plan_statement`), `PlanStatement has_one :portable` (was `:plan_statement_portable`) — each with explicit `class_name:` / `foreign_key:` / `inverse_of:`, specs renamed to match. `PlanStatement belongs_to :plan_statement_portable_batch` was KEPT (no result-side sibling; core model, out of this diff's scope).
+- **PR [app#5260](https://github.com/4shark/app/pull/5260) (merged)** — Chromium in the **single shared Docker image** (`.github/docker/Dockerfile`: added `chromium` + `fonts-liberation` to apt-get), NOT a separate image/ECR. The engineer's call: one image feeds every ECS service (web + all workers, same ECR `:latest`, different commands), so an `apt-get install` there costs the other services nothing at runtime and avoids a second image to maintain. Plus the Ferrum container flags — `browser_options: { 'no-sandbox': nil, 'disable-dev-shm-usage': nil }` — on BOTH portable consumers (rule `plan_statement_portable_batch/consumer.rb` and result `statement_portable_batch/consumer.rb`), required to launch Chromium as root in a container with a small `/dev/shm`.
+- **Deploy-order caveat — a REDEPLOY is required before testing.** The backend was deployed BEFORE #5260 merged, so the running image does NOT yet contain Chromium. Any capture attempt on the current running image fails to launch the browser. Re-run the backend deploy so the new `:latest` (with Chromium) is baked in.
+- **Infra confirmed already on `develop`** (no work owed): `gem 'ferrum'`, `config/sidekiq_portable_exportation.yml`, the HireFire `worker_portable_exportation` dyno (`config/initializers/hire_fire.rb`), and `computation` on both batch models.
+
+**Remaining path to a testable feature (in order):**
+1. **Terraform `worker_portable_exportation` ECS service** (separate PR, terraform repo) — CRITICAL, not yet built. Drains `:portable_exportation`; 8 GB+ instance memory, 40 GB ephemeral disk, keep 10 threads (per the 2026-07-22 scale decisions). Without this the queue has no consumer fleet.
+2. **Redeploy the backend** so the Chromium image (#5260) is live.
+3. **Frontend Phase 1** forced-acceptance render fix — already implemented/CI-green (app-webclient#6613); confirm it is live in the target environment.
+4. **RedeBrasil old-front token-login route** — the last step, this customer only (see § RedeBrasil — old-front constraint). The capture cannot authenticate on RedeBrasil's front until the token-login route exists there.
+
+**Trigger** = console (no rake task): the rule pipeline runs via `PlanStatementPortableBatch::Producer.perform_async(plan_id)`; the result pipeline via `StatementPortableBatch::Producer.perform_async(company_id)`. The unified all-together coordinator (build-sequence step 2) is still owed.
+
+### 2026-07-24 — MONDAY TEST READINESS: study + step-by-step runbook
+
+> A fresh session on Monday should read THIS entry first — it is the executable runbook for the first end-to-end export test. Everything above it is history; the state and steps below are current.
+
+**State (2026-07-24, end of session) — everything green except one naming fix + the RedeBrasil old-front route:**
+
+- **Terraform worker APPLIED on both productive stacks** (shared-001 + atento-001) — terraform PR [#828](https://github.com/4shark/terraform/pull/828), merged and applied. Each stack has a dedicated `capacity_worker_portable_exportation` (ASG + launch template + capacity provider) plus the `<env>-worker-portable-exportation-service` ECS service. Sized `t3a.xlarge` / 40 GB disk / task 4 vCPU + 14 GB; `min_size = 0`, `desired_count = 0` — idle, zero cost until scaled.
+- **App release 3.57.0 cut, tagged, and deployed to all 4 envs** (beta/demo/shared/atento). The master `:latest` that demo/shared/atento run now contains Chromium + Ferrum flags (#5260), so a worker task can launch the headless browser. (Release PR app#5263, tag `3.57.0`.)
+- **Infra confirmed live**: `gem 'ferrum'`, `config/sidekiq_portable_exportation.yml` (queue `:portable_exportation`), the HireFire `worker_portable_exportation` dyno, and `computation` on both batch models.
+- **Both pipelines are merged and first-class**: rule (`PlanStatementPortableBatch::{Producer,Consumer,Finalizer}` + manifest) and result (`StatementPortableBatch::{...}` + manifest).
+
+**✅ Naming fix — DONE (app PR [#5265](https://github.com/4shark/app/pull/5265), merged to develop):**
+
+- **The mismatch (found 2026-07-24):** the scale workflows (`scale-up-service.yaml` / `scale-down-service.yaml`) drove BOTH the ECS resource names AND the sidekiq config path from one `service` input. That works for single-word services but split on a two-word one: ECS resources are hyphen (`<env>-worker-portable-exportation-*`, what terraform PR #828 correctly created) while the config file is underscore (`sidekiq_portable_exportation.yml`) — and the two are NOT always a separator swap (`worker-commission` runs `sidekiq_commission_without_deal_indexation.yml`, a deliberately different name). The original workflow targeted a non-existent ASG/service → the scale step would fail.
+- **Resolved the standard-conformant way:** our standard is ECS/DNS names = hyphen, Ruby config files = underscore — two intentional conventions. PR #5265 makes the `service` dropdown value the hyphen ECS name (used directly for ASG/service/task) and resolves the sidekiq config through an **explicit per-service `case` map** (`this service → this exact file`), which fails loudly on an unmapped service. Terraform (PR #828) was already correct and is untouched.
+- **Status: merged.** `gh workflow run` dispatches from develop (the repo default), and the fix is on develop — so the scale command in step 2 works as written.
+
+**Two-track test plan — decouple the machinery from the RedeBrasil old-front blocker:**
+
+- **Track 1 — validate the MACHINERY first (no old-front dependency).** Pick a company whose `primary_webclient_host` points at the NEW front (the front that has the `/session/create?token=` route and the `/statements/:id?expand=true` render). Run one export for it. This proves the deployed Chromium image captures a real declaration and the Finalizer builds the ZIP end-to-end. **NOT RedeBrasil.**
+- **Track 2 — RedeBrasil real run (BLOCKED).** RedeBrasil is entirely on the OLD front, which lacks `/session/create`; the consumer navigates to `https://#{company.primary_webclient_host}/session/create?token=...` (`app/workers/statement_portable_batch/consumer.rb:24`), which 404s there, so the capture cannot authenticate. Do Track 2 only AFTER the front-end adds the token-login route to the old front.
+
+**STEP-BY-STEP (Track 1, once the naming fix has landed; example on shared-001):**
+
+1. **Inputs (engineer supplies — production data, behind the DB boundary):** a NEW-front company. For the RESULT export you need its `company_id`; for the RULE export a `plan_id` of that company. Confirm the front first: `Company.find(<id>).primary_webclient_host` must be a new-front FQDN.
+2. **Scale the worker up** (productive stack → queue-gated). Run the check, then the scale within 5 minutes as one motion:
+   - `bash ~/.claude/scripts/sidekiq-queue-check.sh --stack shared-001`  (must return GO)
+   - `gh workflow run scale-up-service.yaml -R 4shark/app -f environment=shared-001 -f service=portable-exportation -f count=1`  (the #5265 fix is on develop, so this resolves the right ECS names + sidekiq config)
+3. **Confirm the task is up:** `/apps` skill, or `aws ecs describe-services --cluster shared-001-cluster --services <env>-worker-portable-exportation-service` → runningCount 1.
+4. **Enqueue the export from console** via `bin/ecs run` (the team's one-off console mechanism):
+   - Result: `StatementPortableBatch::Producer.perform_async(<company_id>)`
+   - Rule: `PlanStatementPortableBatch::Producer.perform_async(<plan_id>)`
+5. **Watch it drain:** the Producer fans out one Consumer per declaration on `:portable_exportation`; the scaled worker captures each PDF; the Finalizer fires when `computation.done?`. Watch the queue depth fall to 0 and the batch reach its final state.
+6. **Verify the deliverable (console):** `batch.final?` and `batch.computation.done?` are true; each `batch.portables` has its PDF attachment; the batch attachment holds the ZIP + the XLSX manifest. Download the ZIP via its presigned-URL download surface, open it, confirm the per-declaration PDFs and the manifest columns.
+7. **Scale the worker back to 0:** `gh workflow run scale-down-service.yaml -R 4shark/app -f environment=shared-001 -f service=portable-exportation` so the box stops costing (scale-down sets desired 0, no `count` input).
+
+**What the Monday session needs from the engineer:** only the Track-1 test `company_id` / `plan_id` (a new-front company) and which FQDN counts as the new front. All code/infra pre-reqs are done (terraform #828 applied, release 3.57.0 deployed, scale fix #5265 merged).
+
+**NOT owed for Monday's machinery test:** the unified all-together coordinator (year → month → plano tree, many ZIPs — build-sequence step 2). Monday validates ONE standalone audit (rule or result) end-to-end; the coordinator is the later delivery redesign.
 
 ### Decisions made (2026-07-20 session)
 
@@ -230,6 +290,7 @@ Preserve the existing `PlanStatementPortable` data ("manter os dados funcionais"
 3. **Rule pipeline** — adapt `PlanStatementPortable` (calendar decoupling, computation), rebuild the Ferrum fan-out, forced-actor + reason handling.
 4. **Result pipeline** — mirror `StatementPortable` **(models/tables/uploaders DONE — PR #5247)**; still to do: the new Ferrum fan-out, the batch `computation`, the money/points manifest.
 5. **Run the export** per kind for the customer; Finalizer produces ZIP + XLSX + per-declaration trail; deliver via the surviving download surface (candidate mechanism).
+6. **RedeBrasil old-front login route** (this customer only, last step) — the capture cannot authenticate on RedeBrasil's front until the token-login route exists there; the front-end adds it to the old-front branch. Info-only for now, kept out of the long-term codebase. See § RedeBrasil — old-front constraint.
 
 ---
 
@@ -251,6 +312,18 @@ Preserve the existing `PlanStatementPortable` data ("manter os dados funcionais"
 - Delivery mechanism: the surviving `PlanStatementPortableBatchDownload` download surface is a candidate presigned-URL path.
 - Exact manifest columns per declaration kind.
 - Whether `AcceptmentDocument::Processor` is the *only* forced-acceptance creation path — it is the only one found across the spike, but no exhaustive codebase-wide grep of every `Acceptment`-creating call site was run.
+
+---
+
+## RedeBrasil — old-front constraint (this customer only)
+
+RedeBrasil is the customer this export is being built for, and RedeBrasil is entirely on the **old front-end** — they never migrated to the new front. This settles one worry and raises one real dependency.
+
+**Resolved non-issue — visual/legal validity.** The initial concern was a mixed-front customer: some declarations signed on the old front, some on the new. Capturing on the new front a declaration a person signed on the old front would render a document that is visually different from the one signed (same content, different visual), which raises the question of whether that document is legally valid as evidence of what the person actually signed. This does **not** apply to RedeBrasil — because they never migrated, every declaration was signed on the old front and every capture also renders on the old front, so the captured PDF matches the front the person actually signed on. No mixed-front problem exists for this customer.
+
+**Real dependency — the token-login route does not exist on the old front.** The capture flow authenticates the headless browser by hitting `/session/create?token=<jwt>` on the customer's webclient before navigating to the declaration page. That token-accepting login route exists on the **new** front but **not** on the old front, so the capture cannot log in on RedeBrasil's old front as-is. The fix — **to confirm with the front-end team** — is for the front-end to add a token-accepting login route to the **old-front branch**, mirroring the new-front `/session/create?token=`, so the export can authenticate and capture from the old front.
+
+This is done **only for RedeBrasil / this process**, as the **last step**, and is deliberately kept out of the long-term codebase — it is a one-off enabling change for this export, recorded here so it is not forgotten, not a standing feature to maintain.
 
 ---
 

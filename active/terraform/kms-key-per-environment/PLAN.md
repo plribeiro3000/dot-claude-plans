@@ -1,5 +1,17 @@
 # PLAN — One KMS key per environment, with restrictive key policies
 
+**Status: NOT COMPLETE — one surface is still open (corrected 2026-07-24).** All fifteen stacks are on
+a dedicated task-execution role, and the integrators are on customer-managed keys the shared module
+owns. The account-wide `ecsTaskExecutionRole` no longer carries any per-stack SSM policy. See the
+phase notes below for the per-stack history and the two cross-region blind spots that step-3 exposed.
+
+**What is still open: the integrator MongoDB hosts' EBS volumes are UNENCRYPTED** — verified live, not
+inferred. This plan was marked COMPLETE earlier the same day; that was wrong, because "the integrators
+are on their own key" was read as covering everything the integrator holds at rest, and the key only
+covers SSM and Redis. The database hosts were never on it. See § "The integrator MongoDB EBS gap"
+below for the evidence and the shape of the fix. **This is the FIRST item on 2026-07-27** — finish the
+integrators' at-rest encryption, then the app surface, and only then is this plan closed.
+
 Absorbs and replaces `active/terraform/kms-migration/PLAN.md` (deleted). Sources:
 `active/spike/kms-key-per-environment/SPIKE.md`, `active/spike/aws-engineer-staging-tier/SPIKE.md`,
 direct AWS documentation research, and a live SSM rekey probe (2026-07-17).
@@ -374,7 +386,48 @@ replicated onto demo with zero new findings.
 
 **Lesson: step-3 must sweep every task-def that NAMES the shared role AND reads the dropped prefix, INCLUDING cross-region outbound siblings in another stack.** The productive-stack completions above verified only the same-stack us-east-1 services/crons; the sa-east-1 outbound consumer was the blind spot both times. The proven cutover for a desired-0 service is a targeted `update-service` to the new-role revision — not a full productive deploy (the service is pinned to the old revision by `ignore_changes`, so a precise repoint heals it with zero blast radius).
 
-**Remaining (all non-productive):** only the five `integrator-*` stacks (the AWS-managed `alias/aws/ssm` key design decision — the role split alone vs customer-managed keys). Both `app-outbound-*` stacks are DONE.
+**The `integrator-*` stacks — DONE — 2026-07-24.** The design decision landed on customer-managed keys, one per integrator, and the shared `modules/integrator` now OWNS that key (`kms.tf`): every stack instantiating the module is born with `alias/integrator-<client>`, so the key can neither be omitted nor misnamed for a new integrator — it exists by construction rather than by being passed in. Each integrator's dedicated task-execution role (also module-owned) carries `kms:Decrypt` scoped to that one key, and the SSM parameters were rekeyed onto it, so nothing reads through the account-wide AWS-managed key any more. The key policy is scoped by service (`kms:ViaService` = ssm and elasticache, within this account) rather than by naming principals — which is what makes per-integrator ACCESS DELEGATION expressible: granting an engineer who owns one client the ability to reach only that client's integrator is a matter of scoping their `ssm:GetParameters` to that prefix. The same key also encrypts that integrator's Redis at rest. Delivered as part of the integrator module absorption (see `completed/terraform/integrator-module-absorption/`). **What this does NOT cover: the integrator's MongoDB hosts.** The key's `kms:ViaService` scope is ssm + elasticache, so the database nodes' EBS volumes are outside it and are unencrypted today — see § "The integrator MongoDB EBS gap" below. "The integrators are on their own key" is true of their parameters and their cache, not of their database storage.
+
+**Remaining — the SSM/Redis surface is done on all fifteen stacks; the integrator MongoDB hosts are NOT.** The four non-productive app stacks, the two productive ones, `setup`, `onboarding`, both `app-outbound-*` and the five `integrator-*` are all on a dedicated role with their parameters and Redis on a dedicated key. What that does NOT cover is the integrator database hosts' block storage — see the next section.
+
+### The integrator MongoDB EBS gap — OPEN, first item on 2026-07-27
+
+**The volumes are unencrypted, verified live 2026-07-24** (`aws ec2 describe-volumes`, sa-east-1): all
+twelve root volumes of the four active integrators' replica-set nodes report `Encrypted: false` and
+`KmsKeyId: null` — `integrator-{almaviva,atento,commcenter,maqnelson}-mongo00{4,5,6}`. This is not a
+wrong-key finding: there is no key at all, so the customer data those nodes hold sits on disk in the
+clear. The three `4client-redebrasil-mongo00{3,4,5}` volumes are unencrypted too, but that stack is the
+frozen cancelled-contract one and goes away in its teardown, not here.
+
+**The module never asked for encryption.** `modules/integrator/mongodb.tf` declares each node's
+`root_block_device` with `volume_size` / `volume_type` / `delete_on_termination` / tags and no
+`encrypted` and no `kms_key_id`, so every node inherits the AMI/account default — which is off. The
+per-integrator key the module now owns (`alias/integrator-<client>`) is scoped `kms:ViaService` to
+**ssm and elasticache**; EBS is not in that policy, so even the key that exists today could not encrypt
+these volumes without a policy change.
+
+**Why it was missed rather than deferred.** The EBS surface WAS identified and deliberately deferred
+early in this plan — "*encrypting the EBS volumes REPLACES them (a volume cannot be encrypted in
+place), so that is a separate, deliberate operation*" — but that deferral was written in the `vpn`
+context and only ever executed for `vpn` (PRs #793–#796, where the Mongo host was replaced by an
+encrypted, keyless one). The same reasoning was never carried across to the ~15 integrator Mongo hosts,
+and the integrator completion note above did not name the gap. That is the correction this section
+records.
+
+**Shape of the fix — node replacement, which 4Shark already has tooling for.** An EBS volume cannot be
+encrypted in place, so each node has to be replaced by one provisioned with `encrypted = true` +
+`kms_key_id` pointing at that integrator's key. Replacing replica-set nodes with zero downtime is
+exactly what the `mongodb-reprovision` skill does (fresh nodes → join → sync → cutover → retire the
+old), so this is the same operation already run for the OS upgrade, with two additions on top:
+
+1. **Widen each integrator key's policy to cover EBS** — the current `kms:ViaService` list (ssm,
+   elasticache) has to gain the EC2 service, the way `alias/vpn` was scoped via-EC2 for its own host.
+2. **Declare encryption in the module, not per stack** — `encrypted` + `kms_key_id` belong in
+   `modules/integrator/mongodb.tf`, so a new integrator's nodes are born encrypted by construction,
+   the same guarantee the module already gives for the key itself.
+
+**Per-integrator, not all four at once** — each is a live replica set for a paying client; the cutover
+window is per client, and a failed cutover must not be able to touch a second one.
 | 2 | `app-demo-001` | **Catch the exceptions** beta could not surface — it holds real client data and clients reach it | Low, visible |
 | 3 | `app-shared-001` | Only the exception-of-the-exception should still be unknown here | Real, many clients |
 | 4 | `setup`, `onboarding` | Same shape as the app stacks | Real |
@@ -500,12 +553,89 @@ from a same-stack-only check.
 
 ### Phase 9 — The five integrators (sa-east-1, customer-managed key per integrator)
 
-> **Status 2026-07-20:** the dedicated key per integrator is already MINTED — `modules/integrator`
-> creates `alias/integrator-<slug>` by construction (`modules/integrator/kms.tf`, Phase 10 done via
-> #785). So step 2 below ("customer-managed key per integrator") is DONE; what remains is the role
-> split (step 1), moving SSM onto the key (step 3), plus the naming + Redis standardizations. Sequenced
-> 4th in the authoritative **Execution order** section above. The population table in § Scope ("on the
-> AWS-managed `alias/aws/ssm`") predates #785 and is stale for the key — the key is customer-managed now.
+> **Status 2026-07-24: Phase 9 is DONE and merged — all three steps.** The 2026-07-20 note below was
+> written when only step 2 (the minted key) was done; it is now fully superseded. Three merged commits
+> executed the role split and the rekey across all five stacks: `86e797f` (dedicated task-execution role
+> + kms key on all five), `304af61` (tighten grants to the dedicated key, drop the shared-role
+> `ssm-read`), `32ac8ad` (module owns the key + ends default-SG drift). Every stack's `iam_task_role.tf`
+> carries `integrator-<slug>-ecs-task-execution-role` (+ `-ssm-read` with explicit `kms:Decrypt` on its
+> own key, + `-ecs-exec`); every `compute.tf` points its task defs at that dedicated role; nothing
+> references the account-wide `ecsTaskExecutionRole` any longer. Step 3 (move SSM onto the key) is applied
+> in AWS, not just code — maqnelson's 12 `/integrator-maqnelson/*` parameters are confirmed on
+> `alias/integrator-maqnelson` (`aws ssm describe-parameters`, 2026-07-24), and the four other stacks
+> carry the identical code. The Redis standardization is Phase 9a/9b (merged: #821/#826/#827/#829). **What
+> remains for the integrators is NOT here — it is the remaining `4client-` legacy naming families.**
+>
+> **`4client-` legacy naming — state as of 2026-07-24 (verified by reading the stacks + the `dns` stack):**
+> - **Redis — DONE** (#821/#826/#827/#829; ADR-010 updated in #830). Only remnant is the frozen redebrasil
+>   `ec-redebrasil`, which goes at teardown.
+> - **MongoDB — effectively DONE, not pending as the ADR still implies.** almaviva/atento/commcenter/maqnelson
+>   are already on `integrator-<client>-mongoNNN` — both the EC2 Name tags and the `dns` stack records
+>   (`dns/internal_dns_integrator.tf:15-120`; maqnelson `integrator-maqnelson/mongodb.tf:35-160`). The naming
+>   migration happened as a **node replacement** (the `mongodb-reprovision` skill: fresh nodes, join, cutover),
+>   not an in-place rename — the `4client-` trios were retired at cutover. The SOLE remaining `4client-` Mongo
+>   is **redebrasil** (`dns/internal_dns_integrator.tf:139/151/163`). Its path is **teardown of the stack**, NOT
+>   a reprovision: redebrasil is a cancelled contract, frozen this session (`integrator-redebrasil/freeze.tf`
+>   blocks every apply), and reprovisioning a database about to be deleted is wasted work — the freeze would
+>   also block the reprovision's own applies. Do not reprovision redebrasil; tear it down.
+>   *(Follow-up: the ADR-010 legacy list still names MongoDB as `4client-` debt — that entry is now stale for
+>   the active integrators, same as Redis was; correct it when the SG/VPN families are addressed.)*
+> - **Default security group `4client-<client>` — DONE, applied + merged (#831, 2026-07-24).** The default
+>   SG's Name tag was renamed `4client-<client>` → `integrator-<client>` in the module (`security.tf`).
+>   Applied to the four active integrators as an in-place tag change (`0 add / 1 change / 0 destroy` each — the
+>   SG id and its rules are unchanged, so zero downtime); redebrasil frozen (skipped). The default SG's
+>   group-name is immutable (always `default`), so the Name tag is the only "name" it has. (#831 first
+>   decoupled the SG from `name_prefix`; #832 re-coupled it once `name_prefix` itself moved to `integrator-`.)
+> - **VPN edge `4client-<client>-*` — DONE, applied (#832, 2026-07-24). A ~1 min tunnel bounce per connection,
+>   NOT zero-downtime.** The one-line flip of `local.name_prefix` from `4client-` to `integrator-`
+>   (`modules/integrator/main.tf`) renamed every VPN resource. The gateway / customer gateway / connection
+>   carry the name in a tag (in-place); the CloudWatch tunnel log group's name is force-new, so it is recreated,
+>   and the connection then re-applies its tunnel log config. **The earlier "no service disruption" read
+>   (provider issue #26876) was WRONG for this case** — the connection modify does a real per-tunnel
+>   replacement: on almaviva, tunnel 1 went DOWN 16:14:34 → UP 16:15:29 (~55 s). Because every integrator here
+>   is single-tunnel BY DESIGN (the second tunnel was never established — confirmed by the engineer, not a
+>   regression), that bounce is a full ~1 min VPN outage per connection, with no second tunnel to carry
+>   traffic. The engineer accepted it deliberately: applied inside a ~7-8 h processing-free window (next
+>   integration run far off), so a 1-minute outage is harmless. Verified post-apply: all four active
+>   integrators' connections are `available` with the primary tunnel `UP` (almaviva; commcenter; maqnelson;
+>   atento ×3 — azure, co-cirion, mx-equinix). redebrasil frozen (skipped). **Lesson recorded: renaming a
+>   `4client-` resource that a live `aws_vpn_connection` references (a log group ARN) bounces the tunnel ~1 min
+>   — schedule it in a processing-free window, do not treat it as zero-downtime.**
+>
+> So the `4client-` naming cleanup is **DONE for every active integrator**: Redis, MongoDB, the default SG, and
+> the VPN edge are all on the `integrator-<client>` standard. The only `4client-`/`ec-` names left are on the
+> frozen redebrasil stack, and they go at its teardown. There is no further integrator naming family to migrate.
+> *(ADR-010 follow-up DONE — #833, 2026-07-24: the legacy-exception section now records the `4client-` naming as
+> retired family by family, leaving only the redebrasil-until-teardown note.)*
+>
+> **Integrator follow-ups (engineer, 2026-07-24) — both DONE for the active integrators; outbound remains:**
+> 1. **Full `4client-` audit — DONE.** Swept the whole repo (80 hits), classified into: zero-downtime tag
+>    renames (the `networking/` layer — VPCs, subnets, route tables, TGW attachments, peering), applied in #834;
+>    the app_outbound family (its own PR, still open — see below); redebrasil (frozen → teardown); and
+>    docs/comments (left). The integrator side of `4client-` is now fully retired — Redis (#821/#826/#827/#829),
+>    MongoDB (reprovision), SG (#831), VPN (#832), networking (#834), all `integrator-<client>`. ADR-010
+>    recorded it (#830, #833).
+> 2. **Standardize the integrator stacks — DONE, merged (#835 three stacks + #836 the multi-jurisdiction one).**
+>    Every active integrator stack now has a `variables.tf` + `terraform.tfvars` driven by a single
+>    `client_name`, with every `integrator-<client>` name/slug derived from it — matching setup/onboarding/vpn/
+>    auth. The redundant per-stack duplication is gone. Verified zero-diff: `terraform plan` returned **No
+>    changes** on all four (the resolved values are identical), so it was a pure code refactor, no apply. What
+>    stayed hardcoded: the backend state key and module block labels (neither takes a variable) and display
+>    values (capitalized name, emails). redebrasil left out (frozen — freeze blocks even a plan).
+>
+> **Still open — the app_outbound `4client-` rename (audit category 2).** `modules/app_outbound` (used by both
+> `app-outbound-atento-br` and `app-outbound-maqnelson`) still has `name_prefix = "4client-app-outbound-<client>"`,
+> plus the atento-br outbound VPC/TGW/peering tags in `networking/`. Its `vpn.tf` has NO CloudWatch log group, so
+> unlike the integrator VPN the rename is in-place tags only — **zero downtime, no tunnel bounce** (verify with a
+> No-changes/0-destroy plan). Target `app-outbound-<client>` (ADR-006/010). This was started, then deferred at the
+> engineer's request to finish the integrators first; it is the last `4client-` item outside the frozen redebrasil.
+>
+> **Original 2026-07-20 note (superseded, kept for history):** the dedicated key per integrator is already
+> MINTED — `modules/integrator` creates `alias/integrator-<slug>` by construction
+> (`modules/integrator/kms.tf`, Phase 10 done via #785). So step 2 below ("customer-managed key per
+> integrator") is DONE; what remains is the role split (step 1), moving SSM onto the key (step 3), plus the
+> naming + Redis standardizations. The population table in § Scope ("on the AWS-managed `alias/aws/ssm`")
+> predates #785 and is stale for the key — the key is customer-managed now.
 
 The six-stack estate above is DONE (beta, demo, shared-001, atento-001, setup, onboarding, plus the
 two sa-east-1 `app-outbound-*` siblings). The five integrators are the last population, and unlike the
@@ -554,6 +684,179 @@ assume. A single `terraform` stack = one key; separate stacks = separate keys, p
 Order: one integrator (family) at a time, verified between each; start with the one whose access
 delegation is wanted first (Atento, the Santiago driver) unless a lower-risk integrator is preferred as
 the shakedown.
+
+### Phase 9a — Integrator Redis: reserve DB /0 + new instance, staged (engineer, 2026-07-24)
+
+**The engineer chose to START the integrator effort with the Redis (ElastiCache).** This subsection is the
+Redis half of Phase 9's "naming + Redis standardizations"; the role-split/rekey half stays as Phase 9 above.
+Recorded now so the multi-stage shape is not forgotten — execution comes later.
+
+**Current state (read from Terraform 2026-07-24, do not re-derive).** Each integrator has its OWN dedicated
+ElastiCache created by the module — `modules/integrator/elasticache.tf:7`, `aws_elasticache_cluster.redis`,
+`cluster_id = "ec-<client>"`, single node, `default.redis7`, tag `...-redis001`, reached at DNS
+`4client-<client>-redis001.4shark.internal:6379`. **The logical DB index each app uses lives in the `REDIS`
+env var of that app's `compute*.tf`** (NOT in the module) — a bare `:6379` means DB 0. Redis exposes 16
+logical DBs (0–15). Live allocation:
+
+| Integrator | App (`compute*.tf`) | Current DB |
+|---|---|---|
+| almaviva | `compute.tf` | **/0** |
+| atento | `compute_br.tf` | **/0** |
+| atento | `compute_mx.tf` | /1 |
+| atento | `compute_cl.tf` | /2 |
+| atento | `compute_co.tf` | /3 |
+| atento | `compute_mx_staging.tf` | /4 |
+| atento | `compute_cl_staging.tf` | /5 |
+| atento | `compute_co_staging.tf` | /6 |
+| commcenter | `compute.tf` | **/0** |
+| commcenter | `compute_staging.tf` | /1 |
+| maqnelson | `compute.tf` | **/0** |
+| redebrasil | `compute.tf` | **/0** |
+
+> **Verify at execution:** the engineer said Atento has 8 apps (4 countries × prod+staging), but only 7
+> `REDIS` entries were found — no `compute_br_staging.tf` REDIS surfaced. Confirm whether an Atento BR
+> staging app exists and where its Redis index is, before reallocating.
+
+**Why reserve /0 — the future coordination counter (Stage 3, DEFERRED, NOT now).** Today, when an
+integration finishes, the client's Mongo is shut down to save cost — but only when the integrator has a
+SINGLE app. A multi-app integrator (commcenter = 2, atento = 8) never shuts its Mongo down, so the Mongo
+runs (and costs) whenever ANY of its apps is idle-but-present. The intended fix: reserve Redis DB **/0** as a
+shared coordination counter per integrator. Before an app runs it INCRs the /0 counter; when it finishes it
+DECRs; whichever app sees the DECR reach zero was the last one running and may shut the Mongo down. **The
+integrator application change that implements this counter/shutdown is explicitly OUT OF SCOPE of the
+current work** — the engineer does not want it built now.
+
+**Scope — RedeBrasil is 100% untouched (engineer, 2026-07-24): it is being decommissioned.** It gets no new
+Redis, no repoint, no /0 change; its app stays on /0 on the old cluster until the whole stack is torn down.
+The four in scope are **`almaviva`, `atento`, `commcenter`, `maqnelson`** ("the other four").
+
+**The staging — three PRs (engineer, 2026-07-24).** The engineer refined the sequence so the whole fleet
+moves as one, cleanly:
+
+1. **PR 1 — stand up ALL the new Redis at once.** One PR adds a brand-new ElastiCache for each of the four
+   in-scope integrators, born with the new standardized name and **encrypted at rest under that integrator's
+   dedicated `alias/integrator-<slug>` key** (the module already mints the key — Phase 10). The new clusters
+   are added ALONGSIDE the old ones; nothing points at them yet, so PR 1 is additive and zero-risk to running
+   apps.
+2. **PR 2 — repoint the apps. DONE, applied, merged (#826, 2026-07-24).** Each app's `REDIS` env in
+   `compute*.tf` now points at the new `integrator-<client>-redis001.4shark.internal` host with a DB index in
+   **/1–/15** (reserving /0); the `dns` stack got the four new CNAME records (`aws_elasticache_replication_group`
+   data source → `primary_endpoint_address`). Applied in order: `dns` (4 records added) → almaviva/maqnelson
+   (4 task-def revisions each) → commcenter (8) → atento (25); every "destroy" is an immutable ECS task-def
+   revision being replaced, no service/cluster/data touched. Before applying atento, all four atento clusters
+   were confirmed idle (0 running tasks — CL's run is at 14:00 UTC), the first to exercise the new Redis.
+   Convention now in force: **/0 reserved, apps use /1–/15, at most
+   15 apps per Redis**. DB layout applied — almaviva /1; atento br/1 mx/2 cl/3 co/4 mx_staging/5 cl_staging/6
+   co_staging/7; commcenter prod/1 staging/2; maqnelson /1. **PR #826 merged (2026-07-24).**
+3. **PR 3 — drop the old Redis. DONE, applied, open as #827 (2026-07-24).** Removed the legacy `ec-<client>`
+   clusters and their `4client-<client>-redis001` DNS records for the four migrated integrators; RedeBrasil's
+   `ec-redebrasil` is kept (decommissioning, out of scope). The old cluster is gated off in the shared module
+   by `count = var.create_new_redis ? 0 : 1` with a `moved` block so RedeBrasil's still-live cluster is
+   re-homed, not recreated. Final AWS state verified: only `ec-redebrasil` remains. **Incident during apply:**
+   the PR-3 worktree directory vanished mid-apply (likely a concurrent session's cleanup), so 3 of the 4
+   cluster-drop applies failed with "no such file or directory" after `dns` (4 records) and `almaviva`
+   (ec-almaviva) had already applied; recovered by recreating the worktree from the branch and re-applying
+   maqnelson/commcenter/atento. No outage — the old clusters were already unused (apps on the new Redis).
+   **PR #827 merged (2026-07-24) — the integrator Redis migration is complete end to end.**
+
+**PR 1 status — DONE, applied to all four, merged (#821, 2026-07-24).** Each stack applied clean: **1 added,
+1 changed, 0 destroyed** — `integrator-<client>-redis001` created (encrypted replication group) and the
+dedicated key's policy updated in-place; the legacy `ec-<client>` cluster is untouched and still serves the
+apps (nothing repointed yet). The four new instances are live and idle. **Next is PR 2** (repoint the apps:
+new `primary_endpoint_address`, DB index in /1–/15 with /0 reserved, deploy). Two findings that PR 2/PR 3
+must carry:
+- **The new Redis is an `aws_elasticache_replication_group` (single node, `num_cache_clusters = 1`), NOT an
+  `aws_elasticache_cluster`.** Terraform's standalone `aws_elasticache_cluster` does not accept
+  `at_rest_encryption_enabled` / `kms_key_id` — customer-managed at-rest encryption is only on a replication
+  group. Consequence for **PR 2 (DNS repoint)**: the `dns` stack's data source for the new host must be
+  `data.aws_elasticache_replication_group` and its endpoint is `primary_endpoint_address` — NOT the legacy
+  `data.aws_elasticache_cluster` + `cache_nodes[0].address`. The legacy record keeps the old shape until PR 3.
+- **The key policy was widened from SSM-only to SSM + ElastiCache** (`modules/integrator/kms.tf`: a crypto
+  statement scoped `kms:ViaService = elasticache.sa-east-1.amazonaws.com` plus `kms:CreateGrant` constrained
+  by `kms:GrantIsForAWSResource = true`). This is in the SHARED module, so it is present in code for all five
+  integrators, but only applied on the four in PR 1; RedeBrasil's stack is never applied. The gate is
+  `var.create_new_redis` (default false), set true only in the four active stacks.
+
+**Target DB layout on each new Redis (PR 2), /0 reserved (fresh instance, assign cleanly):**
+- **almaviva**: app → /1
+- **atento**: br→/1, mx→/2, cl→/3, co→/4, mx_staging→/5, cl_staging→/6, co_staging→/7 (+ br_staging→/8 if it
+  exists — verify per the note above)
+- **commcenter**: prod→/1, staging→/2
+- **maqnelson**: app → /1
+
+**Encryption — YES (engineer, 2026-07-24): the new Redis is born encrypted at rest under the dedicated
+`alias/integrator-<slug>` key.** The fresh cluster is the moment to do it, and it closes this effort's
+KMS-per-environment goal for the integrator Redis.
+
+**Naming — DECIDED (engineer, 2026-07-24): the new Redis is `integrator-<client>-redis001`.** The source is
+`terraform/docs/adr/ADR-010-resource-naming-convention.md`. ADR-010's rule (line 27): every integrator
+resource is `integrator-<client>-*`, "across compute AND infrastructure, no exception." ADR-010 §
+"Legacy exception" (lines 62–71) lists TODAY's Redis names — `ec-<client>` / `4client-<client>-redis001` — as
+the acknowledged `4client-` technical debt, "to be addressed in a dedicated future effort — not retrofitted
+piecemeal," and § "Change policy" says a convention migration is done "all resources together in a single
+dedicated effort — never one at a time." **This Redis-standardization IS that sanctioned dedicated effort for
+the Redis** (all four at once, one PR), so the `4client-` Redis name is retired now: cluster_id, DNS record,
+and tag all become **`integrator-<client>-redis001`** (`modules/integrator/elasticache.tf` — today
+`cluster_id = "ec-<client>"` and tag `...-redis001`; the DNS record is `4client-<client>-redis001.4shark.internal`).
+The ElastiCache `cluster_id` has a 40-char limit — `integrator-<client>-redis001` fits for the current four,
+but check per name at build time.
+- **Scope of the rename is the Redis only.** ADR-010's other `4client-` legacy resources — the Mongo host
+  (`4client-<client>-mongo003`), the module default SG (`4client-<client>`), and the VPN-edge resources — are
+  NOT touched by this effort; they stay legacy until their own dedicated efforts.
+- **Follow-up — update ADR-010 itself. DONE, merged (#830, 2026-07-24).** ADR-010 § "Legacy exception" now
+  reflects reality: Redis is out of the `4client-` list, recorded as the first legacy resource-family retired
+  (`integrator-<client>-redis001`, module-created under the dedicated key), with the remaining `4client-` debt
+  named as MongoDB + default SG + VPN edge. The one `ec-` remnant noted is the frozen cancelled-contract stack
+  pending teardown. Doc-only PR, no CHANGELOG entry (no infra change; the migration itself shipped in
+  #821/#826/#827/#829).
+
+**Stage 3 — the coordination counter + Mongo shutdown — remains DEFERRED (NOT this effort),** per the "Why
+reserve /0" rationale above.
+
+### Phase 9b — Redis cleanup + make the module OWN the Redis (engineer, 2026-07-24, MERGED — PR #829)
+
+The three-PR migration (9a) got the fleet onto the new encrypted Redis safely, but it left transitional
+scaffolding in the shared module that had to be removed, and it surfaced a standard the engineer wanted
+enforced: **every integrator MUST have a Redis, born from the module, never added by hand** (every integration
+runs Sidekiq, so Redis is not optional — the module guarantees it, the same way it already guarantees the KMS
+key). Both the cleanup and the mandate landed in a single PR; the originally-planned "PR B" collapsed into
+"PR A" because an ungated module resource IS the mandate — there was nothing separate left to do.
+
+**PR A — code cleanup + mandate (#829, applied + merged 2026-07-24).** `modules/integrator/elasticache.tf` is now the
+final single-Redis shape:
+- **Both `moved` blocks removed** — the one-time state re-home job was done once #827 applied.
+- **Collapsed to ONE Redis resource** — `aws_elasticache_replication_group.redis_v2` renamed to `redis` (the
+  `_v2` suffix is gone; nothing reads as "the second one" now that the first is gone), and the legacy
+  `aws_elasticache_cluster.redis` resource deleted entirely.
+- **`var.create_new_redis` gate removed** — the module now creates the Redis unconditionally; the variable and
+  the `create_new_redis = true` line are gone from the four stacks. This ungated resource IS the mandate: an
+  integrator without a module-created Redis is now impossible by construction, the same class of guarantee as
+  the dedicated KMS key.
+- **The label rename was realized with `terraform state mv`, NOT a moved block** — the engineer asked to remove
+  the moveds, so a lingering moved block in the code was not acceptable. Per stack (`almaviva`, `atento`,
+  `commcenter`, `maqnelson`), `state mv 'module.this.aws_elasticache_replication_group.redis_v2[0]' →
+  'module.this.aws_elasticache_replication_group.redis'` re-homed the state address; the live instance is
+  unchanged, so `plan` afterward reports "No changes" on all four. The `[0]` index came from the old `count`
+  gate; the resource is module-qualified (`module.this.…`), which the first `state mv` attempt missed.
+
+**RedeBrasil — FROZEN by a real terraform-level guard, not by discipline or decommission.** Removing the gate
+would make the module want to create `integrator-redebrasil-redis001` and drop the legacy `ec-redebrasil` on
+RedeBrasil's next apply — but RedeBrasil's contract is cancelled and it must never be applied again. The
+engineer rejected "just don't apply it manually" as a non-mechanism and demanded a code-level block. The
+resolution is `integrator-redebrasil/freeze.tf`: a `terraform_data.frozen` with a `lifecycle` `precondition`
+that always fails, so `plan` and `apply` on that stack abort with an explicit freeze message. Terraform rejects
+a bare `condition = false` (the expression must reference an object), so the condition is `path.module == ""` —
+always false, and it references `path.module` to satisfy the rule. Verified: a `plan` on redebrasil now aborts
+with "integrator-redebrasil is FROZEN (contract cancelled). Delete freeze.tf to apply." The guard is deleted
+when the stack is torn down for real; until then no apply can touch it. This replaces the three options the
+earlier draft floated (decommission now / drop from the list / carve-out) — none were needed once a true freeze
+existed.
+
+**Future — port the pattern to `app`.** The engineer wants the same "the module OWNS the Redis, it is not
+created by the consuming stack" guarantee ported to the `app` module/stacks later, to keep one standard across
+the estate. Deferred; noted here so it is not lost. (App's Redis today is external Redis Cloud, per ADR-010 —
+porting the *guarantee* may mean the app module owning the Redis Cloud resource, not an ElastiCache; scope it
+when it is picked up.)
 
 ### Phase 10 — The module OWNS and auto-creates the key, named after the stack (the forward-lock) — **DONE 2026-07-20**
 
@@ -792,14 +1095,22 @@ the plan is a no-op (0/0/0). Watch out per module: only VALUE strings are parame
 resource labels (`resource "x" "setup"`) — those are state addresses; a blind replace_all breaks them, so
 edits are targeted. `Project` tags and GitHub repo names stay hardcoded (they are the project/repo, not the env).
 
-**Progress (2026-07-23):** DONE + merged — `auth` (**#814**, ~50 names + rds_instance switch, 0/0/0),
+**Progress (2026-07-24):** DONE + merged — `auth` (**#814**, ~50 names + rds_instance switch, 0/0/0),
 `onboarding` (**#816**, 0/0/0, also fixed an SSM path-vs-grant inconsistency), `setup` (**#817**, 0/0/0
-including the production RDS). IN PROGRESS — `vpn`. **`vpn` decision (engineer, 2026-07-23): option B —
-parameterize it via `var.identifier` for uniformity, EVEN THOUGH its "vpn" is the application name (ADR-010, a
-deliberate singleton with no `-001`/`-002`), not an environment identifier.** So vpn gets a new `variables.tf`
-+ `identifier` driving the resource names; the many `Role = "vpn"` tags stay (they are the role, like `Project`),
-the terraform resource labels (`resource "x" "vpn"`, `aws_*.vpn` refs) stay (state addresses), targeted edits
-only (~50), 0/0/0 gate. Only after `vpn` are all four a clean reference and the integrator effort (below) begins.
+including the production RDS), `vpn` (**#819**, 0/0/0). **All four modules are now parameterized by a
+required `var.identifier` and are a clean reference.** The integrator effort (below) begins next.
+
+**`vpn` note (engineer, 2026-07-23): option B — parameterized via `var.identifier` for uniformity, EVEN
+THOUGH its "vpn" is the application name (ADR-010, a deliberate singleton with no `-001`/`-002`), not an
+environment identifier.** The vpn module got a new `variables.tf` + `identifier` driving every resource
+name; the many `Role = "vpn"` tags stayed (they are the role, like `Project`), the terraform resource
+labels (`resource "x" "vpn"`, `aws_*.vpn` refs) stayed (state addresses), and the legacy EIP `Name`
+(`4shark-vpn-001-eip`) stayed (a physical adopted tag). **Architecture note surfaced during review: the
+vpn module is unlike the other three — it contains production AND staging together in one module instance
+(one cluster, one Mongo host, ONE minted KMS key), so `vpn-staging` is a `-staging` suffix on top of
+`var.identifier` INSIDE the single import, not a second module import. A second import would mint a second
+key, which is exactly why staging lives in the same instance.** The single `identifier = "vpn"` in
+`vpn/main.tf` drives both prod and staging names; the 0/0/0 plan refreshed both services with no change.
 
 **NEXT (after the three remaining module parameterizations): the five integrators** (execution-order step 4 / Phase 9 below) — the role split, move each integrator's
 SSM SecureStrings onto the already-minted `alias/integrator-<slug>` key, plus the naming and Redis
@@ -866,7 +1177,9 @@ surfaced two non-obvious blockers that WILL recur, plus the mechanism that worke
      own dedicated `aws_elasticache_cluster.redis` (`ec-<client>`, `modules/integrator/elasticache.tf:7`).
      That per-client self-managed Redis is not the current standard for a new integrator; bring it to the
      current standard as part of this step. **The target standard is the engineer's to specify** (do not
-     assume it) — capture it before touching the Redis.
+     assume it) — capture it before touching the Redis. **The engineer chose to START the integrator effort
+     with the Redis (2026-07-24); the full staged detail — current-state DB map, the `/0`-reservation
+     convention, the Stage 1 correction, and the open decisions — is in Phase 9a above.**
    Order among the five: start with the one whose access delegation is wanted first (Atento — the
    Santiago driver) unless a lower-risk integrator is preferred as the shakedown. The stack-vs-slug count
    and the cross-region-sibling sweep from Phase 9 still apply.
