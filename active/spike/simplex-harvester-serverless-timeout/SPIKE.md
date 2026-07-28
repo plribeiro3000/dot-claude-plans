@@ -331,3 +331,122 @@ The mechanism is not a proactive "pre-warm". When the paused serverless base is 
    - The integrator downstream consumed both results, corroborating that the harvester ran and wrote successfully. The only log noise is expected per-record source-data handling (duplicate register ids, hierarchy rows with no valid parent falling back to admin) — none of it connection-related.
 
 **Outcome: the serverless first-connection timeout is resolved in production.** The fix (SqlClient 5.1 upgrade + driver-native ConnectRetry, secret-name correction, Encrypt=false for the legacy TLS-less servers) is validated end-to-end. This spike is complete.
+
+> **SUPERSEDED — see the 2026-07-27 reopening below.** The claim above ("resolved", "validated end-to-end") did not hold. It rested on two consecutive clean production runs (23/07 and 24/07); the failure returned on 25/07 and has recurred since. Two consecutive successes against a database that pauses *intermittently* are not a validation — they are consistent with the database simply having been awake on those two mornings. This document keeps the original text intact and records the correction below.
+
+---
+
+## Reopened — 2026-07-27: the failure returned, and the shipped mitigation never actually ran
+
+The spike was closed on 2026-07-23 as resolved. The daily load failed again starting 2026-07-25 and the investigation reopened on 2026-07-27. What follows corrects specific claims made above, records what was measured directly this time, and states what is still unknown.
+
+### The failure pattern — intermittent, and independent per country
+
+Run durations from the two production log groups (`/ecs/integrator-atento-harvester-{mx,co}-cron-integration`). A healthy run lasts 15–22 minutes; an aborted one dies in ~35 seconds.
+
+| Date | MX | CO |
+|---|---|---|
+| 22/07 (wed) | OK — 21m42s | OK — 15m32s |
+| 23/07 (thu) | OK — 20m57s | OK — 14m44s |
+| 24/07 (fri) | OK — 22m06s | OK — 14m47s |
+| 25/07 (sat) | **FAIL** — 39s | **FAIL** — 34s |
+| 26/07 (sun) | **FAIL** — 34s | OK — 15m16s |
+| 27/07 (mon) | **FAIL** — 35s | **FAIL** — 34s |
+
+Every failure is the same signature, aborting at `ReifySubsidiaries` — the run's first database access — with `Fin (aborted)` and no data read or written:
+
+```
+Connection Timeout Expired.  The timeout period elapsed during the post-login phase.
+[Pre-Login] initialization=241; handshake=737; [Login] initialization=0; authentication=0;
+[Post-Login] complete=28723;
+Error Number:-2,State:0,Class:11
+```
+
+Sunday is the informative row: CO succeeded while MX failed, four hours apart on the same Azure server. That is only explicable if the two databases pause **independently** — confirmed below.
+
+### Finding 15 — CORRECTS the Resolution's "how the fix actually works": the `ConnectRetryCount` sizing never executes
+
+The Resolution section above states the 10×10 sizing "covers ~100s" of resume window. **It does not.** All of `ConnectRetryCount`'s attempts share a *single* `Connect Timeout` budget, and attempt zero consumes the whole of it. The failing runs prove it arithmetically:
+
+```
+[Pre-Login] 241ms + handshake 737ms + [Post-Login] 28,723ms  ≈  29.7s
+→ hits the ~30s Connect Timeout on the FIRST attempt
+→ 0 of the 10 configured retries ever run
+```
+
+Microsoft's own requirement, which the original change did not satisfy: *"To take advantage of all retry attempts, the Connection Timeout property must provide time for all attempts."* The SSM connection-string parameters were last modified 2026-07-20 — before the fix — confirming `Connect Timeout` was never raised alongside the retry keywords.
+
+Compounding it, the API doc defines `ConnectRetryCount` as *"the number of reconnections attempted after identifying that there was an **idle connection failure**"* — it was designed for reconnecting a connection that already existed and dropped. Serverless-instance support is an extension layered on that, still bounded by the single connect-timeout budget.
+
+**Consequence:** PR #41 removed the manual `OpenWithBackoff` (five independent `Open()` calls, each with a fresh 30s clock, waits of 30/60/120/240s) and replaced it with a mechanism that, as configured, performs exactly one attempt. The protection was removed and not replaced. That is the regression.
+
+### Finding 16 — the normalized bases are confirmed Azure serverless, and one was caught paused live
+
+Two ephemeral ECS tasks were run inside the harvester VPC (image `mcr.microsoft.com/mssql-tools`, production SSM credentials, task definitions deleted afterwards), querying all four connections directly. This replaces every remaining inference in Findings 10/11 with measurement.
+
+| Connection | Host | Engine | Verdict |
+|---|---|---|---|
+| MX source | `10.214.0.122` (`MXDCQSIMBVP003`) | SQL Server 2016 SP2 Enterprise, Windows | On-premises, over VPN |
+| CO source | `172.17.123.134` (`COLBOGSQL44`) | SQL Server 2016 SP3-GDR Standard, WS2022 | On-premises, over VPN |
+| MX normalized | `sql4shark.database.windows.net` / `ME_4Shark_DB` | `SQL Azure` 12.0.2000.8, `GeneralPurpose`, SLO **`GP_S_Gen5_1`** | **Serverless** — awake at probe time |
+| CO normalized | `sql4shark.database.windows.net` / `CO_4Shark_DB` | — | **Serverless — PAUSED at probe time** |
+
+The `_S_` in `GP_S_Gen5_1` is the serverless marker. The CO base returned, three times in a row:
+
+```
+Database 'CO_4Shark_DB' on server 'sql4shark.database.windows.net'
+is not currently available.  Please retry the connection later.
+```
+
+That is error **40613** — the exact contract Finding 6 quotes for a paused serverless database. Not inferred: observed.
+
+Both sources' `/32` addresses match host routes on the harvester subnets' route table pointing at the virtual private gateway, confirming they are reached over the client VPN. On-premises SQL Server has no auto-pause, so the source connections are permanently out of scope for this problem.
+
+**Also settled:** the two normalized bases are *separate databases on one Azure server*, and Azure auto-pause is per database. One awake and one paused in the same second is the direct explanation for Sunday's split result.
+
+**Note on ownership:** `sql4shark.database.windows.net` is 4Shark's own server. The auto-pause configuration is not gated on Atento.
+
+### Finding 17 — the TLS capability of the fleet, measured
+
+The Resolution above deferred encryption as needing "per-environment config, not a static flag". That is now measured rather than asserted. Three modes were tried against each connection from inside the VPC:
+
+| Connection | No encryption | Encrypt + trust certificate | Encrypt + validate certificate |
+|---|---|---|---|
+| MX source | OK | **FAILS** — handshake before login | **FAILS** — handshake before login |
+| CO source | OK | **OK** | FAILS — self signed certificate |
+| MX normalized (Azure) | OK | OK | **OK** |
+| CO normalized (Azure) | OK | OK | **OK** |
+
+The MX source cannot negotiate TLS at all — `TrustServerCertificate` does not help, because it skips certificate *validation* and the failure is in the handshake itself. The CO source *can*, with certificate trust. Both Azure bases pass full certificate validation, needing no trust override. So a single `Encrypt` value cannot serve both source servers, and the Azure side has no reason to stay unencrypted.
+
+### What shipped on 2026-07-27 (release `1.4.0`)
+
+1. **simplex-harvester #44** — attaches SqlClient's Configurable Retry Logic provider to `SqlConnection.RetryLogicProvider` on both contexts, with an explicit transient-error list including `-2`. Unlike `ConnectRetryCount`, each retry issues a *new* `Open()`, so every attempt gets a fresh `Connect Timeout` — which restores what `OpenWithBackoff` provided, without raising the timeout for everything else. Five attempts, exponential gap capped at 60s.
+2. **simplex-harvester #45** — logs each retry with the database label, the attempt number, the next delay, and the server error numbers flattened out of `SqlException.Errors`. The exception's own message only ever surfaces the first entry, which is how a `40613` can hide behind a `-2`.
+3. **Release `1.4.0`** — tagged and merged to `master`, production ECR images rebuilt (`86dbcff`, 2026-07-27 11:53).
+
+The `#45` logging was verified by execution, not by documentation: the real `UtilHelper` was driven against a silent TCP listener to force a genuine `-2`, and the handler emitted four labelled lines with `number=-2 class=11 state=0`. That test also caught a defect — the event's `Exceptions` list is cumulative, so every line was repeating all prior attempts; fixed to describe only the newest, and re-run.
+
+### Process finding — a merge to `develop` never reaches production
+
+The build workflow pushes to the **staging** ECR repositories on a `develop` push and to the **production** repositories only on a `master` push. Before the `1.4.0` release, the production images dated from 2026-07-22. A fix merged to `develop` therefore changes nothing in the daily run — only a release does. This cost most of 2026-07-27 and is worth remembering for any future "we merged the fix, why is it still failing".
+
+### The open hypothesis — NOT validated
+
+Connecting to the Azure base unencrypted may be what converts a clean, retryable `40613` into an opaque `-2` that nothing treats. The `sqlcmd` probe received a clean 40613 *with* encryption, while the application receives a post-login hang *without* it. This matters because EF Core already retries 40613 natively — if the application saw 40613, none of the retry work would have been needed.
+
+**This was not proven.** An encrypted-connection change was built and exercised against an *awake* database, which says nothing about the paused case, and the PR was withdrawn on that basis. `Encrypt` remains `false` on both contexts, deliberately, so that the failure recurs and the new logging captures the real error number.
+
+### Constraint — disabling auto-pause is NOT an acceptable solution
+
+Turning auto-pause off was raised and is **rejected as a direction**. The client will not keep a database server running 24 hours a day for roughly 20 minutes of daily use, and that position is reasonable — it is the entire cost rationale for choosing serverless. Any solution must work *with* the database pausing, not by preventing it. This retires Option E from the original trade-off table and the "disable or lengthen the auto-pause delay" half of it; the keep-alive/ping half is also a poor fit, since a ping that keeps the base awake defeats the same cost goal.
+
+### Next step
+
+Read the 2026-07-28 production run in both log groups and look for the `ConnectionRetry` lines. The error number they carry decides the direction:
+
+- **`number=40613`** — the paused-database rejection is reaching the application, EF Core would already retry it, and the encryption hypothesis is dead. The remaining question becomes budget sizing.
+- **`number=-2`** — the rejection is being masked as an opaque timeout, the encryption hypothesis gains real support, and the next change is encrypting the Azure connection specifically (safe per Finding 17: both Azure bases pass full certificate validation), with the source contexts left unencrypted.
+- **No `ConnectionRetry` line and a clean run** — the bases happened to be awake. Nothing is learned; wait for the next failure.
+
+If the run succeeds *with* retry lines present, that is the best outcome: the load works and the diagnosis arrives at the same time.

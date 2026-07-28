@@ -1,16 +1,51 @@
 # PLAN — One KMS key per environment, with restrictive key policies
 
-**Status: NOT COMPLETE — one surface is still open (corrected 2026-07-24).** All fifteen stacks are on
-a dedicated task-execution role, and the integrators are on customer-managed keys the shared module
-owns. The account-wide `ecsTaskExecutionRole` no longer carries any per-stack SSM policy. See the
+**Status: NOT COMPLETE — the INTEGRATORS are done; the app estate is what remains.** All fifteen stacks
+are on a dedicated task-execution role, and the integrators are on customer-managed keys the shared
+module owns. The account-wide `ecsTaskExecutionRole` no longer carries any per-stack SSM policy. See the
 phase notes below for the per-stack history and the two cross-region blind spots that step-3 exposed.
 
-**What is still open: the integrator MongoDB hosts' EBS volumes are UNENCRYPTED** — verified live, not
-inferred. This plan was marked COMPLETE earlier the same day; that was wrong, because "the integrators
-are on their own key" was read as covering everything the integrator holds at rest, and the key only
-covers SSM and Redis. The database hosts were never on it. See § "The integrator MongoDB EBS gap"
-below for the evidence and the shape of the fix. **This is the FIRST item on 2026-07-27** — finish the
-integrators' at-rest encryption, then the app surface, and only then is this plan closed.
+**Integrator closing audit — 2026-07-27, live against AWS, surface by surface.** Three surfaces are on
+the integrator's own key, verified rather than assumed: the twelve serving EBS volumes (each under its
+own client's key, no cross-use), all 158 `/integrator*` SSM parameters (grouping by key yields exactly
+one bucket per integrator, nothing on the AWS-managed key), and the four `integrator-<client>-redis001`
+ElastiCache groups (`AtRestEncryptionEnabled: true`, own key each). **Three other surfaces are NOT, and
+this plan never scoped them either way** — S3 deployment buckets and the 16 ECR repositories sit on
+AES256 (SSE-S3/AWS-managed: encrypted, but no key policy to scope, so no per-integrator isolation), and
+50 `/ecs/integrator-*` CloudWatch log groups carry no customer key at all. **Note the shape**: it is the
+same one that produced the MongoDB miss — "the integrators are on their own key" standing in for a claim
+nobody had checked surface by surface. All three were taken into scope the same day as **§ Phase 12**,
+which carries their differing mechanics (one in-place, one forces a replace, one needs a data move) and
+the three decisions they need before starting. The audit report is
+`/tmp/interactive_report_integrator_kms_audit_20260727.html`.
+
+**Why this plan was reopened, kept here because the mistake is the lesson.** It was marked COMPLETE on
+2026-07-24 and that was wrong: "the integrators are on their own key" was read as covering everything an
+integrator holds at rest, when the key's `kms:ViaService` scope was SSM and ElastiCache only. The
+MongoDB hosts' EBS volumes were never on it, so the database storage — the largest body of customer data
+the integrators hold — sat unencrypted while the plan claimed completion. A per-surface claim must name
+its surfaces; "on its own key" is not a statement about a stack, it is a statement about a service.
+
+**Progress 2026-07-27 — the data HAS moved; two steps remain, both irreversible-adjacent.** Twelve
+replacement nodes (three per integrator) came up with their root volume encrypted under that
+integrator's own key, each key's policy widened to permit use through EC2 — without which an encrypted
+volume could not be created at all — and then all four replica sets were migrated onto them the same
+day. Every client now serves entirely from the encrypted block; the old unencrypted trio is out of the
+set and stopped, holding a frozen copy. Customer data is on encrypted volumes for the first time.
+
+**The teardown is DONE too — 2026-07-27, same day.** The twelve retired instances and their twelve DNS
+records are destroyed (terraform PR #848). The engineer chose to proceed without the record-count gate,
+which is recorded here as a decision rather than an omission: MongoDB's initial-sync contract is what
+backs "the new nodes have all the data" and it is a strong mechanical guarantee, but nobody counted both
+sides independently.
+
+**What that decision cost is smaller than it looks, and the reason matters.** The twelve root volumes
+carry `delete_on_termination = false`, so they survived the terminate as `available` — 12 × 40 GB — and
+the eight snapshots are still there. The data baseline for a count is therefore intact; what the
+teardown removed is the CHEAP path to it (start a stopped instance and read it). Recovering it now means
+attaching a volume or restoring a snapshot. **The one thing left on this surface is deciding when those
+volumes go**, and that decision ends the possibility of the count. See § "The integrator MongoDB EBS
+gap" below for the verified state, both id tables, and the structural findings the migration surfaced.
 
 Absorbs and replaces `active/terraform/kms-migration/PLAN.md` (deleted). Sources:
 `active/spike/kms-key-per-environment/SPIKE.md`, `active/spike/aws-engineer-staging-tier/SPIKE.md`,
@@ -386,14 +421,15 @@ replicated onto demo with zero new findings.
 
 **Lesson: step-3 must sweep every task-def that NAMES the shared role AND reads the dropped prefix, INCLUDING cross-region outbound siblings in another stack.** The productive-stack completions above verified only the same-stack us-east-1 services/crons; the sa-east-1 outbound consumer was the blind spot both times. The proven cutover for a desired-0 service is a targeted `update-service` to the new-role revision — not a full productive deploy (the service is pinned to the old revision by `ignore_changes`, so a precise repoint heals it with zero blast radius).
 
-**The `integrator-*` stacks — DONE — 2026-07-24.** The design decision landed on customer-managed keys, one per integrator, and the shared `modules/integrator` now OWNS that key (`kms.tf`): every stack instantiating the module is born with `alias/integrator-<client>`, so the key can neither be omitted nor misnamed for a new integrator — it exists by construction rather than by being passed in. Each integrator's dedicated task-execution role (also module-owned) carries `kms:Decrypt` scoped to that one key, and the SSM parameters were rekeyed onto it, so nothing reads through the account-wide AWS-managed key any more. The key policy is scoped by service (`kms:ViaService` = ssm and elasticache, within this account) rather than by naming principals — which is what makes per-integrator ACCESS DELEGATION expressible: granting an engineer who owns one client the ability to reach only that client's integrator is a matter of scoping their `ssm:GetParameters` to that prefix. The same key also encrypts that integrator's Redis at rest. Delivered as part of the integrator module absorption (see `completed/terraform/integrator-module-absorption/`). **What this does NOT cover: the integrator's MongoDB hosts.** The key's `kms:ViaService` scope is ssm + elasticache, so the database nodes' EBS volumes are outside it and are unencrypted today — see § "The integrator MongoDB EBS gap" below. "The integrators are on their own key" is true of their parameters and their cache, not of their database storage.
+**The `integrator-*` stacks — DONE — 2026-07-24.** The design decision landed on customer-managed keys, one per integrator, and the shared `modules/integrator` now OWNS that key (`kms.tf`): every stack instantiating the module is born with `alias/integrator-<client>`, so the key can neither be omitted nor misnamed for a new integrator — it exists by construction rather than by being passed in. Each integrator's dedicated task-execution role (also module-owned) carries `kms:Decrypt` scoped to that one key, and the SSM parameters were rekeyed onto it, so nothing reads through the account-wide AWS-managed key any more. The key policy is scoped by service (`kms:ViaService`, within this account — ssm and elasticache as delivered here, plus ec2 from 2026-07-27) rather than by naming principals — which is what makes per-integrator ACCESS DELEGATION expressible: granting an engineer who owns one client the ability to reach only that client's integrator is a matter of scoping their `ssm:GetParameters` to that prefix. The same key also encrypts that integrator's Redis at rest. Delivered as part of the integrator module absorption (see `completed/terraform/integrator-module-absorption/`). **What this did NOT cover when it was written: the integrator's MongoDB hosts.** As delivered, the key's `kms:ViaService` scope was ssm + elasticache, so the database nodes' EBS volumes were outside it and unencrypted — "the integrators are on their own key" was true of their parameters and their cache, not of their database storage. **Closed 2026-07-27**: each key's policy gained an EC2 via-service statement plus `kms:CreateGrant`, and the nodes were re-provisioned onto encrypted volumes under it. See § "The integrator MongoDB EBS gap" below for the verified state and what is still owed.
 
-**Remaining — the SSM/Redis surface is done on all fifteen stacks; the integrator MongoDB hosts are NOT.** The four non-productive app stacks, the two productive ones, `setup`, `onboarding`, both `app-outbound-*` and the five `integrator-*` are all on a dedicated role with their parameters and Redis on a dedicated key. What that does NOT cover is the integrator database hosts' block storage — see the next section.
+**Remaining — every surface is now encrypted; what is owed on the integrator MongoDB hosts is verification and cleanup, not encryption.** The four non-productive app stacks, the two productive ones, `setup`, `onboarding`, both `app-outbound-*` and the five `integrator-*` are all on a dedicated role with their parameters and Redis on a dedicated key. The integrator database hosts' block storage joined them on 2026-07-27 — the data was migrated onto encrypted volumes the same day the capacity was built. What is left there is the engineer's record-count gate and the teardown of the old nodes; see the next section.
 
-### The integrator MongoDB EBS gap — OPEN, first item on 2026-07-27
+### The integrator MongoDB EBS gap — CLOSED 2026-07-27 (migrated + torn down); only the orphaned-volume deletion remains
 
-**The volumes are unencrypted, verified live 2026-07-24** (`aws ec2 describe-volumes`, sa-east-1): all
-twelve root volumes of the four active integrators' replica-set nodes report `Encrypted: false` and
+**The original finding — the volumes were unencrypted, verified live 2026-07-24** (`aws ec2
+describe-volumes`, sa-east-1), kept as written because it is what the section exists to answer: all
+twelve root volumes of the four active integrators' replica-set nodes reported `Encrypted: false` and
 `KmsKeyId: null` — `integrator-{almaviva,atento,commcenter,maqnelson}-mongo00{4,5,6}`. This is not a
 wrong-key finding: there is no key at all, so the customer data those nodes hold sits on disk in the
 clear. The three `4client-redebrasil-mongo00{3,4,5}` volumes are unencrypted too, but that stack is the
@@ -428,6 +464,191 @@ old), so this is the same operation already run for the OS upgrade, with two add
 
 **Per-integrator, not all four at once** — each is a live replica set for a paying client; the cutover
 window is per client, and a failed cutover must not be able to touch a second one.
+
+**Step 1 of the fix is DONE — terraform PR #845, applied and merged 2026-07-27.** Both additions above
+shipped together with the replacement nodes, because neither is optional: without the key-policy
+widening the encrypted volume cannot be created at all (the policy granted the account root management
+actions only, no cryptographic action), and declaring the encryption in the module rather than per
+stack is what makes it unforgettable — the stack passes node names, the module attaches the key.
+
+What is live now, verified against AWS rather than inferred: **twelve new nodes, three per integrator,
+every root volume `Encrypted: true` under that integrator's own key** (four distinct key ARNs, one per
+stack), each resolving on the internal zone. Each integrator stack applied `3 added, 1 changed, 0
+destroyed` — the single change being its KMS key (policy + description), an in-place update that
+re-encrypts nothing — and the DNS stack applied `12 added, 0 changed, 0 destroyed`. **No live resource
+was replaced at any point.**
+
+The node numbering also got corrected in the same pass. The `mongodb-reprovision` skill said numbering
+ADVANCES and never reuses; it does not — it **alternates between two blocks**, taking whichever is free,
+because the serving block is unavailable (two instances cannot share a `Name` tag and the internal DNS
+record resolves by it) and the retired block frees again at teardown. The replacement nodes are
+therefore `001/002/003`, not `007/008/009`; a number is a slot, not a version, and a counter that only
+climbed would reach `mongo042` and stop meaning anything. Corrected in dot-claude PR #454 before the
+terraform code was renumbered to match.
+
+**Step 2 is DONE for all four integrators — the data has moved, 2026-07-27.** Every client now serves
+its replica set entirely from the encrypted block: `mongo001` PRIMARY, `mongo002` SECONDARY, `mongo003`
+ARBITER, priorities `1 / 0.5 / 0`, `Problems: []`, verified per client after the fact rather than
+inferred from the cutover output. The old trio is out of the set and stopped (twelve instances, all
+`stopped`, data frozen as the warm fallback). The connection strings were rotated in SSM — eleven
+parameters, one per deployment, each verified by re-reading the stored value and confirming it names
+`mongo001/002/003` and no old node. Customer data is therefore on encrypted volumes for the first time.
+
+**The one guarantee that is NOT ours: the record-count comparison.** MongoDB's own initial-sync
+contract is what backs "the new nodes have all the data" — a member reports `SECONDARY` only after the
+sync completed, and `cutover` refuses to touch the set until BOTH new data nodes reach it. That is a
+strong mechanical guarantee, but it is not an independent count of both sides, and the independent count
+is the engineer's `bin/ecs run` gate. It is only possible **before** the teardown, which destroys the
+frozen copy that serves as the baseline.
+
+**Rollback is no longer free.** It stopped being free at each client's B.3 step, where the old data
+members left the set. From here the old nodes are a frozen copy: putting one back is a re-add and a
+full re-sync — a restore, not an undo. The restore points below are the cold path.
+
+**The repoint was NOT the shape the runbook describes, and the next migration needs to know.**
+`mongodb-reprovision`'s SKILL.md says the old nodes are named in four places in each stack's
+`compute.tf`. They are not: the module was consolidated, so all five reference sites live in
+**`modules/integrator/`** — `deployments.tf` (the `AWS_INSTANCE_IDS` env var and the `start_mongodb`
+schedule's `InstanceIds`), `deployments_alb.tf` (the scheduler role's `ec2:StartInstances` resource),
+`iam_deploy.tf` and `outputs.tf` (the instance ARN lists) — and are shared by every integrator stack.
+Consequence: **a repoint cannot be done per client.** It is correct only once every stack that declares
+nodes has cut over, which is why the four ran to completion before the repoint landed (terraform PR
+#846, applied to almaviva `4/3/4`, maqnelson `4/3/4`, atento `0/1/0`; commcenter planned `No changes`
+because it declares neither `mongo_start_cron` nor `inject_mongo_instance_ids`). A per-client switch
+variable was considered and rejected as abstraction for a window that had already closed.
+
+Two facts worth carrying forward. First, **the deploy is mandatory for a reason narrower than the
+runbook states**: the connection string resolves from the SSM ARN at task-start, so a fresh task gets
+the new hosts with no deploy at all — what the deploy fixes is `AWS_INSTANCE_IDS`, a literal baked into
+the task-definition revision, which the services do not pick up because `task_definition` sits in
+`ignore_changes` (`modules/ecs_service/main.tf:155`). Left undeployed, the app's shutdown worker stops
+the retired nodes and leaves the serving ones running — cost, not failure. Eleven deploys were run (the
+four clients' production plus staging and atento's four countries) and the resulting revisions were
+verified to carry the new IDs. Second, **the deploy's own MongoDB preflight is already
+migration-aware** — it derives the instance Name tags from the hosts in the SSM URL rather than
+hardcoding them (`integrator/.github/workflows/deploy.yaml:59-95`), so rotating the parameter is what
+makes the check follow. Nothing there needed changing.
+
+**The teardown ran the same day — terraform PR #848.** The DNS stack applied FIRST (`0 add, 0 change,
+12 destroy`), which is not a preference: a `data "aws_instance"` matches `running`/`stopped` but not
+`terminated`, so terminating before those lookups are gone breaks every later plan of the whole DNS
+stack, for unrelated environments too. Termination protection was cleared out of band on all twelve
+first and verified with `describe-instance-attribute` — `describe-instances` does not return the field
+at all, so a protected instance is indistinguishable from a cleared one and the apply would die
+mid-destroy. Each integrator stack then applied `0 add, 0 change, 3 destroy`, naming exactly its own old
+trio with **zero task-definition churn**, which is the runbook's signal that the repoint had already
+shipped separately. All four sets verified `Healthy: true`, `Problems: []`, priorities `1 / 0.5 / 0`
+after the fact.
+
+**The retired block was DELETED from the module rather than left at `count = 0`, and that is what made
+the destroy possible.** `prevent_destroy` must be a literal, so it attaches to the slot and not to the
+role: the old arbiter carried the guard, and a block left in place would have refused its own destroy.
+Removing the block removed the guard with it — the runbook says exactly this (`SKILL.md:201`) and the
+plan confirmed it, since `mongo006` destroyed without complaint. The `has_mongo` local went too, having
+become dead once the serving block is gated per map key. The next re-provision re-adds 004/005/006 the
+same way and deletes 001/002/003 at its own teardown; the module header now documents that cycle.
+
+**The orphan count is FOURTEEN, not twelve — and the two extras were not left by this migration.**
+`vol-0274bf12f079cf3e4` and `vol-068a53f9cf38e271e`, both tagged `integrator-commcenter-mongo00{1,2}`,
+are 60 GB (today's are 40 GB) and dated 2026-07-13 — before the 2026-07-15 generation existed. They are
+the PREVIOUS re-provision's retired data nodes, whose volumes nobody deleted: unencrypted customer data
+from that generation, billing for two weeks, and no snapshot of them recorded anywhere. Their node names
+collide with numbers that are live again today, which is exactly what makes them easy to misread as
+current. **The lesson generalises past these two: a re-provision that stops at the terminate leaves
+paid-for unencrypted data behind unless deleting the volume is an explicit step** — Phase D.6 exists for
+this and was skipped both times. **Both were deleted on the engineer's go, 2026-07-27**, bringing the
+orphan count back to the twelve this migration deliberately kept.
+
+**What remains on this surface is one decision: when the orphaned volumes go.** `redebrasil` is
+excluded from all of it — the engineer confirmed 2026-07-27 that the stack is being decommissioned this
+week or next, so its unencrypted `4client-redebrasil-mongo00{3,4,5}` volumes go away by deletion rather
+than by re-provisioning.
+
+**A note on `redebrasil` planning, because the obvious reading of it is wrong.** The stack fails config
+validation with six `Unsupported argument` errors — `vpc_id`, `subnet_prv_a_id`, `subnet_prv_b_id`,
+`route_table_private_id`, `additional_ingress_sg_ids`, `internal_zone_id`, all passed to `module "this"`
+and all dropped from the module when it absorbed the subnet lookups (`modules/integrator/main.tf:21-22`
+now reads them from SSM itself). Reproduced against unmodified `develop`, so it predates any open PR.
+This looks like an unnoticed regression and **is not one**: the stack carries `freeze.tf`, a deliberate
+always-failing `precondition` added to abort every plan and apply on a cancelled contract (§ Phase 10
+records it). The config drift simply fires *earlier* than the precondition, so the freeze message never
+gets printed — the drift masks the guard rather than replacing it. **Do not "fix" this stack.** Both the
+drift and the freeze resolve by deleting it. A background task was opened to repair the drift on
+2026-07-27 and was wrong to exist; it is recorded here so the next reader does not re-open it.
+
+**Restore points — record every one here the moment `snapshot` returns them.** They are the cold
+rollback once the old volumes are gone, and after the teardown there is no way to rediscover which
+snapshot belonged to which node.
+
+| Client | Node | Volume | Snapshot | Taken |
+|---|---|---|---|---|
+| almaviva | mongo004 | `vol-0bc85dd65541ea4b5` | `snap-06ffbf5ead8e6ce48` | 2026-07-27 |
+| almaviva | mongo005 | `vol-04ec67b945d5d05c8` | `snap-0e0c030b6c20caea3` | 2026-07-27 |
+| maqnelson | mongo004 | `vol-0bd2586d34b953c5c` | `snap-077ed0e6881bd942c` | 2026-07-27 |
+| maqnelson | mongo005 | `vol-04c0a26b6102b4f60` | `snap-0b63a69da2e8ea440` | 2026-07-27 |
+| commcenter | mongo004 | `vol-087ae6d5959083bc3` | `snap-07b0761fe039cfe43` | 2026-07-27 |
+| commcenter | mongo005 | `vol-06902a79a8dbd9ccc` | `snap-09d1dd6733e65e9e9` | 2026-07-27 |
+| atento | mongo004 | `vol-0ab2bf4f0b48edd10` | `snap-0ab3ad4c82b7f8283` | 2026-07-27 |
+| atento | mongo005 | `vol-03505729e3a466e1a` | `snap-074aea977c11d354f` | 2026-07-27 |
+
+**Root volumes of the twelve retired nodes — captured before the terminate (Phase D.1), because after
+it there is no way to discover which volume belonged to which node.** They carry
+`delete_on_termination = false`, so they survive the instance as `available` and keep costing until
+deleted deliberately. **They are NOT being deleted in this teardown** — the engineer chose to proceed
+without the record-count gate, so these volumes plus the snapshots above are what keeps that
+verification possible at all. Deleting them is a separate, later decision.
+
+| Client | Node | Volume |
+|---|---|---|
+| almaviva | mongo004 | `vol-0bc85dd65541ea4b5` |
+| almaviva | mongo005 | `vol-04ec67b945d5d05c8` |
+| almaviva | mongo006 | `vol-074c9ba6887ede322` |
+| maqnelson | mongo004 | `vol-0bd2586d34b953c5c` |
+| maqnelson | mongo005 | `vol-04c0a26b6102b4f60` |
+| maqnelson | mongo006 | `vol-0f5df2cab6aca2072` |
+| commcenter | mongo004 | `vol-087ae6d5959083bc3` |
+| commcenter | mongo005 | `vol-06902a79a8dbd9ccc` |
+| commcenter | mongo006 | `vol-0167d6bab97db98db` |
+| atento | mongo004 | `vol-0ab2bf4f0b48edd10` |
+| atento | mongo005 | `vol-03505729e3a466e1a` |
+| atento | mongo006 | `vol-080628e841101ae3d` |
+
+Only the DATA MEMBERS OF THE SERVING SET are listed — those are the snapshots that carry data and the
+only ones whose absence would be a missing backup. Two shapes both appear in practice and both are
+correct: when the set is already up, the script reads its config and snapshots exactly the data members
+(almaviva, two snapshots); when no set is reachable — the normal state of a daily-shutdown client at
+Phase 0 — it cannot know which member is the arbiter, so it snapshots EVERY node (maqnelson, six). The
+extra ones there (the arbiter and the three fresh replacements) are near-empty and deliberately not
+tracked here.
+
+**Two operational traps hit during the migration itself, both worth carrying forward.** First, a
+replacement node came up on a private IP that a previously-destroyed instance had used, so the
+engineer's `known_hosts` still held the old key and SSH refused with a host-key-changed warning. That is
+IP reuse inside the VPC, not an attack — but it is verified, never assumed: the instance's own AWS
+console output prints the fingerprints cloud-init generated at boot, and the ED25519 one matched what
+SSH presented. Clearing the stale entries (`ssh-keygen -R <ip>` — there were TWO for that address, not
+one) unblocked it. Second, **the MFA session is valid one hour and this migration outlives it**; when it
+expired mid-run, `create-snapshot` failed and the empty ids nearly passed as backups. Re-elevate before
+each client rather than discovering it inside a step.
+
+**A defect in the re-provision script surfaced here and was fixed before any data moved (dot-claude
+PR #455), and a SECOND round was needed because the first fix repeated the original mistake one level
+up (PR #456).** The first fix asserted the snapshot list was non-empty; the expired session produced two
+records whose ids were the empty string, so the length was right and the check passed. Both layers now
+verify each entry carries a real `snap-` id, and refuse a partial result. The recurring lesson is the
+same in all three rounds: **assert the thing itself, never a count of things.** The preflight decided whether the serving set was up by COUNTING running nodes, an
+inference that held only while a client had one block of nodes. This migration creates a second block,
+so "some are running" became true while the running ones were the fresh replacements — in no set,
+holding nothing — and the nodes with the data were stopped. It then asked a memberless node for the set
+config, resolved an empty list of nodes to back up, and reported `Ready: true` with **zero snapshots**.
+The script now classifies each node individually and branches on whether a set is reachable; an empty
+snapshot list aborts in two independent places. Worth carrying forward: adding nodes to an estate can
+invalidate a count-based premise somewhere downstream, and the failure surfaced as false success.
+
+**One risk to check rather than assume, at the repoint step**: the scheduler that starts these nodes
+daily needs `kms:CreateGrant` to boot an encrypted volume. The grant statement added to each key
+covers it by key policy, but that path is only exercised once the new nodes enter the schedule — verify
+the first scheduled start after the repoint instead of discovering it inside a window.
 | 2 | `app-demo-001` | **Catch the exceptions** beta could not surface — it holds real client data and clients reach it | Low, visible |
 | 3 | `app-shared-001` | Only the exception-of-the-exception should still be unknown here | Real, many clients |
 | 4 | `setup`, `onboarding` | Same shape as the app stacks | Real |
@@ -469,7 +690,407 @@ anonymization cron, so a silent failure there is not cosmetic.
 **Known open question, to be settled at step 1**: whether `target-alb` is needed on a task role at
 all. Beta is where that costs nothing to find out.
 
+### Phase 12 — The three integrator surfaces the closing audit surfaced (S3, ECR, CloudWatch Logs) — PLANNED 2026-07-27
+
+The 2026-07-27 audit found three integrator surfaces that are encrypted but NOT under the integrator's
+own key, and that this plan had never scoped either way. They are grouped here because they share a
+goal, and separated below because **their mechanics are not alike at all** — one is an in-place
+attribute, one is immutable and forces a replace, one cannot be solved without moving data. Ordering
+them by that cost is the plan: the cheapest is also the one carrying the most customer-derived content.
+
+**A correction that removes work, recorded because the opposite was assumed.** The initial instinct was
+that log groups would need renaming so Terraform would see drift and recreate them with the key, leaving
+the wrongly-named ones to age out. **Neither half of that holds.** `kms_key_id` on
+`aws_cloudwatch_log_group` is NOT `ForceNew` — only `name` and `name_prefix` are (provider docs) — and on
+the AWS side `associate-kms-key` attaches a key to an EXISTING group, verbatim: *"Only the log events
+ingested after the key is associated are encrypted with that key."* And the names are already correct:
+all 50 `/ecs/integrator-*` groups are on the `integrator-<client>` standard, the ADR-010 VPN-edge rename
+having already covered the tunnel groups. The single legacy name left in the account is
+`/aws/vpn/4client-redebrasil-main`, on the frozen stack. **So no rename, no recreation, no waiting for
+expiry — adding the argument is the whole change.**
+
+**12a — DONE 2026-07-27 (PR #849, applied to all four stacks).** Every log group the module owns is on
+its integrator's key: almaviva and maqnelson `0 add, 7 change, 0 destroy`, commcenter `11`, atento `33`
+— **not one resource recreated in any of them**, which is the whole point of the correction below.
+Verified after the fact against AWS: 54 of the 61 `integrator*` log groups carry a key. The seven
+without are six on the frozen `redebrasil` stack (expected — it cannot be applied) and one genuine
+find: **`/aws/lambda/EC2-start-integrator-atento-br` is an unmanaged orphan.** The atento stack does not
+set `ec2_start_lambda_log_group`, and the module would name the group `…-integrator-atento` anyway, so
+this `-atento-br` name is a leftover from the older per-country stack layout that Terraform has never
+owned. It holds 0 bytes, so it is cleanup rather than exposure — but it is also the kind of thing that
+only surfaces when someone counts.
+
+**The data-loss question was asked and answered empirically, not from the doc.** After the almaviva
+apply, the VPN log group still reported 5,175,967 stored bytes, and three events dated 2026-07-24 —
+three days before the key existed on that group — read back cleanly via `get-log-events`. So associating
+a key neither drops nor re-encrypts what is already there; CloudWatch keeps the previous encryption
+reference and serves it. **What the change does create is a new dependency**: from now on the log data
+ingested by these groups is unreadable if the integrator's key is deleted or the logs statement is
+removed from its policy. AWS states it plainly — *"If you revoke CloudWatch Logs access to an associated
+key or delete an associated KMS key, your encrypted data in CloudWatch Logs can no longer be
+retrieved."* The 30-day deletion window and rotation make that hard to do by accident, but the blast
+radius of deleting an integrator key is now larger than it was.
+
+**12a design note — the prerequisite that was on the key, not the log group.** The one
+on the key, not the log group: a KMS key usable by CloudWatch Logs needs a policy statement admitting the
+`logs.<region>.amazonaws.com` service principal, normally narrowed by an `kms:EncryptionContext:aws:logs:arn`
+condition. Each integrator key currently admits ssm, elasticache and (since PR #845) ec2, so this is a
+fourth via-service statement on the same policy — the same shape as the EC2 one, and the same reason it
+must land BEFORE the log groups reference the key, or the association is rejected. Content-wise this is
+the surface most worth doing: integrator logs carry processing traces and error payloads that quote
+customer records.
+
+**12b — ECR. A replace is unavoidable, and it empties the repository.** ECR sets encryption at creation
+and offers no way to change it: the API has `put-image-scanning-configuration`, `put-image-tag-mutability`,
+`put-lifecycle-policy` and `put-replication-configuration`, and nothing for encryption. So Terraform must
+destroy and recreate each of the 16 `integrator*` repositories, and the images go with them. **The
+consequence is a sequencing constraint, not a data loss**: the deploy consumes `:latest` from ECR, so a
+freshly recreated repository has nothing to pull until a build runs. The order is replace → build →
+deploy, and it must happen in a window where the integrator is idle — which is most of the day, since
+every integrator sits at `desired_count 0` between processing windows. **Worth deciding rather than
+assuming**: an image layer holds application code, not customer records, so ECR is the weakest case of
+the three on content grounds even though it is the middle one on cost.
+
+**Facts established 2026-07-27, from the vendor rather than from memory, ahead of execution:**
+
+- **The replace is confirmed by AWS, not inferred from a missing API.** Verbatim: *"Repository Encryption
+  Configuration can't be changed after a repository is created."* (`encryption-at-rest.html`,
+  Considerations). There is no import trick and no in-place path.
+- **`force_delete` is required and it is the phase's one real decision.** Verbatim, HashiCorp: the flag
+  *"will delete the repository even if it contains images. Defaults to `false`."* Every repository in
+  scope holds images (the reference one alone ~128), so without it the apply starts, fails on the first
+  destroy, and leaves the run half-done. **A half-done apply is not hypothetical here — it is exactly
+  what happened in Phase 13 (#854) when a permission was missing.** The fork: a module variable
+  defaulting to `false` that each stack opts into and drops after (recommended — keeps the provider's
+  guard-rail intact for every future destroy, on a resource whose contents have NO backup); hardcoding
+  `true` in the module (one PR, but removes the guard permanently for a one-time migration); or emptying
+  each repository by hand (moves the irreversible step out of the plan, where nobody reviews it).
+- **The key-policy prerequisite — DONE 2026-07-27 (PR #855, applied + merged).** Creating a
+  KMS-encrypted repository requires `kms:CreateGrant` and `kms:DescribeKey`, which AWS allows in the key
+  policy. `modules/integrator/kms.tf` gained the ECR pair (via-service crypto + `CreateGrant` bounded by
+  `kms:GrantIsForAWSResource`), following the shape the same file already used for ElastiCache and EC2.
+  Applied to the four active integrators (`0 add, 1 change, 0 destroy` each) and verified against the
+  LIVE policy, not the plan: almaviva's key now carries 10 statements — the original 8 in their original
+  order plus the 2 new ones. **That verification was the point.** A key-policy update is a whole-document
+  `PutKeyPolicy`, so the risk was never "adding a statement" but an existing statement vanishing in the
+  rewrite and the integrator losing SSM decrypt. The plan's `7 unchanged elements hidden` plus zero `-`
+  lines said it, and the live read confirmed it.
+- **Why this went first, alone.** It is the `kms:ReplicateKey` lesson from Phase 13 applied before it
+  costs anything: a capability set without the permission it needs fails at apply, and here the failure
+  would land on the CREATE — after the DESTROY had already emptied the repository. Granting first, in a
+  change that can only add, removes the failure mode instead of surviving it.
+- **`kms:RetireGrant` is NOT covered and cannot be** — AWS requires it on the IAM policy of the identity
+  DELETING an encrypted repository, and a key policy cannot supply it. Nothing is encrypted yet so
+  nothing needs it; it becomes a prerequisite the first time an ENCRYPTED repository is destroyed (a
+  teardown, or a second `force_delete` replace). Recorded in the module header at the point a reader
+  would look.
+- **`integrator-redebrasil` cannot receive ANY module change, and this is broader than ECR.** Its plan
+  fails with six `Unsupported argument` errors (`vpc_id`, `subnet_prv_a_id`, `subnet_prv_b_id`,
+  `route_table_private_id`, `additional_ingress_sg_ids`, `internal_zone_id`) — the stack is frozen at a
+  module interface that no longer exists (the module has 14 variables and none of those is among them).
+  It was excluded from ECR anyway, but the consequence generalizes: **no future module change can be
+  applied there either**, which is why it never picked up the earlier phases and why teardown is the
+  only remaining path for that stack.
+- **The repository count, established from `init` rather than guessed:** each integrator stack
+  instantiates FOUR ECR modules — `ecr_deployment`, `ecr_deployment_staging`, `ecr_harvester`,
+  `ecr_harvester_staging`. That is where the 16 come from.
+- **The window is real and was open when checked.** All twelve integrator clusters reported `0/0`. A
+  destroyed repository is an empty repository, so any task launching between destroy and rebuild cannot
+  pull its image — the order is key policy → confirm idle → replace → build → deploy → verify → drop the
+  opt-in, and the idle check is re-run immediately before, because a GO means clean when checked, not
+  clean now.
+- **The rebuild is the only recovery.** There is no snapshot of an ECR repository; images come back by
+  running the build workflow per integrator plus the harvester repositories. That is what makes the
+  `force_delete` placement decision worth the round-trip rather than a default.
+
+**12c — S3. A new bucket, a data move, and a cutover — the versioning is why.** Default encryption
+applies to newly written objects only, so the obvious cheap path is copy-in-place (rewriting each object
+onto itself re-encrypts it without a new bucket). **That path does not reach the goal here, because the
+buckets are versioned** (`Status: Enabled`): a copy-in-place writes a NEW version and every prior version
+stays on AES256, so "everything encrypted" would additionally require expiring the entire version
+history. A new bucket gives the guarantee by construction — every object KMS-encrypted from its first
+write — and the old bucket takes its versions with it when it is deleted.
+
+Scale, measured 2026-07-27: the almaviva deployment bucket alone holds **~45.6 GB** of live integration
+payloads (`storage/group/*.json`), and there are 13 `4shark-integrator*` buckets in sa-east-1. Size the
+rest at execution rather than now; the almaviva figure is already enough to say this is an `s3 sync`
+window or an S3 Batch Operations job, not a two-minute copy.
+
+The cutover has a piece that is easy to miss: the bucket name reaches the application as the
+module-derived `AWS_BUCKET` env var (`modules/integrator/deployments.tf`, `"4shark-${deployment_name}"`),
+so a new bucket name is a module change → new task-definition revision → deploy, exactly like the
+`AWS_INSTANCE_IDS` repoint was. The bucket is not just storage; its name is configuration.
+
+**Three decisions this phase needs before it can start, none of them mine:**
+
+1. **What the replacement buckets are called.** S3 bucket names are immutable, so a new bucket needs a new
+   name, and ADR-010 says a name describes what the thing is — which a `-v2` suffix does not. The fork is
+   accepting a permanent suffix, or migrating twice (new name now, back to the canonical name later) at
+   double the data movement.
+2. **Whether `4shark-integrator-artifacts` participates at all.** It is shared across integrators rather
+   than owned by one, so there is no "its own key" to put it on — the per-integrator model has no answer
+   for a shared bucket, and forcing one would weaken the isolation argument rather than strengthen it.
+3. **Where `force_delete` lives for ECR.** See 12b — the three options and why the placement, not the
+   migration, is what differs between them. The engineer settled on doing ECR (2026-07-27, "a gente
+   começa a planejar para fazer o ECR de todos os integradores"), so "whether it is worth the replace"
+   is answered; what is open is only this.
+
+`integrator-redebrasil` is excluded from all of 12a/12b/12c: frozen, cancelled contract, resolves by
+teardown.
+
+### Phase 13 — Log-group encryption across EVERY estate — MODULE WORK DONE; 14 adoption cases DEFERRED (engineer, 2026-07-27)
+
+> **DEFERRED, not dropped — and this line is the whole reason it is written here.** The engineer chose to
+> park the 14 remaining groups and move to the integrator ECR work: *"Coloca no planejamento pra gente
+> voltar nisso depois e vamos focar nos integrators agora."* Everything needed to resume is in § Phase
+> 13a below: the exact list, who creates each group, and the path per group. **Nothing here is blocked on
+> discovery** — it is import work with two decisions attached (`RDSOSMetrics` ownership, and confirming
+> the orphan is safe to delete). Resume by reading § Phase 13a; do not re-audit the account first, but DO
+> re-read the live list, because a new stack adds new Container Insights groups.
+
+**The engineer's acceptance criterion, stated by them 2026-07-27 and it governs this phase:** *"Eu só vou
+colocar que isso tá finalizado quando a gente verifica que todos estão finalizados, com exceção da
+redebrasil"* — every log group in CloudWatch encrypted, `redebrasil` excepted because its stack is being
+decommissioned. **That criterion is not met.** Read live from AWS after the last apply, 14 groups carry
+no key besides `redebrasil`'s seven.
+
+**What IS finished, and it is the larger half:** every log group a Terraform module CREATES, in both
+Regions, is encrypted under the key of the stack that owns it. PRs #850 (seven stacks), #851 (the app
+service groups), #852 (crons, deploy hooks, autoscaling), #853 (the app keys re-minted multi-Region) and
+#854 (the outbound replicas) are all applied and merged. No module-created group is on the AWS-owned
+default anywhere.
+
+**Correction to what this section said an hour earlier — these 14 were described as "out of this phase's
+reach" and that was wrong.** Not one of them is un-encryptable; CloudWatch Logs accepts a key on any log
+group, including an existing one (`associate-kms-key`). What is true is narrower: none of them is
+CREATED by a module, so Terraform does not govern them, and the path is **adoption by import, not
+creation**. "The module cannot reach it" was reported as "it cannot be done", which understated the work
+as impossible instead of pending. The distinction is the difference between a closed phase and an open
+one.
+
+#### Phase 13a — The 14 adoption cases (deferred 2026-07-27; this is the resume point)
+
+| Group(s) | Count | Created by | Path |
+|---|---|---|---|
+| `/aws/ecs/containerinsights/<cluster>/performance` | 7 | ECS Container Insights, on enable | Import into the owning stack, associate that stack's key |
+| `/aws/rds/cluster/<cluster>/postgresql` | 3 | RDS, on log export enable | Import into the owning stack, associate that stack's key |
+| `RDSOSMetrics` (one per Region) | 2 | RDS Enhanced Monitoring | **Needs a decision** — a single Region-wide group shared by every RDS instance, so there is no one stack whose key it belongs on. Same shape as the shared-bucket question in § Phase 12c decision 2 |
+| `Lambda-app-shared-001-worker-system-autoscaling` | 1 | A pre-rename Lambda | **Delete, do not encrypt** — stale leftover beside its correctly-named, encrypted sibling; nothing in the code produces this name. Confirm nothing writes to it first |
+| `EC2-start-integrator-atento-br` | 1 | Lambda, on first invoke | Import, then flip `ec2_start_lambda_log_group = true` — `modules/integrator/lambda.tf` already declares the group WITH the key behind that toggle, and this stack (plus `redebrasil`) never turned it on |
+
+**Two of the 14 are independent of everything else and cost almost nothing** — deleting the orphan and
+importing the `EC2-start` group. They were offered as fill-in work and the engineer deferred the whole
+set, so they wait with the rest rather than being picked off; recorded here so the option is visible on
+resume instead of being rediscovered.
+
+**The `RDSOSMetrics` decision is the only real blocker in this sub-phase**, and it generalizes: a
+Region-wide resource shared by every stack has no owner under a one-key-per-stack model. § Phase 12c
+decision 2 asks the same question about a shared bucket. Answer them together or the two answers will
+diverge.
+
+> **This section was marked `DONE` twice on 2026-07-27 and was wrong both times.** The first time it
+> called the phase closed in the same breath as surfacing the outbound groups as an open decision. The
+> second time it closed the phase on MY criterion (module-created groups) rather than the engineer's
+> (every group). Both failures are the same one: the completion claim was written to describe the work
+> that had been done, instead of measured against what completion was defined to be. **The criterion
+> comes first; the claim is checked against it.**
+
+**Applied to seven stacks, all in-place, zero destruction:** `vpn` and `auth-001` (`0/3/0` each),
+`setup` (`0/2/0`), and the four app stacks `beta-001`/`demo-001`/`shared-001`/`atento-001` (`0/2/0`
+each — the pooler log group plus the key policy). Sixteen changes, no resource recreated anywhere.
+Verified against AWS rather than trusting the apply output: every target carries a key AND kept its
+data — `/ecs/auth-001-web` at 44 MB, the four poolers at ~100–134 MB each, `/ecs/setup-web`, `/ecs/vpn`
+and `/ecs/vpn-staging`.
+
+**The plan step caught a real defect before it became an incident, and this is the second time today.**
+The first `setup` plan showed the log group changing but NOT the key — because the CloudWatch Logs
+statements had been added only to `modules/auth` and `modules/vpn`, missing `modules/setup` and
+`modules/app`. Applying that would have failed on permission at the association. Both key policies were
+fixed and the plan re-run before any apply. (The other catch was the teardown's `prevent_destroy`, which
+the plan disproved.) In both cases the AWS documentation had the right shape and the incomplete part was
+its application.
+
+**Two unencrypted groups surfaced that no module change can reach**, both outside this phase's scope:
+`/aws/vpn/4client-redebrasil-main` (487 MB — the largest unencrypted log group in the account, on the
+frozen stack, resolves at its teardown) and `/aws/ecs/containerinsights/setup-cluster/performance`,
+created by Container Insights rather than by Terraform. Same class as the `EC2-start-integrator-atento-br`
+orphan found in Phase 12a: a module governs what it creates, and nothing else.
+
+**PR #851 closed the ECS-service groups — deliberately in the WRONG shape, as accepted debt.** All FOUR
+app stacks (not two: `beta-001` and `demo-001` carry the identical call site and were missed in the
+first count) call `modules/ecs_service` DIRECTLY from their `main.tf`, bypassing `modules/app` — they
+predate it. PR #851 makes each `lookup` default to `module.app.kms_key_arn` instead of null, plus the
+autoscaling-Lambda log groups in the two stacks that create them. Applied to all four (`0/9/0`,
+`0/9/0`, `0/14/0`, `0/13/0`) and merged.
+
+**PR #852 closed the three families #851 did not reach, found by auditing AWS instead of the code.**
+After #851 applied, reading every log group in both regions from the live account showed 32 still on
+the AWS-owned default. Each app stack calls three OTHER modules that also create log groups —
+`ecs_scheduled_task` (22 cron groups), `codedeploy` (4 deploy-hook groups) and `lambda-ecs-autoscaling`
+(6 groups in the two NON-productive stacks). All three modules already declared `kms_key_id` wired to a
+variable; no call site passed one. Same call-site-only shape, no module change. Applied to all four
+stacks (`0/8/0` each) and verified: creation timestamps unchanged from April, `storedBytes` intact, so
+no group was recreated.
+
+**The audit is the finding, not the fix.** #851's own verification read the MODULES and concluded the
+work was done — and it was wrong, because two of the four stacks were already passing the key to their
+autoscaling Lambdas from #851 while the other two were not. A module-level read cannot see an
+asymmetry that lives in the call sites. **Verify a coverage claim against the live account, per
+resource, in every region — never against the code that was supposed to produce it.**
+
+**What remains unencrypted account-wide, and why each is not a gap in this phase.** Twelve groups are
+created by an AWS service rather than by any resource block — seven Container Insights performance
+streams, three RDS `postgresql` engine logs, two `RDSOSMetrics` (one per region) — so there is no
+`kms_key_id` for Terraform to set and adopting them is a separate effort with a different mechanism per
+service. Seven belong to the frozen `redebrasil` stack and resolve at its teardown. One
+(`Lambda-app-shared-001-worker-system-autoscaling`) is a stale leftover from before the naming change,
+sitting next to its correctly-named, encrypted sibling — delete it, do not encrypt it. One
+(`EC2-start-integrator-atento-br`) needs an import before its stack can adopt it (see Phase 12a).
+
+**The six `app-outbound-*` log groups — RESOLVED AND APPLIED 2026-07-27 (PRs #853, #854): replicate the
+cluster key. The engineer's instinct was right and my first framing of the cost was wrong.**
+
+**Outcome, verified in AWS.** The four app keys were re-minted as multi-Region (#853: `1 add, 19–24
+change, 0 destroy` per stack, every change a log group or the alias, all in-place; ingestion measured
+live 6–19s after the cut on both productive stacks). Each outbound then created a replica in
+`sa-east-1` (#854). The six outbound groups now read `mrk-416bffe4…` and `mrk-07429959…` — **byte-identical
+key IDs to `alias/app-shared-001` and `alias/app-atento-001` in us-east-1**, with a `sa-east-1` ARN, and
+`describe-key` in that Region returns `MultiRegionKeyType: REPLICA`. That is the proof it is the
+cluster's key present in a second Region, not a second key.
+
+**The defect this exposed, and it was mine.** #853's key policy listed administration actions ending at
+`kms:Revoke*` — the only `R` entry — which does not reach `kms:ReplicateKey`. So the keys were
+multi-Region **in name only**: the property was set and every replication attempt failed with
+`AccessDeniedException ... because no resource-based policy allows the kms:ReplicateKey action`. Fixed
+in `modules/app/kms.tf` (#854) and applied to both primaries before the outbound could proceed.
+**Setting a capability flag is not the same as granting the permission the capability needs** — a
+wildcard list is exactly where that gap hides, and only an apply finds it.
+
+**A partial apply happened and cost nothing, because the check was run rather than assumed.** The
+failed #854 apply deregistered two task definitions before dying on the replica. The services were
+pinned to revisions the apply did NOT touch (`:9`/`:8` live, both `ACTIVE`), so there was no exposure;
+the re-plan then showed `0 to destroy` because the destroy had already happened. The same check was run
+on `atento-br` BEFORE applying (services on `:78`/`:79`, plan deregistering `:75`/`:76`). **`ignore_changes
+= [task_definition]` means terraform's tracked revision and the serving revision routinely differ — so
+"terraform is destroying a task definition" is not by itself a downtime signal, and the only way to know
+is to compare the two.**
+
+§ Phase 11 makes an outbound consume its linked cluster's key and never mint its own, precisely so it
+cannot lose decrypt when the cluster's key moves. CloudWatch Logs appears to forbid that, because a log
+group is encryptable only by a key whose region matches — AWS states it as a property of the service
+principal: *"This service principal must be in the same AWS Region where the KMS key is stored."*
+(`encrypt-log-data-kms.html`, Step 2). The cluster keys are single-region — `describe-key` returns
+`MultiRegion: False` on all four `alias/app-*`.
+
+**A multi-Region key dissolves the conflict rather than compromising on it.** Verbatim: related
+multi-Region keys *"have the same key material and key ID"* and *"any related multi-Region key in any
+AWS Region can decrypt ciphertext encrypted by any other related multi-Region key"*
+(`multi-region-keys-overview.html`). A `sa-east-1` replica is therefore not a second key that happens to
+be nearby — it IS the cluster's key, present in the outbound's region. That is exactly the property
+§ Phase 11 is protecting, so the rule is satisfied literally, not bent. The account already runs this
+shape: `4shark-master` is a multi-Region PRIMARY in `us-east-1` with a replica in `sa-east-1` under the
+same key ID.
+
+**The blocker is one-way and it is about TIMING, not cost.** Verbatim: *"You cannot convert an existing
+single-Region key to a multi-Region key."* So the four `alias/app-*` keys must be REPLACED by
+multi-Region ones, and everything under them re-encrypted. **An earlier note here called that "the
+largest move" and that was wrong — measured, not assumed:** `/shared-001/*` SSM parameters and the
+`app-shared-001` RDS cluster both still report `mrk-fa0cda…` (the legacy master key). The heavy surfaces
+have NOT migrated — that is Phases 3–8, still pending. What actually sits under the dedicated app keys
+today is the log groups wired this week, re-associated in-place. **The window is now, and it closes:**
+make the app keys multi-Region before Phases 3–8 and the whole app estate lands on them once; do it
+after and the same migration is paid twice.
+
+**Mechanism, checked against the code rather than assumed.** `modules/app` sets `multi_region = true` on
+`aws_kms_key.this`; the outbound stack creates `aws_kms_replica_key` in `sa-east-1` pointing at the
+cluster key's ARN. No new provider wiring is needed — `app-outbound-*/providers.tf` ALREADY declares
+both a default `sa-east-1` provider and a `us-east-1` alias (added to read the cluster's SSM
+parameters). The replica needs its OWN key policy granting `logs.sa-east-1.amazonaws.com`, because
+policy is an *independent property* of a replica and is never synchronized from the primary — only key
+ID, key material, key spec, usage and rotation are shared.
+
+**The integrator keys need none of this.** They live in `sa-east-1` with no cross-region sibling, so a
+single-region key is already the right shape there. The asymmetry is real and worth stating: only the
+app family has a consumer in a second region.
+
+**Why this is debt and not a solution.** The engineer's requirement was explicit — *"não ser algo que
+fica no main.tf, o módulo já cria os logs com a chave"* — and this puts the key in the stack's
+`main.tf`, which is exactly the forgetting surface it was meant to remove. The structural fix is the
+one the integrator already demonstrates: the SERVICES belong inside the estate module, and the module
+passes the key at its own call sites, so no stack ever needs to know a key exists. For the app estate
+that means moving the service definitions out of the four `main.tf` files and into `modules/app`.
+
+**Decision, 2026-07-27: take the debt now, correct it in the app estate work.** The interim ships so
+CloudWatch Logs is closed account-wide and can be verified as a whole; the refactor happens when
+Phases 3–8 touch the app estate anyway, which is after the integrator finishes. Recording it here
+because a remedy deferred without a written trace is a remedy abandoned. **PR #852 widened this same
+debt from one module to four** — the cron, deploy-hook and autoscaling call sites now carry the key in
+the stack too, so the app-estate refactor has four families to absorb, not one.
+
+**Correction — `onboarding` was never a gap.** An earlier note in this plan claimed it created log
+groups in the stack. It does not: neither the stack nor `modules/onboarding` declares any, its three
+sub-modules (`networking_data`, `ecr`, `iam_deploy`) create none, and no log group with `onboarding` in
+its name exists in us-east-1. The claim was inferred from "the module does not create them" rather than
+checked.
+
+#### Survey as of 2026-07-27 (kept for the record)
+
+This was the survey that scoped the sweep, written before PR #850 and kept because it is the map of
+where log groups are created — the thing that had to be established once and would otherwise be
+re-derived by the next person. **Every "does not set a key" below was resolved by PR #850 except the
+last paragraph**, which names what a module change cannot reach.
+
+**Every estate module already OWNED a key** — `modules/{integrator,app,auth,vpn,setup,onboarding}/kms.tf`
+each declare `aws_kms_key.this`. Nothing was blocked on minting keys; the sweep was a wiring job.
+
+**Where log groups are created, and how each was resolved:**
+
+| Module | Groups | Resolution (PR #850) |
+|---|---|---|
+| `auth` | `web` (logs.tf:1), `staging_web` (auth_001_staging.tf:14) | wired to the module's own key |
+| `vpn` | `vpn` + `vpn_staging` (logs.tf:1,12) | wired to the module's own key (`alias/vpn`, previously minted and idle) |
+| `connection_pooler` | `this` (main.tf:241) | optional argument, fed the APP stack's key — the pooler is a dependency of the app stack, not a stack of its own, and the rule is one key per stack |
+| `codedeploy` | `codedeploy_hook` (main.tf:227, conditional) | optional argument; `setup` passes its key, inert while the hook is disabled |
+| `lambda-ecs-autoscaling` | `this` (main.tf:5, conditional) | optional argument added; no caller wires it yet |
+
+**The generic sub-modules and their callers.** `ecs_service` has carried
+`cloudwatch_log_group_kms_key_id` all along, and `ecs_scheduled_task` gained `log_group_kms_key_id` in
+PR #849. `modules/setup/main.tf:304` now defaults its `lookup` to the stack's key instead of null, so a
+service added to the map is encrypted unless deliberately overridden. **The two that remain are
+`app-shared-001/main.tf:566` and `app-atento-001/main.tf:527`**, which call `ecs_service` directly from
+the stack — older-style stacks not yet on `modules/app`, so no module change reaches them — plus
+`onboarding`, which creates its log groups in the stack rather than in `modules/onboarding` (whose three
+sub-modules create none). All three are the same one-line change.
+
+**The prerequisite each estate inherits from 12a.** A key cannot encrypt a log group until its policy
+admits the `logs.<region>.amazonaws.com` service principal, narrowed by `ArnLike` on
+`kms:EncryptionContext:aws:logs:arn` — the via-service shape used for SSM/ElastiCache/EC2 does NOT work
+for CloudWatch Logs, because Logs encrypts on ingest as itself. Every key needed that statement before
+its log groups could reference it. **This is the prerequisite that was half-forgotten and that the plan
+step caught**: PR #850 initially added it to `auth` and `vpn` only, and `setup`'s plan showed the log
+group changing without the key — the tell. `modules/setup/kms.tf` and `modules/app/kms.tf` were fixed
+before any apply ran. All four estate keys now carry it, in whichever form each file already used: where
+via-service was expressed as a list, the logs entry joined the list; where it was a single value, a
+separate statement carries it.
+
+**The productive applies went without incident.** `app-shared-001` and `app-atento-001` were applied
+last, deliberately, so they ran with five prior confirmations that the policy shape works in practice
+rather than only in plan. Both came back `0 added, 2 changed, 0 destroyed`.
+
+**Scope note — `simplex-harvester` is already covered.** Its log groups are created by
+`modules/integrator/harvesters.tf` through `ecs_scheduled_task`, so PR #849 encrypted them; there is no
+separate harvester estate to sweep.
+
 ### Phases 3–8 — The app estate: module-owned keys, data migration, and naming (RESTRUCTURED 2026-07-20)
+
+**Carried in from Phase 13 (2026-07-27): the app-estate log-group debt is corrected HERE.** The four app
+stacks call FOUR log-group-creating modules directly from their own `.tf` files rather than through
+`modules/app` — `ecs_service` (the services), `ecs_scheduled_task` (the crons), `codedeploy` (the
+deploy hook) and `lambda-ecs-autoscaling` (the scaling functions) — so in every one of those the key is
+passed at the stack call site, the shape the engineer explicitly rejected. Moving those definitions
+into `modules/app` is what makes the guarantee structural, and it belongs in this phase because it is
+the same act as everything else here: the module owns what the stack currently improvises. Do not treat
+the Phase 13 interim as finished work.
 
 **This supersedes the original per-resource-type Phases 3–8** (create keys → SSM → Secrets Manager →
 RDS snapshot/restore → legacy RDS → retire). The design converged on two decisions taken after the
@@ -578,8 +1199,12 @@ from a same-stack-only check.
 >   a reprovision: redebrasil is a cancelled contract, frozen this session (`integrator-redebrasil/freeze.tf`
 >   blocks every apply), and reprovisioning a database about to be deleted is wasted work — the freeze would
 >   also block the reprovision's own applies. Do not reprovision redebrasil; tear it down.
->   *(Follow-up: the ADR-010 legacy list still names MongoDB as `4client-` debt — that entry is now stale for
->   the active integrators, same as Redis was; correct it when the SG/VPN families are addressed.)*
+>   *(Follow-up CLOSED 2026-07-27: ADR-010 was corrected and is now current. Its § "Legacy exception —
+>   integrator `4client-` (retired 2026-07)" lists all four families — Redis, MongoDB, default SG, VPN
+>   edge — as retired onto `integrator-<client>`, and states that the only remnants are on the frozen
+>   cancelled-contract stack. The closing audit confirms that claim against AWS: the only `4client-`/`ec-`
+>   names left in the account are `4client-redebrasil-mongo00{3,4,5}` and `ec-redebrasil`. **Nothing is
+>   owed on the naming standardization** — it resolves by that stack's teardown.)*
 > - **Default security group `4client-<client>` — DONE, applied + merged (#831, 2026-07-24).** The default
 >   SG's Name tag was renamed `4client-<client>` → `integrator-<client>` in the module (`security.tf`).
 >   Applied to the four active integrators as an in-place tag change (`0 add / 1 change / 0 destroy` each — the
@@ -1277,6 +1902,7 @@ confident — non-blocking.
 | **`alias/main`** (`64eb0fa9`, sa-east-1) | Legitimate — CloudTrail's key, `audit/kms.tf:116`. Leave alone. |
 | **VPN EBS encryption** | The `alias/vpn` key (PR #790) is minted ready but idle. Using it means encrypting the three VPN hosts' EBS volumes (MongoDB data host + the two Pritunl instances), which REPLACES each volume — a data migration on the MongoDB host (`disable_api_termination`, `delete_on_termination=false`, holds all Pritunl state), taken in a window. Deferred; the key's via-EC2 policy is already in place for it. |
 | **The restricted engineer tier** | `active/spike/aws-engineer-staging-tier/`. This plan makes its scoping possible; it does not build it. |
+| **Integrator S3 / ECR / CloudWatch Logs** | **Surfaced 2026-07-27 by the closing audit, then taken IN scope the same day — see § Phase 12** for the three efforts, their differing mechanics, and the three decisions they need first. Moved out of this table because "out of scope" is where a thing goes when nobody intends to do it. |
 
 The remaining orphan (`alias/4shark-ecs-beta-key`) is billed and unrotated (`alias/auth002` is in use — see its row). Deleting a KMS key is irreversible — each is its own decision.
 
