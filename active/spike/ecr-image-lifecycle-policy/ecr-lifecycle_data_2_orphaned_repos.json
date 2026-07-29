@@ -1,0 +1,20 @@
+{
+  "_source": "aws ecr describe-images --repository-name <name> --region us-east-1 --query 'sort_by(imageDetails,&imagePushedAt)[-1].imagePushedAt' / --query 'sum(imageDetails[].imageSizeInBytes)', executed 2026-07-28",
+  "_note": "Repositories checked against every current terraform stack (grep -rl across ~/Projects/4Shark/terraform for the literal repository name) with zero matches, and against the app/onboarding/setup build workflows (which push only to <env>-app / <env>-connection-pooler / onboarding-web / setup-web names). Last push predates the 2026-02-19 cutover to the app-shared-001/app-atento-001/app-beta-001/app-demo-001 stacks (or, for the worker_* repos, predates the Nov-2025/Jan-2026 window entirely) — these repositories are not written to by any pipeline in the current codebase.",
+  "_caveat": "reported_size_bytes is the RAW SUM of imageDetails[].imageSizeInBytes across every image in the repo. ECR does not deduplicate shared layers in this figure — an image's reported size includes every layer it references even when that layer's blob is physically stored once and shared with other images/repos. This number is directionally useful (shows the repo is non-trivial, not empty) but is NOT the actual billed/dedup'd byte count; the Cost Explorer figures in SPIKE.md are the ground truth for billed storage.",
+  "repositories": [
+    { "name": "app",                             "region": "us-east-1", "last_push_at": "2026-01-09T16:17:50.504-03:00", "image_count": 10, "reported_size_bytes": 5283864428 },
+    { "name": "beta-app",                        "region": "us-east-1", "last_push_at": "2026-01-06T11:35:45.120-03:00", "image_count": 50, "reported_size_bytes": 25663588766 },
+    { "name": "beta-web",                        "region": "us-east-1", "last_push_at": "2025-12-17T20:22:40.626-03:00", "reported_size_bytes": 9731682721 },
+    { "name": "demo-app001",                     "region": "us-east-1", "last_push_at": "2025-11-14T14:35:26.930-03:00", "reported_size_bytes": 10271371659 },
+    { "name": "worker_migration",                "region": "us-east-1", "last_push_at": "2025-12-19T10:20:52.304-03:00", "reported_size_bytes": 2056659502 },
+    { "name": "worker_system",                   "region": "us-east-1", "last_push_at": "2026-01-09T16:18:39.086-03:00", "reported_size_bytes": 19495761163 },
+    { "name": "worker_user",                     "region": "us-east-1", "last_push_at": "2026-01-09T16:18:33.233-03:00", "reported_size_bytes": 17959249879 },
+    { "name": "worker_cleansing",                "region": "us-east-1", "last_push_at": "2025-12-19T14:18:16.394-03:00", "reported_size_bytes": 2056661716 },
+    { "name": "worker_commission_white_shark",   "region": "us-east-1", "last_push_at": "2026-01-09T16:18:34.424-03:00", "reported_size_bytes": 17959251350 },
+    { "name": "worker_commission_tiger_shark",   "region": "us-east-1", "last_push_at": "2026-01-09T16:18:54.570-03:00", "reported_size_bytes": 23487608520 },
+    { "name": "worker-commission",               "region": "us-east-1", "last_push_at": "2026-01-09T16:18:37.282-03:00", "reported_size_bytes": 21029253617 }
+  ],
+  "reported_size_bytes_total": 154994953321,
+  "reported_size_gb_total_approx": 144.37
+}

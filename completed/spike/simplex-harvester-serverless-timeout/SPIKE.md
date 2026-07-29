@@ -450,3 +450,83 @@ Read the 2026-07-28 production run in both log groups and look for the `Connecti
 - **No `ConnectionRetry` line and a clean run** — the bases happened to be awake. Nothing is learned; wait for the next failure.
 
 If the run succeeds *with* retry lines present, that is the best outcome: the load works and the diagnosis arrives at the same time.
+
+---
+
+## Answer — 2026-07-28: the paused database produces `-2`, and the new retry rescued the run
+
+Both production runs completed. The MX run hit a paused normalized base, the retry provider from #44 absorbed it, and the new logging captured the error number. This is the "best outcome" case named above: the load worked *and* the diagnosis arrived.
+
+### Finding 18 — the error is `-2`, not `40613`
+
+The MX run, verbatim from `/ecs/integrator-atento-harvester-mx-cron-integration`:
+
+```
+09:30:48.895 [INF] ---------------Inicio---------------
+09:31:25.631 [WRN] ConnectionRetry  NormalizedDatabaseConnection  attempt 1  next delay 4.8s
+                   number=-2 class=11 state=0 Connection Timeout Expired.
+                   [Pre-Login] initialization=239; handshake=722;
+                   [Login] initialization=0; authentication=0; [Post-Login] complete=28792;
+09:31:36.473 [INF] [1] LoadJearquia: chamando sp_reporte_jeraquia_4shark...
+...
+09:51:44.457 [INF] LoadUpdates resumo: promotion=3, demotion=0, update_parent=64, no_change=8967, error=0, skipped=4
+09:51:44.457 [INF] ---------------Fin---------------
+```
+
+Three things are settled by this single line.
+
+**The database that refused is the normalized base** — the label says so directly. The ambiguity of `ReifySubsidiaries:397`, which cost a full day of investigation on 27/07, is gone.
+
+**The error number is `-2`.** Microsoft's serverless documentation says a paused database returns `40613` on the first connection attempt, and the `sqlcmd` probe on 27/07 received exactly that. The application does not. It receives an opaque post-login timeout of 28,792 ms — the same ~28.7s signature as every failure in the 25–27/07 window.
+
+**The retry provider works.** One retry line means attempt 1 failed and attempt 2 succeeded: the run reached `LoadJearquia` eleven seconds later and completed normally, 9,067 rows, `error=0`, in ~21 minutes. The `-2` cost the run about 37 seconds instead of aborting it.
+
+CO ran clean with no retry line at all — `Inicio` 08:30:40, first query 4.7s later — so its database was awake. Consistent with the two bases pausing independently (Finding 16).
+
+### What this decides
+
+The hypothesis stated as unvalidated on 27/07 now has direct production evidence behind it. Something between the application and Azure is converting the paused-database rejection into a generic timeout, and the leading candidate remains `Encrypt=false` on the Azure connection: the encrypted `sqlcmd` client got a clean `40613` in 16s, while the unencrypted application driver hangs 28.7s in post-login and reports `-2`.
+
+**This is now a strong correlation, not a proof.** The two clients differ in more than encryption — ODBC Driver 13 versus Microsoft.Data.SqlClient 5.1.6, different timeout defaults. The clean experiment is to change only `Encrypt` on the Azure context and observe whether the same paused-base scenario reports `40613` instead of `-2`.
+
+Finding 17's TLS matrix already established that this change is safe on the Azure side: both normalized bases accept full certificate validation, needing no `TrustServerCertificate`. It must NOT be applied to the source contexts — the MX source cannot negotiate TLS at all.
+
+**Why it matters even though the run now succeeds:** if the application received `40613`, EF Core's own `EnableRetryOnFailure` would handle it natively, and the retry provider would be a second safety net rather than the only thing standing between a paused database and an aborted run. A `-2` is treated as retryable today only because `UtilHelper` puts it in an explicit transient list — a local decision that works, but rests on retrying an error the EF Core team deliberately considers unsafe to retry in general.
+
+### Current state
+
+The daily load is **no longer failing**. The regression that reopened this spike is closed by #44 + #45 in release `1.4.0`. What remains is a quality question, not an outage: whether to keep relying on a `-2`-is-retryable list, or to make the database report the error it is documented to report.
+
+### Remaining step
+
+Change `Encrypt` to `true` on `GetNormalizedDatabaseContext` only, leaving both source contexts unencrypted, and read the next run that catches a paused base. If the retry line then carries `number=40613`, the masking is confirmed and the `-2` entry in the transient list becomes a redundant safety net rather than the load-bearing mechanism. If it still carries `-2`, encryption is not the masking factor and the transient list stays as the deliberate mechanism.
+
+Either way the load keeps working while this is answered, so it can move at review pace rather than under outage pressure.
+
+---
+
+## Closed — 2026-07-28: the follow-ups were examined and dropped
+
+The remaining step above proposed changing the encryption setting, then a connection-budget setting, to make the paused database report the error it documents instead of an opaque timeout. Both were built, both were examined before merging, and **both were withdrawn**. The record of why matters more than the changes would have.
+
+### The encryption follow-up — withdrawn, premise did not survive checking
+
+The hypothesis was that connecting unencrypted is what masks the server's rejection. It rested on a comparison between two observations: a standalone client that received a clean 40613, and the application that receives an opaque `-2`.
+
+Checking the flags of the probe that produced the 40613 showed it ran with certificate trust only, **without requesting encryption** — the same posture as the application. Encryption was never the difference between the two observations. Azure additionally enforces transport encryption regardless of the client setting, so the change would have been close to a no-op on the wire. The premise was never verified before the change was proposed; verifying it is what killed it.
+
+### The connection-budget follow-up — withdrawn, arithmetic did not support it
+
+The second attempt raised the connection budget for that endpoint from ~30s to 60s, reasoning that the server needs more time to send its rejection. Measuring against the 28/07 production run showed the opposite: the first attempt gave up at ~30s, the second connected, and the database was ready roughly 42 seconds in. A 60s budget would simply have let the *first* attempt connect — saving one retry line and about five seconds, and making the 40613 **less** likely to be observed rather than more, since the client would wait for the resume instead of receiving a rejection. The change worked against the goal stated for it.
+
+### Why nothing further is needed
+
+The reliance on `-2` being in an explicit transient list was the last stated concern. It is not a real risk: the retry provider is attached to the connection and never to a command, and an `Open()` that timed out changed nothing on the server, so replaying it is safe. The reasoning EF Core gives for excluding `-2` applies to commands, not to connection establishment.
+
+The load is working. A paused database costs about 37 seconds on the affected morning, and the retry budget spans nearly four minutes against a resume the vendor describes as taking about one. It is dimensioned with margin.
+
+### Left open deliberately
+
+Why the application's driver reports `-2` where the standalone client reported `40613` against the same paused database is unexplained. The remaining differences are the driver itself and the login-timeout budget. This is a curiosity about driver behaviour, not maintenance — worth picking up only if someone has spare time.
+
+**Outcome: the regression that reopened this spike is closed by the retry provider and the retry logging, shipped in release 1.4.0 and confirmed working in production on 2026-07-28.** The auto-pause stays enabled, which was the client's requirement — the solution lives with the database pausing rather than preventing it.

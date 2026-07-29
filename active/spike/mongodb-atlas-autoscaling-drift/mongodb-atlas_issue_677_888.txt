@@ -1,0 +1,84 @@
+SOURCE: https://github.com/mongodb/terraform-provider-mongodbatlas/issues/677
+FETCHED VIA: WebFetch (body) + gh api (metadata + comments)
+
+=== ISSUE #677 ===
+title: "Auto scaling of storage cannot be disabled for mongodbatlas_advanced_cluster
+        via \"disk_gb_enabled\""
+state: closed
+state_reason: completed
+created_at: 2022-02-15T08:29:36Z
+closed_at: 2022-02-18T00:37:23Z
+labels: []
+
+Body (via WebFetch summary):
+Setting disk_gb_enabled = false in the auto_scaling block fails to disable
+storage autoscaling on the Atlas API side. Despite the Terraform plan showing
+the configuration change, the API continues to keep autoscaling enabled.
+After applying, subsequent plans still indicate the resource needs
+modification — a perpetual drift between desired and actual state.
+
+Comments (gh api, verified 2026-07-28):
+
+--- Comment 1 ---
+user: nikhil-mongo
+created_at: 2022-02-17T08:06:02Z
+body:
+@BlacCello As per the repro, this seems to be underlying API issue and not
+related to Terraform provider. I have filed an internal ticket to address
+this. It is better we can close this here as this will be handled for the
+API releases and not with Terraform provider.
+
+Thanks
+
+--- Comment 2 ---
+user: nikhil-mongo
+created_at: 2022-02-17T08:06:19Z
+body:
+HELP-31579 filed internally.
+
+--- Comment 3 ---
+user: themantissa
+created_at: 2022-02-18T00:37:23Z
+body:
+Closing as not a Terraform issue.
+
+=== NOTES ON #677 ===
+- This issue is from 2022 — old, and closed as "not a Terraform provider
+  issue", deferred to the Atlas API team (internal ticket HELP-31579). No
+  public confirmation was found that the underlying API behavior was ever
+  fixed; the issue was closed as out-of-scope for the provider repo, not as
+  resolved-and-verified.
+- Relevance: this is evidence that disabling disk_gb_enabled via Terraform
+  has historically NOT reliably taken effect at the Atlas API level, which
+  is a relevant caveat for the "disable auto-scaling, manage size in code"
+  alternative (see SPIKE.md Finding 6 / trade-offs table).
+
+===========================================================================
+
+SOURCE: https://github.com/mongodb/terraform-provider-mongodbatlas/issues/888
+FETCHED VIA: WebFetch
+
+title: "Cannot ignore changes for replication_specs when autoscaling is enabled"
+state: closed
+
+Body (via WebFetch summary):
+The user wants fine-grained control over which fields in replication_specs
+trigger Terraform updates when autoscaling is enabled — specifically wanting
+to ignore changes to instance_size while still tracking other fields.
+
+Quoted from the issue: "Block type 'replication_specs' is represented by a
+set of objects, and set elements do not have addressable keys."
+
+Terraform's lifecycle.ignore_changes cannot target individual nested
+attributes within a set block — only entire top-level blocks can be ignored.
+This traces to a Terraform core limitation (referenced in the issue:
+hashicorp/terraform#26359), not something the mongodbatlas provider can work
+around on its own within the ignore_changes mechanism.
+
+=== NOTES ON #888 ===
+- Confirms why a granular `lifecycle.ignore_changes = [replication_specs[0]...instance_size]`
+  approach does not work for mongodbatlas_advanced_cluster — replication_specs
+  is a set-typed block, and Terraform's ignore_changes cannot address
+  individual attributes inside a set element. Only the whole replication_specs
+  block (or nothing) can be ignored via this mechanism, which would also
+  freeze disk size and node counts along with instance size.

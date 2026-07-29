@@ -1,0 +1,40 @@
+{
+  "_source": "aws ecr describe-images --repository-name <name> --region <region>, executed 2026-07-28, piped through jq for the tagged/untagged/manifest-type breakdown",
+  "_note": "Representative currently-in-use repositories, picked to show the shape of accumulation on repos the pipelines are actively pushing to today (as opposed to the fully orphaned repos in ecr-lifecycle_data_2). imageTags == null is ECR's own signal for 'untagged'.",
+  "repositories": [
+    {
+      "name": "shared-001-app",
+      "region": "us-east-1",
+      "total_images": 364,
+      "tagged": 82,
+      "untagged": 282,
+      "untagged_that_are_buildkit_cacheconfig_artifacts": 90,
+      "untagged_other": 192,
+      "oldest_push": "2026-02-19T20:18:12.475-03:00",
+      "newest_push": "2026-07-24T16:05:02.670-03:00",
+      "total_size_gb_reported": 149.19,
+      "manifest_media_types": [
+        { "type": "application/vnd.oci.image.index.v1+json", "count": 91 },
+        { "type": "application/vnd.oci.image.manifest.v1+json", "count": 273 }
+      ]
+    },
+    {
+      "name": "onboarding-web",
+      "region": "us-east-1",
+      "total_images": 35,
+      "tagged": 11,
+      "untagged": 24,
+      "total_size_gb_reported": 11.66
+    },
+    {
+      "name": "integrator-atento-mx",
+      "region": "sa-east-1",
+      "total_images": 88,
+      "tagged": 23,
+      "untagged": 65,
+      "oldest_push": "2026-04-12T15:26:51.627-03:00",
+      "newest_push": "2026-07-13T14:15:53.529-03:00",
+      "total_size_gb_reported": 34.12
+    }
+  ]
+}

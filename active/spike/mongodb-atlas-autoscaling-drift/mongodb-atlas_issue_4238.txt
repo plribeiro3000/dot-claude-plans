@@ -1,0 +1,78 @@
+SOURCE: https://github.com/mongodb/terraform-provider-mongodbatlas/issues/4238
+FETCHED VIA: gh api repos/mongodb/terraform-provider-mongodbatlas/issues/4238 (metadata) + WebFetch (body)
+
+=== METADATA (gh api, verified 2026-07-28) ===
+number: 4238
+title: "[Bug]: produced an unexpected new value"
+state: open
+created_at: 2026-02-26T09:41:24Z
+updated_at: 2026-02-27T11:43:00Z
+labels: ["not_stale"]
+comments: 3
+
+=== ISSUE BODY (via WebFetch summary of the issue page) ===
+Reporter: black-snow
+Provider version affected: 2.7.0
+
+Error reported:
+"When applying changes to mongodbatlas_advanced_cluster.this, provider produced
+an unexpected new value: .replication_specs[0].region_configs[0].analytics_specs.disk_size_gb:
+was cty.NumberIntVal(2048), but now null."
+
+Configuration included analytics_specs with disk_size_gb = 2048, auto_scaling
+settings, and electable_specs with specific instance sizes and node counts,
+deployed on Azure's Germany West Central region. use_effective_fields = true
+was added alongside electable_specs when the error appeared. Apply succeeded
+on MongoDB Atlas's backend but failed during Terraform's state-consistency
+validation.
+
+=== COMMENTS (gh api repos/mongodb/terraform-provider-mongodbatlas/issues/4238/comments, verified 2026-07-28) ===
+
+--- Comment 1 ---
+user: github-actions[bot]
+created_at: 2026-02-26T09:41:35Z
+body:
+Thanks for opening this issue! Please make sure you've followed our guidelines
+when opening the issue. In short, to help us reproduce the issue we need:
+  - Terraform configuration file used to reproduce the issue
+  - Terraform log files from the run where the issue occurred
+  - Terraform Atlas provider version used to reproduce the issue
+  - Terraform version used to reproduce the issue
+  - Confirmation if Terraform OSS, Terraform Cloud, or Terraform Enterprise deployment
+
+The ticket CLOUDP-384558 was created for internal tracking.
+
+--- Comment 2 ---
+user: black-snow
+created_at: 2026-02-26T09:43:57Z
+body:
+Deleting the disk specs (that I took from the import) seems to fix this.
+
+--- Comment 3 ---
+user: AgustinBettati
+created_at: 2026-02-27T11:42:51Z
+body:
+Hi @black-snow, thank you for providing these details.
+
+I was able to reproduce the `inconsistent result after apply` error by creating
+the configuration you shared and then doing a follow-up apply that enables
+use_effective_fields.
+
+I can also confirm that your workaround of removing `analytics_specs.disk_size_gb`
+successfully allows Terraform to reach an empty plan.
+
+We have identified an inconsistent behavior in the upstream API that is causing
+this. We are looking into it and will get back to you here as soon as we have
+an update.
+
+=== NOTES ===
+- No further update from MongoDB after the 2026-02-27 comment as of the fetch
+  date (2026-07-28) — issue remains open, last updated 2026-02-27.
+- Same error shape as the 4Shark stack B failure: "was cty.NumberIntVal(X),
+  but now null" on a *_specs.disk_size_gb field, triggered by enabling
+  use_effective_fields while the config still declares a disk_size_gb value.
+  The 4Shark error is on electable_specs.disk_size_gb (79); this issue is on
+  analytics_specs.disk_size_gb (2048) — same field pattern, different spec
+  block.
+- The maintainer-confirmed workaround (comment 3) is removing the disk_size_gb
+  attribute from the affected specs block, not just enabling use_effective_fields.

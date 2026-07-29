@@ -1,0 +1,59 @@
+{
+  "_source": "aws ecr describe-repositories --region us-east-1 / --region sa-east-1, executed 2026-07-28, default (read-only) AWS profile",
+  "_note": "Raw output saved verbatim from the two regions the 4Shark ECR footprint spans. None of these repositories carry a lifecycle policy (confirmed for 'app' via aws ecr get-lifecycle-policy -> LifecyclePolicyNotFoundException; the terraform module that creates every other repository has no lifecycle_policy resource at all, so the same holds account-wide by construction).",
+  "us_east_1": {
+    "repositories": [
+      { "repositoryName": "demo-app001", "createdAt": "2025-10-22T09:15:40.031000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_migration", "createdAt": "2025-12-18T14:27:26.199000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "demo-001-app", "createdAt": "2026-02-19T20:00:09.989000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "shared-001-app", "createdAt": "2026-02-19T20:00:53.124000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "atento-001-app", "createdAt": "2026-02-19T20:03:41.139000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "beta-001-connection-pooler", "createdAt": "2026-07-04T08:36:48.384000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "demo-001-connection-pooler", "createdAt": "2026-07-04T08:46:06.569000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "atento-001-connection-pooler", "createdAt": "2026-07-04T08:52:38.335000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker-commission", "createdAt": "2025-11-19T10:42:46.056000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_system", "createdAt": "2025-11-19T17:07:11.760000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_user", "createdAt": "2025-11-19T17:37:09.639000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "setup-web", "createdAt": "2026-02-19T08:37:32.247000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "beta-001-app", "createdAt": "2026-02-19T19:59:07.605000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "beta-app", "createdAt": "2025-11-14T15:50:36.852000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "beta-web", "createdAt": "2025-11-19T09:48:18.589000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_commission_white_shark", "createdAt": "2025-11-19T15:37:19.733000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "onboarding-web", "createdAt": "2026-03-20T08:44:47.066000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "shared-001-connection-pooler", "createdAt": "2026-07-04T08:49:20.819000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_commission_tiger_shark", "createdAt": "2025-11-19T16:20:40.360000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "worker_cleansing", "createdAt": "2025-12-18T11:58:24.465000-03:00", "imageTagMutability": "MUTABLE" },
+      { "repositoryName": "app", "createdAt": "2026-01-07T17:27:07.945000-03:00", "imageTagMutability": "MUTABLE" }
+    ]
+  },
+  "sa_east_1": {
+    "repositories": [
+      { "repositoryName": "integrator-atento-mx", "createdAt": "2026-04-12T14:33:03.934000-03:00" },
+      { "repositoryName": "integrator-atento-br", "createdAt": "2026-04-12T14:33:03.980000-03:00" },
+      { "repositoryName": "integrator-atento-mx-staging", "createdAt": "2026-05-05T13:31:14.699000-03:00" },
+      { "repositoryName": "integrator-atento-harvester-co-staging", "createdAt": "2026-06-26T22:11:38.216000-03:00" },
+      { "repositoryName": "integrator-atento-harvester-mx-staging", "createdAt": "2026-06-26T22:11:38.227000-03:00" },
+      { "repositoryName": "auth-001", "createdAt": "2026-07-01T16:17:25.913000-03:00", "imageScanningConfiguration_scanOnPush": true },
+      { "repositoryName": "integrator-redebrasil", "createdAt": "2026-03-25T17:57:35.890000-03:00" },
+      { "repositoryName": "atento-001-app", "createdAt": "2026-04-22T18:22:11.733000-03:00" },
+      { "repositoryName": "integrator-atento-co-staging", "createdAt": "2026-05-05T13:31:14.940000-03:00" },
+      { "repositoryName": "integrator-atento-harvester-co", "createdAt": "2026-06-16T13:07:19.786000-03:00" },
+      { "repositoryName": "auth-001-staging", "createdAt": "2026-07-01T16:17:25.919000-03:00", "imageScanningConfiguration_scanOnPush": true },
+      { "repositoryName": "vpn-staging", "createdAt": "2026-07-10T16:53:24.689000-03:00", "imageScanningConfiguration_scanOnPush": true },
+      { "repositoryName": "integrator-maqnelson", "createdAt": "2026-07-28T10:08:13.341000-03:00" },
+      { "repositoryName": "vpn", "createdAt": "2026-07-10T16:53:24.687000-03:00", "imageScanningConfiguration_scanOnPush": true },
+      { "repositoryName": "integrator-almaviva", "createdAt": "2026-07-28T10:05:22.601000-03:00" },
+      { "repositoryName": "integrator-atento-co", "createdAt": "2026-04-12T14:33:03.975000-03:00" },
+      { "repositoryName": "integrator-atento-cl", "createdAt": "2026-04-12T14:33:03.997000-03:00" },
+      { "repositoryName": "integrator-atento-cl-staging", "createdAt": "2026-05-05T13:31:15.340000-03:00" },
+      { "repositoryName": "integrator-atento-harvester-mx", "createdAt": "2026-06-15T11:27:59.199000-03:00" },
+      { "repositoryName": "shared-001-app", "createdAt": "2026-07-15T07:55:47.126000-03:00" },
+      { "repositoryName": "integrator-commcenter", "createdAt": "2026-07-28T10:10:46.419000-03:00" },
+      { "repositoryName": "integrator-commcenter-staging", "createdAt": "2026-07-28T10:10:46.430000-03:00" }
+    ]
+  },
+  "_full_raw_files_used": [
+    "/tmp/ecr_repos_us_east_1.json",
+    "/tmp/ecr_repos_sa_east_1.json"
+  ]
+}

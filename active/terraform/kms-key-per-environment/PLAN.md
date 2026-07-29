@@ -690,7 +690,18 @@ anonymization cron, so a silent failure there is not cosmetic.
 **Known open question, to be settled at step 1**: whether `target-alb` is needed on a task role at
 all. Beta is where that costs nothing to find out.
 
-### Phase 12 — The three integrator surfaces the closing audit surfaced (S3, ECR, CloudWatch Logs) — PLANNED 2026-07-27
+### Phase 12 — The three integrator surfaces the closing audit surfaced (S3, ECR, CloudWatch Logs) — 12a + 12b DONE 2026-07-27/28; 12c IN PROGRESS (step 1 done, step 2 next)
+
+> **Status, 2026-07-28.** CloudWatch Logs (12a) and ECR (12b) are applied, verified against AWS and
+> merged. **S3 (12c) is the only integrator surface left, and it is HALF done**: the bucket default
+> encryption is applied and merged (step 1, PR #860 + #861), so new objects are on the stack's key — but
+> the objects that already exist are still under the AWS-managed key, and moving them is § 12c step 2,
+> **the next work item in this whole plan**. It is the heaviest of the three surfaces precisely because
+> it is the one that cannot be solved without moving data. Everything the integrator estate needs beyond
+> this is either out of Phase 12 (the `redebrasil` teardown) or deferred by decision (§ Phase 13a).
+>
+> **Do not read "the integrator is done" from 12a/12b/12c-step-1 being green.** It is not done until
+> step 2 finishes, and the app estate does not start before it.
 
 The 2026-07-27 audit found three integrator surfaces that are encrypted but NOT under the integrator's
 own key, and that this plan had never scoped either way. They are grouped here because they share a
@@ -793,7 +804,67 @@ the three on content grounds even though it is the middle one on cost.
   only remaining path for that stack.
 - **The repository count, established from `init` rather than guessed:** each integrator stack
   instantiates FOUR ECR modules — `ecr_deployment`, `ecr_deployment_staging`, `ecr_harvester`,
-  `ecr_harvester_staging`. That is where the 16 come from.
+  `ecr_harvester_staging`. Iterated by `for_each`, so the 16 are distributed unevenly: almaviva 1,
+  maqnelson 1, commcenter 2, atento 11 (four countries × deployment, three staging, four harvester),
+  redebrasil 1.
+
+**12b execution — the flag and the key are TWO applies, and that is not a preference.** PR #856 set
+`force_delete` alone (`0 add, N change, 0 destroy` per stack); PR #857 adopted the key. Combining them
+was tried first and **failed**: the plan showed the flag being added, the apply still died with
+`RepositoryNotEmptyException ... consider using force_delete`. **Terraform issues the delete using the
+value already in STATE, not the one in the new configuration** — so the delete runs first, with the old
+value. Nothing was destroyed (the API refuses before acting), which is the only reason this cost a
+re-plan instead of an incident. The tell that the split worked: in #857's plan `force_delete` no longer
+appears in the diff at all — it has moved to the unchanged attributes, leaving only the encryption
+forcing the replacement.
+
+**This is the THIRD instance of one failure shape in this plan, and it now has a name.** `kms:ReplicateKey`
+(Phase 13), the ECR key-policy grant (12b), and `force_delete` (here) are all *a capability enabled in the
+same apply as the operation that consumes it*. Two were caught by an apply failing; one was caught by
+reading the docs first. **Rule for the rest of this plan: when a change needs a permission, a flag, or a
+property that did not exist before, that prerequisite lands and is CONFIRMED in its own apply.** The cost
+is one extra round-trip; the alternative is a failure that lands after the destroy.
+
+**12b applied 2026-07-28 — all four active stacks, in two waves, PR #857 merged.** almaviva (`1/0/1`),
+maqnelson (`1/0/1`), commcenter (`2/0/2`) went first; atento (`11/0/11`) followed once the engineer
+confirmed the window. Every apply `0 changed`, so no resource outside the repositories was touched.
+Verified in AWS: all 15 repositories read `KMS` under their own stack's key with their names unchanged.
+`redebrasil`'s 16th stays `AES256` — it cannot receive a module change at all (frozen interface) and
+resolves by teardown.
+
+**The rebuild is NINE dispatches, not fifteen, and the shape is not uniform** — this had to be read from
+the workflows before destroying anything, because a wrong assumption here empties a repository with no
+way to refill it. Seven come from `integrator`'s `Build`, one per slug of the `INTEGRATORS` repository
+variable (`commcenter` and `commcenter-staging` are SEPARATE slugs; so are each atento country and its
+staging). The four harvester repositories come from `simplex-harvester`'s `Build`, which **takes no input
+at all** — the BRANCH selects the destination: `master` → the two production repos, any other ref → the
+two staging repos, each dispatch covering MX and CO together. Dispatching those by slug would have failed
+after the destroy.
+
+**The scheduling constraint is in the OTHER stack's timezone, and the deadline is not the integration.**
+`ECS-integrator-atento-cl-cron-integration-cron-schedule` is `cron(0 10 * * ? *)` in **America/Santiago**
+— not Brasília, which is what a reader assumes and what the engineer initially estimated. More
+importantly the binding deadline is `integrator-atento-cl-scale-up-{web,worker}` at `cron(55 9 * * ? *)`
+Santiago: **the scale-up is what launches the task and pulls the image**, five minutes ahead of the
+integration. Read the scale-up schedule, not the integration schedule, when sizing a window like this.
+
+**A stack cannot be partially applied, and the answer is a policy one.** The engineer asked to apply the
+harvesters, BR, MX and CO while holding CL. That requires `-target`, which 4Shark forbids and the wrapper
+rejects (it hides drift in non-targeted resources). So an ECR migration is per-STACK, all-or-nothing, and
+a stack with several countries is gated by whichever country runs next.
+
+**12b COMPLETE — verified 2026-07-28, per repository rather than by sampling.** All 15 repositories of the
+four active stacks read `KMS` under their own stack's key with unchanged names, AND all 15 carry the
+`latest` tag the task definitions pull. The tag was confirmed by a direct `--image-ids imageTag=latest`
+lookup on each one, not inferred from nine green workflow runs — **a successful build is not a present
+image, and the whole sequence was built to avoid exactly that class of assumption.** The Chile deadline
+cleared with 24 minutes to spare: image in the repository at 09:31 Santiago against a 09:55 scale-up.
+`integrator-redebrasil` remains `AES256`, unreachable by any module change and resolving by teardown.
+
+> **A JMESPath note that cost a round-trip**: `length(imageDetails[?contains(imageTags, 'latest')])`
+> fails with `invalid type for value: None` when any image in the repository is untagged. Use
+> `--image-ids imageTag=latest` instead — it asks the API the question directly and errors cleanly if
+> the tag is absent, which is the answer you actually want.
 - **The window is real and was open when checked.** All twelve integrator clusters reported `0/0`. A
   destroyed repository is an empty repository, so any task launching between destroy and rebuild cannot
   pull its image — the order is key policy → confirm idle → replace → build → deploy → verify → drop the
@@ -821,19 +892,529 @@ module-derived `AWS_BUCKET` env var (`modules/integrator/deployments.tf`, `"4sha
 so a new bucket name is a module change → new task-definition revision → deploy, exactly like the
 `AWS_INSTANCE_IDS` repoint was. The bucket is not just storage; its name is configuration.
 
-**Three decisions this phase needs before it can start, none of them mine:**
+**The naming decision is MADE (engineer, 2026-07-28): keep `4shark-integrator-<client>` exactly as it
+is.** *"Eu gosto dos nomes dos buckets que estão hoje, que é 4Shark integrator. Aí, o nome do cliente, eu
+gosto desse padrão. Quero manter esse padrão."* A permanent `-v2` suffix is off the table, so the
+migration is the double one: out to a temporary name, back to the canonical name. This is the more
+expensive path in data movement and it was chosen deliberately, not by default — the name is the thing
+being protected.
 
-1. **What the replacement buckets are called.** S3 bucket names are immutable, so a new bucket needs a new
-   name, and ADR-010 says a name describes what the thing is — which a `-v2` suffix does not. The fork is
-   accepting a permanent suffix, or migrating twice (new name now, back to the canonical name later) at
-   double the data movement.
-2. **Whether `4shark-integrator-artifacts` participates at all.** It is shared across integrators rather
-   than owned by one, so there is no "its own key" to put it on — the per-integrator model has no answer
-   for a shared bucket, and forcing one would weaken the isolation argument rather than strengthen it.
-3. **Where `force_delete` lives for ECR.** See 12b — the three options and why the placement, not the
-   migration, is what differs between them. The engineer settled on doing ECR (2026-07-27, "a gente
-   começa a planejar para fazer o ECR de todos os integradores"), so "whether it is worth the replace"
-   is answered; what is open is only this.
+**The engineer's sequence, recorded verbatim in intent (2026-07-28).** Create a temporary bucket; move
+the data there; delete the original; point the application at the temporary one so it keeps running;
+then re-create the ORIGINAL NAME with the key; replicate from the temporary back into it; cut the
+application over once synchronized; delete the temporary. The application never stops writing, and the
+canonical name is reclaimed at the end.
+
+**RESEARCH DONE 2026-07-28 — and it found that S3 is NOT like ECR, which is the finding that matters.**
+The ECR migration needed a destroy because encryption is fixed at creation. **S3's is not.** Verbatim:
+*"If you want to encrypt your objects with SSE-KMS, you must change the encryption type in your bucket
+settings"* (`bucket-encryption.html`) — an in-place setting change on the existing bucket. The problem S3
+actually has is the OBJECTS, not the bucket, and AWS names the mechanism for those in the same page:
+*"To encrypt your existing unencrypted Amazon S3 objects, you can use Amazon S3 Batch Operations… You can
+use the Batch Operations Copy operation to copy existing unencrypted objects and write them back to the
+same bucket as encrypted objects."*
+
+**Three facts that bear on the sequence, each sourced:**
+
+1. **Live replication does NOT carry existing objects.** Verbatim: *"By default, Amazon S3 replicates the
+   following: **Objects created after you add a replication configuration**"*
+   (`replication-what-is-isnot-replicated.html`). So "espelhar os dados do bucket original" is TWO
+   mechanisms, not one — live replication for new writes, **S3 Batch Replication** for the ~45 GB already
+   there. A plan that assumes one silently copies nothing.
+2. **AWS explicitly advises against deleting a bucket whose name you intend to keep.** Verbatim: *"If you
+   delete a bucket in the shared global namespace, be aware that another AWS account can use the same
+   general purpose bucket name for a new bucket and can therefore potentially receive requests intended
+   for the deleted bucket. If you want to prevent this, **or if you want to continue to use the same
+   bucket name, don't delete the bucket.**"* (`delete-bucket.html`)
+3. **There is NO stated reclaim window — the "espera um tempo" step has no number to fill in.** Verbatim:
+   *"When you delete a general purpose bucket, the bucket might not be instantly removed. Instead, Amazon
+   S3 queues the bucket for deletion… the deletion process takes time to fully propagate and achieve
+   consistency throughout the system."* No duration is given anywhere. **A migration whose hinge is an
+   unspecified wait, on a globally-contested namespace, cannot be scheduled.**
+
+**The alternative these facts point at — same goal, bucket never deleted, one pass over the data.** Set
+the bucket's default encryption to the integrator's key (in place, instant); run S3 Batch Operations Copy
+over the objects in place, which writes each back as a new KMS-encrypted CURRENT version; then let a
+lifecycle rule age out the old AES256 versions — `NoncurrentVersionExpiration` with `NoncurrentDays`,
+which verbatim *"doesn't apply to the current object versions. It removes only the noncurrent versions"*
+(`lifecycle-configuration-examples.html`). The name is never released, so it can never be taken; the
+application never repoints, because `AWS_BUCKET` does not change; and the data moves once instead of
+twice. The cost is that full coverage arrives when the noncurrent window elapses rather than at a
+cutover — **the same trade the engineer already accepted for CloudWatch Logs** (*"as outras paciência, a
+gente espera 180 dias pra elas expirarem"*).
+
+**Surfaced to the engineer 2026-07-28 as a disagree-and-commit, not a question.** The double migration
+remains theirs to choose; what this section records is that AWS advises against its central step and
+gives no duration for its central wait.
+
+#### The in-place path, sized and de-risked (research 2026-07-28)
+
+**Nothing is ever unavailable, and that is the load-bearing fact.** Changing the bucket default does not
+touch what is already stored — *"Objects that are already in an existing unencrypted bucket won't be
+automatically encrypted"* — and reading is transparent regardless of which key wrote an object:
+*"There is no change in the way that you access objects"* (`default-encryption-faq.html`). AES256 and
+KMS objects coexist in one bucket and the application never inspects which is which. **So this migration
+needs no window at all** — which dissolves the engineer's "tem que rodar em menos de um dia" constraint:
+the job can take a week and the integrator keeps running throughout.
+
+**THE PREREQUISITE, and it is the fourth instance of the same failure shape.** The integrator key policy
+allows SSM, ElastiCache, EC2, CloudWatch Logs and ECR — **not S3**. An object written under the key
+before that statement exists becomes unreadable to the application, because SSE-KMS reads need decrypt.
+The S3 statement lands and is confirmed in its own apply, before any object is rewritten. Use the
+`kms:ViaService = s3.<region>.amazonaws.com` shape the module already uses — **NOT an encryption-context
+condition**, because *"If your existing IAM policies or AWS KMS key policies use your object ARN as the
+encryption context… these policies won't work with an S3 Bucket Key. S3 Bucket Keys use the bucket ARN
+as encryption context"* (`bucket-key.html`).
+
+**Enable S3 Bucket Keys BEFORE the batch, or every future read costs a KMS call.** Without it,
+*"Amazon S3 uses an individual AWS KMS data key for every object… Amazon S3 makes a call to AWS KMS every
+time a request is made against a KMS-encrypted object"*; with it, *"reduce AWS KMS request costs by up to
+99 percent"*. It applies to new writes only — *"objects that are already in the bucket do not use the S3
+Bucket Key"* — so enabling it first means the batch itself produces Bucket-Key objects. Enabling it after
+would require a second pass over 8.24M objects.
+
+**Scale, measured 2026-07-28: 8,241,007 objects in the almaviva bucket alone** (CloudWatch
+`NumberOfObjects`; a plain `list-objects-v2` did not finish in 5 minutes). **Object count, not the ~45 GB,
+is what sizes this** — Batch Operations bills and works per object. The other twelve buckets are unmeasured.
+
+**AWS publishes NO throughput figure. Do not promise a duration.** The only statement is *"Because
+manifests can contain billions of objects, jobs might take a long time to run"* (`batch-ops-create-job.html`).
+
+**What makes it low-risk is that the job is self-narrowing and chunkable, not that it is fast.** The
+manifest generator filters on `MatchAnyObjectEncryption` — *"includes only source bucket objects with the
+indicated server-side encryption type (SSE-S3, SSE-KMS, DSSE-KMS, SSE-C, or NOT-SSE). If you select
+SSE-KMS… you can optionally further filter your results by specifying a specific KMS key ARN."* So a job
+scoped to "not yet on this key" **shrinks every time it runs**: a re-run picks up only the remainder, and
+a failure is a partial result to resume rather than a restart. `MatchAnyPrefix` / `CreatedAfter` /
+`CreatedBefore` slice it further. Every job also emits a completion report that can be scoped to failed
+tasks only, so failures are enumerable rather than inferred.
+
+**One versioned-bucket behaviour to design around, and it happens to favour us:** *"it doesn't take a
+'snapshot' of the state of the bucket… Amazon S3 performs the operation on the latest version of the
+object, not on the version that existed when you created the job."* Do NOT pin version IDs — acting on
+latest is what we want, and objects the integrator writes mid-job are already KMS from the bucket default,
+so they never needed the job.
+
+**"In place" does NOT mean overwrite, and saying so caused a real misunderstanding (2026-07-28).** The
+engineer read "in-place" as "the old bytes are replaced" and reasonably asked why anything would then
+need expiring. In a versioning-enabled bucket there is no overwrite: the copy writes version 2 (KMS) and
+version 1 (AES256) survives as noncurrent. Both buckets checked have `Versioning: Enabled`, and a sampled
+object reads `ServerSideEncryption: AES256, SSEKMSKeyId: null` — SSE-S3, the AWS-managed key.
+
+**Which makes expiry OPTIONAL, and the engineer was right to challenge it.** After the batch, every read
+the application performs returns the KMS version — correctness is complete with the batch alone. Expiry
+answers two different questions: whether any byte may remain under the AWS-managed key rather than the
+stack's (the noncurrent versions are still encrypted, just not by us), and whether storage stays
+permanently doubled (45 GB → 90 GB on almaviva alone). **Neither is required for the system to work**, so
+expiry is a separate cleanup decision that can be deferred indefinitely — NOT a step of the migration,
+which is how this section originally and wrongly framed it.
+
+#### 12c prerequisite APPLIED 2026-07-28 (PR #860) — the S3 statement on each integrator key
+
+Applied to all four active integrators, `0 add, 1 change, 0 destroy` each, no bucket or object touched.
+Verified by reading each live key policy back and searching for `s3.sa-east-1.amazonaws.com` — 2 hits per
+key. **Verify by searching for the ViaService, never by counting statements**: an earlier round of this
+same step was reported as applied on a statement COUNT that happened to match, when the last two
+statements were in fact the ECR pair from PR #855 and the S3 pair was absent from all four keys.
+Written with `kms:ViaService = s3.<region>` rather than an encryption-context condition — deliberately
+diverging from the CloudWatch Logs statement above, because S3 Bucket Keys move the encryption context
+from the object ARN to the BUCKET ARN, so an object-scoped policy would silently stop matching the moment
+Bucket Keys are enabled. **This prerequisite would NOT have failed loudly**: unlike the ECR grant, a
+missing S3 grant fails at read time, one object at a time, after the object is already encrypted.
+
+#### 12c step 1 APPLIED 2026-07-28 (PR #861) — bucket default encryption on the integrator estate
+
+**All 11 buckets of the four active integrators now default to their stack's key, with S3 Bucket Keys
+on.** Applied per stack — almaviva 1, maqnelson 1, commcenter 2, atento 7 — every one an in-place update
+of `aws_s3_bucket_server_side_encryption_configuration`, `0 add, N change, 0 destroy`. No bucket was
+recreated, no object was rewritten, and no name was released.
+
+**Verified against the live API, per bucket, not from the apply output** — `get-bucket-encryption` on
+each of the 11 returns `aws:kms` + `BucketKeyEnabled: true`. The apply summary says a resource changed;
+it does not say the resulting configuration is the intended one, and this migration has already been
+reported "applied" once on evidence that did not actually confirm the change (§ 12c prerequisite).
+
+**The no-data-loss guarantee was demonstrated, not asserted.** A pre-existing object
+(`storage/group/1.json`, almaviva) was downloaded after the change: it still reports
+`ServerSideEncryption: AES256` and its 892 bytes came back intact — the AES256 objects are untouched and
+still readable, exactly as the coexistence property predicts. Separately, a throwaway object written to
+`commcenter-staging` came back `aws:kms` under the commcenter key with `BucketKeyEnabled: true`, was
+re-read byte-identical, and was then hard-deleted by version id, leaving neither a version nor a delete
+marker. **That write-then-read is what proves the § 12c prerequisite grant actually works** — a missing
+S3 grant fails at READ time, per object, after the object is already encrypted, so nothing before this
+test would have surfaced it.
+
+**Bucket Keys had to land in this same apply, not a later one.** They apply to new writes only, so
+turning them on after the objects exist would need a second full pass over 8.24M objects — and without
+them S3 calls KMS on every request against a KMS-encrypted object, which at that scale is a permanent
+per-read cost and a throttling surface.
+
+**What is now true and what is not**: every object written from this point forward is on the stack's key.
+The objects already stored are still AES256 and still read fine. **Step 1 is HALF the migration — the
+half that stops the bleeding, not the half that moves the data.** Bringing the existing objects onto the
+key is § 12c step 2 below, and it is the NEXT thing to do.
+
+**MERGED 2026-07-28 — code and infrastructure are back in sync**, and the shared module was checked for
+collateral drift rather than assumed clean. `modules/s3_bucket` is called by the four app stacks as well
+as by `modules/integrator`, so its change reached stacks this migration never touched. `app-shared-001`
+plans **`No changes`**, and the live encryption of `beta-001` / `demo-001` / `atento-001` reads
+`AES256` + `BucketKeyEnabled: false` — exactly what the module's `kms_key_arn == null` path declares. The
+app estate is therefore unchanged and carries no pending diff for an unrelated apply to trip over.
+
+**Note for the app-estate phase: those four stacks call `../modules/s3_bucket` straight from their own
+`s3.tf`**, so the key would be passed at the STACK call site — the shape the engineer rejected for the
+app key ("esse multi region devia estar no modulo"). Same refactor debt already recorded for
+`ecs_service` / `ecs_scheduled_task` / `codedeploy` / `lambda-ecs-autoscaling`; fold `s3_bucket` into it.
+
+#### Stack standardization APPLIED and MERGED 2026-07-28 (PR #863) — and two lessons that outlive it
+
+**What it closed.** Every `EC2-start` log group in the integrator estate now carries its stack's key —
+verified live, the only one without is `redebrasil` (frozen, cancelled contract, resolves by teardown).
+The group is derived per productive environment from `var.deployments`, with **no flag**, because
+`deployments.tf` already states the rule this plan kept violating: *"Everything else follows from that ...
+There is no flag to set."* Three successive drafts added an input (a name suffix, then a set of keys)
+before the module's own documentation was read. **EBS encryption by default is now on in both regions**,
+so `encrypted` is no longer an attribute any caller declares — the engineer's framing, and the reason
+every per-resource `encrypted = true` written for this PR was removed again: *"não existe alguém escolher
+se encripta ou não"*.
+
+**LESSON 1 — a resource changing STATE ADDRESS while keeping its real name is a `state mv`, never a
+destroy/create.** Changing `count` to `for_each` moves `foo[0]` to `foo["main"]`; Terraform sees an
+unrelated destroy plus create at the SAME AWS name. On the first apply that raced and lost:
+`ResourceAlreadyExistsException` on create, because the CloudWatch Logs delete was still propagating.
+Recovery was fix-forward (re-plan showed `1 to add, 0 to destroy`, apply, verify) — but the three
+remaining stacks used `terraform state mv` instead and planned **zero actions**. Reach for `state mv`
+whenever the address moves and the name does not.
+
+**LESSON 2 — a stale branch does not announce itself; it shows up as someone else's change being
+reverted.** `app-shared-001` planned `18 to add, 7 to change, 18 to destroy`, which was dismissed twice as
+"pre-existing provider drift" on the strength of four empty-array lines. Reading the whole diff under the
+engineer's insistence — *"eu preciso saber o motivo de todas essas alterações sempre, está na porra da
+política"* — showed it removing two `MIGRATION_*` `statement_timeout` variables that were **live in
+production and present in the code**, merged three hours earlier by PR #864. The branch predated it.
+After a rebase the same stack planned **`No changes`**: there was no provider drift at all, and applying
+would have silently reverted a production change nobody asked to revert. **Rebase before planning, and
+justify every line of a plan — a classification made from a sample is not a justification.**
+
+#### 12c step 2 — NEXT: migrate the objects that already exist (Batch Operations Copy)
+
+> **This is the next work item, and it is written as its own numbered step because it was twice framed as
+> a deferred nice-to-have and twice had to be corrected by the engineer** — most recently 2026-07-28:
+> *"opa, como que o proximo é o app? e a migracao dos arquivos atuais em todos os buckets s3 cara?"*
+> **The app estate does NOT start until this finishes.** The phrasing that caused the drift was "not
+> required for correctness", which is true and irrelevant: the system works with mixed encryption, but
+> the GOAL of this whole plan is that 4Shark's data sits under 4Shark's per-stack keys, and until the
+> existing objects move, the overwhelming majority of the integrator's bytes are still under the
+> AWS-managed key. Half-done is not done.
+
+**Scope: the 11 buckets of the four active integrators**, the same set § 12c step 1 just changed —
+almaviva, maqnelson, commcenter (+staging), and atento `br`/`cl`/`co`/`mx` (+staging `cl`/`co`/`mx`).
+`4shark-integrator-artifacts` is NOT in scope (it is the open shared-resource question below) and
+`redebrasil` is excluded like everywhere else in Phase 12.
+
+**THE OPERATION IS `S3UpdateObjectEncryption`, NOT `S3PutObjectCopy` — and this replaces everything this
+section previously said about copying objects onto themselves.** AWS shipped `UpdateObjectEncryption` on
+2026-02-05 for exactly this problem, and its own documentation names our case as Example 2: *"Create a
+Batch Operations job that updates SSE-S3 encrypted objects to SSE-KMS"*. It *"can atomically update the
+server-side encryption type of an existing object in a general purpose bucket without any data movement,
+using envelope encryption to re-encrypt the data key with your newly specified server-side encryption
+type."*
+
+**Re-wrapping 23.2M data keys is a categorically different operation from rewriting 23.2M objects**, and
+every hazard the copy approach forced this plan to reason about disappears with it:
+
+| | `S3PutObjectCopy` (the old plan) | `S3UpdateObjectEncryption` (correct) |
+|---|---|---|
+| Data movement | rewrites every object | none — re-wraps the data key |
+| Object size limit | 5 GB, oversize fails | none stated; 20 billion objects per manifest |
+| Creation date | rewritten on every object | *"preserves all object metadata properties, including the storage class, creation date, last modified date, ETag, and checksum"* |
+| Lifecycle clocks | reset under the `integration-debug/*` prefixes | untouched |
+| Versioned bucket | writes a new version; AES256 version lingers | acts on the current version in place |
+| Storage cost | doubles until noncurrent versions expire | unchanged |
+
+**Two consequences worth naming, because they cut in opposite directions.** The good one: the noncurrent
+AES256 versions never come into existence, so the "expire the old versions" cleanup this plan kept
+carrying as a separate open decision **simply does not arise** — the storage-doubling and the
+"some bytes still under the AWS-managed key" questions both evaporate. The one to be honest about:
+**there is no old version to roll back to.** The copy approach's reversibility came from versioning
+leaving the AES256 object behind; here the change is atomic and in place. That is a smaller risk surface
+rather than a larger one — nothing is rewritten, so there is no partial-write failure mode — but it is
+not the same safety property, and this plan should not pretend it is.
+
+**The properties that still hold**: nothing is unavailable at any point, because SSE-S3 and SSE-KMS
+objects coexist and *"There is no change in the way that you access objects"*; the job acts on the
+current version unless a version ID is given, so objects the integrator writes mid-job are already KMS
+and need nothing; and the manifest generator's `MatchAnyObjectEncryption` filter scopes each run to
+objects not yet on the key, so a job **shrinks on every re-run** — a failure is a partial result to
+resume, never a restart.
+
+**Preconditions checked against this estate, 2026-07-28.** `UpdateObjectEncryption` *"doesn't support
+objects that are unencrypted"* — ours are all SSE-S3, so they qualify, and any exception would surface
+in the completion report rather than silently. It *"fails on any object that has an S3 Object Lock
+retention mode or legal hold applied"* — Object Lock is not configured on these buckets
+(`GetObjectLockConfiguration` returns `ObjectLockConfigurationNotFoundError`). It needs the **full key
+ARN**, never an alias — *"You can't use an alias name or alias ARN"* — which the per-stack ARNs already
+give us.
+
+**BLOCKER, and it is a tooling one: the installed AWS CLI is too old.** `aws-cli/2.28.17` rejects both
+`S3UpdateObjectEncryption` and the `MatchAnyObjectEncryption` filter at client-side parameter validation
+(*"must be one of: LambdaInvoke, S3PutObjectCopy, …"*), because its bundled service model predates the
+2026-02-05 launch. The current release is **2.36.9**, and the current `s3control create-job` reference
+lists both. **Upgrading the CLI is the fix** — "calling the API directly" does not route around it,
+because the CLI *is* the API client and the block is its own model validation, so bypassing it means
+hand-signing SigV4 requests against the S3 Control endpoint, which is not something to improvise on a
+production migration. AWS CloudShell is the zero-install alternative (browser, pre-authenticated,
+current CLI).
+
+**`S3PutObjectCopy` remains a working fallback if the CLI cannot be upgraded** — the old mechanics are
+preserved below and they do function on 2.28.17 — but it is strictly worse on every row of the table
+above, and without `MatchAnyObjectEncryption` it also loses the shrink-on-re-run property, since the
+generated manifest would have to include every object on every run.
+
+**Do NOT promise a duration.** AWS publishes no throughput figure; the only statement is that jobs over
+large manifests *"might take a long time to run"*. Almaviva alone is 8,241,007 objects. The job is
+chunkable by `MatchAnyPrefix` / `CreatedBefore` if it needs to be paced, and every job emits a completion
+report that can be scoped to failed tasks only — so progress and failure are both enumerable rather than
+inferred.
+
+**THE COUNTS BELOW ARE VERSIONS AND DELETE MARKERS, NOT CURRENT OBJECTS — do not read them as the size
+of the work.** CloudWatch's `NumberOfObjects` on `AllStorageTypes` counts every version plus every delete
+marker in a versioned bucket. It was caught on `atento-co`, whose metric said 18: the first job's
+manifest generation *"found no keys matching the filter criteria"*, and a listing showed the bucket holds
+**zero current data objects** — 9 noncurrent versions and 9 delete markers, which is exactly the 18. The
+whole bucket is deleted data. **The 8.2M / 15M figures for `almaviva` and `maqnelson` are therefore an
+upper bound of unknown tightness**, and every sizing statement in this section that rests on them is
+provisional until each bucket's manifest generation reports its real `TotalNumberOfTasks`.
+
+**The cheapest way to measure current objects IS the job itself** — manifest generation reports the true
+count, costs nothing on an empty result, and a bucket with nothing to do simply fails fast with
+`InvalidManifestContent`. So the running order below doubles as the measurement, and no separate
+inventory pass is needed.
+
+**How far off the metric actually is varies wildly per bucket, so neither direction generalizes.** On
+`atento-co` it was total fiction — 18 by the metric, 0 real objects. On `almaviva` it is nearly exact —
+8,241,007 by the metric against **8,218,095** real current objects from manifest generation, a gap of
+about 23k. The lesson is not "the metric always overstates by a lot"; it is that the ratio of live data
+to dead versions is a property of how each client's bucket has been used, and only the manifest knows.
+
+**Per-bucket totals, measured 2026-07-28** (CloudWatch `NumberOfObjects` / `AllStorageTypes` — versions
+plus delete markers, per the correction above):
+
+| Bucket | Objects |
+|---|---|
+| `atento-br`, `atento-cl-staging`, `atento-co-staging`, `atento-mx-staging`, `commcenter-staging` | empty |
+| `atento-co` | 18 |
+| `atento-mx` | 27 |
+| `atento-cl` | 50 |
+| `commcenter` | 24,755 |
+| `almaviva` | 8,241,007 |
+| `maqnelson` | **14,960,541** |
+
+**`maqnelson` is the largest bucket in the estate — almost double `almaviva` — and this plan said the
+opposite everywhere until it was measured.** Almaviva was called "the largest" purely because it was the
+one bucket anyone had counted (it was the example when the 8.2M figure was taken). Nothing else was ever
+measured, and the unmeasured bucket turned out to be the big one. **The sizing story of this whole step
+is `maqnelson` + `almaviva` ≈ 23.2M objects; every other in-scope bucket together is under 25k.**
+
+**Order of execution — smallest NON-EMPTY first.** The first run must prove the job shape (IAM role,
+manifest filter, report destination, copy semantics, resulting encryption) end to end, and getting it
+wrong on 15M objects costs a long wait before the error surfaces. So: `atento-co` (18) → `atento-mx`
+(27) → `atento-cl` (50) → `commcenter` (24.7k) → `almaviva` (8.2M) → `maqnelson` (15M).
+
+**The empty buckets are NOT the proving ground, though an earlier draft of this section said they were.**
+An empty bucket generates an empty manifest, which exercises none of the copy semantics — it proves the
+job was accepted, not that it does the right thing. They need no job at all: with nothing stored, step
+1's default already governs everything they will ever hold.
+
+**Metadata and tags survive by default — the AWS blog overstates this and the API reference settles it.**
+The blog says to specify object properties as part of the job; the `S3CopyObjectOperation` reference says
+that for `NewObjectMetadata`, *"If you don't provide this parameter, Amazon S3 copies all the metadata
+from the original objects"*, and for `NewObjectTagging`, *"If NewObjectTagging is not specified, the tags
+of the source objects are copied to destination objects by default."* So OMIT both. Supplying them is
+what would cause loss — an empty `NewObjectTagging` set explicitly strips tags.
+
+**What the copy DOES change is the creation date** — *"all your objects show an updated creation date
+upon completion, regardless of when you originally added them to S3."* Two consequences, one harmless and
+one that was checked. The harmless one: the module's two lifecycle rules are prefix-scoped to
+`integration-debug/scripts/` (7 days) and `integration-debug/audits/` (30 days), so objects under those
+prefixes get their clock reset and live one extra window — a delay in cleanup, not a loss.
+
+**The one that mattered — whether the integrator reads object age as business state — was checked, and
+the answer is no.** The estate note says the integrator "cycles data between Mongo and S3 as it warms and
+cools", which made object age plausibly meaningful, and a rewritten creation date across 8.2M objects is
+not undoable. It turns out not to: `grep` for `last_modified` / `LastModified` across the integrator's
+`app/` and `lib/` returns nothing, and `list_objects` / `bucket.objects` returns nothing across `app/`,
+`lib/` and `config/` — the application never enumerates the bucket at all. Every access goes through
+`integrator/app/models/s3.rb`, which builds a deterministic key (`storage/<type>/<id>.json`) and calls
+`put_object` / `get_object` / `delete_object` on it. **The bucket is a keyed store addressed by id, not a
+timeline**, so a rewritten creation date changes nothing the application reads.
+
+**Storage class: every bucket is `StandardStorage` only** — verified 2026-07-28 by listing the
+CloudWatch `BucketSizeBytes` metric dimensions across all of `sa-east-1`; no `Glacier`, no `IA`, no
+`IntelligentTiering` on any bucket in the region. That removes the restore-first precondition the Copy
+restrictions impose on archived objects, and it means `StorageClass` can be omitted from the job.
+
+**The 5 GB ceiling is the one real limit, and it is DETECTABLE rather than silent.** Copy restrictions:
+*"Objects to be copied can be up to 5 GB in size."* Enumerating the oversize objects up front is not
+practical — a `list-objects-v2` over almaviva's 8.2M keys does not finish (attempted; it also did not
+finish on maqnelson within two minutes). Arithmetic says they are unlikely: 45.6 GB over 8,241,007
+objects averages ~5.5 KB, so a single 5 GB object would be more than a tenth of the bucket in one file.
+The plan does not rest on that, though — an oversize object FAILS its task and lands in the completion
+report, so the first job's report is what settles it, per bucket. If any appear, they are handled
+separately with a multipart copy; do not silently leave them behind.
+
+**Job mechanics, settled from the AWS documentation 2026-07-28:**
+
+**The job role EXISTS as of 2026-07-28: `arn:aws:iam::405749097490:role/s3-batch-kms-migration`, created
+by hand through the API and NOT in Terraform — deliberately, on the engineer's own rule**: *"o primeiro a
+gente resolve direto na api e depois dropamos diretamente na api da aws"* for a one-off, and Terraform
+for anything standing. This one is genuinely one-off: once every object is on the key, nothing assumes
+the role again — a new object is encrypted by the bucket default at write time with no job involved, KMS
+key rotation does not re-encrypt stored objects, and a NEW integrator's bucket starts empty with the key
+already default, so it never needs a migration at all. **DELETE THE ROLE when § 12c step 2 completes**
+(`delete-role-policy` then `delete-role`); its description says so too. The app estate will need the same
+thing later, but as its own temporary role in `us-east-1` — not a reason to keep this one.
+
+Its inline policy is scoped to exactly the 11 in-scope bucket ARNs and the 4 integrator key ARNs, not
+`*`, so a mistake in a job definition cannot reach anything outside this migration. **No key policy
+change was needed**: each integrator key's S3 statement is `Principal: {"AWS": "*"}` gated on
+`kms:CallerAccount` = the 4Shark account and `kms:ViaService` = `s3.sa-east-1.amazonaws.com`, so any
+principal in the account acting through S3 is already covered — the role's own IAM policy is what grants.
+
+**The role's policy was written for the COPY approach and must be widened before the first
+`UpdateObjectEncryption` job.** It currently grants `s3:GetObject` / `s3:PutObject` / tagging plus
+`kms:Decrypt` + `kms:GenerateDataKey`. `UpdateObjectEncryption` needs the **`s3:UpdateObjectEncryption`**
+action instead of `s3:PutObject`, and AWS's documented policy for it also lists **`kms:Encrypt`** and
+**`kms:ReEncrypt*`** alongside Decrypt and GenerateDataKey. Update the inline policy when the operation
+switches; the role itself does not need recreating.
+
+Its policy needs
+`s3:GetObject` + `s3:PutObject` on the bucket's objects (source and destination are the same bucket
+here), `s3:PutInventoryConfiguration` on the bucket — required specifically because we generate the
+manifest rather than supply one — read access to the manifest location, write access to the report
+location, and `kms:Decrypt` + `kms:GenerateDataKey` on the stack key so the copy can read the AES256
+source and write the KMS destination.
+
+The manifest is GENERATED, not hand-built, and that choice is what makes the step resumable: the
+generator's `MatchAnyObjectEncryption` filter scopes each run to objects not yet on the key, so a re-run
+picks up only the remainder. A hand-built CSV manifest would be a frozen snapshot of an 8.2M-key listing
+we already know we cannot produce.
+
+The job is created in `sa-east-1` — *"you must create the job in the same Region as the destination
+bucket"* — which is where these buckets and their keys already are.
+
+**Manifest and report both go to a dedicated prefix INSIDE the bucket being migrated.** Decided rather
+than surfaced: it keeps each client's operational artifacts inside that client's own bucket, which is the
+same client-scoping rule 4Shark's Output Policy already applies to S3 staging, and it avoids taking a
+dependency on `4shark-integrator-artifacts` whose key question is still open. Re-runs are unaffected —
+the manifest and report objects are themselves written under the new key, so the "not yet on this key"
+filter excludes them from subsequent manifests. Completion reports are always SSE-S3 regardless
+(*"Completion reports are always encrypted with server-side encryption with Amazon S3 managed keys"*),
+which is a property of the report, not of the data.
+
+**Verification is per bucket and must not be inferred from the job's own success count.** After each
+job, re-run the same job as a VERIFICATION SWEEP — an identical `SSES3`-filtered manifest generation over
+the same bucket — and independently read a sample of objects back, confirming `aws:kms` + the stack key
+and that the payload still parses. This is the same discipline that caught the § 12c prerequisite being
+reported applied when it was not.
+
+**The completion criterion is NOT "the sweep finds zero objects" — it is "the sweep finds only
+`kms-migration/` artifacts", and getting that wrong would read as a failed migration.** This section
+previously asserted that the manifest and report objects *"are themselves written under the new key, so
+the filter excludes them from subsequent manifests"*. **That is false, and the commcenter sweep proved
+it**: it returned 3 tasks, and its generated manifest named exactly the previous job's own report files
+(`kms-migration/reports/job-<id>/manifest.json`, `.md5`, and the results CSV) — zero data objects. AWS
+writes these SSE-S3 regardless of the bucket default (*"Completion reports are always encrypted with
+server-side encryption with Amazon S3 managed keys (SSE-S3)"*), so **every sweep finds the previous
+sweep's own artifacts, forever.** There is no "not this prefix" manifest filter to exclude them
+(`KeyNameConstraint` only matches, never excludes), so the check is to READ the sweep's generated
+manifest and confirm every key in it sits under `kms-migration/`.
+
+**EXECUTION LOG — 2026-07-28**
+
+| Bucket | Job result | Verified against AWS |
+|---|---|---|
+| `atento-co` | failed, `InvalidManifestContent` — *"Manifest generation found no keys matching the filter criteria"* | listing shows zero current data objects; the bucket is 9 noncurrent versions + 9 delete markers |
+| `atento-mx` | **7/7 succeeded, 0 failed, 4s** | `head-object`: `aws:kms` + stack key + BucketKey; `LastModified` still 2026-06-26; ONE version, same `VersionId`; read-back 173,268 bytes = `ContentLength` |
+| `atento-cl` | failed, same empty-manifest reason as `atento-co` | — |
+| `commcenter` | **24,388/24,388 succeeded, 0 failed, 33s** | two objects read back and parsed as valid JSON at exactly their `ContentLength` (4,882 and 2,925 bytes); `LastModified` still 2025-07-17 / 2025-07-24; `storage/client/1.json` still a single version |
+| `commcenter` verification sweep | 3/3 succeeded | its generated manifest names ONLY the previous job's own report artifacts — **zero data objects left on SSE-S3** |
+| `almaviva` | **8,218,095/8,218,095 succeeded, 0 failed** (job `bafaacc5`) | **verified three ways — see below** |
+| `almaviva` verification sweep | 14/14 succeeded (job `6009d50c`) | its generated manifest names ONLY the migration job's own report artifacts (`manifest.json`, `.md5`, and 12 partitioned result CSVs) — **zero data objects left on SSE-S3** |
+| `maqnelson` | running (job `0f057597`) — 90.7% at 01:21 UTC, 0 failed | pending |
+| the 5 empty buckets | no job needed | **confirmed empty by direct listing**, not by the CloudWatch metric — `atento-br`, `commcenter-staging`, and the `atento-{cl,co,mx}-staging` trio all return no `Contents` at all. Re-checked deliberately because that metric is what misled on `atento-co` |
+
+**The engineer stopped the run before the two big buckets to ask whether a backup had been taken. It had
+not, and the answer is worth keeping**: there is NO backup of these buckets — the only AWS Backup plan in
+`sa-east-1` is `auth-001-cross-region-dr` and its only protected resource is the `auth-001` RDS instance;
+`almaviva` has no replication configured either. **And versioning does not cover this operation**,
+precisely because `UpdateObjectEncryption` is in place and leaves no prior version — verified on both
+`atento-mx` and `commcenter`, each still showing a single version with its original `VersionId`. What
+stands in for a backup here is that the operation does not rewrite the object at all, plus the empirical
+checks in the table above, taken on a small real bucket BEFORE anything larger was touched. **If a future
+step of this migration ever needs a genuine rollback path, it has to be created first — replication to a
+copy bucket, or an AWS Backup plan — because none exists today.**
+
+**`LastModified` preservation is now confirmed at scale, not just in the doc.** Commcenter's objects still
+carry 2025-07-17 / 2025-07-24 dates after 24,388 re-encryptions, and almaviva's still read 2025-02-11
+after 8.2M. Under the `S3PutObjectCopy` approach this plan originally specified, every one of those dates
+would now read 2026-07-28.
+
+**The strongest single check available was run on `almaviva`, and it is worth repeating on any future
+estate: a byte-for-byte diff of the SAME object before and after.** `storage/group/1.json` was downloaded
+early in the session while the bucket was still SSE-S3, and again after the 8.2M-object migration
+completed. `diff` returned empty — 892 bytes both times, and the re-read reports `aws:kms` under the
+almaviva key with Bucket Key on. Sampling encryption metadata proves the key changed; only the diff proves
+the payload did not. **Take the "before" copy BEFORE starting, or this check is unavailable later.**
+
+**Throughput is NOT constant, and the lifetime average is the wrong number to plan with.** Two jobs
+running concurrently share the account's Batch Operations capacity: while both ran, each held ~450 obj/s.
+The moment `almaviva` finished, `maqnelson` roughly doubled. A 42-second sample right after that showed
+1,350 obj/s — a burst, not a rate; measured over the following 20 minutes it settled at 888 obj/s.
+**Estimate from a delta across a long interval, never from the lifetime average (which carries the slow
+shared-capacity hours) and never from a sub-minute sample (which catches a burst).** The counter also
+advances in blocks, so two samples 19 seconds apart can show zero movement on a healthy job.
+
+**The engineer chose to let the migration overlap the integration window rather than pause it** —
+`maqnelson` was still at ~91% when its `mongo_start_cron` fired at 01:20 UTC. The reasoning for why that
+is safe: `UpdateObjectEncryption` is atomic per object and moves no data, so an object is never
+mid-change; SSE-S3 and SSE-KMS coexist and reads are transparent; and anything the integration writes
+during the window is already born on the key from the bucket default, so the job has nothing to do with
+it. **The one risk that could not be dismissed by measurement is KMS request contention** — mitigated by
+Bucket Keys being on (up to 99% fewer KMS calls), but the account's KMS quota was never checked. Two
+monitors covered the window: one on the jobs' failure counters, one on the integrator worker's log for
+S3/KMS errors.
+
+**What is explicitly NOT part of this step**: expiring the noncurrent AES256 versions. That is a separate
+cleanup decision (storage doubles until it happens; correctness does not depend on it) and the engineer
+already challenged including it here. It stays out.
+
+#### The estate, measured 2026-07-28 — the app side is the EASY side, not the hard one
+
+| | integrator (`sa-east-1`) | app (`us-east-1`) |
+|---|---|---|
+| Buckets | 12 client + `-artifacts` | 4 (`beta`/`demo`/`shared`/`atento`-001) |
+| Objects (largest) | 8,241,007 (almaviva) | 45,499 (shared-001) |
+| Size (largest) | ~45.6 GB (almaviva) | not measured |
+| Versioning | Enabled | Enabled |
+| Objects today | `AES256` (SSE-S3) | `AES256` (SSE-S3) |
+
+**Region placement is already correct and needed no change — it just was not written down anywhere**,
+which is why the engineer had to ask. All 12 integrator buckets plus `4shark-integrator-artifacts` are in
+`sa-east-1` where the integrators run; all four app buckets are in `us-east-1` where the apps run.
+
+**The app side is ~181× smaller in object count**, which is what sizes a Batch Operations job. A sampled
+key — `integration-debug/audits/97/client/<timestamp>.csv` — is a write-once artifact with the date in
+its name. **The engineer's read of the two workloads is borne out**: the integrator cycles data between
+Mongo and S3 as it warms and cools, so object states carry meaning there; the app generates spreadsheets
+for download and receives uploads for processing, never mutating them, so versioning stores nothing of
+value and only doubles cost. That difference is a versioning-policy decision per estate, separate from
+encryption and not urgent.
+
+**Still open and NOT the engineer's to guess: `4shark-integrator-artifacts`.** It is shared across
+integrators rather than owned by one, so there is no "its own key" to put it on. **The same question
+appears in § Phase 13a as `RDSOSMetrics`** — a Region-wide log group shared by every RDS instance.
+Answer them together; a shared resource under a one-key-per-stack model needs one rule, not two.
 
 `integrator-redebrasil` is excluded from all of 12a/12b/12c: frozen, cancelled contract, resolves by
 teardown.
