@@ -1096,7 +1096,76 @@ After a rebase the same stack planned **`No changes`**: there was no provider dr
 would have silently reverted a production change nobody asked to revert. **Rebase before planning, and
 justify every line of a plan — a classification made from a sample is not a justification.**
 
-#### 12c step 2 — NEXT: migrate the objects that already exist (Batch Operations Copy)
+#### 12c step 2 — DONE 2026-07-29. 23.2M objects re-encrypted, zero failures, integration ran through it
+
+**The integrator estate is migrated.** `atento-mx` 7, `commcenter` 24,388, `almaviva` 8,218,095,
+`maqnelson` 14,959,643 — **23,202,133 objects, not one failed task in any job.** The five empty buckets
+needed no job; `atento-co` and `atento-cl` held only deleted versions; `redebrasil` is excluded (frozen).
+
+**The overlap question was answered by measurement, not by argument.** The engineer chose to let
+`maqnelson`'s job run through its own integration window rather than pause it — the job was still at ~91%
+when `mongo_start_cron` fired at 01:20 UTC. During that overlap the integrator's worker produced **over
+60,000 log lines and zero error lines** — no `AccessDenied`, no `SlowDown`, no `Throttled`, no exception
+of any kind. **The KMS-contention risk this plan could not dismiss analytically is now dismissed
+empirically**, on a real integration running concurrently with ~1.4M objects being re-encrypted.
+
+**Do not read this as "S3 Batch Operations never interferes."** What was observed is this operation
+(`UpdateObjectEncryption` — atomic, no data movement) on this estate, with Bucket Keys on. The account's
+KMS quota was still never checked, so a job shape that consumes materially more KMS (a Copy-based
+migration, or Bucket Keys off) has not been cleared by this evidence.
+
+**Verification standard applied per bucket**, and it is the standard to repeat on the app estate: run the
+same `SSES3`-filtered job again as a sweep and READ its generated manifest — success is "every key in it
+sits under `kms-migration/`", never "the sweep found nothing", because AWS writes completion reports
+SSE-S3 regardless of the bucket default so each sweep always finds the previous one's artifacts.
+`commcenter`, `almaviva` and `maqnelson` all passed exactly that way — 3, 14 and 19 artifact keys, zero
+data objects. **`maqnelson` was the last one outstanding and it closed clean on 2026-07-29**: the sweep
+completed 19/19 tasks with zero failures, and every one of the 19 keys in its manifest is under
+`kms-migration/reports/`. The integrator estate's verification is therefore complete, not merely its
+migration.
+
+#### Estate-wide standardization audit, 2026-07-29 — the rule, and who already meets it
+
+**The rule, in the engineer's words:** whatever the system needs in order to run must be produced by the
+module from the fact that the stack exists — never declared in a file inside the stack. *"Se o integrador
+precisa do ElastCache para rodar, isso tem que ser criado junto com o módulo."* A stack defines only what
+genuinely differs between environments: the name, the VPN peers, the per-country deployment map. The
+reason is not tidiness — it is that **a new stack copied from `main.tf` alone must come up complete**, and
+anything living in a separate stack file is something the next stack can silently omit.
+
+**Already compliant, and they are the reference implementations: `setup`, `onboarding`, `vpn`,
+`auth-001`.** Each is a single `module "this"` call and nothing else — zero resources, zero data sources,
+zero locals outside the module. Their file layout is identical down to the filenames. **All six modules
+that need a KMS key own one** (`setup`, `onboarding`, `vpn`, `auth`, `app`, `integrator` each have a
+`kms.tf`), so the per-stack key is already universal.
+
+**The integrator now meets it too, with one exception.** The three examples raised are all already true:
+`elasticache.tf` creates the subnet group and replication group **unconditionally** (no `count`, no
+`for_each`); `s3.tf` does `for_each = var.deployments`, so listing a deployment IS what creates its
+bucket, already on the stack key; `kms.tf` creates key and alias unconditionally. Three of four integrator
+stacks are a bare `module "this"`. **The single remaining loose resource in the whole integrator estate is
+`aws_instance.windows_machine` in the atento stack** — and whether it belongs in the module is a genuine
+question, because it is engineer tooling rather than something the integrator needs to run. Either the
+module grows it behind a variable (on the stack key, like every other module surface) or it moves out of
+the integrator stack entirely; leaving it inline is what let its volume stay unencrypted.
+
+**The real gap is the app estate, and it is ~25× the size.** Where an integrator stack is one module call,
+`app-shared-001` is **35 module calls plus 27 loose resources** across a dozen files, and `atento-001` /
+`beta-001` / `demo-001` repeat the same hand-assembly (26 / 25 / 24 loose resources): `connection_pooler`,
+`iam_task_role`, `iam_deploy_user`, `rds`, `mongodb`, `opensearch`, `lambda`, `ssm`, `scheduled-tasks`.
+**The sharpest case is S3: only `modules/integrator` owns a bucket.** The app stacks call
+`../modules/s3_bucket` from their own `s3.tf`, so the bucket exists because someone remembered the call —
+a new app environment copied from `main.tf` alone comes up with none. Every one of those loose resources
+is a place a module-wide change can fail to reach, which is exactly the mechanism that produced this
+plan's two encryption holes; the app estate simply has 27 of them per stack instead of one.
+
+**The divergence is NOT in naming or layout** — those are uniform across the estate, and module-owned
+resources consistently derive names from the environment (`local.deployment_name`) rather than the stack,
+which is what made the per-country log-group fix fall out without needing an input. The divergence is
+entirely in how much of the system each stack assembles by hand, and it splits cleanly: integrator,
+setup, onboarding, vpn and auth are done; the app estate is the remaining work.
+
+#### 12c step 2 — the mechanics, kept for the app estate
 
 > **This is the next work item, and it is written as its own numbered step because it was twice framed as
 > a deferred nice-to-have and twice had to be corrected by the engineer** — most recently 2026-07-28:
@@ -1272,8 +1341,16 @@ for anything standing. This one is genuinely one-off: once every object is on th
 the role again — a new object is encrypted by the bucket default at write time with no job involved, KMS
 key rotation does not re-encrypt stored objects, and a NEW integrator's bucket starts empty with the key
 already default, so it never needs a migration at all. **DELETE THE ROLE when § 12c step 2 completes**
-(`delete-role-policy` then `delete-role`); its description says so too. The app estate will need the same
-thing later, but as its own temporary role in `us-east-1` — not a reason to keep this one.
+(`delete-role-policy` then `delete-role`); its description says so too.
+
+> **CORRECTION, 2026-07-29 — this paragraph used to say the app estate would need "its own temporary role
+> in `us-east-1`". That is wrong, and the premise under it is wrong: IAM is a GLOBAL service — a role has
+> no region.** What is regional is the *resources a policy names*, not the role. So the app migration
+> reused THIS role, extended in place (`put-role-policy`) with the four `4shark-{shared,atento,beta,demo}-001`
+> bucket ARNs across all three S3 statements and the four `us-east-1` `mrk-` key ARNs on the KMS statement
+> — 15 buckets and 8 keys total, still enumerated, still never `*`. A second role would have bought
+> nothing and left a second thing to remember to delete. **The deletion debt is therefore ONE role, not
+> two, and it now waits for the app sweeps as well as § 12c step 2.**
 
 Its inline policy is scoped to exactly the 11 in-scope bucket ARNs and the 4 integrator key ARNs, not
 `*`, so a mistake in a job definition cannot reach anything outside this migration. **No key policy
@@ -1341,7 +1418,7 @@ manifest and confirm every key in it sits under `kms-migration/`.
 | `commcenter` verification sweep | 3/3 succeeded | its generated manifest names ONLY the previous job's own report artifacts — **zero data objects left on SSE-S3** |
 | `almaviva` | **8,218,095/8,218,095 succeeded, 0 failed** (job `bafaacc5`) | **verified three ways — see below** |
 | `almaviva` verification sweep | 14/14 succeeded (job `6009d50c`) | its generated manifest names ONLY the migration job's own report artifacts (`manifest.json`, `.md5`, and 12 partitioned result CSVs) — **zero data objects left on SSE-S3** |
-| `maqnelson` | running (job `0f057597`) — 90.7% at 01:21 UTC, 0 failed | pending |
+| `maqnelson` | **14,959,643/14,959,643 succeeded, 0 failed** (job `0f057597`) | verification sweep running (job `89e80944`); the engineer closed the step on the strength of the other three sweeps rather than blocking on it |
 | the 5 empty buckets | no job needed | **confirmed empty by direct listing**, not by the CloudWatch metric — `atento-br`, `commcenter-staging`, and the `atento-{cl,co,mx}-staging` trio all return no `Contents` at all. Re-checked deliberately because that metric is what misled on `atento-co` |
 
 **The engineer stopped the run before the two big buckets to ask whether a backup had been taken. It had
@@ -1418,6 +1495,271 @@ Answer them together; a shared resource under a one-key-per-stack model needs on
 
 `integrator-redebrasil` is excluded from all of 12a/12b/12c: frozen, cancelled contract, resolves by
 teardown.
+
+### Phase 14 — The app estate: the LAST thing between here and the goal (surveyed 2026-07-29)
+
+> **When the four `app-*` stacks and the two `app-outbound-*` stacks are on their own keys, this entire
+> task is finished** — every 4Shark environment encrypted, each with a key of its own. The integrator,
+> setup, onboarding, vpn and auth estates are already there.
+
+**THE FINDING THAT SIZES THIS PHASE: the per-stack keys already EXIST and almost nothing uses them.**
+`modules/app/kms.tf` creates `aws_kms_key.multi_region` with `alias/app-<identifier>` per stack, and all
+four are live in `us-east-1` — `app-shared-001`, `app-atento-001`, `app-beta-001`, `app-demo-001`. But
+the module wires that key into exactly **one** surface: `log_group_kms_key_id` (`modules/app/main.tf:62`).
+Everything else in the estate still points at the SHARED `4shark-master` multi-Region key
+(`mrk-fa0cda24…`), which is the key this whole plan exists to stop using — one key for every environment
+is precisely the isolation failure being undone.
+
+**34 references to the shared master key remain, and they cluster into four kinds of file:**
+
+| File | shared-001 | atento-001 | beta-001 | demo-001 | outbound-atento-br | outbound-maqnelson |
+|---|---|---|---|---|---|---|
+| `rds.tf` | 4 | 4 | 3 | 3 | — | — |
+| `connection_pooler.tf` | 3 | 3 | 3 | 3 | — | — |
+| `iam_task_role.tf` | 1 | 1 | 1 | 1 | 1 | 1 (`iam.tf`) |
+| `opensearch.tf` | 1 | 1 | — | — | — | — |
+
+The RDS references are not one thing: they cover `storage_encrypted` + `kms_key_id` on the cluster,
+`master_user_secret_kms_key_id` on the managed master password, and `performance_insights_kms_key_id` on
+each instance. Each is a separate surface that has to move.
+
+**The two outbound stacks have NO key of their own at all** — `modules/app_outbound` contains no
+`aws_kms_key` resource anywhere, and no `alias/app-outbound-*` exists. They are the only 4Shark
+environments with no dedicated key, so for them step 1 below is genuinely "create it", not "start using
+what is already there".
+
+#### The order, and why it is this order
+
+The engineer set it explicitly, and it inverts what would otherwise be tempting: *"não faz sentido
+padronizar agora, porque não tem padrão. Padronizar agora vai acabar gerando mais problema. A gente tem
+que corrigir tudo, encriptar tudo com a chave, e depois a gente olha para o planejamento de padronização
+da stack."*
+
+**14a — Every environment has a dedicated key, created by its module.** For the four `app-*` stacks this
+is already done and needs only verification. For the two `app-outbound-*` stacks it is real work:
+`modules/app_outbound` grows a `kms.tf` on the shape `modules/app/kms.tf` already uses, producing
+`alias/app-outbound-<client>`. Nothing consumes the new keys in this step — it is additive and carries no
+risk, which is why it goes first.
+
+**14b — Every service moves onto its stack's key.** The 34 references above, surface by surface: RDS
+cluster storage, RDS managed master password, RDS Performance Insights, OpenSearch, the connection
+pooler, and the task-role decrypt grants. **This is the step with real operational weight** — an RDS
+`kms_key_id` change is not in-place, and Performance Insights and the managed master password each have
+their own re-key semantics. Each surface needs its own research before it is planned, exactly as the
+integrator's ECR (immutable, forced replace) and S3 (live setting) turned out to differ.
+
+**14b.1 — S3 default encryption: DONE (PR #865, applied and merged 2026-07-29).** S3 was not in the
+34-reference table because the app buckets pointed at no customer key at all — they defaulted to SSE-S3,
+so their objects sat under the AWS-managed key. It went first precisely because it is the one surface in
+the estate with **zero** operational weight: bucket default encryption is a live setting, changing it
+rewrites nothing, and a bucket serves objects under mixed encryption without the reader knowing which.
+
+What applied, identically on all four stacks (`0 to add, 3 to change, 0 to destroy`, all in-place):
+`modules/app/kms.tf` gained the two S3 statements — the crypto grant scoped by `kms:ViaService` +
+`kms:CallerAccount`, and the `kms:CreateGrant` gated on `kms:GrantIsForAWSResource` — on both
+`aws_kms_key.multi_region` and `aws_kms_key.this`; and each stack's `s3.tf` passes
+`kms_key_arn = module.app.kms_key_arn` to `../modules/s3_bucket`.
+
+**The key-policy statements had to land in the SAME change, not after it**, and that ordering is the
+reason this note exists: the policy admitted SSM and CloudWatch Logs only, so an object written under a
+key whose policy does not admit S3 becomes unreadable **at read time, one object at a time**, long after
+the write succeeded. Unlike a missing repository grant, that failure is silent until someone reads.
+
+Scoped by `kms:ViaService` and never by encryption context, because **S3 Bucket Keys move the encryption
+context from the object ARN to the bucket ARN** — an object-scoped condition silently stops matching the
+moment Bucket Keys are enabled, and they are enabled here (Bucket Keys apply to new writes only, so they
+had to be on before the objects were written rather than after).
+
+Verified live per bucket with `get-bucket-encryption`: all four report `aws:kms` with
+`BucketKeyEnabled: true`, each under a distinct `mrk-` key.
+
+**14b.2 — S3 existing objects: DONE and VERIFIED (2026-07-29).** The objects already in the four buckets
+were written under SSE-S3 and would have stayed that way; the same Batch Operations
+`S3UpdateObjectEncryption` job proven on the other estate (23,202,133 objects, zero failed tasks) moved
+them, in place, with no data movement.
+
+| Bucket | Objects migrated | Failed | Sweep result |
+|---|---|---|---|
+| `4shark-beta-001` | 1,313 | 0 | 3 keys, all artifacts |
+| `4shark-demo-001` | 3,527 | 0 | 3 keys, all artifacts |
+| `4shark-shared-001` | 31,019 | 0 | 3 keys, all artifacts |
+| `4shark-atento-001` | 59,295 | 0 | 3 keys, all artifacts |
+
+**95,154 objects, not one failed task in any job.** Each sweep's generated manifest holds exactly the
+three artifacts its own migration job wrote (`manifest.json`, `manifest.json.md5`, one `results/*.csv`
+under `kms-migration/reports/job-<migration-job-id>/`) and zero data objects — the documented pass
+condition, not an empty result.
+
+**The estimate in this plan was ~45k–112k per bucket and the real counts are far lower, for the reason
+already documented for `atento-co`**: that estimate came from CloudWatch `NumberOfObjects` /
+`AllStorageTypes`, which counts versions AND delete markers rather than current objects. Do not size a
+future migration from that metric.
+
+**Integrity proved by checksum on both PRODUCTIVE buckets, not inferred from the job's own report.** A
+`head-object` on a real audit CSV in each, then a full read-back and an `md5` of the downloaded bytes:
+`4shark-shared-001` 3,153,873 bytes, ETag and MD5 both `5bc62b7ad06f228edc048deccf7ae504`;
+`4shark-atento-001` 5,095,591 bytes, both `f44be2741d54ed2025c1858367a2afa1`. Each reports
+`aws:kms` + `BucketKeyEnabled: true` under its own stack's key, and **`LastModified` still shows the
+original write date** (2026-06-30 and 2026-07-07) — the in-place property holding in practice, and the
+read path confirmed working through the new key policy.
+
+**The whole S3 surface of the app estate is therefore finished** — default encryption and stored objects
+both on each stack's own key.
+
+**14b.3 — OpenSearch: DONE AND VERIFIED (2026-07-29), with two remaining cleanup items.** Both canonical
+domains — `app-shared-001` and `app-atento-001` — now run under their own environment's key
+(`mrk-416bffe4…` and `mrk-07429959…`), keeping their canonical names. Verified live: the applications
+connect to them, and the `deals` index in each carries the DECLARED definition (`refresh_interval: -1`,
+`dynamic: "false"`, all nine fields correctly typed).
+
+**The strongest evidence is the index creation timestamps.** `atento-001` created its index at 19:51:07
+UTC and `shared-001` at 19:51:30 — 23 seconds apart, both inside the deploy window that opened at 19:46.
+Two independent environments creating the index seconds apart is the initializer running at boot, not a
+write creating it implicitly. Corroborated negatively: zero `[search_indexes]` lines in either web log
+after the deploy, where the previous deploy produced three `LocalJumpError` lines per environment.
+
+**Two items remain, neither touching traffic**: destroy both transitional domains AND restore
+`prevent_destroy` in `modules/opensearch/main.tf` (it is currently off for EVERY domain — the only open
+fragility); then delete the local credential backup at
+`~/Downloads/opensearch-key-migration-credentials/`.
+
+**The app-side defect this exposed, and the two hotfixes that closed it.** The initializer never created
+the index — `create!` existed but nothing called it, so an OpenSearch pointed at a fresh cluster would let
+the engine auto-create `deals` with a 1s refresh interval and guessed types, reintroducing exactly the
+regression ADR-0001 fixed. `3.59.1` added the creation (and carried a Rails 8.1.3.1 bump closing
+CVE-2026-66066 in Active Storage). `3.59.2` removed a `rescue StandardError` that had been added on the
+agent's own initiative: it swallowed the boot failure, so the first deploy was PROMOTED while the index
+did not exist. Raising instead fails the health check, which makes blue/green abort and keep the running
+version — the engineer caught this, and it is the reason the defect surfaced at all.
+
+**`return` does not work inside the `to_prepare` block — measured, not theorized.** Production logs from
+both environments showed `LocalJumpError — unexpected return`: the block is stored at file load and
+invoked later, when no enclosing scope remains to return from. `next` exits the block correctly. This cost
+one deploy cycle and is worth remembering for any initializer that guards inside `to_prepare`.
+
+**Original 14b.3 analysis (kept for the reasoning):**
+
+**OpenSearch: IN-PLACE IS IMPOSSIBLE, and that is an API refusal, not a downtime trade-off
+(researched 2026-07-29).** AWS's own API reference for `EncryptionAtRestOptions` says it verbatim: *"Can
+only be used when creating a new domain or enabling encryption at rest for the first time on an existing
+domain. You can't modify this parameter after it's already been specified."* Both domains
+(`app-shared-001`, `app-atento-001`, us-east-1) already have encryption at rest ON, pointed at the shared
+`4shark-master` key — so the key cannot be changed on them at any price. **A new domain is the only
+path**; the question is not "in place or new", it is only "how do we cut over".
+
+**The cutover is cheap, and the data question resolves BETTER than assumed.** The engineer's premise was
+that the index data is disposable because it only lives during a calculation. The code is stronger than
+that: `DealSearchIndex::Producer` (`app/workers/deal_search_index/producer.rb:17`) opens with
+`commission.deal_indexation_batches.delete_all` and re-indexes that commission's deals from scratch on
+every recompute. There is no accumulated state to migrate — an empty new domain refills itself
+commission by commission as recomputes run.
+
+**THE OPERATIONAL PRECONDITION, set by the engineer and it is the one that governs this work: nothing may
+be running when a cutover happens.** *"não vamos ter problema com dados se garantirmos que não tem nada
+em execução quando fizermos."* That is the condition to verify before each repoint — an in-flight
+commission recompute has `DealIndexationBatch` rows sitting in `executed`/`claimed` that reference
+documents in the cluster being pointed away from, and its `Computation` counters would never reconcile.
+With the pipeline idle there is no such state, which is what makes the swap safe.
+
+**Mechanically the cutover is an env-var change plus a deploy.** The app resolves the cluster from
+`OPENSEARCH_HOST` / `OPENSEARCH_USER` / `OPENSEARCH_PASSWORD`
+(`app/lib/application_configuration.rb:190-199`), and the app's own `CLAUDE.md` states deploys are
+zero-downtime by design. The module writes the credentials to
+`/${domain_name}/opensearch/master_{user,password}`, so a new domain name produces new SSM paths that the
+task definition must be repointed at.
+
+**Two constraints the plan must respect when this is executed:**
+
+The module carries `lifecycle { prevent_destroy = true }` (`modules/opensearch/main.tf`), so retiring the
+old domain is a deliberate removal of that guard — it cannot happen by accident, and it must not happen
+before the new domain is serving.
+
+**NAMING — a correction to the premise, recorded because it changes where the work lands.** The engineer
+recalled having removed an `app` prefix and wanted it restored. **The OpenSearch domains never lost
+it**: they are `app-shared-001` and `app-atento-001` both in code and live (`list-domain-names`,
+2026-07-29). What was renamed was the STACK DIRECTORY — commit `a9614ef` moved
+`app-shared-001/opensearch.tf` to `shared-001/opensearch.tf`, and `32c5cec` moved it back ("reclaim
+app-shared-001 slot"); the `domain_name` argument read `app-shared-001` before and after both. **The
+resource that actually lacks the prefix is the CONNECTION POOLER** — `shared-001-connection-pooler` and
+its three secrets (`app-shared-001/connection_pooler.tf:12,16,33,50`). The naming intent is real, it just
+lands on the pooler, and it is settled when 14b reaches the pooler — not here.
+
+#### The chosen sequence: temporary domain, round trip, final name preserved
+
+**The engineer's decision, and the reason it is a round trip rather than a one-way rename:** a domain
+name is unique per account per Region, so the encrypted replacement cannot be born as `app-shared-001`
+while `app-shared-001` still exists. Rather than accept a permanently different name, the domain is moved
+out and back — *"subimos um temporário, migramos e depois dropamos o antigo e subimos novamente e fazemos
+outra migração."* The canonical name survives the migration; the cost is two cutovers instead of one.
+
+**BOTH STACKS MOVE TOGETHER IN EVERY PR, AND CREATING A DOMAIN IS ALWAYS ITS OWN PR, SEPARATE FROM THE
+REPOINT THAT USES IT.** Two constraints, and they do not conflict — which is the part that was got wrong
+once and is written here so it is not got wrong again.
+
+The engineer's constraint is **deploy count**: *"eu vou fazer dois deploys. Do jeito que você está
+falando, quatro deploys vai demorar muito mais."* Moving both stacks in the same PR is what satisfies it.
+**Separating creation from repoint costs ZERO extra deploys** — standing up a domain changes no task
+definition, so that PR needs no deploy at all. Only a repoint does.
+
+**Separation is what removes the race, not merely what orders it.** Bundle them and the repoint's
+`OPENSEARCH_HOST` resolves to a domain created in the same apply, so correctness rests entirely on
+Terraform's graph and on the provider genuinely blocking until the cluster serves. Split them and the
+question disappears: by the time the repoint runs, the domain has existed for as long as it took to merge
+a PR, and its credentials are already sitting in SSM.
+
+| PR | Content | Deploys | State |
+|---|---|---|---|
+| 1 (#866) | Create `app-shared-001-tmp` + `app-atento-001-tmp`, each on its own stack's key | none | **APPLIED 2026-07-29** |
+| 2 | Repoint both applications at the transitional domains | one per stack | next |
+| 3 | Destroy both originals (lifting `prevent_destroy`), recreate each under its canonical name encrypted | none | |
+| 4 | Repoint both applications back; remove the transitional domains | one per stack | |
+
+**PR 1 applied — both stacks `5 added, 0 changed, 0 destroyed`.** Verified live with `describe-domain`:
+both report `Processing: false`, `Created: true`, and each sits on its own stack's key
+(`alias/app-shared-001` and `alias/app-atento-001` respectively, never the shared master). The
+credentials the module generated are in SSM under each domain's own path, which is where PR 2 reads them
+from.
+
+Two deploy rounds total, exactly as asked. **Every repoint PR is gated on the pipeline being idle**
+(§ the precondition above); the creation and teardown PRs are not, because they touch nothing the
+application is reading.
+
+**Reading either plan — the task-definition churn is expected, not a surprise to re-diagnose.** A task
+definition is immutable, so changing `OPENSEARCH_HOST` registers a new revision and deregisters the old
+one; Terraform reports that as one add plus one destroy per definition. Measured on PR 1: `shared-001`
+`23 add / 7 change / 18 destroy` and `atento-001` `22 add / 7 change / 17 destroy`. The destroys equal
+the count of task definitions carrying the variable (18 and 17), the extra five adds per stack are the
+domain plus the credentials the module generates, and the seven changes are the scheduled tasks.
+
+**The scheduled tasks move at APPLY time, the services only at DEPLOY time — and that asymmetry is
+structural.** `aws_scheduler_schedule.task_definition_arn` records the task-definition **family**, not a
+pinned revision, so it re-resolves to the newest revision on its own (the same behavior documented in the
+MongoDB re-provision runbook). The long-running services keep serving their current revision until the
+deploy. The resulting intermediate state — crons on the new domain, services on the old — is bounded and
+harmless precisely because the cutover is gated on an idle pipeline.
+
+**Decision recorded: each transitional domain is named `app-<stack>-tmp`.** It exists for the length of
+one migration and is destroyed in PR 2, so it does not set a convention — the `-tmp` suffix says exactly
+that, where a `-002` would read as a second environment and outlive its meaning if the cleanup ever
+slipped.
+
+**Decision recorded: each transitional domain mirrors ITS OWN stack, not a normalized pair.** The two
+stacks already differ (`shared-001` passes `off_peak_hours`, `atento-001` does not; `shared-001` appends
+a trailing slash to the endpoint URL, `atento-001` does not). Normalizing them here would fold a
+standardization change into a key migration — that belongs to 14c.
+
+**14c — Standardization, and ONLY after 14b.** The app stacks assemble by hand what the integrator gets
+from its module: `app-shared-001` alone is 35 module calls plus 27 loose resources across a dozen files,
+and the other three repeat it (26 / 25 / 24). The sharpest case is that **only `modules/integrator` owns
+an S3 bucket** — the app stacks call `../modules/s3_bucket` from their own `s3.tf`, so a new app
+environment copied from `main.tf` alone comes up with no bucket at all. Moving all of that into
+`modules/app` is the same shape of work the integrator finished, and the reason it comes last is that
+restructuring the stacks while their key wiring is still mid-migration would mean changing two variables
+at once on every plan.
+
+**What is NOT in this phase**: the `4shark-integrator-artifacts` bucket (shared across integrators, so no
+single stack's key fits — same open question as `RDSOSMetrics` in § Phase 13a), and the two VPN root
+volumes (replacing them drops every tunnel; needs its own window).
 
 ### Phase 13 — Log-group encryption across EVERY estate — MODULE WORK DONE; 14 adoption cases DEFERRED (engineer, 2026-07-27)
 

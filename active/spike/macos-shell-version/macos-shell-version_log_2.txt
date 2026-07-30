@@ -1,0 +1,69 @@
+Investigation of /bin/sh on this machine (macOS 26.5.2 "Tahoe", Darwin 25.5.0, arm64)
+
+Command: bash --version
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+Copyright (C) 2007 Free Software Foundation, Inc.
+
+Command: /bin/sh --version
+GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25)
+Copyright (C) 2007 Free Software Foundation, Inc.
+
+Command: ls -la /bin/sh /bin/bash
+-r-xr-xr-x  1 root  wheel  1293840 Jun 24 23:29 /bin/bash
+-rwxr-xr-x  1 root  wheel   101232 Jun 24 23:29 /bin/sh
+
+Command: file /bin/sh /bin/bash
+/bin/sh:   Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64e:Mach-O 64-bit executable arm64e]
+/bin/bash: Mach-O universal binary with 2 architectures: [x86_64:Mach-O 64-bit executable x86_64] [arm64e:Mach-O 64-bit executable arm64e]
+
+Command: md5 /bin/sh /bin/bash
+MD5 (/bin/sh) = 3fc51468053f9d40bedfa7b8c5e65197
+MD5 (/bin/bash) = c223f2756bb35351108bc1500dd14abc
+
+Conclusion from file size + checksum: /bin/sh is NOT a symlink or byte-identical
+copy of /bin/bash. It is a separate, much smaller (101KB vs 1.29MB) Mach-O binary.
+
+Command: strings /bin/sh
+@(#)PROGRAM:sh  PROJECT:dash-16
+/bin/bash
+/bin/dash
+/bin/zsh
+/private/var/select/sh
+Error opening %s: %s
+Unrecognized shell referenced in %s: %s
+Failed to exec %s as variant for /bin/sh (%d: %s).
+ Falling back to %s.
+Failed to exec %s as variant for /bin/sh (%d: %s).
+
+Interpretation: /bin/sh on current macOS is a small DISPATCHER binary (Apple
+project "dash-16") that reads a symlink at /private/var/select/sh and execs
+whichever of /bin/bash, /bin/dash, or /bin/zsh that symlink currently points
+to. It is not "bash in POSIX mode" as a literal fact about the binary — it is
+a selectable shim, and bash is only the CURRENT selection.
+
+Command: stat -f "%N -> %Y (link) type=%HT" /private/var/select/sh
+/private/var/select/sh -> /bin/bash (link) type=Symbolic Link
+
+So on THIS machine, right now, the selector happens to point at /bin/bash —
+which is why `/bin/sh --version` reports bash 3.2.57 and why the engineer's
+"is sh secretly the same bash" intuition tests true here. But the mechanism
+is a switchable OS-level selector (documented since Catalina at the old path
+/var/select/sh — see scriptingosx.com source in SPIKE.md Finding 3), not an
+identity between the two binaries.
+
+Behavioral test: /bin/sh -c 'echo $BASH_VERSION; echo $0; a=(1 2 3); echo "${a[@]}"'
+Output:
+3.2.57(1)-release
+/bin/sh
+1 2 3
+
+/bin/sh identifies itself as bash 3.2.57(1)-release via $BASH_VERSION, and a
+bash array assignment/access ("${a[@]}") works even when invoked as /bin/sh —
+so on this machine, invoking a script via /bin/sh does NOT strip bash
+extensions the way a true POSIX-only shell (dash) would.
+
+Command: sw_vers && uname -a
+ProductName:            macOS
+ProductVersion:         26.5.2
+BuildVersion:           25F84
+Darwin Paulos-MacBook-Air.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:27:52 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T8112 arm64

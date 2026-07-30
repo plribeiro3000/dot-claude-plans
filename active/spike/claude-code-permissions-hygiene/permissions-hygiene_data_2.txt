@@ -1,0 +1,71 @@
+Local environment audit — this machine, 2026-07-29
+Read-only Bash inspection, no file mutated.
+
+--------------------------------------------------------------------------------
+Version in use
+--------------------------------------------------------------------------------
+$ claude --version
+2.1.220 (Claude Code)
+
+This is ahead of every version number discussed in the docs/changelog findings
+(2.1.208 through 2.1.219), so the Edit(path)-only file-permission-check behavior
+(introduced 2.1.210) and the repo-root settings.local.json save location
+(introduced 2.1.211) both apply unconditionally on this machine.
+
+--------------------------------------------------------------------------------
+~/.claude/settings.json (shared, dot-claude-repo-managed, "User" scope per the docs)
+--------------------------------------------------------------------------------
+File size: 23,656 bytes
+Total permissions.allow entries: 199
+Total permissions.deny entries: 64
+
+Allow-side entries matching the unmatched Write()/Glob()/NotebookEdit() shape (3 total):
+  Glob(**)
+  Write(**)
+  Write(/tmp/**)
+
+Deny-side entries matching the same shape (20 total):
+  Write(./**/*.key)
+  Write(./**/*.pem)
+  Write(./**/.env)
+  Write(./**/.env.*)
+  Write(./**/.npmrc)
+  Write(./**/.pypirc)
+  Write(./**/credentials.yml.enc)
+  Write(./**/id_rsa*)
+  Write(./**/master.key)
+  Write(./**/secrets/**)
+  Write(./.env)
+  Write(./.env.*)
+  Write(./secrets/**)
+  Write(~/.aws/**)
+  Write(~/.docker/config.json)
+  Write(~/.gnupg/**)
+  Write(~/.netrc)
+  Write(~/.npmrc)
+  Write(~/.pypirc)
+  Write(~/.ssh/**)
+
+Total unmatched-shape rules across both arrays: 23. This count is consistent with the
+engineer's report of "dozens of lines" of startup warnings (23 rules x 1 warning line each
+= 23 lines per pass; the engineer additionally reports the whole block appearing twice —
+see Finding 3, marked Not found for a root cause).
+
+Deduplication check: `jq -r '.permissions.allow[]?, .permissions.deny[]?' settings.json |
+sort | uniq -d` returned EMPTY — there are no literal duplicate rule strings within the
+file itself. Whatever produces the doubled block in the terminal output is not a
+duplicate-entry data problem in this file; the rules exist exactly once each.
+
+--------------------------------------------------------------------------------
+~/.claude/settings.local.json (personal, machine-local)
+--------------------------------------------------------------------------------
+File size: 13,997 bytes
+Total permissions.allow entries: 181
+Total permissions.deny entries: 0
+Allow-side entries matching the unmatched Write()/Glob()/NotebookEdit() shape: 0
+
+This file holds no unmatched-shape rules — it is composed of accumulated Bash
+command-allow entries (per the docs' "Permanently per repository and command" behavior
+for Bash "don't ask again" approvals), not file-edit rules, consistent with Finding 2
+(file-modification approvals are documented as session-only and are never written to
+this file at all).

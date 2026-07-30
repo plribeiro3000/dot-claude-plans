@@ -1,0 +1,49 @@
+SOURCE: https://raw.githubusercontent.com/anthropics/claude-code/main/CHANGELOG.md
+FETCHED: 2026-07-29 via curl, saved locally, read in full (offset-verified, 5248 lines total)
+Excerpt: version entries 2.1.209 through 2.1.214 (the entries bracketing the Edit(path)-only
+permission-check change and the settings.local.json repo-root relocation).
+
+## 2.1.214 (selected lines only — full entry has ~90 lines, most unrelated to permissions)
+
+- Fixed single-segment `dir/**` allow rules like `Edit(src/**)` auto-approving writes to
+  nested `dir/` directories anywhere in the tree instead of only `<cwd>/dir`
+- Fixed a permission-check bypass affecting commands run in Windows PowerShell 5.1 sessions
+- Changed single-segment `dir/**` hook `if:` conditions to match only `<cwd>/dir`; write
+  `**/dir/**` for any-depth matching. `deny`/`ask` permission rules keep their any-depth
+  match.
+
+## 2.1.212 (selected lines only)
+
+- Deprecated the Task tool's `mode` parameter (now ignored); subagents inherit the parent
+  session's permission mode by default
+(no entry in 2.1.212 specifically about Write(path)/Edit(path) or settings.local.json
+location — included here only to show the version is contiguous with 211/210/214)
+
+## 2.1.211 (selected lines only)
+
+- Fixed permission previews relayed to chat channels not neutralizing bidirectional-override,
+  zero-width, and look-alike quote characters, so tool inputs cannot visually alter the
+  approval message
+- Fixed auto mode overriding a PreToolUse hook's `ask` decision for unsandboxed Bash — a
+  hook `ask` now floors the decision at a prompt
+- Changed "always allow" permission rules to save at the repository root, so approvals
+  granted in a git worktree persist across sessions and worktrees
+
+## 2.1.210 (selected lines only)
+
+- Added a startup warning for `Write(path)`, `NotebookEdit(path)`, and `Glob(path)`
+  permission rules — use `Edit(path)` or `Read(path)` instead
+
+--------------------------------------------------------------------------------
+Search performed across the full 5248-line file
+--------------------------------------------------------------------------------
+grep -n -i "until session end|don't ask again|file modification|Edit/write files|session end"
+returned 5 unrelated matches (about Windows PowerShell rule matching, backgrounded-session
+re-prompting, an auto-mode opt-in prompt, Bash dialog raw-command display, and a VSCode
+button label) — none of them document when "file-modification approval lasts only until
+session end" became the behavior. This appears to be long-standing, undocumented-by-version
+behavior, not a dated change. Marked as such in SPIKE.md (Finding 2).
+
+grep -n "^## 2\." confirmed the earliest entry in this file is 2.0.0 — the file does not
+go back far enough to show whether the Edit(path)-only behavior is truly new in 2.1.210 or
+a documentation-only clarification of pre-existing engine behavior. Not resolved further.

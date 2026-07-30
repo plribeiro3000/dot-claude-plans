@@ -1,0 +1,119 @@
+SOURCE: https://code.claude.com/docs/en/permissions
+FETCHED: 2026-07-29 (verified via WebFetch + full-text Read of the persisted tool-result page)
+Excerpted sections relevant to the SPIKE (full page is ~568 lines; only the load-bearing
+sections are reproduced verbatim here, with original line numbers from the fetched page).
+
+--------------------------------------------------------------------------------
+Lines 13-19 — the tiered permission table
+--------------------------------------------------------------------------------
+Claude Code uses a tiered permission system to balance power and safety:
+
+| Tool type         | Example          | Approval required                                                                   | "Yes, don't ask again" behavior        |
+| :---------------- | :--------------- | :----------------------------------------------------------------------------------- | :--------------------------------------- |
+| Read-only         | File reads, Grep | No, within the working directory and additional directories                          | N/A                                    |
+| Bash commands     | Shell execution  | Yes, except a built-in set of read-only commands                                     | Permanently per repository and command |
+| File modification | Edit/write files | Yes                                                                                   | Until session end                      |
+
+--------------------------------------------------------------------------------
+Line 21 — where "don't ask again" is persisted, and what is NOT persisted
+--------------------------------------------------------------------------------
+When you choose "Yes, don't ask again" and the approval saves permanently, such as for a
+Bash command, Claude Code saves the rule to `.claude/settings.local.json` at the root of
+the git repository, resolved through worktrees to the main checkout. The rule applies to
+future sessions anywhere in that repository, including sessions started in subdirectories
+and in worktrees. A file-modification approval isn't saved to the file: as the table
+shows, it lasts until the session ends. Outside a git repository, and when the repository
+root is your home directory, Claude Code saves the rule in the directory you started it
+from.
+
+--------------------------------------------------------------------------------
+Line 23 — version threshold for the repo-root save location
+--------------------------------------------------------------------------------
+Before v2.1.211, Claude Code always saved the rule in the starting directory, so an
+approval granted in a worktree or subdirectory didn't apply to the rest of the
+repository. Rules that earlier versions saved in a subdirectory or worktree still apply
+to sessions started there.
+
+--------------------------------------------------------------------------------
+Lines 29-37 — /permissions command and rule-evaluation order
+--------------------------------------------------------------------------------
+You can view and manage Claude Code's tool permissions with `/permissions`. This UI
+lists all permission rules and the `settings.json` file each rule comes from.
+
+* Allow rules let Claude Code use the specified tool without manual approval.
+* Ask rules prompt for confirmation whenever Claude Code tries to use the specified tool.
+* Deny rules prevent Claude Code from using the specified tool.
+
+Rules are evaluated in order: deny, then ask, then allow. The first match in that order
+determines the outcome, and rule specificity doesn't change the order.
+
+--------------------------------------------------------------------------------
+Line 43-44 — enforcement note
+--------------------------------------------------------------------------------
+Permission rules are enforced by Claude Code, not by the model. Instructions in your
+prompt or CLAUDE.md shape what Claude tries to do, but they don't change what Claude Code
+allows. To grant or revoke access, use /permissions, the rules described here, a
+permission mode, or a PreToolUse hook.
+
+--------------------------------------------------------------------------------
+Lines 257-269 — Read and Edit tool-specific rules; the Edit(path)/Read(path)-only check
+--------------------------------------------------------------------------------
+`Edit` rules apply to all built-in tools that edit files. Claude makes a best-effort
+attempt to apply `Read` rules to all built-in tools that read files like Grep and Glob,
+to @file mentions in your prompts, and to the selection and open-file context that a
+connected IDE shares with Claude.
+
+[min-version: 2.1.208] A `Read` deny rule also blocks the Edit tool on the same path,
+including creating a new file there. Write and NotebookEdit aren't covered, so add an
+`Edit` deny rule for paths no tool may change. Requires Claude Code v2.1.208 or later.
+
+[min-version: 2.1.210] The file permission checks match only `Edit(path)` and `Read(path)`
+rules. A `Write(path)`, `NotebookEdit(path)`, or `Glob(path)` rule is accepted but never
+matched by those checks, so Claude Code warns at startup for each allow, deny, or ask
+rule in one of these unmatched forms. Use `Edit(docs/**)` in place of `Write(docs/**)` or
+`NotebookEdit(docs/**)`, and `Read(docs/**)` in place of `Glob(docs/**)`. A tool-name rule
+with no path, such as a deny rule for `Write`, isn't affected: it matches the tool
+everywhere and produces no warning. Requires Claude Code v2.1.210 or later.
+
+A deny rule `Write(docs/**)` in project settings produces this startup warning:
+
+    Permission deny rule (.claude/settings.json): Write(docs/**) is not matched by file
+    permission checks — only Edit(path) rules are. Use Edit(docs/**) instead (Edit rules
+    cover all file-editing tools).
+
+--------------------------------------------------------------------------------
+Lines 411-419 — hooks as an alternative to broad allow rules
+--------------------------------------------------------------------------------
+Claude Code hooks let you register custom shell commands that evaluate permissions at
+runtime. When Claude Code makes a tool call, PreToolUse hooks run before the permission
+prompt, for every tool except EndConversation. The hook output can deny the tool call,
+force a prompt, or skip the prompt to let the call proceed.
+
+Hook decisions don't bypass permission rules. Claude Code evaluates deny and ask rules
+regardless of what a PreToolUse hook returns: a matching deny rule blocks the call, and a
+matching ask rule still prompts even when the hook returned "allow" or "ask". This
+preserves the deny-first precedence described in Manage permissions, including deny rules
+set in managed settings.
+
+A blocking hook also takes precedence over allow rules. A hook that exits with code 2
+stops the tool call before permission rules are evaluated, so the block applies even when
+an allow rule would otherwise let the call proceed. To run all Bash commands without
+prompts except for a few you want blocked, add "Bash" to your allow list and register a
+PreToolUse hook that rejects those specific commands.
+
+--------------------------------------------------------------------------------
+Lines 516-528 — settings precedence, repeated for permission rules specifically
+--------------------------------------------------------------------------------
+Permission rules follow the same settings precedence as all other Claude Code settings:
+
+1. Managed settings: can't be overridden by any other level, including command line
+   arguments
+2. Command line arguments: temporary session overrides
+3. Local project settings (.claude/settings.local.json)
+4. Shared project settings (.claude/settings.json)
+5. User settings (~/.claude/settings.json)
+
+If a tool is denied at any level, no other level can allow it. [...] The same holds
+across settings scopes: if user settings allow a permission and project settings deny it,
+the deny rule blocks it. The reverse is also true: a user-level deny blocks a
+project-level allow, because deny rules from any scope are evaluated before allow rules.

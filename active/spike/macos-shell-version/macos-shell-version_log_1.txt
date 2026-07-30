@@ -1,0 +1,28 @@
+Reproducer run: macos-shell-version_reproducer_1.sh
+Command: /bin/bash macos-shell-version_reproducer_1.sh (system bash 3.2.57(1)-release)
+
+A_FIRST=[{"line1": "alpha"}]
+A_SECOND=[{"line2": "beta"}]
+B_COMBINED=[part-one
+part-two]
+C_FIRST=[label=x]
+C_SECOND=[label=y]
+
+---
+
+Command: /opt/homebrew/bin/bash macos-shell-version_reproducer_1.sh (Homebrew bash 5.3.9(1)-release)
+
+A_FIRST=[{"line1": "alpha"}]
+A_SECOND=[{"line2": "beta"}]
+B_COMBINED=[part-one
+part-two]
+C_FIRST=[label=x]
+C_SECOND=[label=y]
+
+---
+
+Result: byte-identical output under both bash versions. All three heredoc-inside-$(...)
+shapes (two independent substitutions each with its own heredoc; two heredocs
+sequentially inside one $(...) group; a heredoc-using function called twice via
+$(...)) parse and execute correctly under bash 3.2.57 with no divergence from
+bash 5.3.9. See SPIKE.md Finding 5 for the interpretation.

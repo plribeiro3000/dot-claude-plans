@@ -1,0 +1,42 @@
+SOURCE: https://code.claude.com/docs/en/settings
+FETCHED: 2026-07-29 (verified via WebFetch, re-fetched once for self-check on 2026-07-29 —
+both fetches returned matching text for the quotes below)
+
+--------------------------------------------------------------------------------
+Settings file hierarchy / precedence
+--------------------------------------------------------------------------------
+1. Managed (highest): can't be overridden by anything
+2. Command line arguments: temporary session overrides
+3. Local: overrides project and user settings
+4. Project: overrides user settings
+5. User (lowest): applies when nothing else specifies the setting
+
+| Scope       | File Location                                               | Shared with team? |
+|:------------|:-------------------------------------------------------------|:-------------------|
+| Managed     | Server-managed, plist/registry, or managed-settings.json     | Yes (deployed by IT) |
+| User        | ~/.claude/settings.json                                      | No |
+| Project     | .claude/settings.json                                         | Yes (committed to git) |
+| Local       | .claude/settings.local.json                                   | No (gitignored) |
+
+--------------------------------------------------------------------------------
+settings.local.json purpose (verbatim, confirmed on re-fetch)
+--------------------------------------------------------------------------------
+"When Claude Code saves a setting to this file in a repository that doesn't already
+ignore it, Claude Code adds `**/.claude/settings.local.json` to your global git excludes
+file."
+
+"Claude Code reads and writes this file at the root of the git repository, resolved
+through worktrees to the main checkout, so one file covers sessions started in any
+subdirectory or worktree of the repository. The file stays in the directory you start
+Claude Code from in three cases: outside a git repository, when the repository root is
+your home directory, and in Agent SDK sessions."
+
+"Before v2.1.211, the file always lived in the starting directory." (confirmed verbatim
+on re-fetch)
+
+--------------------------------------------------------------------------------
+No deprecated-syntax migration guidance found on this page
+--------------------------------------------------------------------------------
+The Settings page (as fetched) contains no notes about permission rule syntax changes,
+deprecated Write()/Glob() path rules, or a migration path from old rule formats — that
+guidance lives only on the Permissions page (see permissions-hygiene_doc_1.txt).

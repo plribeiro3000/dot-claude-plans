@@ -1,0 +1,114 @@
+Machine-state inventory for this spike, all commands run directly on the
+engineer's machine (macOS 26.5.2, Darwin 25.5.0, arm64).
+
+--- Shell / interpreter versions ---
+
+bash --version           -> GNU bash, version 3.2.57(1)-release (arm64-apple-darwin25), Copyright (C) 2007 FSF
+/opt/homebrew/bin/bash --version -> GNU bash, version 5.3.9(1)-release (aarch64-apple-darwin25.1.0), Copyright (C) 2025 FSF, License GPLv3+
+zsh --version             -> zsh 5.9 (arm64-apple-darwin25.0)
+/Users/plribeiro3000/.rvm/rubies/ruby-4.0.2/bin/ruby -> ruby 4.0.2 (2026-03-17 revision d3da9fec82) +PRISM [arm64-darwin25]  (RVM-managed, first on PATH)
+/usr/bin/ruby --version   -> ruby 2.6.10p210 (2022-04-12 revision 67958) [universal.arm64e-darwin25]  (Apple system ruby)
+
+which -a bash sh zsh ruby:
+/bin/bash
+/opt/homebrew/bin/bash
+/bin/sh
+/bin/zsh
+/Users/plribeiro3000/.rvm/rubies/ruby-4.0.2/bin/ruby
+/usr/bin/ruby
+
+PATH (this session, order matters for "which bash"):
+/Users/.../.rvm/gems/.../bin : /Users/.../.rvm/gems/.../global/bin : /Users/.../.rvm/rubies/.../bin :
+/Users/.../.local/share/zinit/polaris/bin : /Users/.../.pyenv/shims : /bin :
+/Users/.../.nvm/versions/node/v24.16.0/bin : /Users/.../.local/bin :
+/opt/homebrew/opt/postgresql@17/bin : /opt/homebrew/bin : /opt/homebrew/sbin :
+/usr/local/bin : /System/Cryptexes/App/usr/bin : /usr/bin : /bin : /usr/sbin : /sbin : ...
+
+which bash -> /bin/bash
+
+Note: /bin precedes /opt/homebrew/bin in PATH on this machine, so `which bash`
+and any `#!/usr/bin/env bash` shebang resolve to the OLD system bash 3.2.57,
+NOT the Homebrew 5.3.9 install — even though the modern bash is present on
+disk. Relying on `env bash` alone would silently keep picking up 3.2.57 here.
+
+--- Upstream comparison (web-verified, see SPIKE.md citations) ---
+
+Current upstream zsh: 5.9.2, released 2026-07-12 (zsh.sourceforge.io/News/).
+This machine's zsh (5.9) is two minor releases behind but on the actively
+maintained line -- not years-stale the way bash 3.2 (2007) is against bash
+5.3.9 (2025).
+
+--- Script inventory under ~/.claude/scripts and ~/.claude/skills/*/scripts ---
+
+Total *.sh files found (find ~/.claude/scripts ~/.claude/skills -name "*.sh" -type f): 89
+
+Shebang breakdown (find ... -exec head -n 1 {} + | sort | uniq -c):
+      58  #!/bin/bash
+      31  #!/usr/bin/env bash
+       0  #!/bin/sh
+       0  #!/bin/zsh or #!/usr/bin/env zsh
+
+--- settings.json hook wiring ---
+
+grep -c '"command":' ~/.claude/settings.json -> 66 hook command entries total.
+
+Sample of the first 15 (grep '"command":' ~/.claude/settings.json | head -15):
+            "command": "$HOME/.claude/scripts/check-dependencies.sh",
+            "command": "$HOME/.claude/scripts/check-claude-version.sh",
+            "command": "$HOME/.claude/scripts/check-entrypoint.sh",
+            "command": "$HOME/.claude/scripts/check-projects-folder.sh",
+            "command": "$HOME/.claude/scripts/check-ssh-keys.sh",
+            "command": "$HOME/.claude/scripts/check-plans-location.sh",
+            "command": "$HOME/.claude/scripts/check-push-default.sh",
+            "command": "$HOME/.claude/scripts/check-abandoned-worktrees.sh",
+            "command": "$HOME/.claude/scripts/check-merged-branches.sh",
+            "command": "$HOME/.claude/scripts/clean-permission-rules.sh --session",
+            "command": "$HOME/.claude/scripts/cleanup-sessions.sh",
+            "command": "$HOME/.claude/scripts/migrate.sh",
+            "command": "$HOME/.claude/scripts/inject-code-pattern-rule.sh",
+            "command": "$HOME/.claude/scripts/inject-output-policy-reminder.sh",
+            "command": "$HOME/.claude/scripts/inject-skill-tip.sh",
+
+None of the sampled (or grepped) hook "command" values are prefixed with a
+literal "bash " verb -- Claude Code invokes the path directly, which means
+execution depends on the file's own shebang line + executable bit, not on a
+hardcoded interpreter name in settings.json. Changing a script's shebang line
+from #!/bin/bash to #!/bin/zsh would be picked up by the hook runner without
+a settings.json edit -- ASSUMING settings.json invocation is the only call
+path (see permissions.allow finding below, which is NOT shebang-driven).
+
+--- permissions.allow entries tied to the literal "bash" verb ---
+
+grep -c 'Bash(bash ~/.claude' ~/.claude/settings.json -> 33 entries
+
+These are permission-matcher allow-list rules of the shape
+`Bash(bash ~/.claude/scripts/<name>.sh:*)` or similar. Per CLAUDE.md's own
+documented Command Safety Policy, the permissions matcher does a STRING-PREFIX
+match against the literal command text typed by the agent (e.g. "bash
+~/.claude/scripts/ruby.sh ..."). If a script's invocation verb changed from
+"bash <path>" to "zsh <path>" (or to a bare "<path>" relying on the shebang),
+every one of these 33 allow-list entries would need a matching rewrite, or
+the agent would hit a manual permission prompt on every previously-silent
+invocation.
+
+--- Scheduler installers hardcoding the bash interpreter ---
+
+grep -n "bash" ~/.claude/scripts/setup-plans-autocommit.sh:
+1:#!/usr/bin/env bash
+57:        <string>/bin/bash</string>                                    (launchd plist, macOS)
+88:ExecStart=/bin/bash %h/.claude/scripts/plans-autocommit.sh            (systemd unit, Linux)
+111:        task_command="wsl.exe -d ${WSL_DISTRO_NAME} -u ${USER} bash -lc '${COMMIT_SCRIPT}'"  (WSL2/Task Scheduler)
+143:bash "${COMMIT_SCRIPT}"                                              (direct invocation fallback)
+
+grep -n "bash" ~/.claude/scripts/setup-config-self-heal.sh:
+1:#!/usr/bin/env bash
+61:        <string>/bin/bash</string>
+92:ExecStart=/bin/bash %h/.claude/scripts/config-self-heal.sh
+115:        task_command="wsl.exe -d ${WSL_DISTRO_NAME} -u ${USER} bash -lc '${SELF_HEAL_SCRIPT}'"
+129:bash "${SELF_HEAL_SCRIPT}"
+
+Both installer scripts hardcode /bin/bash (macOS launchd), /bin/bash (Linux
+systemd), and a literal "bash -lc" (WSL2 Task Scheduler) as the interpreter
+for the scheduled scripts they generate, across all three platforms (macOS,
+Linux, WSL2). A shell-migration would need to touch these two installer
+scripts as well as the target .sh files and the settings.json allow-list.
