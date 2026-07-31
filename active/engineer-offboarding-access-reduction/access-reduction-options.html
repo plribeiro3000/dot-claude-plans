@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Redução de acesso AWS — engenheiro em desligamento</title>
+  <meta name="description" content="Mapa do acesso atual, correção sobre onde está o risco real, e comparação das opções de redução discreta.">
+  <style>
+    :root {
+      --bg:#fafaf9; --surface:#fff; --surface-alt:#f5f5f4; --text:#1c1917;
+      --text-muted:#78716c; --border:#e7e5e4; --accent:#2563eb; --accent-light:#eff6ff;
+      --success:#16a34a; --success-bg:#dcfce7;
+      --danger:#dc2626;  --danger-bg:#fef2f2;
+      --warn:#b45309;    --warn-bg:#fffbeb;
+      --radius:8px; --shadow:0 1px 3px rgba(0,0,0,0.08); --shadow-hover:0 4px 12px rgba(0,0,0,0.12);
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg:#1c1917; --surface:#292524; --surface-alt:#1f1d1c; --text:#fafaf9;
+        --text-muted:#a8a29e; --border:#44403c; --accent-light:#1e3a5f;
+        --success-bg:#14532d; --danger-bg:#7f1d1d; --warn-bg:#451a03; --warn:#fbbf24;
+      }
+    }
+    :root[data-theme="dark"] {
+      --bg:#1c1917; --surface:#292524; --surface-alt:#1f1d1c; --text:#fafaf9;
+      --text-muted:#a8a29e; --border:#44403c; --accent-light:#1e3a5f;
+      --success-bg:#14532d; --danger-bg:#7f1d1d; --warn-bg:#451a03; --warn:#fbbf24;
+    }
+    :root[data-theme="light"] {
+      --bg:#fafaf9; --surface:#fff; --surface-alt:#f5f5f4; --text:#1c1917;
+      --text-muted:#78716c; --border:#e7e5e4; --accent-light:#eff6ff;
+      --success-bg:#dcfce7; --danger-bg:#fef2f2; --warn-bg:#fffbeb; --warn:#b45309;
+    }
+    @media (prefers-reduced-motion: reduce) { * { animation:none!important; transition:none!important; } }
+    *{box-sizing:border-box} html,body{margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;font-size:15px}
+    .container{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+    header.report-header{border-bottom:1px solid var(--border);padding-bottom:1.5rem;margin-bottom:2rem}
+    header.report-header h1{margin:0 0 .5rem;font-size:1.75rem;font-weight:600;letter-spacing:-.01em}
+    header.report-header .subtitle{color:var(--text-muted);margin:0}
+    header.report-header .meta{color:var(--text-muted);font-size:.85rem;margin-top:.75rem}
+    h2.section{font-size:1.2rem;font-weight:600;margin:2.5rem 0 .35rem;letter-spacing:-.01em}
+    h2.section + p.section-lead{color:var(--text-muted);margin:0 0 1rem;font-size:.93rem}
+    .finding{background:var(--surface);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;padding:1.1rem 1.35rem;margin-bottom:1rem;box-shadow:var(--shadow)}
+    .finding.critical{border-left-color:var(--danger)}
+    .finding.good{border-left-color:var(--success)}
+    .finding h3{margin:0 0 .4rem;font-size:1rem;font-weight:600;display:flex;gap:.5rem;align-items:baseline;flex-wrap:wrap}
+    .tag{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding:.15rem .5rem;border-radius:10px;flex-shrink:0}
+    .tag-critical{background:var(--danger-bg);color:var(--danger)}
+    .tag-info{background:var(--accent-light);color:var(--accent)}
+    .tag-good{background:var(--success-bg);color:var(--success)}
+    .finding p{margin:.4rem 0}
+    .finding ul{margin:.5rem 0;padding-left:1.2rem}
+    .finding li{margin:.25rem 0}
+    code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.87em;background:var(--surface-alt);padding:.1rem .35rem;border-radius:4px;border:1px solid var(--border)}
+    .src{display:block;margin-top:.6rem;font-size:.8rem;color:var(--text-muted);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow)}
+    table{border-collapse:collapse;width:100%;min-width:640px;font-size:.9rem}
+    th,td{text-align:left;padding:.6rem .85rem;border-bottom:1px solid var(--border);vertical-align:top}
+    th{background:var(--surface-alt);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.04em;color:var(--text-muted)}
+    tbody tr:last-child td{border-bottom:none}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:1.25rem}
+    .option-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;box-shadow:var(--shadow);transition:transform 150ms ease,box-shadow 150ms ease;display:flex;flex-direction:column}
+    .option-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hover)}
+    .option-card.recommended{border:2px solid var(--accent);position:relative}
+    .recommended-badge{position:absolute;top:-12px;right:1rem;background:var(--accent);color:#fff;padding:.2rem .65rem;border-radius:12px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .option-card.complement{border:2px dashed var(--success)}
+    .complement-badge{position:absolute;top:-12px;right:1rem;background:var(--success);color:#fff;padding:.2rem .65rem;border-radius:12px;font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+    .option-title{font-size:1.1rem;font-weight:600;margin:0 0 .25rem}
+    .option-tagline{color:var(--text-muted);font-size:.9rem;margin:0 0 1rem}
+    .pros-cons h4{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin:.75rem 0 .35rem;font-weight:600}
+    .pros-cons ul{list-style:none;padding:0;margin:0}
+    .pros-cons li{padding:.2rem 0;display:flex;gap:.45rem;align-items:flex-start;font-size:.9rem}
+    .marker{flex-shrink:0;width:1.1rem;height:1.1rem;border-radius:3px;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;margin-top:.25rem}
+    .marker-pro{background:var(--success-bg);color:var(--success)}
+    .marker-con{background:var(--danger-bg);color:var(--danger)}
+    .effort{margin-top:auto;padding-top:.75rem;border-top:1px dashed var(--border);font-size:.82rem;color:var(--text-muted);display:flex;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
+    .effort strong{color:var(--text)}
+    .recommendation{margin:2rem 0 0;padding:1.25rem 1.5rem;background:var(--accent-light);border-left:4px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0}
+    .recommendation h2{margin:0 0 .5rem;font-size:1.1rem;color:var(--accent)}
+    .recommendation p{margin:.5rem 0 0;font-size:.95rem}
+    .callout{margin:1.25rem 0;padding:1.1rem 1.35rem;background:var(--warn-bg);border-left:4px solid var(--warn);border-radius:0 var(--radius) var(--radius) 0}
+    .callout h3{margin:0 0 .4rem;font-size:1rem;color:var(--warn)}
+    .callout p{margin:.4rem 0;font-size:.93rem}
+    pre.code{overflow-x:auto;background:var(--surface-alt);border:1px solid var(--border);border-radius:var(--radius);padding:1rem 1.1rem;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.82rem;line-height:1.5;margin:.75rem 0}
+    footer.report-footer{margin-top:3rem;padding-top:1.25rem;border-top:1px solid var(--border);color:var(--text-muted);font-size:.83rem}
+    @media print{
+      body{background:#fff;color:#000} .container{max-width:none;padding:0}
+      .option-card,.finding{break-inside:avoid;box-shadow:none;border:1px solid #ccc}
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="report-header">
+      <h1>Redução de acesso AWS — engenheiro em desligamento</h1>
+      <p class="subtitle">Mapa do que ele realmente tem hoje, onde está o risco de verdade, e as opções de redução ordenadas por quanto barulho fazem.</p>
+      <p class="meta">Gerado 2026-07-31 12:48 · conta <code>405749097490</code> · fonte: <code>~/Projects/4Shark/terraform/identity/</code> + leituras read-only na AWS</p>
+    </header>
+
+    <h2 class="section">1. De onde vem o poder dele</h2>
+    <p class="section-lead">Tudo passa por um único caminho, o que é uma boa notícia: dá para mexer em um ponto só.</p>
+
+    <div class="finding good">
+      <h3><span class="tag tag-good">Estrutura</span> Um usuário IAM, um grupo, quatro policies</h3>
+      <p>O usuário <code>emerson.silva@4shark.com.br</code> entra no grupo <code>engineers</code> por derivação do <code>terraform.tfvars</code> — não existe nenhuma policy anexada diretamente ao usuário. Confirmado ao vivo: <code>aws iam list-attached-user-policies</code> devolveu <code>{"AttachedPolicies": []}</code>.</p>
+      <p>Isso importa para a decisão: <strong>anexar algo direto no usuário é um espaço vazio hoje</strong> — não colide com nada, e sai com um comando.</p>
+      <span class="src">identity/group_baseline.tf:6-11 · identity/engineers.tf:26-35 · identity/terraform.tfvars</span>
+    </div>
+
+    <div class="finding">
+      <h3><span class="tag tag-info">Camada MFA</span> É o que você descreveu — e é reversível por natureza</h3>
+      <p>Quatro policies, todas condicionadas a <code>"aws:MultiFactorAuthPresent" = "true"</code>. É aqui que mora o <em>terraform apply</em>:</p>
+      <ul>
+        <li><code>EngineerWriteAccess</code> — leitura e escrita de segredos (<code>secretsmanager:GetSecretValue</code>), <code>s3:DeleteObject</code>, <code>ssm:PutParameter</code>, <code>kms:Decrypt</code>, <code>rds:ModifyDBInstance</code>, regras de security group</li>
+        <li><code>EngineerTerraformNetwork</code> — <code>ec2:TerminateInstances</code>, <code>ec2:DeleteVpc</code>, apagar subnets, route tables, transit gateway, VPN</li>
+        <li><code>EngineerTerraformServices</code> — <code>rds:DeleteDBCluster</code>, <code>rds:DeleteDBInstance</code>, <code>ecs:DeleteCluster</code>, <code>ecs:DeleteService</code>, <code>s3:DeleteBucket</code>, <code>es:DeleteDomain</code>, <code>route53:DeleteHostedZone</code></li>
+        <li><code>EngineerTerraformIdentity</code> — <code>iam:CreateUser</code>, <code>iam:CreateAccessKey</code>, <code>iam:AttachUserPolicy</code>, <code>iam:DeleteUser</code>, mais SSO e Identity Store. É o vetor de porta-dos-fundos: criar um usuário admin que sobrevive ao desligamento.</li>
+      </ul>
+      <span class="src">policy_engineer_write.tf · policy_engineer_terraform_network.tf:117-118 · policy_engineer_terraform_services.tf:112,155,157 · policy_engineer_terraform_identity.tf:51,59,68</span>
+    </div>
+
+    <h2 class="section">2. A correção — o mais destrutivo não está atrás do MFA</h2>
+    <p class="section-lead">Esta é a parte que muda a conclusão do exercício.</p>
+
+    <div class="finding critical">
+      <h3><span class="tag tag-critical">Corrige a premissa</span> <code>ECSRemoteAccess</code> está no baseline, sem MFA</h3>
+      <p>A policy <code>ECSRemoteAccess</code> é anexada ao grupo <strong>sem nenhuma condição de MFA</strong>. Ela concede, com a chave de acesso simples que ele já tem no bolso:</p>
+      <ul>
+        <li><code>ecs:ExecuteCommand</code> em <code>task/*</code> e <code>cluster/*</code> — ou seja, <strong>console Rails em produção</strong>. Leitura, escrita e <em>delete</em> de toda a base de produção e dos dados de cliente. Nenhum segundo fator envolvido.</li>
+        <li><code>ecs:UpdateService</code> com <code>Resource = "*"</code> — escalar qualquer serviço produtivo para zero. Outage total, um comando, sem MFA.</li>
+        <li><code>ecs:RunTask</code> e <code>ecs:StopTask</code>.</li>
+      </ul>
+      <p><strong>Consequência:</strong> tirar a camada MFA reduz o poder de mexer em <em>infraestrutura</em>, mas não encosta na capacidade de derrubar a plataforma nem de levar embora os dados. Se o objetivo é dormir tranquilo, o MFA sozinho não resolve.</p>
+      <span class="src">policies_baseline.tf:96-142 (Sids ECSExecuteCommand, ECSRunStopTask, ECSScalingService)</span>
+    </div>
+
+    <h2 class="section">3. O que decide a discrição</h2>
+    <p class="section-lead">Duas leituras livres que ele tem — e duas que ele não tem — determinam qual opção passa despercebida.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Ele consegue ver…</th><th>Situação</th><th>Efeito na escolha</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Policies anexadas ao próprio usuário<br><code>iam:ListAttachedUserPolicies</code></td>
+            <td><strong>Não</strong> — só existe na <code>EngineerTerraformIdentity</code>, que exige MFA</td>
+            <td>Uma policy de <em>Deny</em> anexada ao usuário é invisível para ele</td>
+          </tr>
+          <tr>
+            <td>Os próprios dados de usuário<br><code>iam:GetUser</code></td>
+            <td><strong>Sim</strong> — self-service, sem MFA, escopado ao próprio ARN</td>
+            <td>Um <em>permissions boundary</em> aparece na saída desse comando. Descarta a opção C.</td>
+          </tr>
+          <tr>
+            <td>CloudTrail</td>
+            <td><strong>Não</strong> — nenhuma permissão de CloudTrail existe em nenhuma policy do stack</td>
+            <td>Alarme de detecção é 100% invisível para ele</td>
+          </tr>
+          <tr>
+            <td>Terraform da identidade</td>
+            <td><strong>Não</strong> — <code>guard.tf</code> impede plan e apply por qualquer caller que não seja a conta break-glass</td>
+            <td>Negar escrita de IAM não custa nada operacionalmente a ele</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout">
+      <h3>Ele está trabalhando agora</h3>
+      <p>A chave de acesso dele (criada em 2026-03-03) foi usada em <strong>2026-07-30 contra <code>ecs</code> em <code>us-east-1</code></strong> — ontem. Qualquer bloqueio amplo quebra o dia dele e ele percebe na hora. É exatamente o que você quer evitar, e é o que descarta as opções B e C.</p>
+    </div>
+
+    <h2 class="section">4. As outras plataformas já são inofensivas</h2>
+    <p class="section-lead">Verificado — não precisa mexer em nenhuma delas agora.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Plataforma</th><th>Papel dele</th><th>Poder destrutivo</th></tr></thead>
+        <tbody>
+          <tr><td>MongoDB Atlas</td><td><code>ORG_MEMBER</code> + time <code>engineers-baseline</code> com <code>GROUP_READ_ONLY</code></td><td>Nenhum — só leitura</td></tr>
+          <tr><td>Cloudflare</td><td><code>Administrator Read Only</code></td><td>Nenhum — só leitura</td></tr>
+          <tr><td>AWS SSO (console)</td><td>Permission set <code>EngineerAccess</code> → <code>ReadOnlyAccess</code></td><td>Nenhum — o poder vem do usuário IAM, não do SSO</td></tr>
+          <tr><td>GitHub</td><td><code>member</code> na org (não admin)</td><td>Baixo — não apaga repositório</td></tr>
+        </tbody>
+      </table>
+      </div>
+    <p class="section-lead" style="margin-top:.75rem">Fontes: <code>mongodb_teams.tf:76-78</code> · <code>terraform.tfvars</code> · <code>sso.tf:38-42</code> · <code>guard.tf</code></p>
+
+    <h2 class="section">5. Opções</h2>
+    <p class="section-lead">Ordenadas por relação entre redução de risco e quanto sinal emitem para ele.</p>
+
+    <div class="grid">
+      <article class="option-card recommended">
+        <span class="recommended-badge">Recomendada</span>
+        <h3 class="option-title">A — Deny cirúrgico no usuário</h3>
+        <p class="option-tagline">Policy de <code>Deny</code> anexada ao usuário IAM, listando só os verbos irreversíveis e a escrita de identidade. Deny explícito vence qualquer Allow do grupo.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>O dia a dia dele continua idêntico: deploy, scale, logs, <code>terraform plan</code>, SSM, leitura de segredos</li>
+            <li><span class="marker marker-pro">+</span>Invisível — ele não lista policies do próprio usuário sem MFA, e não lê CloudTrail</li>
+            <li><span class="marker marker-pro">+</span>Fecha a porta-dos-fundos de identidade (criar usuário/chave que sobreviva ao corte) a custo operacional zero, já que o stack de identidade é break-glass</li>
+            <li><span class="marker marker-pro">+</span>Sai com um comando na semana que vem</li>
+          </ul>
+          <h4>Contras</h4>
+          <ul>
+            <li><span class="marker marker-con">−</span>Se ele tentar apagar algo, toma <code>AccessDenied</code>. Atenuante: essas policies são escritas ação por ação, então negar um verbo específico é o cotidiano ali — lê como lacuna de policy, não como alarme</li>
+            <li><span class="marker marker-con">−</span>Recurso fora do Terraform até a reconvergência pós-corte</li>
+          </ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>P</strong></span><span>Sinal para ele: <strong>Baixo</strong></span><span>Reversível: <strong>1 comando</strong></span></div>
+      </article>
+
+      <article class="option-card complement">
+        <span class="complement-badge">Complemento</span>
+        <h3 class="option-title">E — Guardas no recurso + detecção</h3>
+        <p class="option-tagline"><code>deletion_protection</code> nos clusters RDS produtivos, proteção de terminação nas EC2 standalone, e um alarme CloudTrail sobre <code>ecs:ExecuteCommand</code> / <code>UpdateService</code> com <code>desiredCount=0</code>.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul>
+            <li><span class="marker marker-pro">+</span>Zero sinal — não toca na identidade dele em lugar nenhum</li>
+            <li><span class="marker marker-pro">+</span>É a única forma de cobrir o buraco do console Rails (seção 2) sem quebrar o trabalho dele</li>
+            <li><span class="marker marker-pro">+</span>O alarme é invisível: ele não tem leitura de CloudTrail</li>
+          </ul>
+          <h4>Contras</h4>
+          <ul>
+            <li><span class="marker marker-con">−</span>Detecção não é prevenção — avisa depois do fato</li>
+            <li><span class="marker marker-con">−</span>Não impede exfiltração de dados de cliente pelo console</li>
+          </ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>M</strong></span><span>Sinal para ele: <strong>Nenhum</strong></span><span>Reversível: <strong>Sim</strong></span></div>
+      </article>
+
+      <article class="option-card">
+        <h3 class="option-title">B — Deny de toda a camada MFA</h3>
+        <p class="option-tagline">Nega tudo que hoje é liberado por MFA, de uma vez.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul><li><span class="marker marker-pro">+</span>Reduz mais que a opção A</li></ul>
+          <h4>Contras</h4>
+          <ul>
+            <li><span class="marker marker-con">−</span>Quebra <code>terraform apply</code> e leitura de segredos no primeiro dia — ele bate no muro e sabe que é sobre ele</li>
+            <li><span class="marker marker-con">−</span>Ainda não cobre o console Rails nem o <code>UpdateService</code></li>
+          </ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>P</strong></span><span>Sinal para ele: <strong>Alto</strong></span><span>Reversível: <strong>1 comando</strong></span></div>
+      </article>
+
+      <article class="option-card">
+        <h3 class="option-title">C — Permissions boundary read-only</h3>
+        <p class="option-tagline">Um teto de permissão no usuário; o efetivo vira a interseção.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul><li><span class="marker marker-pro">+</span>Uma única chamada de API</li></ul>
+          <h4>Contras</h4>
+          <ul>
+            <li><span class="marker marker-con">−</span><strong>Visível</strong> — aparece em <code>aws iam get-user</code>, que ele tem no baseline</li>
+            <li><span class="marker marker-con">−</span>Mata todo write de uma vez, mesmo efeito da B no dia a dia</li>
+          </ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>P</strong></span><span>Sinal para ele: <strong>Alto</strong></span><span>Reversível: <strong>1 comando</strong></span></div>
+      </article>
+
+      <article class="option-card">
+        <h3 class="option-title">D — Desativar o dispositivo MFA</h3>
+        <p class="option-tagline">Sem MFA, as quatro policies elevadas param de valer sozinhas.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul><li><span class="marker marker-pro">+</span>Não cria nenhum recurso novo</li></ul>
+          <h4>Contras</h4>
+          <ul>
+            <li><span class="marker marker-con">−</span><strong>Ele desfaz sozinho</strong> — o baseline dá <code>iam:CreateVirtualMFADevice</code> e <code>iam:EnableMFADevice</code> sem condição nenhuma</li>
+            <li><span class="marker marker-con">−</span>Percebe na primeira ação elevada</li>
+          </ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>P</strong></span><span>Sinal para ele: <strong>Alto</strong></span><span>Durável: <strong>Não</strong></span></div>
+      </article>
+
+      <article class="option-card">
+        <h3 class="option-title">F — Remover do grupo / do tfvars</h3>
+        <p class="option-tagline">O desligamento de fato.</p>
+        <div class="pros-cons">
+          <h4>Prós</h4>
+          <ul><li><span class="marker marker-pro">+</span>Revoga tudo, inclusive o console Rails</li></ul>
+          <h4>Contras</h4>
+          <ul><li><span class="marker marker-con">−</span>Perde até a leitura. É a ação da semana que vem, não a de hoje</li></ul>
+        </div>
+        <div class="effort"><span>Esforço: <strong>P</strong></span><span>Sinal para ele: <strong>Total</strong></span><span>Momento: <strong>No corte</strong></span></div>
+      </article>
+    </div>
+
+    <div class="recommendation">
+      <h2>Recomendação</h2>
+      <p><strong>A + E.</strong> A opção A tira o que é irreversível e a porta-dos-fundos de identidade sem mudar nada do dia a dia dele; a E cobre — por detecção e por trava no próprio recurso — o buraco do <code>ecs:ExecuteCommand</code> que a A não alcança sem fazer barulho.</p>
+      <p>O que fica em aberto de propósito: o console Rails em produção continua acessível a ele até o corte. Fechar isso é visível por construção, porque é a ferramenta que ele usa todo dia. A escolha entre "aceitar e monitorar" e "fechar e ele perceber" é sua — e é a única decisão de verdade aqui.</p>
+    </div>
+
+    <h2 class="section">6. Documento de policy da opção A</h2>
+    <p class="section-lead">Escopo: verbos irreversíveis por serviço, mais toda escrita de identidade fora do próprio usuário dele (o <code>NotResource</code> preserva o self-service de senha, chave e MFA, para que nada quebre do lado dele).</p>
+    <pre class="code">{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyIrreversibleInfrastructure",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:TerminateInstances",
+        "ec2:DeleteVpc", "ec2:DeleteSubnet", "ec2:DeleteRouteTable",
+        "ec2:DeleteInternetGateway", "ec2:DeleteNatGateway", "ec2:DeleteSecurityGroup",
+        "ec2:DeleteVpcEndpoint", "ec2:DeleteVpcPeeringConnection", "ec2:DeleteFlowLogs",
+        "ec2:DeleteTransitGateway", "ec2:DeleteTransitGatewayRouteTable",
+        "ec2:DeleteTransitGatewayVpcAttachment", "ec2:DeleteVpnConnection",
+        "ec2:DeleteVpnGateway", "ec2:DeleteKeyPair", "ec2:DeleteLaunchTemplate",
+        "rds:DeleteDBCluster", "rds:DeleteDBInstance", "rds:DeleteDBSubnetGroup",
+        "rds:DeleteDBClusterParameterGroup", "rds:DeleteDBParameterGroup",
+        "ecs:DeleteCluster", "ecs:DeleteService", "ecs:DeleteCapacityProvider",
+        "elasticloadbalancing:DeleteLoadBalancer", "elasticloadbalancing:DeleteListener",
+        "elasticloadbalancing:DeleteTargetGroup",
+        "elasticache:DeleteCacheCluster", "elasticache:DeleteCacheSubnetGroup",
+        "es:DeleteDomain",
+        "lambda:DeleteFunction", "lambda:DeleteLayerVersion",
+        "logs:DeleteLogGroup",
+        "route53:DeleteHostedZone",
+        "s3:DeleteBucket", "s3:DeleteBucketPolicy", "s3:DeleteObjectVersion",
+        "s3:PutBucketPolicy", "s3:PutBucketAcl", "s3:PutBucketPublicAccessBlock",
+        "ecr:DeleteRepository",
+        "secretsmanager:DeleteSecret",
+        "kms:PutKeyPolicy",
+        "servicediscovery:DeleteNamespace",
+        "sns:DeleteTopic",
+        "codedeploy:DeleteApplication", "codedeploy:DeleteDeploymentGroup",
+        "autoscaling:DeleteAutoScalingGroup", "autoscaling:DeleteLaunchConfiguration",
+        "scheduler:DeleteSchedule", "scheduler:DeleteScheduleGroup",
+        "events:DeleteRule"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyIdentityWriteOutsideOwnUser",
+      "Effect": "Deny",
+      "Action": [
+        "iam:Create*", "iam:Delete*", "iam:Attach*", "iam:Detach*",
+        "iam:Put*", "iam:Update*", "iam:Tag*", "iam:Untag*",
+        "iam:AddUserToGroup", "iam:RemoveUserFromGroup", "iam:SetDefaultPolicyVersion",
+        "sso:*",
+        "identitystore:Create*", "identitystore:Delete*", "identitystore:Update*"
+      ],
+      "NotResource": [
+        "arn:aws:iam::405749097490:user/emerson.silva@4shark.com.br",
+        "arn:aws:iam::405749097490:mfa/emerson.silva@4shark.com.br"
+      ]
+    }
+  ]
+}</pre>
+    <p class="section-lead"><code>iam:PassRole</code> fica de fora da negação de propósito — o baseline precisa dele para <code>ecs:RunTask</code>, e negá-lo quebraria o trabalho dele visivelmente.</p>
+
+    <h2 class="section">7. Sub-decisão em aberto: os dois verbos de ECS</h2>
+    <p class="section-lead">Não incluí nenhum dos dois na policy acima porque cada um tem um custo de visibilidade diferente. Escolha caso a caso.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Ação</th><th>Se negar</th><th>Custo de visibilidade</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>ecs:UpdateService</code> escopado só aos clusters produtivos (<code>atento-001-cluster</code>, <code>shared-001-cluster</code> e os dois <code>connection-pooler</code>)</td>
+            <td>Ele continua escalando beta e demo normalmente; não consegue zerar produção</td>
+            <td><strong>Baixo</strong> — escalar produção à mão é raro, e ele já tem que pedir gate de fila para deploy produtivo</td>
+          </tr>
+          <tr>
+            <td><code>ecs:ExecuteCommand</code></td>
+            <td>Fecha o console Rails em produção — o maior vetor, tanto de destruição quanto de vazamento de dados de cliente</td>
+            <td><strong>Alto</strong> — é a ferramenta de trabalho diária dele. Quebra na primeira tentativa e é inconfundível</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <footer class="report-footer">
+      Levantamento feito só com leitura: arquivos do stack <code>identity/</code> e chamadas read-only na AWS (<code>iam list-attached-user-policies</code>, <code>iam list-access-keys</code>, <code>iam get-access-key-last-used</code>, <code>sts get-caller-identity</code>, <code>ecs list-clusters</code>). Nada foi alterado.
+    </footer>
+  </div>
+</body>
+</html>
