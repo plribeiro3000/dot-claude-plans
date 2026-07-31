@@ -67,6 +67,37 @@ Success = payment `integrated`, the execution `PayrollRequest` `success`, and th
 
 **FPW auth-failure decision (2026-07-24, settled): leave FPW as-is.** FPW is a distributed Producer/Consumer flow, so a per-record failure is the correct behavior there — some records failing while others succeed is expected. A live probe confirmed the LG/FPW SOAP API authenticates inline per call and returns HTTP 500 + a `Senha inválida` Fault on a bad credential, which the existing consumer `else` branch already marks as `integration_status: :failure`. The systemic halt (this Maqnelson pattern) is NOT ported to FPW — the zonal all-or-nothing shape that justifies it does not apply to a distributed flow.
 
+### Manual dry-run — when the customer never sends an ID, pick the latest existing payment ourselves
+
+The customer did not send a payment ID and stopped responding (WhatsApp + a group, no reply). Decision (engineer, 2026-07-30): pick an existing payment from the Maqnelson company ourselves and integrate it **manually, step by step in the outbound console**, watching each step's result before committing — because the push writes a real payroll value to the customer's Nexus. Minimize the footprint by sending a **single `user_payment`** first, so the customer has one clean record to validate ("subiu o valor?") and then delete. Only after that succeeds do we do the full load. The handshake is: run the manual push → ask them to confirm the value went up → on confirmation, ask them to delete the test record → then run the full integration.
+
+The manual walkthrough is **zero-side-effect on our side, by hard requirement (engineer, 2026-07-30): the engineer will not write an undo script.** It reproduces the `Processor` flow as plain console reads + HTTP calls but persists NOTHING locally — it does NOT call `start_integration!` / `update_all` / `finish_integration!` (no state flip) AND does NOT create the `PayrollRequest` / `PayrollAuthenticationRequest` audit rows the `Processor` normally saves. Every observation is a `puts` to the terminal. The **only persisted effect anywhere is the single POST to the customer's Nexus** (the one record they validate and delete). This is the whole reason for not using `.new.perform(payment_id)`: `perform` flips our state and writes the audit rows inline, which would then need cleanup. If a step raises, the console prints the backtrace and there is still nothing to undo.
+
+**Discovery — find the company and the latest candidate payment (read-only):**
+
+```ruby
+company = Company.find(97)                                         # Maqnelson company_id (engineer, 2026-07-30)
+company.payroll_integration.class.name                            # confirm "MaqnelsonIntegration"
+company.payments.order(id: :desc).limit(10).pluck(:id, :status)   # pick the latest with sendable user_payments
+```
+
+**Build the payload without mutating anything (unrolled from `Processor#perform`):**
+
+```ruby
+payment = Payment.find(<ID_ESCOLHIDO>)
+payroll_integration = company.payroll_integration
+user_payments = payment.user_payments.with_integration_status(:pending, :failure).where.not(billable_money: 0).order(:id).limit(1)   # ONE record first
+pagamentos = user_payments.map { |up| { usuario_id_externo: up.user.primary_identifier_value, tipo_pagamento_id_externo: up.payment_type.external_id, premio_valor: up.billable_money.to_s } }
+body = { mes_competencia: payment.reference_month.month.to_s, ano_competencia: payment.reference_month.year.to_s, pagamentos: pagamentos }
+pp body
+```
+
+**Authenticate (external call, read-only on their side) and push (the real write):** unrolled from `Processor#perform` lines 42-108 — same auth path, token at `data.tokenAcesso`, `Bearer` push to `payroll_integration.path`. Inspect `response.code` / `response.body`. Do NOT flip DB state until the customer confirms the value landed; then either leave our side as-is for the full load or set the touched `user_payments` to `:success` by hand.
+
+**Result — manual single-record push SUCCEEDED (2026-07-30).** Auth returned HTTP 200; the push returned HTTP 201 with `{"sucesso":true,"mensagem":"Lote processado com sucesso.","total_pagamentos":1,"mes_competencia":6,"ano_competencia":2026}` for one commission record (competência 6/2026). Nothing was persisted on our side (no state flip, no `PayrollRequest`/`PayrollAuthenticationRequest` rows). The full outbound path — networking, auth, payload, push — is proven end to end against the real customer Nexus. **Open handshake:** ask the customer to confirm the value landed on their side, then ask them to delete the test record, then run the full load.
+
+**Next phase (after the single push is validated): full load.** Send every pending `user_payment` of the payment (drop the `.limit(1)`), or run the synchronous `.new.perform(payment_id)`. The "UserCommission / Commissioning" the engineer mentioned is the source-of-value question for that full load — to be pinned down when we get there, not now.
+
 **Follow-up (engineer, 2026-07-24):** revisit the atento-br outbound after this — it likely peers its VPC broadly to `app-atento-001` for the database and may grant wider production-DB access than intended; apply the same scoping.
 
 ---

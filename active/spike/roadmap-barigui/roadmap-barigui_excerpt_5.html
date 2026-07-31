@@ -1,0 +1,447 @@
+<!-- Auxiliary file for SPIKE.md — full verbatim copy for reference. -->
+<!-- Source: ~/Projects/4Shark/app-webclient/src/app/plan-statement/plan-statement-show/plan-statement-show.component.html -->
+<!-- Repo commit at capture time: f1920fb6bed46c477028113d90df1994ad48f278 -->
+<!-- Relevant to demand 4 (collapse/expand + signature lock) and demand 7 (formula visibility). -->
+<!-- Five incentive sections (deal, indicator, ranking, limiter, redemption) all share the
+     same "description + always-visible formula value" rendering — five of the ~11 total
+     occurrences of the pattern flagged for demand 7. -->
+
+<section>
+  <h1 class="title">{{ 'plan_statement.one' | translate }}</h1>
+  <div class="breadcrumbs">
+    <span class="breadcrumb" routerLink="/planStatements">{{ 'plan_statement.one' | translate }}</span>
+    <span class="material-symbols-outlined">chevron_right</span>
+    <span>{{ 'breadcrumb.show' | translate }}</span>
+  </div>
+  <div class="buttons-container">
+    <button class="menu-button" [routerLink]="['/planStatements/']">
+      <span class="material-symbols-outlined">arrow_back</span>
+      <span>{{ 'actions.back' | translate }}</span>
+    </button>
+  </div>
+  <div class="loading d-flex-column d-flex-ju-center" *ngIf="loading; else planStatementShowTemplate">
+    <div class="loading-spinner"></div>
+    <div class="loading-text mg-t-15 d-flex-al-baseline">
+      <span>{{ 'info.loading' | translate }}</span>
+      <span class="dot-elastic"></span>
+    </div>
+  </div>
+  <ng-template #planStatementShowTemplate>
+    <h2 class="object-show-title">{{ planStatement?.plan.name }}</h2>
+    <span class="show-title-date">
+      {{ 'plan_statement.created_at' | translate }}:
+      {{ planStatement?.createdAt | date: 'shortDate' : '' : translateService.currentLang }}</span
+    >
+    <div class="new-box-show">
+      <div class="show-data">
+        <div class="infos">
+          <span class="info-type">{{ 'user.one' | translate }}:</span>
+          <span class="info-value-user">{{ planStatement?.user?.name }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'user.email' | translate }}:</span>
+          <span class="info-value">{{ planStatement?.user?.email }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'calendar.reference' | translate }}:</span>
+          <span class="info-value">{{ planStatement?.plan?.calendar?.reference }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'calendar.frequency.one' | translate }}:</span>
+          <span class="info-value">{{
+            'calendar.frequency.options.' + planStatement?.plan?.calendar?.frequency | translate
+          }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'calendar.startsAt' | translate }}:</span>
+          <span class="info-value">{{
+            planStatement?.plan?.calendar?.startsAt | date: 'shortDate' : '' : translateService.currentLang
+          }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'calendar.endsAt' | translate }}:</span>
+          <span class="info-value">{{
+            planStatement?.plan?.calendar?.endsAt | date: 'shortDate' : '' : translateService.currentLang
+          }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'goal.one' | translate }}:</span>
+          <span class="info-value">{{ planStatement?.plan?.goal }}</span>
+        </div>
+        <div class="infos" *ngIf="planStatement?.user?.department">
+          <span class="info-type">{{ 'user.department' | translate }}:</span>
+          <span class="info-value">{{ planStatement?.user?.department }}</span>
+        </div>
+        <div class="infos">
+          <span class="info-type">{{ 'plan_statement.status.one' | translate }}:</span>
+          <span class="info-value">
+            <ng-container *ngIf="planStatement?.status === 'accepted'; else pendingTemplate">
+              <span class="badge bg-success"
+                >{{ 'acceptment.accepted_at' | translate }}
+                {{ planStatement?.acceptment?.createdAt | date: 'shortDate' : '' : translateService.currentLang }}</span
+              >
+            </ng-container>
+            <ng-template #pendingTemplate>
+              <span class="badge bg-{{ planStatement?.status === 'canceled' ? 'danger' : 'warning' }}">{{
+                'plan_statement.status.options.' + planStatement?.status | translate
+              }}</span>
+            </ng-template>
+            <ng-container *ngIf="planStatement?.plan?.disabledAt">
+              <span class="badge bg-danger" translate>plan.page.disabled_plan</span>
+            </ng-container>
+          </span>
+        </div>
+        <div class="infos" *ngIf="planStatement?.userFieldSnapshots?.length > 0">
+          <div *ngFor="let userField of planStatement?.userFieldSnapshots">
+            <span class="info-type">{{ userField.key }}:</span>
+            <span class="info-value">{{ userField.value }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="list" *ngIf="goalPlans.length > 0">
+      <h4 class="middle-title">{{ 'goal.other' | translate }}</h4>
+      <div class="list-header">
+        <span class="column-xl">{{ 'variable.one' | translate }}</span>
+        <span class="column-l">{{ 'goal.type.one' | translate }}</span>
+        <span class="column-l">{{ 'goal.one' | translate }}</span>
+        <span class="column-l">{{ 'goal.starts_at' | translate }}</span>
+        <span class="column-l">{{ 'goal.ends_at' | translate }}</span>
+      </div>
+      <div *ngFor="let goalPlan of goalPlans" class="list-item">
+        <span class="column-xl bold">{{ goalPlan.goal?.variable.name }}</span>
+        <span class="column-l">{{ 'goal.type.options.' + goalPlan.goal?.type | translate }}</span>
+        <span class="column-l">{{ goalPlan.value }}</span>
+        <span class="column-l">{{
+          goalPlan.goal?.startsAt | date: 'shortDate' : '' : translateService.currentLang
+        }}</span>
+        <span class="column-l">{{
+          goalPlan.goal?.endsAt | date: 'shortDate' : '' : translateService.currentLang
+        }}</span>
+      </div>
+    </div>
+    <!-- Deal incentive — collapse toggled on click; expanded state driven purely by
+         .expanded, which the ngOnInit auto-expand-all sets whenever action includes 'accept'. -->
+    <ng-container *ngIf="dealIncentives">
+      <h4 class="middle-title">{{ 'deal_incentive.other' | translate }}</h4>
+      <div *ngFor="let dealIncentive of dealIncentives">
+        <div class="show-panel" (click)="dealIncentive.expanded = !dealIncentive.expanded">
+          <div class="show-panel-header blue font-20">
+            {{ dealIncentive.name }}
+            <small class="font-14">{{ 'incentives.reference' | translate }}: {{ dealIncentive.reference }}</small>
+          </div>
+          <div class="show-panel-body" *ngIf="dealIncentive.expanded">
+            <hr />
+            <div class="show-panel-item" *ngIf="dealIncentive.product">
+              <small>{{ 'product.one' | translate }}</small>
+              <div>
+                <span>{{ dealIncentive.product?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="dealIncentive.client">
+              <small>{{ 'client.one' | translate }}</small>
+              <div>
+                <span>{{ dealIncentive.client?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.formula_rule.other' | translate }}</small>
+              <div *ngFor="let rule of dealIncentive?.rules">
+                <div *ngIf="rule.description; else noRuleDescription">
+                  <div class="show-panel-item-arrow">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    <div>
+                      <span class="show-item-description">{{ rule.description }}</span>
+                      <br />
+                      <span class="show-item-value bold">{{ 'plan_statement.page.formula' | translate }}:</span>
+                      <span class="show-item-value">{{ rule.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noRuleDescription>
+                  <span>{{ rule.value }}</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-container *ngIf="indicatorIncentives">
+      <h4 class="middle-title">{{ 'indicator_incentive.other' | translate }}</h4>
+      <div *ngFor="let indicatorIncentive of indicatorIncentives">
+        <div class="show-panel" (click)="indicatorIncentive.expanded = !indicatorIncentive.expanded">
+          <div class="show-panel-header blue font-20">
+            {{ indicatorIncentive.name }}
+            <small class="font-14">{{ 'incentives.reference' | translate }}: {{ indicatorIncentive.reference }}</small>
+          </div>
+          <div class="show-panel-body" *ngIf="indicatorIncentive.expanded">
+            <hr />
+            <div class="show-panel-item" *ngIf="indicatorIncentive.product">
+              <small>{{ 'product.one' | translate }}</small>
+              <div>
+                <span>{{ indicatorIncentive.product?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="indicatorIncentive.client">
+              <small>{{ 'client.one' | translate }}</small>
+              <div>
+                <span>{{ indicatorIncentive.client?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.formula_rule.other' | translate }}</small>
+              <div *ngFor="let rule of indicatorIncentive?.rules">
+                <div *ngIf="rule.description; else noIndicatorRuleDescription">
+                  <div class="show-panel-item-arrow">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    <div>
+                      <span class="show-item-description">{{ rule.description }}</span>
+                      <br />
+                      <span class="show-item-value bold">{{ 'plan_statement.page.formula' | translate }}:</span>
+                      <span class="show-item-value">{{ rule.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noIndicatorRuleDescription>
+                  <span>{{ rule.value }}</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-container *ngIf="rankifierIncentives">
+      <h4 class="middle-title">{{ 'ranking_incentive.other' | translate }}</h4>
+      <div *ngFor="let rankingIncentive of rankifierIncentives">
+        <div class="show-panel" (click)="rankingIncentive.expanded = !rankingIncentive.expanded">
+          <div class="show-panel-header blue font-20">
+            {{ rankingIncentive.name }}
+            <small class="font-14">{{ 'incentives.reference' | translate }}: {{ rankingIncentive.reference }}</small>
+          </div>
+          <div class="show-panel-body" *ngIf="rankingIncentive.expanded">
+            <hr />
+            <div class="middle-title-sub">
+              <small>{{ 'rankifier.one' | translate }}</small>
+              <h4 class="middle-title">{{ rankingIncentive.rankifier.name }}</h4>
+            </div>
+            <div class="list" *ngIf="rankingIncentive?.rankifier?.rankifierVariables.length > 0">
+              <div class="list-header">
+                <span class="column-xl">{{ 'variable.one' | translate }}</span>
+                <span class="column-l">{{ 'rankifier_variable.comparator' | translate }}</span>
+                <span class="column-l" *ngIf="displayMinimum(rankingIncentive)">{{
+                  'ranking.minimum' | translate
+                }}</span>
+                <span class="column-l">{{ 'goal.one' | translate }}</span>
+                <span class="column-l" *ngIf="displayCap(rankingIncentive)">{{ 'ranking.cap' | translate }}</span>
+                <span class="column-l">{{ 'ranking.weight' | translate }}</span>
+              </div>
+              <div *ngFor="let variable of rankingIncentive.rankifier.rankifierVariables" class="list-item">
+                <span class="column-xl bold">{{ variable.variable.name }}</span>
+                <span class="column-l">{{ variable.comparator }}</span>
+                <span class="column-l" *ngIf="displayMinimum(rankingIncentive)">
+                  {{ variable.minimum }}
+                </span>
+                <span class="column-l">{{ variable.goal }}</span>
+                <span class="column-l" *ngIf="displayCap(rankingIncentive)">
+                  {{ variable.cap | number: '0.2-2' }}%
+                </span>
+                <ng-template #noCapTemplate>
+                  <span class="column-l" hidden></span>
+                </ng-template>
+                <span class="column-l">
+                  {{
+                    variable.type == 'GoalReachRankifier' ? (variable.weight | number: '0.1-2') + '%' : variable.weight
+                  }}
+                </span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="rankingIncentive.product">
+              <small>{{ 'product.one' | translate }}</small>
+              <div>
+                <span>{{ rankingIncentive.product?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="rankingIncentive.client">
+              <small>{{ 'client.one' | translate }}</small>
+              <div>
+                <span>{{ rankingIncentive.client?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.formula_rule.other' | translate }}</small>
+              <div *ngFor="let rule of rankingIncentive?.rules">
+                <div *ngIf="rule.description; else noRankingRuleDescription">
+                  <div class="show-panel-item-arrow">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    <div>
+                      <span class="show-item-description">{{ rule.description }}</span>
+                      <br />
+                      <span class="show-item-value bold">{{ 'plan_statement.page.formula' | translate }}:</span>
+                      <span class="show-item-value">{{ rule.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noRankingRuleDescription>
+                  <span>{{ rule.value }}</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-container *ngIf="limiterIncentives">
+      <h4 class="middle-title">{{ 'limiter_incentive.other' | translate }}</h4>
+      <div *ngFor="let limiterIncentive of limiterIncentives">
+        <div class="show-panel" (click)="limiterIncentive.expanded = !limiterIncentive.expanded">
+          <div class="show-panel-header blue font-20">
+            {{ limiterIncentive.name }}
+            <small class="font-14">{{ 'incentives.reference' | translate }}: {{ limiterIncentive.reference }}</small>
+          </div>
+          <div class="show-panel-body" *ngIf="limiterIncentive.expanded">
+            <hr />
+            <div class="show-panel-item" *ngIf="limiterIncentive.product">
+              <small>{{ 'product.one' | translate }}</small>
+              <div>
+                <span>{{ limiterIncentive.product?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="limiterIncentive.client">
+              <small>{{ 'client.one' | translate }}</small>
+              <div>
+                <span>{{ limiterIncentive.client?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.formula_rule.other' | translate }}</small>
+              <div *ngFor="let rule of limiterIncentive?.rules">
+                <div *ngIf="rule.description; else noLimiterRuleDescription">
+                  <div class="show-panel-item-arrow">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    <div>
+                      <span class="show-item-description">{{ rule.description }}</span>
+                      <br />
+                      <span class="show-item-value bold">{{ 'plan_statement.page.formula' | translate }}:</span>
+                      <span class="show-item-value">{{ rule.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noLimiterRuleDescription>
+                  <span>{{ rule.value }}</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <ng-container *ngIf="redemptionIncentives">
+      <h4 class="middle-title">{{ 'redemption_incentive.other' | translate }}</h4>
+      <div *ngFor="let redemptionIncentive of redemptionIncentives">
+        <div class="show-panel" (click)="redemptionIncentive.expanded = !redemptionIncentive.expanded">
+          <div class="show-panel-header blue font-20">
+            {{ redemptionIncentive.name }}
+            <small class="font-14">{{ 'incentives.reference' | translate }}: {{ redemptionIncentive.reference }}</small>
+          </div>
+          <div class="show-panel-body" *ngIf="redemptionIncentive.expanded">
+            <hr />
+            <div class="show-panel-item" *ngIf="redemptionIncentive.product">
+              <small>{{ 'product.one' | translate }}</small>
+              <div>
+                <span>{{ redemptionIncentive.product?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item" *ngIf="redemptionIncentive.client">
+              <small>{{ 'client.one' | translate }}</small>
+              <div>
+                <span>{{ redemptionIncentive.client?.name }}</span>
+              </div>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.formula_rule.other' | translate }}</small>
+              <div *ngFor="let rule of redemptionIncentive?.rules">
+                <div *ngIf="rule.description; else noRedemptionRuleDescription">
+                  <div class="show-panel-item-arrow">
+                    <span class="material-symbols-outlined">arrow_forward</span>
+                    <div>
+                      <span class="show-item-description">{{ rule.description }}</span>
+                      <br />
+                      <span class="show-item-value bold">{{ 'plan_statement.page.formula' | translate }}:</span>
+                      <span class="show-item-value">{{ rule.value }}</span>
+                    </div>
+                  </div>
+                </div>
+                <ng-template #noRedemptionRuleDescription>
+                  <span>{{ rule.value }}</span>
+                </ng-template>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <br />
+    <div class="d-flex-ju-end mg-t-30 mg-b-30" *ngIf="planStatement?.acceptment">
+      <div class="description">
+        <div *ngIf="signature" class="signature">
+          <span class="signed-by">{{ 'acceptment.signed_by' | translate }}</span>
+          <img [src]="signature?.url" alt="signature" />
+        </div>
+        <div class="forced-acceptance mg-t-15" *ngIf="forcedAcceptance()">
+          <span class="badge bg-warning">{{ 'acceptment.forced.badge' | translate }}</span>
+          <div class="mg-t-15">
+            <span>{{ 'acceptment.accepted_by' | translate }}: </span>
+            <b>{{ planStatement?.acceptment?.user?.name }}</b>
+          </div>
+          <div>
+            <span>{{ 'acceptment.forced.on_behalf_of' | translate }}: </span>
+            <b>{{ planStatement?.user?.name }}</b>
+          </div>
+        </div>
+        <div class="mg-t-15" *ngIf="!forcedAcceptance()">
+          <b>{{ planStatement?.acceptment?.user?.name }}</b>
+        </div>
+        <span>{{ 'user.id' | translate }} {{ planStatement?.acceptment?.user?.id }}</span>
+        <span class="ip">IP: {{ planStatement?.acceptment?.from }}</span>
+        <div class="font-size-small">
+          {{ planStatement?.acceptment?.createdAt | date: 'full' : '' : translateService.currentLang }}
+        </div>
+        <div class="font-size-small" *ngIf="planStatement?.acceptment?.acceptmentReason">
+          {{ 'acceptment_reason.one' | translate }}:
+          <b>{{ planStatement?.acceptment?.acceptmentReason?.name }}</b>
+          — {{ planStatement?.acceptment?.acceptmentReason?.description }}
+        </div>
+      </div>
+    </div>
+    <br />
+    <!-- The signature lock — Accept is disabled unless readyToSign() (== allExpanded()). -->
+    <div class="buttons-container">
+      <div *ngIf="planStatement?.plan.policyDocument">
+        <small>{{ 'plan.policyDocument' | translate }}</small>
+        <a [href]="planStatement.plan?.policyDocument" target="_blank">
+          {{ 'plan.click_here' | translate }}
+        </a>
+      </div>
+      <span
+        class="accept-button-wrapper"
+        *ngIf="planStatement?.actions?.includes('accept')"
+        [title]="readyToSign() ? '' : ('plan_statement.page.expand_to_accept' | translate)"
+      >
+        <button class="menu-button" (click)="openSignatureDialog()" [disabled]="!readyToSign()">
+          <span class="material-symbols-outlined">signature</span>
+          <span>{{ 'actions.resource.accept' | translate }}</span>
+        </button>
+      </span>
+      <button class="menu-button" (click)="togglePanels()">
+        <span class="material-symbols-outlined">{{ allExpanded() ? 'unfold_less' : 'unfold_more' }}</span>
+        <span>{{ (allExpanded() ? 'actions.collapse_all' : 'actions.expand_all') | translate }}</span>
+      </button>
+      <button class="menu-button" (click)="print()">
+        <span class="material-symbols-outlined">print</span>
+        <span>{{ 'actions.print' | translate }}</span>
+      </button>
+    </div>
+  </ng-template>
+</section>

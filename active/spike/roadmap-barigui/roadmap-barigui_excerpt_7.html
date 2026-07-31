@@ -1,0 +1,241 @@
+<!-- Auxiliary file for SPIKE.md — partial verbatim excerpt for reference (lines 160-500 of the source). -->
+<!-- Source: ~/Projects/4Shark/app-webclient/src/app/statement/statement-show/statement-show.component.html -->
+<!-- Repo commit at capture time: f1920fb6bed46c477028113d90df1994ad48f278 -->
+<!-- Relevant to demand 7 (formula visibility) — five more occurrences (deal, indicator,
+     ranking, rankifier, limiter, redemption) of the same "always-visible formula" pattern
+     already found five times in plan-statement-show (roadmap-barigui_excerpt_5.html) and
+     once in dashboard-plan (roadmap-barigui_excerpt_2.html). Note the different fallback
+     shape here — the header title ITSELF falls back to rule.value when rule.description
+     is blank (lines 270-274, 382-386, 428-432, 475-479), one more shape to cover. -->
+
+    <ng-container *ngIf="dealCommissionings">
+      <h4 class="middle-title">{{ 'deal.other' | translate }}</h4>
+      <div *ngFor="let dealCommissioning of dealCommissionings">
+        <div class="show-panel" (click)="dealCommissioning.expanded = !dealCommissioning.expanded">
+          <div class="show-panel-header">
+            <span class="show-panel-header-tittle">{{ dealCommissioning.deal?.externalId }}</span>
+            <span class="show-panel-header-item">{{ 'deal.variable_remuneration_achieved' | translate }}</span>
+          </div>
+          <div class="show-panel-header">
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">ID:</span>
+              <span class="show-panel-header-info">{{ dealCommissioning.deal?.id }}</span>
+            </div>
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">{{ 'deal.date' | translate }}:</span>
+              <span class="show-panel-header-info">{{
+                dealCommissioning.deal?.date | date: 'shortDate' : '' : translateService.currentLang
+              }}</span>
+            </div>
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">{{ 'deal.value' | translate }}:</span>
+              <span class="show-panel-header-info bold"
+                >{{
+                  dealCommissioning.deal?.value
+                    | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                }}
+              </span>
+            </div>
+            <div class="show-panel-header-values">
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{ dealCommissioning.points }}</span>
+                <span class="show-panel-header-info bold">{{ 'incentives.views.points' | translate }}</span>
+              </div>
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{
+                  dealCommissioning.money
+                    | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="show-panel-body" *ngIf="isExpanded(dealCommissioning)">
+            <hr />
+            <div class="show-panel-item">
+              <small>{{ 'plan.description' | translate }}:</small>
+              <br />
+              <span class="show-item-description">{{
+                dealCommissioning.deal.description ? dealCommissioning.deal.description : '---'
+              }}</span>
+            </div>
+            <div class="show-panel-item">
+              <small>{{ 'rule.one' | translate }}:</small>
+              <br />
+              <span class="show-item-value">{{ dealCommissioning.rule.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button class="has-more" *ngIf="hasMoreDealCommissionings() && !reviewing" (click)="getDealCommissionings()">
+        {{ 'actions.load_more' | translate }}
+        <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+      </button>
+    </ng-container>
+    <ng-container *ngIf="indicatorCommissionings">
+      <h4 class="middle-title">{{ 'commissioning.indicator_commissioning.other' | translate }}</h4>
+      <div *ngFor="let indicatorCommissioning of indicatorCommissionings">
+        <div class="show-panel" (click)="indicatorCommissioning.expanded = !indicatorCommissioning.expanded">
+          <div class="show-panel-header">
+            <span class="show-panel-header-tittle">{{
+              indicatorCommissioning.rule.description
+                ? indicatorCommissioning.rule.description
+                : indicatorCommissioning.rule.value
+            }}</span>
+          </div>
+          <div class="statement-total">
+            <span>{{ 'statement.total' | translate }}:</span>
+            <div class="show-panel-header-values">
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{ indicatorCommissioning.points }}</span>
+                <span class="show-panel-header-info bold">{{ 'incentives.views.points' | translate }}</span>
+              </div>
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{
+                  indicatorCommissioning.money
+                    | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="show-panel-body" *ngIf="isExpanded(indicatorCommissioning)">
+            <hr />
+            <div class="show-panel-item">
+              <small>{{ 'rule.one' | translate }}:</small>
+              <br />
+              <span class="show-item-value">{{ indicatorCommissioning.rule.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        class="has-more"
+        *ngIf="hasMoreIndicatorCommissionings() && !reviewing"
+        (click)="getIndicatorCommissionings()"
+      >
+        {{ 'actions.load_more' | translate }}
+        <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+      </button>
+    </ng-container>
+    <ng-container *ngIf="rankifierCommissionings">
+      <h4 class="middle-title">{{ 'commissioning.ranking_commissioning.other' | translate }}</h4>
+      <div *ngFor="let rankifierCommissioning of rankifierCommissionings">
+        <div class="show-panel" (click)="rankifierCommissioning.expanded = !rankifierCommissioning.expanded">
+          <div class="show-panel-header">
+            <span class="show-panel-header-tittle">{{
+              rankifierCommissioning.rule.description
+                ? rankifierCommissioning.rule.description
+                : rankifierCommissioning.rule.value
+            }}</span>
+          </div>
+          <div class="show-panel-header">
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-item">{{ 'deal.variable_remuneration_achieved' | translate }}:</span>
+            </div>
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">{{ 'ranking.points' | translate }}:</span>
+              <span class="show-panel-header-info bold">{{ rankifierCommissioning.points }}</span>
+            </div>
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">{{ 'ranking.money' | translate }}:</span>
+              <span class="show-panel-header-info bold">{{
+                rankifierCommissioning.money
+                  | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+              }}</span>
+            </div>
+          </div>
+          <div class="show-panel-body" *ngIf="isExpanded(rankifierCommissioning)">
+            <hr />
+            <div class="show-panel-item">
+              <small>{{ 'rule.one' | translate }}:</small>
+              <br />
+              <span class="show-item-value">{{ rankifierCommissioning.rule.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        class="has-more"
+        *ngIf="hasMoreRankifierCommissionings() && !reviewing"
+        (click)="getRankifierCommissionings()"
+      >
+        {{ 'actions.load_more' | translate }}
+        <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+      </button>
+    </ng-container>
+    <ng-container *ngIf="limiterCommissionings">
+      <h4 class="middle-title">{{ 'commissioning.limiter_commissioning.other' | translate }}</h4>
+      <div *ngFor="let limiterCommissioning of limiterCommissionings">
+        <div class="show-panel" (click)="limiterCommissioning.expanded = !limiterCommissioning.expanded">
+          <div class="show-panel-header">
+            <span class="show-panel-header-tittle">{{
+              limiterCommissioning.rule.description
+                ? limiterCommissioning.rule.description
+                : limiterCommissioning.rule.value
+            }}</span>
+          </div>
+          <div class="show-panel-header">
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-item">{{ 'deal.variable_remuneration_achieved' | translate }}</span>
+            </div>
+            <div class="show-panel-header-values">
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{ limiterCommissioning.points }}</span>
+                <span class="show-panel-header-info bold">{{ 'incentives.views.points' | translate }}</span>
+              </div>
+              <div class="show-panel-header-infos">
+                <span class="show-panel-header-info bold">{{
+                  limiterCommissioning.money
+                    | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="show-panel-body" *ngIf="isExpanded(limiterCommissioning)">
+            <hr />
+            <div class="show-panel-item">
+              <small>{{ 'rule.one' | translate }}:</small>
+              <br />
+              <span class="show-item-value">{{ limiterCommissioning.rule.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        class="has-more"
+        *ngIf="hasMoreLimiterCommissionings() && !reviewing"
+        (click)="getLimiterCommissionings()"
+      >
+        {{ 'actions.load_more' | translate }}
+        <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+      </button>
+    </ng-container>
+    <ng-container *ngIf="redemptionCommissionings?.length > 0">
+      <h4 class="middle-title">{{ 'commissioning.redemption_commissioning.other' | translate }}</h4>
+      <div *ngFor="let redemptionCommissioning of redemptionCommissionings">
+        <div class="show-panel" (click)="redemptionCommissioning.expanded = !redemptionCommissioning.expanded">
+          <div class="show-panel-header">
+            <span class="show-panel-header-tittle">{{
+              redemptionCommissioning.rule.description
+                ? redemptionCommissioning.rule.description
+                : redemptionCommissioning.rule.value
+            }}</span>
+          </div>
+          <div class="show-panel-header">
+            <div class="show-panel-header-infos">
+              <span class="show-panel-header-info">{{ 'redemption.money' | translate }}:</span>
+              <span class="show-panel-header-info bold">{{
+                redemptionCommissioning.money
+                  | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+              }}</span>
+            </div>
+          </div>
+          <div class="show-panel-body" *ngIf="isExpanded(redemptionCommissioning)">
+            <hr />
+            <div class="show-panel-item">
+              <small>{{ 'rule.one' | translate }}:</small>
+              <br />
+              <span class="show-item-value">{{ redemptionCommissioning.rule.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>

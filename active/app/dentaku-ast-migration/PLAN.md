@@ -39,7 +39,7 @@ One item per PR, ascending by blast radius. The ordering criterion is not effort
 |---|---|---|---|---|---|
 | 1 | `Formula` model + identifier extraction | 1 | 2 models + 2 specs | No — no caller | **Merged**, PR #5274 |
 | 2 | Specific validation messages | 4 | 2 models + 9 locale files | No — see note below | **Merged**, PR #5276 + `app-webclient` #6651, #6652 |
-| 3 | Accumulation detection | 5 (part) | 1 model | Yes — flips `accumulated_deals` | Blocked on nothing |
+| 3 | Accumulation detection | 5 (part) | 1 model | Yes — flips `accumulated_deals` | **Merged**, PR #5278 |
 | 4 | Variable identification | 5 (part) | 1 model + 1 spec removal | Yes — changes `incentive_variables` rows | Blocked on blast radius |
 | 5 | Both-branch validation | 2 + 3 | 1 model | Yes — rejects formulas that pass today | Blocked on blast radius + Phase 3 choice |
 
@@ -222,6 +222,22 @@ CONSTRAINT_OPTION_BY_ATTRIBUTE_AND_ERROR_KEY = {}.freeze
 **Two consequences for later items.** First, once that branch lands, `Rule` can declare its own mapping (`value: { undefined_function: :function, parse_error: :excerpt, … }`) and the import report gains the interpolated fragment — a follow-up that finishes item 2 rather than new scope. Second, the mechanism resolves **one** option per attribute-and-key pair, so `too_few_operands` and `too_many_operands`, which carry both `expected` and `actual`, can surface only one of the two there; either the message is rewritten around a single count or that pair stays uninterpolated. Item 5's unknown-variable message carries a single value (the variable name), so it fits the mechanism cleanly.
 
 **The spreadsheet-import path has no automated coverage, by design.** The repository has no `spec/workers/` directory at all — the Testing Philosophy excludes chained-pipeline workers. So the guarantee for any new key on that path is not a CI test. What item 2 used instead, and what later items should reuse, is a **closed-set argument**: enumerate what the model can emit (`Rule` puts exactly `blank`, one of the seven reasons, or `invalid` on `value`, because `Formula::Error#reason` collapses anything unknown), then show the frontend covers that set exhaustively. That is stronger than sampling, and it does not decay when the gem adds a reason.
+
+### From item 3 (PR #5278)
+
+**A private method cannot be tested, so complexity that needs a test cannot live in one — and this is the rule that decides how item 4 is written.** The first revision put the accumulation predicate inside `Incentive#check_accumulation`, a `before_save` callback, and covered it with `incentive.send(:check_accumulation)`. The engineer rejected it on the language: a private method in Ruby is not reachable, so there is no valid unit test for it; reaching it means an integration test through its caller, at much higher cost. The `send` was justified by precedent in `spec/models/acceptment_spec.rb`, which does the same — but legacy is not precedent, and that is written in the rules injected on every write. **The symptom was the diagnosis**: feeling the need for a test on a private method means the method is carrying too much.
+
+The fix moved the knowledge to `Formula#accumulates_deals?` — public, unit-testable, and the object that already knows which identifiers the formula references. `check_accumulation` became one line that needs no test of its own, and the backfill worker asks the same object the same question. **Item 4 inherits this directly**: `Incentive#update_variables` is a large private method, and decomposing it means moving behavior to public surfaces (`Formula`, `Variable`), never extracting more privates.
+
+**Name the operation in the domain space, not the implementation space.** The predicate shipped first as `references_accumulation_key?` — "reference" is tokenizer mechanics and "key" is the technical word for the token. The business question is whether the incentive accumulates deals, and the attribute it feeds is already called `accumulated_deals`, so `accumulates_deals?` was there for the taking. The constant kept `ACCUMULATION_KEY_PATTERN`, deliberately: it describes a pattern over key names, so implementation vocabulary *is* its subject.
+
+**Collapsing a redundant alternation deletes intent.** The old `ACCUMULATION_KEY_PATTERN` repeated `total_quantity_` even though `total_` already subsumes it. An intermediate revision removed the redundancy as dead weight; the engineer pushed back that the repetition existed to *name* `total_quantity_` as its own family. Behaviour was identical either way — what the collapse destroyed was documentation. The union stayed at three alternatives with a comment saying why.
+
+**Measure before arguing about behavior, and measure again after.** Two rounds of review turned on claims about which identifiers the old pattern matched. Running both patterns side by side over a list of boundary identifiers settled each one in seconds and produced the table now in the PR body. Two results contradicted everyone's intuition, mine included: the old pattern never matched a bare `total`, nor `quantidade_total` without a suffix. Whether a bare `total` — a built-in vocabulary key — *should* accumulate is still open, and deliberately untouched by item 3.
+
+**A release back-merge dissolves `[Unreleased]` without conflicting.** When release 3.60.0 finished, the `[Unreleased]` block became `## [3.60.0]`. A branch whose CHANGELOG hunk anchors on a line inside that block rebases **cleanly** and lands the entry inside the released section — git sees identical context lines and cannot know the heading above them changed meaning. Caught here by simulating the merge (`git merge-tree`) rather than trusting a clean rebase. Any item still open when a release finishes must re-check where its changelog entry landed.
+
+**Environment note.** A release that bumps Rails leaves `vendor/bundle` behind in whichever checkout was not updated. The worktree and the main checkout have separate bundles: `bundle install` in one does not serve the other, and `foreman` for the local databases must run from the checkout whose bundle is current.
 
 ## Open decisions for the engineer
 

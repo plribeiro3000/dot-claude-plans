@@ -1,0 +1,76 @@
+Partial copy, taken 2026-07-30 from app-webclient@f1920fb6b (develop HEAD at spike time).
+Source: app-webclient/src/app/statement/statement-show/statement-show.component.ts
+Preserved as evidence for SPIKE.md Finding "Item 4 — result declaration side gates on full
+pagination drain, not just panel expansion". Line numbers below are the ORIGINAL file's
+line numbers (verified by direct Read of the live file on 2026-07-30), not renumbered here.
+
+Lines 980-1039 (paginationDrained / allExpanded / expandPanels / readyToSign):
+
+  980    paginationDrained() {
+  981      return [
+  982        this.hasMoreDealCommissionings(),
+  983        this.hasMoreAccumulatedDeals(),
+  984        this.hasMoreIndicatorCommissionings(),
+  985        this.hasMoreLimiterCommissionings(),
+  986        this.hasMoreRankifierCommissionings(),
+  987        this.hasMoreRedemptionCommissionings(),
+  988      ].every((hasMore: boolean) => !hasMore);
+  989    }
+  990
+  991    allExpanded() {
+  992      return this.panels().every((panel: any) => this.isExpanded(panel)) && this.paginationDrained();
+  993    }
+  994
+  995    expandPanels(expanded: boolean) {
+  996      this.panels().forEach((panel: any) => {
+  997        panel.expanded = expanded;
+  998      });
+  999
+  1000     this.reviewing = expanded;
+  1001
+  1002     if (expanded) {
+  1003       this.loadAllPages();
+  1004     }
+  1005   }
+  1006
+  1007   togglePanels() {
+  1008     this.expandPanels(!this.reviewing);
+  1009   }
+  1010
+  1011   loadAllPages() {
+  1012     if (this.dealCommissioningsLastPageLength == 9) {
+  1013       this.getDealCommissionings();
+  1014     }
+  1015
+  1016     if (this.accumulatedDealsLastPageLength == 9) {
+  1017       this.getAccumulatedDeals();
+  1018     }
+  1019
+  1020     if (this.indicatorCommissioningsLastPageLength == 9) {
+  1021       this.getIndicatorCommissionings();
+  1022     }
+  1023
+  1024     if (this.limiterCommissioningsLastPageLength == 9) {
+  1025       this.getLimiterCommissionings();
+  1026     }
+  1027
+  1028     if (this.rankifierCommissioningsLastPageLength == 9) {
+  1029       this.getRankifierCommissionings();
+  1030     }
+  1031
+  1032     if (this.redemptionCommissioningsLastPageLength == 9) {
+  1033       this.getRedemptionCommissionings();
+  1034     }
+  1035   }
+  1036
+  1037   readyToSign() {
+  1038     return this.allExpanded() && !this.loading;
+  1039   }
+
+Significance: on the result-declaration side (statement-show), "fully expanded" is defined as
+BOTH every panel expanded AND every paginated commissioning list drained to its last page
+(paginationDrained). This is the closest existing equivalent to "scrolled to the end" named in
+the Atento demand — it is implemented as exhaustive pagination, not a literal scroll-position
+listener. The rule-declaration side (plan-statement-show, see excerpt_1) has no pagination at
+all (incentives arrive in one GraphQL response), so it only gates on allExpanded() — there is no
+scroll/pagination equivalent to drain there, because there is nothing paginated to drain.

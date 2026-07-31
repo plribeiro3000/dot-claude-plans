@@ -18,7 +18,9 @@ Two of the three mechanics are immutable after creation. The third is the only o
 
 ## The current shape
 
-Measured from `develop` at `fd2f5a1`. All four clusters are Aurora PostgreSQL 16.13 with `manage_master_user_password = true`, `storage_encrypted = true`, `deletion_protection = true`, and two instances each with Performance Insights on.
+Measured from `develop` at `fd2f5a1`. **The four stacks are not the same kind of database, and an earlier revision of this spike got that wrong by calling all four Aurora.** Three are Aurora PostgreSQL 16.13 clusters via `modules/rds_aurora_cluster`; the fourth (`app-beta-001`) is a single plain RDS PostgreSQL 18.4 instance via `modules/rds_instance` — `instance_class = "db.t3.micro"`, `allocated_storage = 20`, `multi_az = false`, no cluster and no reader. That difference decides its migration path (Finding 7) and it is the reason the correction matters rather than being a detail.
+
+All four share `manage_master_user_password = true`, `storage_encrypted = true`, and `deletion_protection = true`.
 
 | Stack | Storage key | Master secret key | PI keys | Total |
 |---|---|---|---|---|
@@ -142,6 +144,57 @@ So the six PI key references do not break, and nothing must be done before the d
 - NOT verified: whether changing the PI key requires a disable/re-enable cycle, and whether historical PI data encrypted under the old key survives it. The page documents the key as a create-time and enable-time option and is silent on changing it in place.
 
 ---
+
+## Finding 6 — The cluster identifier is invisible to the application, so no round-trip is needed
+
+The question was whether a replacement database must end up carrying the original identifier, which for the OpenSearch domains forced a two-hop round trip through a temporary name. Here it does not, and the reason is the pooler.
+
+The application resolves a stable internal CNAME — `connection-pooler-<environment>.4shark.internal` — which contains no database identifier. The pooler, in turn, receives its backend host as a Terraform reference, not a literal:
+
+```
+app-shared-001/main.tf:102-118
+
+  databases = [
+    {
+      name          = "shared001_master"
+      host          = module.rds_aurora_cluster.cluster_endpoint
+      ...
+    },
+    {
+      name          = "shared001_follower"
+      host          = module.rds_aurora_cluster.cluster_reader_endpoint
+      ...
+    },
+  ]
+```
+
+So a new database with a new identifier produces a new endpoint, Terraform rewires the pooler to it by reference, and the application never sees the change. The cutover point is the pooler's configuration, not the application's — and the pooler is precisely the component whose job is to absorb a backend change.
+
+The consequence for planning is that a **one-way move to a new permanent identifier is available**, and the round trip through a temporary name is unnecessary. What remains to be measured is the pooler's own cutover: repointing it changes its task definition, so its tasks are replaced, and whether the application's connections survive that replacement transparently is not established here.
+
+## Finding 7 — For a plain RDS instance, the original hypothesis IS the documented path
+
+Finding 1 closed the hypothesis for Aurora, where encryption belongs to the shared cluster volume. A plain RDS instance has its own storage, and there the same idea is documented on both halves.
+
+The replica can be created encrypted under a chosen key. The console flow for creating a read replica states it directly:
+
+> "To create an encrypted read replica, expand **Additional configuration** and specify the following settings: 1. Choose **Enable encryption**. 2. For **AWS KMS key**, choose the AWS KMS key identifier of the KMS key."
+
+with the precondition we already satisfy:
+
+> "The source DB instance must be encrypted."
+
+And the promotion half — the engineer's "derrubamos a master e automaticamente a aws coloca o novo como primario" — is documented as literal behaviour:
+
+> "If you delete a source DB instance without deleting its read replicas in the same AWS Region, each replica is promoted to a standalone DB instance."
+
+Deleting the source to trigger promotion is not the shape to use, because it couples the promotion to a destroy. `promote-read-replica` is the deliberate operation and should be preferred; the quote matters because it establishes that promotion of a same-region replica to a standalone instance is a first-class, supported transition rather than an improvisation.
+
+**Verification**
+- URLs fetched: `https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.Create.html`, `https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_ReadRepl.html`
+- Verbatim quotes checked: all three above
+- Quote substrings confirmed in § "Console" (create read replica, step 10) and § "Considerations when deleting replicas"
+- NOT verified: that the KMS-key choice applies to a SAME-region replica specifically. The console flow documents the setting without restricting it by Region, and the page covers same-Region and cross-Region together, but no sentence scopes it explicitly. This is the one point to confirm on `beta` before relying on it — and `beta` is non-productive, which is what makes it the right place to confirm it.
 
 ## The three mechanics, summarised
 

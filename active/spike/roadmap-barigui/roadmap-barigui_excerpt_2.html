@@ -1,0 +1,850 @@
+<!-- Auxiliary file for SPIKE.md — full verbatim copy for reference. -->
+<!-- Source: ~/Projects/4Shark/app-webclient/src/app/dashboard/plan/dashboard-plan.component.html -->
+<!-- Repo commit at capture time: f1920fb6bed46c477028113d90df1994ad48f278 (2026-07-30 12:49:23 -0300) -->
+<!-- Relevant to demands 1 (ranking), 2 (indicator totalizer), 3 (seller screen cleanup). -->
+
+<div class="loading d-flex-column d-flex-ju-center" *ngIf="loading; else dashboardPlan">
+  <div class="loading-spinner"></div>
+  <div class="loading-text mg-t-15 d-flex-al-baseline">
+    <span>{{ 'info.loading' | translate }}</span>
+    <span class="dot-elastic"></span>
+  </div>
+</div>
+<ng-template #dashboardPlan>
+  <section class="dash">
+    <div class="d-flex-ju-sb">
+      <div>
+        <h1 class="title">{{ 'dashboard.dashboard_plan' | translate }}</h1>
+        <div class="breadcrumbs">
+          <a class="gray-400" routerLink="/dashboard/calendars/">
+            <span>{{ 'dashboard.dashboard_calendar' | translate }}</span>
+          </a>
+          <span class="material-symbols-outlined">chevron_right</span>
+          <span class="breadcrumb">{{ 'dashboard.dashboard_plan' | translate }}</span>
+        </div>
+      </div>
+      <div>
+        <button class="menu-button" routerLink="/dashboard/calendars/">
+          <span class="material-symbols-outlined">arrow_back</span>
+          <span>{{ 'actions.back' | translate }}</span>
+        </button>
+      </div>
+    </div>
+    <div class="row plan-name-and-period">
+      <div class="col-12 col-xl-9">
+        <div class="filter-chips">
+          <div class="filter-chip filter-chip--filled">
+            <span class="material-symbols-outlined filter-chip-icon">description</span>
+            <span class="filter-chip-label">{{ plan?.name }}</span>
+          </div>
+          <div class="filter-chip filter-chip--filled">
+            <span class="material-symbols-outlined filter-chip-icon">calendar_month</span>
+            <span class="filter-chip-label">{{ calendar?.name }}</span>
+          </div>
+          <div class="filter-chip filter-chip--filled">
+            <span class="material-symbols-outlined filter-chip-icon">event</span>
+            <span class="filter-chip-label"
+              >{{ calendar?.startsAt | date: 'shortDate' : '' : translateService.currentLang }}
+              {{ 'forms.to' | translate }}
+              {{ calendar?.endsAt | date: 'shortDate' : '' : translateService.currentLang }}</span
+            >
+          </div>
+          <ng-container *ngIf="calendarRunning(calendar); else planNotRunningChip">
+            <div class="filter-chip filter-chip--success">
+              <span class="material-symbols-outlined filter-chip-icon">more_time</span>
+              <span class="filter-chip-label"
+                >{{ daysUntilCalendarCloses }}
+                {{ 'calendar.day.other' | translate }}
+                {{ 'calendar.remaining_days' | translate }}</span
+              >
+            </div>
+          </ng-container>
+          <ng-template #planNotRunningChip>
+            <div class="filter-chip filter-chip--caution" *ngIf="calendarClosesToday; else calendarClosedChip">
+              <span class="material-symbols-outlined filter-chip-icon">today</span>
+              <span class="filter-chip-label">{{ 'calendar.closes_today' | translate }}</span>
+            </div>
+            <ng-template #calendarClosedChip>
+              <div class="filter-chip filter-chip--warning">
+                <span class="material-symbols-outlined filter-chip-icon">calendar_clock</span>
+                <span class="filter-chip-label">{{ 'calendar.period_closed' | translate }}</span>
+              </div>
+            </ng-template>
+          </ng-template>
+        </div>
+      </div>
+      <div class="col-12 col-xl-3 d-flex-ju-end">
+        <ng-container *ngFor="let userCommissionDataset of userCommissionDatasets; let i = index">
+          <div class="box-widget-new col-12">
+            <div class="variable-remuneration">
+              <p class="widget-value bold">
+                {{
+                  userCommissionDataset.money
+                    | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                }}
+              </p>
+              <small>{{ 'statement.total' | translate }}</small>
+            </div>
+            <span class="font-65 gray-400 material-symbols-outlined">paid</span>
+          </div>
+        </ng-container>
+      </div>
+    </div>
+    <ng-container *ngIf="user">
+      <div class="middle-title-sub d-flex-al-center d-flex-ju-sb">
+        <div class="mg-r-20">
+          <ng-container *ngIf="currentUserSeat == 'SalesRepresentative'; else selectedUserTemplate"
+            ><small class="bold">{{ 'user.one' | translate }}</small></ng-container
+          >
+          <ng-template #selectedUserTemplate
+            ><small class="bold">{{ 'dashboard.selected_user' | translate }}</small></ng-template
+          >
+          <h4 class="middle-title blue">{{ user?.name }}</h4>
+        </div>
+        <div class="filters" *ngIf="userId && currentUserSeat != 'SalesRepresentative'">
+          <button class="menu-button filter-btn" (click)="clearUser()">
+            <span class="material-symbols-outlined"> clear_all </span>
+            {{ 'actions.clear_filter' | translate }}
+          </button>
+        </div>
+      </div>
+      <div class="mg-t-30">
+        <div class="d-flex-ju-sb row">
+          <!-- Ranking box — already guarded, hidden from the seller (demand 3). -->
+          <div class="col-12 col-lg-2 current-user-seat" *ngIf="currentUserSeat != 'SalesRepresentative'">
+            <div class="box-widget-new">
+              <div class="variable-remuneration">
+                <p class="widget-value bold">{{ selectedUserRanking }}°</p>
+                <small>{{ 'dashboard.plan.ranking' | translate }}</small>
+                <br />
+              </div>
+              <span class="font-65 gray-400 material-symbols-outlined">groups</span>
+            </div>
+          </div>
+          <!-- Plan-average box — already guarded, hidden from the seller (demand 3). -->
+          <div class="col-12 col-lg-2 current-user-seat" *ngIf="currentUserSeat != 'SalesRepresentative'">
+            <div class="box-widget-new">
+              <ng-container *ngIf="selectedUserMoney == averageMoneyUser">
+                <div class="txt-al-center">
+                  <small class="value">{{ 'dashboard.average_plan' | translate }}</small>
+                </div>
+                <div>
+                  <span class="font-65 gray-400 material-symbols-outlined">equal</span>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="selectedUserMoney > averageMoneyUser">
+                <div class="txt-al-center">
+                  <span class="value bold"
+                    >{{ percentageAboveAverage(selectedUserMoney, averageMoneyUser) }}%
+                    {{ 'dashboard.above' | translate }}</span
+                  >
+                  <br />
+                  <small class="value">{{ 'dashboard.average_per_plan' | translate }}</small>
+                </div>
+                <div>
+                  <span class="font-65 gray-400 material-symbols-outlined">arrow_circle_up</span>
+                </div>
+              </ng-container>
+              <ng-container *ngIf="selectedUserMoney < averageMoneyUser">
+                <div class="txt-al-center">
+                  <span class="value bold"
+                    >{{ percentageBelowAverage(selectedUserMoney, averageMoneyUser) }}%
+                    {{ 'dashboard.below' | translate }}</span
+                  >
+                  <br />
+                  <small class="value">{{ 'dashboard.average_per_plan' | translate }}</small>
+                </div>
+                <div>
+                  <span class="font-65 gray-400 material-symbols-outlined">arrow_circle_down</span>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+          <!-- Immediate-manager box — NOT guarded by currentUserSeat. Only the column
+               width class changes; the manager name itself is always rendered, including
+               to a SalesRepresentative. Candidate gap for demand 3. -->
+          <div
+            class="col-12"
+            [class]="currentUserSeat != 'SalesRepresentative' ? 'col-lg-2 current-user-seat' : 'col-lg-3'"
+          >
+            <div class="box-widget-new">
+              <div>
+                <small>{{ 'user.parent' | translate }}:</small>
+                <br />
+                <span class="mg-r-5">
+                  <img
+                    [src]="user?.seat?.parent?.user?.profile?.url || '/assets/profile.png'"
+                    alt="profile"
+                    class="profile"
+                  />
+                </span>
+                <span class="blue bold name">{{ user?.seat?.parent?.user?.name }}</span>
+              </div>
+            </div>
+          </div>
+          <div
+            class="col-12"
+            [class]="currentUserSeat != 'SalesRepresentative' ? 'col-lg-2 current-user-seat' : 'col-lg-3'"
+          >
+            <div class="box-widget-new">
+              <div class="txt-al-center">
+                <small>{{ 'seat.type.one' | translate }}:</small>
+                <br />
+                <span class="access-level">{{ 'user.seat_types.' + user?.seat?.type | translate }}</span>
+              </div>
+            </div>
+          </div>
+          <div
+            class="col-12"
+            [class]="currentUserSeat != 'SalesRepresentative' ? 'col-lg-2 current-user-seat' : 'col-lg-3'"
+          >
+            <div class="box-widget-new">
+              <ng-container *ngIf="selectedUserPlanStatement?.acceptment?.id; else missingSignedPlanStatementsTemplate">
+                <div class="variable-remuneration">
+                  <small>{{ 'dashboard.signed_plan_statements' | translate }}</small>
+                  <br />
+                </div>
+                <span class="font-65 gray-400 material-symbols-outlined active">person_check</span>
+              </ng-container>
+              <ng-template #missingSignedPlanStatementsTemplate>
+                <div class="variable-remuneration">
+                  <small>{{ 'dashboard.unsigned_plan_statements' | translate }}</small>
+                  <br />
+                </div>
+                <span class="font-65 gray-400 material-symbols-outlined deactive">person_check</span>
+              </ng-template>
+            </div>
+          </div>
+          <div
+            class="col-12"
+            [class]="currentUserSeat != 'SalesRepresentative' ? 'col-lg-2 current-user-seat' : 'col-lg-3'"
+          >
+            <div class="box-widget-new">
+              <ng-container *ngIf="selectedUserStatement?.acceptment?.id; else missingSignedStatementsTemplate">
+                <div class="variable-remuneration">
+                  <small>{{ 'dashboard.signed_statements' | translate }}</small>
+                  <br />
+                </div>
+                <span class="font-65 gray-400 material-symbols-outlined active">person_check</span>
+              </ng-container>
+              <ng-template #missingSignedStatementsTemplate>
+                <div class="variable-remuneration">
+                  <small>{{ 'dashboard.unsigned_statements' | translate }}</small>
+                  <br />
+                </div>
+                <span class="font-65 gray-400 material-symbols-outlined deactive">person_check</span>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+
+    <div class="middle-title-sub d-flex-al-center d-flex-ju-sb">
+      <div class="mg-r-20">
+        <h4 class="middle-title">{{ 'plan.one' | translate }}</h4>
+      </div>
+    </div>
+    <div class="mg-t-30">
+      <div class="d-flex-ju-sb row">
+        <div class="col-12 col-lg-3">
+          <div class="box-widget-new">
+            <div>
+              <small>{{ 'plan_participation_approval_batch.owner_id' | translate }}:</small>
+              <br />
+              <span class="mg-r-5">
+                <img [src]="plan?.owner?.profile?.url || '/assets/profile.png'" alt="profile" class="profile" />
+              </span>
+              <span class="blue bold name">{{ plan?.owner?.name }}</span>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-lg-3">
+          <div class="box-widget-new">
+            <div>
+              <small>{{ 'user.responsible' | translate }}:</small>
+              <ng-container *ngFor="let responsible of plan?.responsible">
+                <div class="mg-t-5 d-flex-al-center">
+                  <span class="active material-symbols-outlined mg-r-5">check</span>
+                  <span class="mg-r-5">
+                    <img [src]="responsible.profile?.url || '/assets/profile.png'" alt="profile" class="profile" />
+                  </span>
+                  <span class="blue bold name">{{ responsible?.name }}</span>
+                </div>
+              </ng-container>
+            </div>
+          </div>
+        </div>
+        <!-- Plan-level signature percentage — NOT guarded by currentUserSeat.
+             This is the "group signature percentage" candidate for demand 3. -->
+        <div class="col-12 col-lg-3">
+          <div class="box-widget-new">
+            <div class="variable-remuneration">
+              <ng-container *ngIf="plan?.totalAcceptedStatements > 0; else withoutAcceptedPlanStatementsTemplate">
+                <p class="widget-value bold">
+                  {{ percentageApprovedStatements(plan?.totalAcceptedStatements, plan?.totalStatements) }}%
+                </p>
+                <small>{{ 'dashboard.signed_plan_statements' | translate }}</small>
+              </ng-container>
+              <ng-template #withoutAcceptedPlanStatementsTemplate>
+                <p>{{ 'dashboard.none' | translate }}</p>
+                <small>{{ 'dashboard.unsigned_plan_statements' | translate }}</small>
+              </ng-template>
+              <br />
+            </div>
+            <span class="font-65 gray-400 material-symbols-outlined">person_check</span>
+          </div>
+        </div>
+        <!-- Statement-level signature percentage — same gap as above. -->
+        <div class="col-12 col-lg-3">
+          <div class="box-widget-new">
+            <div class="variable-remuneration">
+              <ng-container *ngIf="statement?.totalAcceptedStatements > 0; else withoutAcceptedStatementsTemplate">
+                <p class="widget-value bold">
+                  {{ percentageApprovedStatements(statement?.totalAcceptedStatements, statement?.totalStatements) }}%
+                </p>
+                <small>{{ 'dashboard.signed_statements' | translate }}</small>
+              </ng-container>
+              <ng-template #withoutAcceptedStatementsTemplate>
+                <p>{{ 'dashboard.none' | translate }}</p>
+                <small>{{ 'dashboard.unsigned_statements' | translate }}</small>
+              </ng-template>
+              <br />
+            </div>
+            <span class="font-65 gray-400 material-symbols-outlined">person_check</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <ng-container *ngIf="dealDatasets?.length">
+      <div class="row mg-t-30 deals-cards-row">
+        <div class="col-12 col-lg-4 goal-card">
+          <div class="deals-card">
+            <h4 class="middle-title">{{ dealBoxTitle() }}</h4>
+            <ng-container *ngIf="planGoal; else emptyDealsCard">
+              <div class="row goal-inside-box">
+                <div class="row d-flex-al-center d-flex-ju-sb">
+                  <div class="col-12 col-md-6 col-lg-6">
+                    <div class="goal-info">
+                      <small>{{ 'goal.views.result' | translate }}</small>
+                      <span class="result-value bold">{{ planGoal[0].result }}</span>
+                    </div>
+                    <div class="goal-info">
+                      <small>{{ 'goal.one' | translate }}</small>
+                      <span class="goal-value bold">{{ planGoal[0].goal }}</span>
+                    </div>
+                  </div>
+                  <div class="col-12 col-md-6 col-lg-6">
+                    <div class="goal-progress-new" [style.--percentage]="planGoal[0].value">
+                      <div class="white-circle">
+                        <span>{{ planGoal[0].value }}%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div
+                *ngIf="planGoalDifference"
+                class="deals-goal-delta"
+                [ngClass]="planGoalAbove ? 'deals-goal-delta--above' : 'deals-goal-delta--below'"
+              >
+                <span class="material-symbols-outlined">{{ planGoalAbove ? 'trending_up' : 'trending_down' }}</span>
+                <span
+                  >{{ planGoalDifference }}
+                  {{ (planGoalAbove ? 'dashboard.deals_above_goal' : 'dashboard.deals_below_goal') | translate }}</span
+                >
+              </div>
+            </ng-container>
+            <ng-template #emptyDealsCard>
+              <div class="empty-value-inside-box">
+                <span>{{ 'goal.page.empty' | translate }}</span>
+              </div>
+            </ng-template>
+          </div>
+        </div>
+        <div class="col-12 col-lg-8">
+          <div class="deals-card" #dealChartContainer>
+            <div class="d-flex-al-center d-flex-ju-sb mg-b-10">
+              <h4 class="middle-title">{{ 'dashboard.deals_history' | translate }}</h4>
+              <div class="deals-date-range" *ngIf="dealDateRangeDays">
+                <span class="material-symbols-outlined">calendar_month</span>
+                <small>{{ 'dashboard.deals_last_n_days' | translate: { count: dealDateRangeDays } }}</small>
+              </div>
+            </div>
+            <div class="deals-legend">
+              <span class="deals-legend-dot"></span>
+              <small>{{ 'dashboard.daily_volume' | translate }}</small>
+            </div>
+            <app-line-charts [value]="deals" [view]="dealChartView" [timeline]="false"></app-line-charts>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <h4 class="middle-title" *ngIf="incentiveDatasets?.length > 0">{{ 'incentives.other' | translate }}</h4>
+    <ng-container *ngFor="let incentiveDataset of incentiveDatasets | slice: 0 : visibleCount; trackBy: trackByFn">
+      <div class="show-panel" (click)="incentiveDatasetToggleExpanded(incentiveDataset)">
+        <div class="show-panel-header">
+          <div class="icon-and-title">
+            <span class="material-symbols-outlined font-40 blue">request_quote</span>
+            <span class="show-panel-header-tittle">{{ incentiveDataset?.name }}</span>
+          </div>
+          <span
+            class="show-panel-header-info bold total-value"
+            *ngIf="incentiveDataset?.commissionType === 'money'; else elseTemplate"
+            >{{
+              incentiveDataset?.value
+                | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+            }}</span
+          >
+          <ng-template #elseTemplate>
+            <span
+              class="show-panel-header-info bold total-value"
+              [ngClass]="{ 'gray-scale-300': incentiveDataset?.value === 0 }"
+              >{{ incentiveDataset?.value | number: '1.1-5' }} {{ 'incentives.views.points' | translate }}</span
+            >
+          </ng-template>
+        </div>
+        <!-- "Meus Incentivos" rule display — description + formula value always shown
+             together. Sixth occurrence of the pattern flagged for demand 7. -->
+        <div class="show-panel-body" *ngIf="incentiveDataset?.expanded">
+          <hr />
+          <div class="show-panel-item">
+            <ng-container *ngFor="let ruleDataset of incentiveDataset?.ruleDatasets">
+              <div class="show-panel-item-arrow">
+                <span class="material-symbols-outlined">arrow_forward</span>
+                <div class="incentive-description-and-value">
+                  <div>
+                    <span class="show-item-value bold">{{ 'rule.description' | translate }}:</span>
+                    <span class="show-item-description">{{ ruleDataset.description }}</span>
+                    <br />
+                    <span class="show-item-value bold">{{ 'rule.formula_rule.one' | translate }}:</span>
+                    <span class="show-item-value">{{ ruleDataset?.ruleValue }}</span>
+                  </div>
+                  <span *ngIf="incentiveDataset?.commissionType === 'money'; else elseTemplate" class="bold">
+                    {{
+                      ruleDataset?.value
+                        | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                    }}
+                  </span>
+                  <ng-template #elseTemplate>
+                    <span class="bold" [ngClass]="{ 'gray-scale-300': ruleDataset?.value === 0 }">
+                      {{ ruleDataset?.value | number: '1.1-5' }} {{ 'incentives.views.points' | translate }}</span
+                    >
+                  </ng-template>
+                </div>
+              </div>
+            </ng-container>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+    <button class="has-more mg-t-30" *ngIf="incentiveDatasets?.length > visibleCount" (click)="loadMore()">
+      {{ 'actions.load_more' | translate }}
+      <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+    </button>
+    <!-- Indicator widgets — "back" face always renders a line chart regardless of
+         variable.frequency. No monthly-specific branch exists here (demand 2). -->
+    <ng-container *ngIf="variables?.length > 0">
+      <h4 class="middle-title">{{ 'indicator.other' | translate }}</h4>
+      <div class="row mg-t-30">
+        <ng-container *ngFor="let variable of variables">
+          <div class="col-12 col-lg-4 goal-card">
+            <div class="goal-widget-box">
+              <div class="front">
+                <ng-container *ngIf="goalDatasets">
+                  <span class="goal-title">{{ variable?.name }}</span>
+                  <div class="row goal-inside-box">
+                    <div class="empty-value-inside-box" *ngIf="!filterGoalDataset(variable.id)?.value">
+                      <span class="mg-t-30">{{ 'goal.page.empty_for_variable' | translate }}</span>
+                    </div>
+                    <div
+                      class="row d-flex-al-center d-flex-ju-sb"
+                      [ngClass]="{ 'filter-blur opacity-50': !filterGoalDataset(variable.id)?.value }"
+                    >
+                      <div class="col-12 col-md-6 col-lg-6">
+                        <div class="goal-info">
+                          <small>{{ 'goal.views.current_result' | translate }}</small>
+                          <ng-container *ngIf="filterGoalDataset(variable.id)?.value; else noVariableTypeTemplate">
+                            <span
+                              class="result-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'DurationDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.value }}
+                            </span>
+                            <span
+                              class="result-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'PercentDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.formattedValue | number: '0.1-2' }}%
+                            </span>
+                            <span
+                              class="result-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'NumberDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.formattedValue | number: '0.1-2' }}
+                            </span>
+                          </ng-container>
+                          <ng-template #noVariableTypeTemplate>
+                            <span class="result-value bold"> -- </span>
+                          </ng-template>
+                        </div>
+                        <div class="goal-info">
+                          <small>{{ 'goal.employee_goal' | translate }}</small>
+                          <ng-container *ngIf="filterGoalDataset(variable.id)?.goal; else noGoalTemplate">
+                            <span
+                              class="goal-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'DurationDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.goal }}
+                            </span>
+                            <span
+                              class="goal-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'PercentDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.formattedGoal | number: '0.1-2' }}%
+                            </span>
+                            <span
+                              class="goal-value bold"
+                              *ngIf="filterGoalDataset(variable.id)?.variableType === 'NumberDataType'"
+                            >
+                              {{ filterGoalDataset(variable.id)?.formattedGoal | number: '0.1-2' }}
+                            </span>
+                          </ng-container>
+                          <ng-template #noGoalTemplate>
+                            <span class="goal-value bold"> -- </span>
+                          </ng-template>
+                        </div>
+                        <div *ngIf="plan?.company?.goalCalculationModule" class="goal-info">
+                          <small
+                            >{{ 'goal.baseline' | translate }}:
+                            <ng-container *ngIf="filterGoalDataset(variable.id)?.baseline; else noVariableType">
+                              <span *ngIf="filterGoalDataset(variable.id)?.variableType === 'DurationDataType'">
+                                {{ filterGoalDataset(variable.id)?.baseline }}
+                              </span>
+                              <span *ngIf="filterGoalDataset(variable.id)?.variableType === 'PercentDataType'">
+                                {{ filterGoalDataset(variable.id)?.formattedBaseline | number: '0.1-2' }}%
+                              </span>
+                              <span *ngIf="filterGoalDataset(variable.id)?.variableType === 'NumberDataType'">
+                                {{ filterGoalDataset(variable.id)?.formattedBaseline | number: '0.1-2' }}
+                              </span>
+                            </ng-container>
+                            <ng-template #noVariableType>
+                              <span> -- </span>
+                            </ng-template>
+                          </small>
+                        </div>
+                      </div>
+                      <div class="col-12 col-md-6 col-lg-6">
+                        <div
+                          *ngIf="plan?.company?.goalCalculationModule"
+                          class="goal-progress-new"
+                          [style.--percentage]="
+                            roundedProgressBarValue(
+                              filterGoalDataset(variable.id)?.formattedGoal,
+                              filterGoalDataset(variable.id)?.formattedValue,
+                              filterGoalDataset(variable.id)?.formattedBaseline
+                            )
+                          "
+                        >
+                          <div class="white-circle">
+                            <span
+                              >{{
+                                progressBarValue(
+                                  filterGoalDataset(variable.id)?.formattedGoal,
+                                  filterGoalDataset(variable.id)?.formattedValue,
+                                  filterGoalDataset(variable.id)?.formattedBaseline
+                                )
+                              }}%</span
+                            >
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  <a class="d-flex-al-center txt-al-center z3" (click)="toggleGoalCardActive($event)">
+                    <span class="material-symbols-outlined mg-r-5">monitoring</span>
+                    <span>{{ 'dashboard.view_follow_up' | translate }}</span>
+                  </a>
+                </ng-container>
+              </div>
+              <div class="back">
+                <span class="goal-title mg-b-30">{{ variable?.name }}</span>
+                <ng-container *ngIf="lineCharts">
+                  <div
+                    class="empty-value-inside-box"
+                    *ngIf="lineCharts[variable.name] && lineCharts[variable.name][0]?.series?.length <= 0"
+                  >
+                    <div class="d-flex-column">
+                      <span class="mg-t-30">{{ 'indicator.no_data_variable' | translate }}</span>
+                    </div>
+                  </div>
+                  <div
+                    class="d-flex-ju-center"
+                    [ngClass]="{
+                      'filter-blur opacity-50':
+                        lineCharts[variable.name] && lineCharts[variable.name][0]?.series?.length <= 0,
+                    }"
+                  >
+                    <ng-container *ngIf="variable.dataType === 'NumberDataType'">
+                      <app-line-charts [value]="lineCharts[variable.name]"></app-line-charts>
+                    </ng-container>
+                    <ng-container *ngIf="variable.dataType === 'PercentDataType'">
+                      <app-line-charts
+                        [value]="lineCharts[variable.name]"
+                        [yAxisTickFormatting]="yAxisTickFormattingPercent"
+                      ></app-line-charts>
+                    </ng-container>
+                    <ng-container *ngIf="variable.dataType === 'DurationDataType'">
+                      <app-line-charts
+                        [value]="lineCharts[variable.name]"
+                        [yAxisTickFormatting]="yAxisTickFormattingDuration"
+                      ></app-line-charts>
+                    </ng-container>
+                  </div>
+                </ng-container>
+                <a class="d-flex-al-center txt-al-center mg-t-30 z3" (click)="toggleGoalCardActive($event)">
+                  <span class="material-symbols-outlined mg-r-5">data_usage</span>
+                  <span>{{ 'dashboard.view_range' | translate }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+    </ng-container>
+
+    <!-- Employee/ranking section — entirely guarded, hidden from the seller.
+         Top-3 cards + "load more" list, capped by the backend's 10-record limit
+         (see roadmap-barigui_excerpt_3.rb). This is the block demand 1 targets. -->
+    <ng-container *ngIf="currentUserSeat != 'SalesRepresentative'">
+      <div class="user-title-and-filters">
+        <div>
+          <h4 class="middle-title">{{ 'dashboard.employee.other' | translate }}</h4>
+        </div>
+        <div class="filters" *ngIf="userId">
+          <button class="menu-button filter-btn" (click)="clearUser()">
+            <span class="material-symbols-outlined"> clear_all </span>
+            {{ 'actions.clear_filter' | translate }}
+          </button>
+        </div>
+      </div>
+
+      <div class="average-numbers mg-t-30">
+        <div class="d-flex-ju-sb row">
+          <div class="col-12 col-lg-3">
+            <div class="box-widget-new">
+              <div class="variable-remuneration">
+                <p class="widget-value bold">
+                  {{ totalUserAggregatedUserCommissionDatasets }}
+                </p>
+                <small *ngIf="totalUserAggregatedUserCommissionDatasets === 1">{{
+                  'dashboard.employee.one' | translate
+                }}</small>
+                <small *ngIf="totalUserAggregatedUserCommissionDatasets > 1">{{
+                  'dashboard.employee.other' | translate
+                }}</small>
+                <br />
+              </div>
+              <span class="font-65 gray-400 material-symbols-outlined">group</span>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="box-widget-new">
+              <div class="variable-remuneration">
+                <p class="widget-value bold">
+                  {{
+                    averageMoneyUser
+                      | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                  }}
+                </p>
+                <small>{{ 'statement.average_per_employee' | translate }}</small>
+                <br />
+              </div>
+              <span class="font-65 gray-400 material-symbols-outlined">calculate</span>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="box-widget-new">
+              <div class="variable-remuneration">
+                <p class="widget-value bold">
+                  {{ userAggregatedUserCommissionDatasetsAboveAverage }}
+                </p>
+                <small>{{ 'dashboard.employee.other' | translate }} {{ 'dashboard.above_average' | translate }}</small>
+                <br />
+              </div>
+              <span class="font-65 gray-400 material-symbols-outlined">arrow_circle_up</span>
+            </div>
+          </div>
+          <div class="col-12 col-lg-3">
+            <div class="box-widget-new">
+              <div class="variable-remuneration">
+                <p class="widget-value bold">
+                  {{ userAggregatedUserCommissionDatasetsBelowAverage }}
+                </p>
+                <small>{{ 'dashboard.employee.other' | translate }} {{ 'dashboard.below_average' | translate }}</small>
+                <br />
+              </div>
+              <span class="font-65 gray-400 material-symbols-outlined">arrow_circle_down</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sort dropdown — 4 fixed options, plain component field with no queryParams
+           or storage sync (demand 6 candidate — see selectSort() in the .ts file). -->
+      <div class="mg-t-15 mg-b-30">
+        <p>
+          <small class="bold gray-400">{{ 'dashboard.top_employees' | translate }}</small>
+        </p>
+        <span class="gray-400 material-symbols-outlined">swap_vert</span>
+        <select [(value)]="sort" (change)="selectSort($event)">
+          <option value="highest_value">{{ 'dashboard.largest_absolute_values' | translate }}</option>
+          <option value="lowest_value">{{ 'dashboard.smaller_absolute_values' | translate }}</option>
+          <option value="highest_point">{{ 'dashboard.highest_scores' | translate }}</option>
+          <option value="lowest_point">{{ 'dashboard.lowest_scores' | translate }}</option>
+        </select>
+      </div>
+
+      <div class="row">
+        <ng-container
+          *ngFor="let userAggregatedUserCommissionDataset of userAggregatedUserCommissionDatasets | slice: 0 : 3"
+        >
+          <div class="col-12 col-xl-4">
+            <div
+              class="card-top-3"
+              [ngClass]="{ selected: selectedUser?.id == userAggregatedUserCommissionDataset?.user?.id }"
+            >
+              <div class="card-top-3-item">
+                <div class="position-and-image">
+                  <div class="position">
+                    <span>{{ userAggregatedUserCommissionDataset?.ranking }}°</span>
+                  </div>
+                  <span class="user-image">
+                    <img
+                      [src]="userAggregatedUserCommissionDataset?.user?.profile?.url || '/assets/profile.png'"
+                      alt="profile"
+                      class="profile"
+                    />
+                  </span>
+                </div>
+                <div class="name-and-acess-level">
+                  <span
+                    [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+                    class="name bold"
+                  >
+                    {{ userAggregatedUserCommissionDataset?.user?.name }}
+                  </span>
+                  <br />
+                  <span
+                    [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+                    class="access-level"
+                    >{{ 'user.seat_types.' + userAggregatedUserCommissionDataset?.user?.seat?.type | translate }}</span
+                  >
+                </div>
+                <span>
+                  <a
+                    class="d-flex-al-center gap-2 font-14 semi-bold black"
+                    (click)="selectUser(userAggregatedUserCommissionDataset)"
+                    [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+                  >
+                    <span class="material-symbols-outlined drop-down">filter_list</span>
+                    <span>{{ 'actions.filter' | translate }}</span>
+                  </a>
+                </span>
+              </div>
+              <hr />
+              <div class="money-and-point-values">
+                <span
+                  [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+                  class="values"
+                >
+                  {{
+                    userAggregatedUserCommissionDataset?.money
+                      | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+                  }}
+                </span>
+                <span
+                  [ngClass]="{
+                    selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id,
+                    'gray-scale-300': userAggregatedUserCommissionDataset?.points === 0,
+                  }"
+                  class="values"
+                >
+                  {{ userAggregatedUserCommissionDataset?.points | number: '0.1-2' }}
+                  {{ 'incentives.views.points' | translate }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </ng-container>
+      </div>
+
+      <div
+        class="list"
+        *ngFor="
+          let userAggregatedUserCommissionDataset of userAggregatedUserCommissionDatasets | slice: 3 : usersVisibleCount
+        "
+      >
+        <div
+          class="list-item"
+          [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+        >
+          <span class="column-s position">{{ userAggregatedUserCommissionDataset?.ranking }}°</span>
+          <span class="user-image">
+            <img
+              [src]="userAggregatedUserCommissionDataset?.user?.profile?.url || '/assets/profile.png'"
+              alt="profile"
+              class="profile"
+            />
+          </span>
+          <span
+            [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+            class="column-xl bold name"
+          >
+            {{ userAggregatedUserCommissionDataset?.user?.name }}
+          </span>
+          <span class="column-l">
+            <span
+              [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+              class="access-level"
+              >{{ 'user.seat_types.' + userAggregatedUserCommissionDataset?.user?.seat?.type | translate }}</span
+            >
+          </span>
+          <span class="column-l values bold">
+            {{
+              userAggregatedUserCommissionDataset?.money
+                | currency: currency : currencySymbol : currencyNumberRepresentation : currencyLocale
+            }}
+          </span>
+          <span
+            class="column-l values bold"
+            [ngClass]="{ 'gray-scale-300': userAggregatedUserCommissionDataset?.points === 0 }"
+          >
+            {{ userAggregatedUserCommissionDataset?.points | number: '0.1-2' }}
+            {{ 'incentives.views.points' | translate }}
+          </span>
+          <span class="column-l">
+            <a
+              class="d-flex-al-center gap-2 font-14 semi-bold black"
+              (click)="selectUser(userAggregatedUserCommissionDataset)"
+              [ngClass]="{ selected: selectedUser?.id === userAggregatedUserCommissionDataset?.user?.id }"
+            >
+              <span class="material-symbols-outlined drop-down">filter_list</span>
+              <span>{{ 'actions.filter' | translate }}</span>
+            </a>
+          </span>
+        </div>
+      </div>
+
+      <button
+        class="has-more"
+        *ngIf="usersVisibleCount < userAggregatedUserCommissionDatasets?.length"
+        (click)="loadMoreUsers()"
+      >
+        {{ 'actions.load_more' | translate }}
+        <span class="material-symbols-outlined drop-down">arrow_drop_down</span>
+      </button>
+    </ng-container>
+  </section>
+</ng-template>
