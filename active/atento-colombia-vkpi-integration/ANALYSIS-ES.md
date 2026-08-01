@@ -1,59 +1,38 @@
-# Integración de KPIs Colombia — Estado de los requisitos y recomendaciones
+# Integración de KPIs Colombia — Estado de los requisitos
 
 **Documento técnico 4Shark · 31 de julio de 2026**
 
 **Alcance:** la tabla de indicadores del VKPI, que es la única que la integración consume.
-
-**Anexo:** `remediacion_vkpi_colombia.sql` — los scripts que implementan cada recomendación de este documento.
-
----
-
-## Propósito de este documento
-
-El 28 de julio compartimos un análisis técnico con los requisitos necesarios para integrar la base de KPIs. El 29 de julio acordamos los puntos en reunión, y quedó de su lado definir la estructura de la llave. El 30 de julio recibimos la maqueta con la propuesta.
-
-Este documento revisa cada punto contra los datos de esa maqueta: qué quedó resuelto, qué falta, y para lo que falta, exactamente qué cambio lo cierra. El anexo trae ese cambio ya escrito en SQL.
-
-Queremos avanzar y queremos entregar la estimación de esfuerzo. Con la estructura actual no podemos hacerlo con responsabilidad, y la razón es concreta: la tabla no tiene una llave que identifique una fila de manera única. Sobre una base así, cualquier plazo que diéramos sería un número puesto para responder a la pregunta, y el error aparecería recién en producción, sobre la nómina.
+**Anexo:** `remediacion_vkpi_colombia.sql`
 
 ---
 
-## Resumen de estado
+Revisamos la maqueta del 30 de julio contra los puntos que acordamos el 29. Tres quedaron cerrados y dos siguen abiertos. Este documento detalla los dos abiertos, y el anexo trae el script del único que tiene solución escrita.
+
+Queremos entregar la estimación de esfuerzo, y no podemos hacerlo todavía: la tabla no tiene una llave que identifique una fila de manera única. Sobre esa base la integración no funciona, y cualquier plazo que diéramos sería un número que no podríamos sostener.
 
 | Punto | Estado |
 |---|---|
 | Llave que identifique una fila de manera única | **Abierto** |
-| Definición del cálculo del valor del supervisor | **Abierto** |
-| Columna de valor obligatoria | **Abierto** |
-| Identificador único de la persona | Cerrado |
-| Formato de `DT_DATA` sin ambigüedad de día/mes | Cerrado |
+| Cómo se calcula el valor del supervisor | **Abierto** |
+| Identificador único de la persona | Cerrado — `NR_RE`, el código de Simplex, confirmado en la reunión y consistente con los datos |
+| Formato de `DT_DATA` | Cerrado — `yyyymmdd`, sin ambigüedad de día y mes |
 | Una sola columna con el valor del indicador | Cerrado |
-| Fechas de creación y actualización por registro | Punto de atención |
-| Tabla de metas | Postergado |
+| Fechas de creación y actualización | Recomendación de proceso, no requisito |
+| Tabla de metas | Postergado hasta cerrar indicadores |
 
 ---
 
-## 1. Requisitos abiertos
+## 1. La llave propuesta no identifica una fila
 
-### 1.1 La llave propuesta no identifica una fila
+`NR_CHAVE_EMPRESA_MES_RE` combina período, persona y servicio, pero no incluye el indicador. Como cada fila es una combinación de persona, indicador y mes, y una persona tiene en promedio 9,31 indicadores mensuales, la llave se repite:
 
-La llave propuesta, `NR_CHAVE_EMPRESA_MES_RE`, combina período, persona y servicio. Validamos su composición fila por fila y es consistente, sin una sola divergencia:
-
-```
-NR_CHAVE_EMPRESA_MES_RE = DT_DATA + "-" + NR_RE + "-" + NR_SERVIVIO_CODIGO
-```
-
-El problema es de granularidad. Cada fila representa una combinación de persona, indicador y mes — `NR_ID` cambia de fila en fila, y una persona tiene en promedio 9,31 indicadores en el mes. Como la llave no incluye el indicador, se repite:
-
-| Medición sobre la maqueta (60.924 filas) | Valor |
+| Sobre las 60.924 filas de la maqueta | |
 |---|---|
-| Valores distintos de `NR_CHAVE_EMPRESA_MES_RE` | 6.547 |
-| Llaves que aparecen más de una vez | **6.415 (98,0%)** |
+| Valores distintos de la llave | 6.547 |
+| Llaves repetidas | **6.415 (98,0%)** |
 | Máximo de filas bajo una misma llave | 19 |
-| Pares persona-mes con un solo indicador | 132 de 6.547 |
-| Filas duplicadas agregando `NR_ID` a la combinación | **0** |
-
-Un ejemplo concreto de la maqueta:
+| Duplicados agregando `NR_ID` | **0** |
 
 ```
 20260501-128178-2242   →  AUSENTISMO
@@ -61,121 +40,51 @@ Un ejemplo concreto de la maqueta:
 20260501-128178-2242   →  Calidad
 ```
 
-**El requisito** es que una fila sea identificable de manera única en la granularidad que consumimos: **período, persona, servicio e indicador**. Está verificado contra sus propios datos — con esa combinación, los duplicados bajan a cero en las 60.924 filas.
+**El requisito** es unicidad en la granularidad que consumimos: período, persona, servicio e indicador. Verificado contra sus propios datos, con esa combinación los duplicados bajan a cero.
 
-**Nuestra recomendación es resolverlo con un índice único compuesto, y no con una columna concatenada, porque la columna genera trabajo duplicado de los dos lados.**
-
-Ustedes ya escriben período, persona, servicio e indicador, cada uno en su propia columna. Materializar además una columna que concatena esos mismos cuatro valores significa escribir la misma información dos veces: una vez en las columnas y otra vez en la cadena de texto. Y del lado nuestro el costo se repite en espejo — tendríamos que leer la columna concatenada, partirla para recuperar los cuatro componentes, y de todas formas leer las columnas originales para el resto del procesamiento.
-
-Un índice único compuesto usa las columnas que ya existen, tal como están:
+**Recomendamos un índice único compuesto, no una columna concatenada, porque la columna genera trabajo duplicado de los dos lados.** Ustedes ya escriben los cuatro valores, cada uno en su columna; materializar además una cadena con esos mismos valores es escribir la misma información dos veces. Y de nuestro lado el costo se repite en espejo: tendríamos que leer la cadena, partirla para recuperar los componentes, y de todas formas leer las columnas originales.
 
 ```sql
 CREATE UNIQUE NONCLUSTERED INDEX UX_indicadores_score_periodo_persona_servicio_indicador
     ON dbo.tb_dim_indicadores_score (DT_DATA, NR_RE, NR_SERVIVIO_CODIGO, NR_ID);
 ```
 
-Nadie escribe de más y nadie parte cadenas. El motor de base de datos resuelve la unicidad de forma nativa, que es para lo que está hecho, y desaparece un riesgo que la columna concatenada trae consigo: cualquier cambio futuro en el formato de la concatenación rompería en silencio a todos los que la consumen, y aquí no hay formato que mantener.
-
-La decisión final es de ustedes, que son quienes operan la base. Lo que no puede faltar es la unicidad en esa granularidad: sin ella, nuestra carga incremental no distingue un indicador de otro y sobrescribe valores. En un proceso que alimenta remuneración variable eso no produce un error visible, produce un número equivocado que nadie nota.
-
-### 1.2 Falta definir cómo se calcula el valor del supervisor
-
-En la reunión del 29 de julio quedó planteado que el valor del supervisor no se deriva igual que el del asesor: el del asesor es una división, y el del supervisor necesita un acumulado que no se puede reconstruir desde las filas de los asesores. Quedó de su lado enviarnos dos opciones para diferenciar el tipo de operación.
-
-Esa definición sigue pendiente. No llegó en el correo, y la maqueta tampoco la responde: las filas de supervisor no están, así que no podemos deducir el criterio observando los datos. Los siete valores de `NM_CARGO_DESCRIPCION` presentes son todos de operación, y de los 229 supervisores nombrados en la columna de supervisor, 225 no tienen ninguna fila propia.
-
-**Lo que necesitamos definir** es quién calcula el acumulado del supervisor y cómo llega hasta nosotros: si viene ya calculado en su propia fila, si viene separado en otra estructura, o si la expectativa es que lo calculemos nosotros.
-
-**Nuestra posición es que el acumulado se calcule de su lado y llegue como una fila más**, con el identificador del propio supervisor y el valor ya resuelto, exactamente igual que la de un asesor. El motivo es que ese cálculo depende de la jerarquía, y la jerarquía que la plataforma 4Shark reconoce viene desde Simplex, que es su origen de registro. Si nosotros lo calculáramos recorriendo la jerarquía del VKPI, tendríamos dos sistemas afirmando el mismo hecho, mantenidos por procesos distintos y con cadencias distintas. Van a divergir, y el día que diverjan todos los números de supervisor quedan mal en silencio hasta que alguien audite una nómina.
-
-Si la solución que ustedes ven es otra, necesitamos conocerla para poder dimensionar el trabajo, porque cambia lo que tenemos que construir.
-
-### 1.3 La columna de valor tiene que ser obligatoria
-
-La estructura de una sola columna de valor por fila es la correcta y es lo que necesitamos. Lo que falta es la restricción: la columna debe ser `NOT NULL`.
-
-Un indicador sin valor no es un indicador — si la fila existe, existe porque hay una medición. Vale hacer la distinción porque no son lo mismo: **cero es un valor válido**, es simplemente un indicador que quedó en cero en el período, y no hay ningún inconveniente en enviarlo. Nulo no es un valor.
-
-En la maqueta no encontramos valores vacíos; lo que pedimos es que la restricción exista en la tabla, para que no puedan aparecer.
-
-Como referencia, del lado de la plataforma la Variable puede configurarse para asumir cero cuando no llega información, de modo que enviar la fila en cero es opcional para ustedes. Enviarla tampoco genera ningún inconveniente.
+Usa las columnas tal como están, lo resuelve el motor de forma nativa, y desaparece el riesgo de que un cambio de formato en la concatenación rompa en silencio a quien la consume. La decisión final es de ustedes; lo que no puede faltar es la unicidad, porque sin ella nuestra carga sobrescribe un indicador con otro — y en un proceso que alimenta remuneración variable eso no da error, da un número equivocado que nadie nota.
 
 ---
 
-## 2. Puntos cerrados
+## 2. Falta definir cómo se calcula el valor del supervisor
 
-### 2.1 Identificador de la persona
+En la reunión del 29 quedó planteado que el valor del supervisor no se deriva igual que el del asesor: necesita un acumulado que no se reconstruye desde las filas de los asesores. Quedó de su lado enviarnos dos opciones para diferenciar el tipo de operación.
 
-En la reunión del 29 de julio quedó confirmado que `NR_RE` es el código de Simplex que la plataforma ya recibe hoy para cada colaborador. Los datos de la maqueta son consistentes con esa definición: `NR_RE` es un código interno de cuatro a seis dígitos, en un rango de 3.433 a 129.053, distinto de la cédula en todas las filas, con 3.535 valores únicos y ninguno vacío.
+Esa definición sigue pendiente, y la maqueta tampoco la responde: no trae filas de supervisor. Los siete cargos presentes son todos de operación, y de los 229 supervisores nombrados, 225 no tienen fila propia.
 
-**El requisito, de aquí en adelante, es que el identificador siga siendo uno solo.** Una persona tiene una identidad, y esa identidad es la que la resuelve contra el usuario en la plataforma. Si en algún momento el identificador cambiara, las filas históricas quedarían referenciadas por un valor y las nuevas por otro, y la continuidad de la persona se perdería justo donde importa: en su histórico de indicadores. Por eso no podemos trabajar con dos identificadores alternativos ni con una transición entre ellos.
+**Necesitamos saber quién calcula el acumulado y cómo llega hasta nosotros**: si viene ya calculado en su propia fila, si viene en otra estructura, o cuál es la solución que ustedes ven.
 
-De nuestro lado vamos a cruzar los 3.535 identificadores de la maqueta contra la base de Colombia para confirmar que todos resuelven a un usuario existente. Es una verificación nuestra, no un pedido.
+Nuestra posición es que llegue como una fila más, con el identificador del propio supervisor y el valor ya resuelto, igual que la de un asesor. El motivo es que ese cálculo depende de la jerarquía, y la jerarquía que la plataforma reconoce viene desde Simplex, que es su origen de registro. Si lo calculáramos recorriendo la jerarquía del VKPI, dos sistemas estarían afirmando el mismo hecho con procesos y cadencias distintas; van a divergir, y el día que diverjan todos los números de supervisor quedan mal en silencio.
 
-### 2.2 Formato de `DT_DATA`
-
-La columna llega en formato `yyyymmdd`, siempre día 01, lo que resuelve la ambigüedad de día y mes que motivó el pedido original. Lo damos por cerrado y lo tomamos como definitivo.
-
-### 2.3 Una sola columna con el valor
-
-La tabla trae un único valor por fila, sin columna de tipo de cálculo. Es la estructura que necesitamos: el valor llega resuelto y la plataforma lo consume tal cual. La interpretación de ese valor — si es porcentaje, conteo, duración — y su modo de cálculo se configuran del lado de 4Shark, al registrar cada Variable.
+Si la solución que ustedes ven es otra, necesitamos conocerla para dimensionar el trabajo, porque cambia lo que tenemos que construir.
 
 ---
 
-## 3. Punto de atención — las fechas de creación y actualización
+## 3. Recomendación de proceso — las fechas
 
-Las columnas `DT_CREACION` y `DT_ACTUALIZACION` están presentes y traen fecha, así que la estructura es la que pedimos y podemos trabajar sobre ella. Observamos que ambas tienen un único valor constante, idéntico al milisegundo en las 60.924 filas, lo que es coherente con haber sido pobladas de una vez para construir la maqueta.
+Las columnas de creación y actualización están y traen fecha, así que la estructura es la que pedimos. Lo que conviene garantizar es que la fecha de creación se fije una sola vez al insertar, y que la de actualización se mueva únicamente cuando el valor cambió.
 
-Lo que conviene garantizar, y por eso lo dejamos como recomendación de proceso, es que `DT_CREACION` se fije una sola vez al insertar la fila, y que `DT_ACTUALIZACION` se mueva únicamente cuando el valor cambió — una reescritura con el mismo valor no debería tocarla. Esa segunda condición es la que hace eficiente la carga incremental.
+Para no replicar esa regla en cada rutina que escribe en la tabla, el anexo entrega un procedimiento que recibe todas las columnas como parámetros y lo resuelve por su cuenta: inserta con ambas fechas si la fila no existe, actualiza valor y fecha si el valor cambió, y no toca nada si el valor es el mismo. Basta registrarlo y hacer que el proceso de carga lo invoque. Es el mismo mecanismo que usamos en nuestro integrador.
 
-**La recomendación** es no replicar esa lógica en cada punto del código que escribe en la tabla, sino concentrarla en un procedimiento almacenado. El anexo lo entrega listo: recibe todas las columnas como parámetros y resuelve los tres casos — si la fila no existe la inserta con ambas fechas, si existe y el valor cambió actualiza el valor y la fecha de actualización, y si existe con el mismo valor no modifica nada. Basta registrarlo y hacer que el proceso de carga lo invoque en lugar de escribir directo en la tabla.
-
-Es el mismo mecanismo que usamos en nuestro integrador, y evita que la garantía dependa de que cada rutina que toque la tabla se acuerde de aplicarla.
+Una vez aplicada la estructura y en uso el procedimiento, recomendamos vaciar la tabla y recargarla desde cero, para que todo el contenido sea coherente con las reglas nuevas.
 
 ---
 
-## 4. Recomendación — recarga limpia después de aplicar la estructura
+## 4. Qué necesitamos para poder estimar
 
-Una vez aplicados los cambios de estructura y en funcionamiento el procedimiento de carga, recomendamos vaciar la tabla y volver a cargarla desde cero con los flujos ya corregidos.
+Necesitamos que resuelvan los dos puntos y nos entreguen la base ya con los cambios aplicados, para hacer un análisis final sobre la estructura real. Con eso estimamos.
 
-El motivo es que los datos actuales fueron escritos bajo las reglas anteriores: sin la restricción de unicidad y sin la semántica de fechas por registro. Una recarga limpia garantiza que todo el contenido sea coherente con la estructura nueva, en lugar de convivir con un histórico escrito bajo reglas distintas.
+La confirmación de que lo van a hacer no nos alcanza, y no es desconfianza. Entre la intención y la implementación puede aparecer un impedimento que los lleve a resolverlo de otra manera — una decisión razonable de su lado, que sin embargo puede cambiar por completo lo que nosotros tenemos que construir. Si nos enteramos al conectarnos, la estimación que hayamos dado antes ya no sirve. Por eso necesitamos conocer la solución final, implementada, y no la intención.
 
----
+Si eligen un camino distinto al recomendado no tenemos objeción, siempre que se cumplan los requisitos; solo pedimos que nos lo indiquen junto con la entrega. Ya tenemos una noción del trabajo que implica esta integración: lo que no podemos dimensionar es el efecto de definiciones que todavía no existen.
 
-## 5. Punto postergado — la tabla de metas
+Las metas quedan como seguimiento posterior — no son requisito para avanzar con indicadores.
 
-Durante el análisis identificamos que las metas encajan en este flujo, y quedó registrado que la definición de su plantilla estaba pendiente.
-
-Lo dejamos como seguimiento posterior. No es un requisito para avanzar con los indicadores y preferimos no sumarlo al alcance actual: primero cerramos la integración de indicadores y después retomamos las metas con la atención que requieren.
-
-Cuando lo retomemos, el criterio que ya conversamos se mantiene: tabla separada de la de indicadores, con su propio par de fechas. Indicador y meta cambian con cadencias distintas, y si comparten fila comparten par de fechas, con lo cual la fecha de actualización deja de indicar cuál de los dos cambió.
-
----
-
-## 6. Cómo trabaja la plataforma 4Shark
-
-Estas definiciones explican por qué los requisitos anteriores tienen la forma que tienen.
-
-**Consumimos una sola tabla.** Las demás tablas del VKPI son de uso interno de ustedes y no forman parte de la integración.
-
-**La jerarquía se mantiene con un único origen.** La plataforma ya recibe desde Simplex la identidad de cada persona, su cargo y su responsable. Por eso 4Shark no consume las columnas de supervisor, gerente, gestor, cargo ni estado del empleado de la tabla de KPIs. Lo dejamos explícito para evitar que en el futuro se intente conciliar información por esas columnas: en el momento en que las dos fuentes difieran, cualquier conciliación produciría un resultado incorrecto sin señal de error.
-
-**Un valor final por fila.** El modelo consume un valor único por combinación de persona, indicador y período. Cualquiera que sea el tipo de operación de origen — suma, división, acumulado — debe resolverse antes de que la fila llegue a nosotros. No sumamos numeradores y denominadores entre filas, no promediamos y no agregamos hacia arriba en la jerarquía.
-
-**Las Variables se configuran en la plataforma.** El equipo funcional las registra en 4Shark, y ahí se define su tipo de dato y su modo de cálculo. No creamos Variables automáticamente a partir de la base de KPIs. Si llega un indicador cuya Variable no está registrada, la API lo rechaza, el rechazo aparece en el informe de integración, les avisamos, y una vez registrada reenviamos la información.
-
----
-
-## 7. Qué necesitamos para poder estimar
-
-El anexo contiene los scripts en orden de ejecución, cada uno con su consulta de verificación previa. La sección final reúne las consultas de aceptación que ejecutamos sobre la base para dar por cerrada la remediación, de modo que el resultado se pueda comprobar del lado de ustedes antes de avisarnos.
-
-Necesitamos una de estas dos respuestas.
-
-**Que confirmen que van a implementar la estructura recomendada.** Con esa confirmación empezamos a planificar de inmediato, porque ya conocemos la estructura destino: está definida en este documento y escrita en el anexo. La estimación sale rápido porque no hay nada que descubrir.
-
-**O que nos indiquen cómo van a cubrir cada requisito, si prefieren resolverlo de otra manera.** Es una alternativa legítima y no tenemos objeción a que la implementación sea distinta mientras se cumplan los requisitos. Lo que necesitamos que quede claro es que en ese caso la estimación llega después: tenemos que esperar a que la nueva estructura esté implementada, revisarla, y recién entonces dimensionar el trabajo. La forma que elijan cambia lo que tenemos que construir de nuestro lado, y por eso la decisión nos condiciona directamente.
-
-Lo que no podemos hacer es estimar sobre la estructura actual, donde los registros se duplican bajo la llave propuesta. No es una cuestión de preferencia técnica: sobre esa base la integración no funciona.
-
-Quedamos con disposición para acompañar la ejecución de los scripts en una sesión técnica conjunta, si eso acelera el cierre.
+Quedamos con disposición para acompañar la ejecución del script en una sesión técnica conjunta, si eso acelera el cierre.

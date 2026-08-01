@@ -21,8 +21,7 @@ The commitment stands and is honored: the roadmap is delivered, structured by ph
 | Requirement | Status |
 |---|---|
 | A row is uniquely identifiable at period + person + service + indicator | Open — the proposed key repeats on 98.0% of its values |
-| Supervisor rows carrying their accumulated value | Open — the sample contains none |
-| Value column is `NOT NULL` | Open — the constraint is absent |
+| How the supervisor's accumulated value is computed, and by whom | Open — the two options promised in the 29-jul call never arrived, and the sample carries no supervisor rows to infer it from |
 | A single person identifier, stable over time | Closed — `NR_RE` is the Simplex code, confirmed in the 29-jul call and consistent with the data |
 | `DT_DATA` free of day/month ambiguity | Closed — delivered as `yyyymmdd` |
 | One column carrying the indicator value | Closed |
