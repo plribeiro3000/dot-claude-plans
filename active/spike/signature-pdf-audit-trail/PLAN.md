@@ -7,7 +7,7 @@
 
 ## Execution status
 
-> **NEXT SESSION (Monday test): read the `### 2026-07-24 — MONDAY TEST READINESS` entry below** — it is the executable runbook (current state, the one gating naming-fix decision, the two-track test plan, and the step-by-step). Start there.
+> **NEXT SESSION: read the `### 2026-08-03` entry (latest) below.** Still in the CODE phase — no production run has happened yet. #5275 shipped the per-audit navigable folder tree (`YYYY/MM/<plano>/`) + single-source filename in both standalone finalizers. **Next code step: the unified all-together coordinator** (build-sequence step 2 — a new operator-triggered process that runs BOTH audits and merges rule + result into one `year → month → plano` tree; it does not exist in `app/workers` yet). Only AFTER the code is complete come the operational steps — the Track-1 machinery test (the `### 2026-07-24 — MONDAY TEST READINESS` runbook) and the RedeBrasil old-front token-login route (Track 2, front-end dependency).
 
 **Machinery is fully deployed as of 2026-07-24.** Both standalone audits (rule PR #5257 + result PR #5253) are merged; Chromium is baked into the shared image (#5260); the terraform worker is applied on both productive stacks (terraform #828); app release **3.57.0** shipped the Chromium `:latest` to all 4 envs. The feature is ready to test end-to-end. **No code/infra work remains** — the scale-workflow naming fix (app PR [#5265](https://github.com/4shark/app/pull/5265)) is merged to develop, so the queue-scale step targets the right ECS names and each service maps to its exact sidekiq config. Monday is purely operational: run the runbook with a new-front company. (RedeBrasil itself still waits on the old-front token-login route — Track 2.) The **RedeBrasil-specific** run is still blocked on the old-front token-login route, so Monday tests the machinery on a new-front company first. Frontend Phase 1 (PR [app-webclient#6613](https://github.com/4shark/app-webclient/pull/6613)) is live; the unified all-together coordinator (build-sequence step 2) is a later delivery redesign, not needed for the machinery test.
 
@@ -134,6 +134,20 @@ Two PRs landed, closing build-sequence step 1 (the standalone rule audit) and th
 **What the Monday session needs from the engineer:** only the Track-1 test `company_id` / `plan_id` (a new-front company) and which FQDN counts as the new front. All code/infra pre-reqs are done (terraform #828 applied, release 3.57.0 deployed, scale fix #5265 merged).
 
 **NOT owed for Monday's machinery test:** the unified all-together coordinator (year → month → plano tree, many ZIPs — build-sequence step 2). Monday validates ONE standalone audit (rule or result) end-to-end; the coordinator is the later delivery redesign.
+
+### 2026-08-03 — Navigable folder tree + single-source filename in both standalone finalizers (#5275 merged)
+
+**PR [app#5275](https://github.com/4shark/app/pull/5275) (merged to develop)** applied the navigable folder shape INSIDE each standalone audit's ZIP. Both finalizers (`PlanStatementPortableBatch::Finalizer`, `StatementPortableBatch::Finalizer`) now file each PDF under a `YYYY/MM/<plan-folder>/` tree with the XLSX manifest at the ZIP root. This is the per-audit navigable shape from the delivery redesign (§ 2026-07-22 decision #2 / § 2026-07-23 confirmed structure) — it is **NOT** the unified all-together coordinator (build-sequence step 2): each audit still produces its OWN ZIP, and merging rule + result into one `year → month → plano` tree remains owed.
+
+**Single source of truth for the per-PDF filename.** The name moved onto the portable models, which represent the exported PDF: `PlanStatementPortable#file_name(date:)` and `StatementPortable#file_name(date:)`. This removed the four duplicated definitions (two finalizers + two worksheet manifests) that could drift, so the ZIP entry and the manifest row are always the same name. The caller passes the same date it files the folder under (`date:` named param — the model no longer reaches into `interval`/`period`); the model derives `plan.id` / user identifier / `statement.id` from its own `statement`.
+
+**Domain-path fixes made along the way (all schema-verified this session):**
+- **Single-frequency calendars were being silently dropped.** The plan flow selected `calendar.intervals.monthly`, empty for a `calendar.single?` calendar, so single-frequency plans produced no ZIP entry and no manifest row. Now it selects `intervals.single` for single-frequency and `intervals.monthly` otherwise (the >2-interval → last rule lives inside the monthly branch). Two Copilot threads flagged this same finding and were resolved as already-fixed.
+- **Result side reaches plan/period through `commission`, not `user_commission`.** `user_commissions` has no `plan_id`/`period_id` (schema); `commissions` has both (`schema.rb:484-485`). `StatementPortable#file_name` and the result finalizer/worksheet now derive `statement.commission.plan` / `.period` — the established idiom (`statement_audit_work_book` uses `commission.plan`). The rule side keeps `plan_statement.plan`, a real direct FK (`plan_statements.plan_id`).
+- **Filename separator is hyphen, no spaces** (`a-b-c.pdf`), matching the exporter convention (`plan_goal_audit` etc.); a space breaks downstream tooling.
+- **Kaizen:** the dead `delegate :cached, :file_url, to: :attachment` on both portable item models was removed — workers read the S3 file via `attachment.file.read` / `attachment.local_cached_file`, never `portable.cached`/`file_url`.
+
+Rubocop green; the two portable model specs pass (the finalizers/worksheets carry no specs, consistent with the audit triad). No unified-coordinator work in this PR.
 
 ### Decisions made (2026-07-20 session)
 

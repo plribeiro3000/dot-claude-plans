@@ -1,0 +1,168 @@
+VKPI Colombia — schema dump
+Server: COLBOGSQL58\MSSQL58_KPI
+Captured: 2026-08-03 by Paulo Ribeiro (SSMS, direct connection)
+Source: the five INFORMATION_SCHEMA / sys catalog queries agreed in session
+
+Scope: STRUCTURE of the VKPI source. The rows on this server are sample data;
+the data analysis lives elsewhere, against the files Atento sent.
+Keep this file as the reference for the VKPI source structure.
+
+
+================================================================================
+QUERY 1 — TABLES
+================================================================================
+
+table_schema  table_name                      table_type
+dbo           tb_dim_indicadores              BASE TABLE
+dbo           tb_dim_indicadores_score        BASE TABLE
+dbo           tb_dim_mapa_operacional_mensal  BASE TABLE
+dbo           tb_dim_programa                 BASE TABLE
+
+
+================================================================================
+QUERY 2 — COLUMNS
+================================================================================
+
+table_schema	table_name	position	column_name	data_type	max_length	numeric_precision	numeric_scale	is_nullable	column_default
+dbo	tb_dim_indicadores	1	NR_ID_PAIS	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	2	NM_PAIS	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	3	NR_ID	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores	4	NM_INDICADOR_STANDARD	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	5	NM_UTILIZADO_EN_EL_PAIS	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	6	NM_INDICADOR_EN_EL_PAIS	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	7	NM_SEGUIMIENTO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	8	NM_TIPO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	9	NM_SUBTIPO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	10	NM_NATURALEZA	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	11	NM_DESCRIPCION	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	12	NM_LOGRO_DE_META	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	13	NM_TIENE_META	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	14	NM_CALCULO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	15	Ano	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	16	Mes	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores	17	Dia	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	1	NR_CHAVE_EMPRESA_MES_RE	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_indicadores_score	2	NR_CHAVE_EMPRESA_DIA_RE	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_indicadores_score	3	DT_DATA	date	NULL	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	4	NR_EMPRESA	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	5	NR_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	6	NR_INDICADOR	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	7	NR_LLAVE_CUARTIL	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	8	NR_SERVIVIO_CODIGO	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	9	NR_NUMERADOR	float	NULL	53	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	10	NR_DENOMINADOR	float	NULL	53	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	11	NM_FAIXA	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	12	FL_SCORE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	13	NM_QUARTIL	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	14	NR_SCORE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_indicadores_score	15	NR_CHAVE_METAS_MES_RE	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_indicadores_score	16	NM_EMPLEADO_ACTIVO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	1	DT_DATA	date	NULL	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	2	NR_REGIAO	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	3	NR_ID_FUNCIONARIO	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	4	NM_FUNCIONARIO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	5	NM_EMPLEADO_ACTIVO	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	6	NM_CARGO_DESCRIPCION	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	7	NR_SERVIVIO_CODIGO	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	8	NR_VICE_PRESIDENTE_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	9	NM_VICE_PRESIDENTE	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	10	NR_DIRETOR_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	11	NM_DIRETOR	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	12	NR_GESTOR_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	13	NM_SUPERINTENDENTE	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	14	NR_GERENTE_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	15	Cedula	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	16	NM_GERENTE	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	17	NM_GESTOR	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	18	NR_SUPERINTENDENTE_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	19	NM_SUPERVISOR	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	20	NR_SUPERVISOR_RE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	21	NR_CHAVE_EMPRESA_MES_RE	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	22	NR_CHAVE_EMPRESA_DIA_RE	float	NULL	53	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	23	FL_QUARTILIZA	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	24	Ano	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	25	Mes	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	26	NR_CHAVE_EMPRESA_MES_RE_SUPERVISOR	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	27	NR_CHAVE_EMPRESA_MES_RE_GESTOR	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_mapa_operacional_mensal	28	NR_CHAVE_EMPRESA_MES_RE_GERENTE	bigint	NULL	19	0	YES	NULL
+dbo	tb_dim_programa	1	DT_DATA	date	NULL	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	2	NR_REGION	int	NULL	10	0	YES	NULL
+dbo	tb_dim_programa	3	NM_REGION	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	4	NR_CLIENTE	int	NULL	10	0	YES	NULL
+dbo	tb_dim_programa	5	NM_CLIENTE	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	6	NR_PROGRAMA	int	NULL	10	0	YES	NULL
+dbo	tb_dim_programa	7	NM_PROGRAMA	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	8	NM_STATUS_PROGRAMA	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	9	NM_TIPO_FACTURACION	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	10	NM_INTEGRACION	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	11	Ano	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	12	Mes	varchar	8000	NULL	NULL	YES	NULL
+dbo	tb_dim_programa	13	Dia	varchar	8000	NULL	NULL	YES	NULL
+
+
+================================================================================
+QUERY 3 — INDEXES, PRIMARY KEYS, UNIQUE CONSTRAINTS
+================================================================================
+
+EMPTY RESULT SET.
+
+No index, no primary key and no unique constraint exists on any of the four
+tables. Nothing enforces row uniqueness at the database level.
+
+
+================================================================================
+QUERY 4 — FOREIGN KEYS
+================================================================================
+
+EMPTY RESULT SET.
+
+No foreign key is declared anywhere. The relation
+tb_dim_indicadores_score.NR_INDICADOR -> tb_dim_indicadores.NR_ID
+is logical only; the database does not enforce it.
+
+
+================================================================================
+QUERY 5 — ROW COUNTS
+================================================================================
+
+table_schema  table_name                      row_count
+dbo           tb_dim_indicadores                    739
+dbo           tb_dim_indicadores_score              355
+dbo           tb_dim_mapa_operacional_mensal     18,360
+dbo           tb_dim_programa                       809
+
+These counts are sample data. This server holds example rows for structural
+work, not the production volume. Draw no conclusion about the data from them —
+the data analysis was done against the files Atento sent.
+
+
+================================================================================
+READING NOTES
+================================================================================
+
+1. This dump is authoritative for STRUCTURE only.
+
+2. The column set here differs from the files Atento sent:
+     database              16 columns, NR_INDICADOR, NR_NUMERADOR, NR_DENOMINADOR
+     Maqueta.csv (30-jul)  22 columns, NR_ID, RESULTADO, HC, HC_Total, DT_CREACION / DT_ACTUALIZACION
+     Propuesta (02-ago)    22 columns, NR_ID, RESULTADO, HC, HC_Total, DT_CREATED / DT_MODIFIED
+   The indicator column is NR_INDICADOR here and NR_ID in both files. What that
+   divergence means — a structure not yet applied here, or a different
+   environment — is not settled by this dump.
+
+3. tb_dim_indicadores has NO column holding a 4Shark variable key. Its
+   identifying columns are NR_ID (int) plus three name columns:
+   NM_INDICADOR_STANDARD, NM_UTILIZADO_EN_EL_PAIS, NM_INDICADOR_EN_EL_PAIS.
+   NM_INDICADOR_STANDARD is a cross-country standard name and is the only
+   candidate for a stable textual key.
+
+4. Every column in all four tables is nullable and none has a default. This is
+   the same finding recorded as point 7 of the 28-jul document, still true.
+
+5. DT_DATA is typed `date` in the database. The day/month inversion reported in
+   point 6 of the 28-jul document is a load-process defect, not a type problem.
+
+6. tb_dim_mapa_operacional_mensal holds the VKPI hierarchy — supervisor,
+   gestor, gerente, superintendente, diretor and vice-presidente, each as an RE
+   number plus a name. This is the parallel hierarchy that guardrail G1 forbids
+   consuming; the platform's hierarchy of record is Simplex.

@@ -1,0 +1,97 @@
+Raw evidence extracted directly from the installed Claude Code desktop app binary
+on this machine, for the SPIKE at
+~/Projects/4Shark/dot-claude-plans/active/spike/full-bash-command-visibility/SPIKE.md
+
+Source binary: /Applications/Claude.app/Contents/Resources/app.asar
+Desktop shell version (Info.plist CFBundleShortVersionString): 1.24012.9
+Embedded Claude Code engine version strings found in the bundle (grep -o
+'"2\.1\.[0-9]*"' | sort -u): "2.1.2", "2.1.217", "2.1.219", "2.1.94"
+(the engineer-reported running engine version for this session is 2.1.220;
+these are neighboring version-check/update-metadata strings inside the bundle,
+not necessarily the single currently-executing version literal)
+
+Extraction command:
+  strings /Applications/Claude.app/Contents/Resources/app.asar > /tmp/claude_app_strings_20260803.txt
+
+Total extracted string lines: 252211
+
+=== Occurrence counts for hook-related JSON field names (case-sensitive) ===
+
+  grep -c "additionalContext"        /tmp/claude_app_strings_20260803.txt   -> 4
+  grep -c "hookEventName"            /tmp/claude_app_strings_20260803.txt   -> 5
+  grep -c "permissionDecisionReason" /tmp/claude_app_strings_20260803.txt   -> 3
+  grep -c "hookSpecificOutput"       /tmp/claude_app_strings_20260803.txt   -> 5
+  grep -c "systemMessage"            /tmp/claude_app_strings_20260803.txt   -> 0   (case-sensitive)
+  grep -ci "systemMessage"           /tmp/claude_app_strings_20260803.txt   -> 2   (case-insensitive; see below — false match)
+  grep -ci "system_message"          /tmp/claude_app_strings_20260803.txt   -> 0
+  grep -c "\"systemMessage\""        /tmp/claude_app_strings_20260803.txt   -> 0   (quoted JSON-key form)
+
+The 2 case-insensitive hits for "systemmessage" are NOT the hook field — they
+are an unrelated internal option name "includeSystemMessages" (conversation/
+transcript filtering), confirmed by context:
+
+  grep -io ".\{60\}systemmessage.\{60\}" /tmp/claude_app_strings_20260803.txt
+
+  Hit 1: "ction eC(e,t){let r=await Uee(e),n=(t==null?void 0:t.includeSystemMessages)??!1,i=r.filter(a=>zee(a,n)).map(a=>YO(a));return QO(i,t)}"
+  Hit 2: "i.length===0?[]:Fee(i,{limit:r.limit,offset:r.offset,includeSystemMessages:r.includeSystemMessages})}async function Ile(e,t,r){if(!bt"
+
+Interpretation: additionalContext, hookEventName, and hookSpecificOutput all
+survive minification as literal object-key/string-literal tokens (property
+names and string comparisons are not renamed by standard JS minifiers/bundlers
+unless accessed exclusively via computed/bracket notation with a separately
+mangled variable). The literal string "systemMessage" does not appear
+ANYWHERE in the bundle, in any casing, in any form. This is a necessary (not
+merely suggestive) condition for the app to read a `systemMessage` key off a
+parsed hook-output JSON object by that name — if the app never contains the
+literal string, it cannot be doing `obj.systemMessage` or `obj["systemMessage"]`
+anywhere in this build (2.1.220-adjacent). It is *consistent with* (does not
+prove beyond doubt, since dead-code elimination or a build-time renamed
+constant are logically possible but a priori not designed-for a *public,
+documented* hook contract field) the field being unread/unrendered in this
+build of the desktop app.
+
+=== permissionDecisionReason usage sites found in the bundle ===
+
+Command: grep -o ".\{80\}permissionDecisionReason.\{80\}" /tmp/claude_app_strings_20260803.txt
+
+  Site 1:
+  }),{}):{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:"This tool requires explicit approval regardless of permission mode."}}}]},{mat
+
+  Site 2:
+  se"?{}:{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:"Organization policy requires approval for this tool."}}]}]}}const Pa="Workflow
+
+  Site 3:
+  in"}),{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:s?"This tool is unavailable in unattended sessions (scheduled-task runs and rem
+
+  Site 4 (repeat of pattern in a second internal policy path):
+  }return{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:"This tool requires explicit approval regardless of permission mode."}}}]},{mat
+
+  Site 5:
+  ed"}),{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:i?C.WORKFLOW_CONSENT_MANAGED_DECISION_REASON:C.WORKFLOW_CONSENT_INDETERMINATE_D
+
+  Site 6:
+  SON}}):{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"ask",permissionDecisionReason:"This tool requires explicit approval regardless of permission mode."}}}]},{mat
+
+Interpretation: these are Claude Code's OWN internal/managed-policy hook
+outputs (organization policy / unattended-session / workflow-consent gates),
+not user-authored hooks. They corroborate that the "ask" and "deny"
+permissionDecision values, paired with a permissionDecisionReason string, are
+a live, exercised code path inside this exact binary — i.e., the app
+definitely has rendering logic for permissionDecisionReason on ask/deny
+(the app's own built-in features depend on the user seeing that reason),
+which is consistent with the docs' claim (see SPIKE.md Finding 4).
+
+=== Search attempts that found nothing relevant (reported as such, not guessed) ===
+
+  grep -o ".\{50\}\.slice(0,100).\{50\}"                              -> 0 matches
+  grep -oi ".\{40\}truncat[a-z]*.\{0,60\}command.\{0,40\}"            -> 1 unrelated match (background-task timeout message, not permission-dialog truncation)
+  grep -io ".\{40\}run this command.\{40\}"                            -> 0 matches
+  grep -io ".\{40\}want to allow.\{80\}"                                -> 0 matches
+  grep -io ".\{60\}bash command.\{60\}"                                 -> matches found, but only tool-definition/timeout copy, not permission-dialog copy
+
+No UI copy string for the Bash permission-approval dialog itself (e.g. "Allow
+Claude to run <command>?") was found via strings/grep in this bundle. This is
+expected — the desktop app is Electron-based and the interactive dialog is
+very likely rendered by a separate renderer-process bundle/webpack chunk not
+searched here, or the copy is composed from smaller fragments at runtime.
+This file records the negative result rather than omitting it.
