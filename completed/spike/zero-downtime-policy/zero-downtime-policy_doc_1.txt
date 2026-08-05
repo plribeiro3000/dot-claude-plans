@@ -1,0 +1,121 @@
+Source: https://code.claude.com/docs/en/permission-modes
+Fetched: 2026-08-04
+Section quoted: "What the classifier blocks by default" and "Boundaries you state in conversation"
+(part of the "Eliminate permission prompts with auto mode" section)
+
+Verbatim excerpt — auto mode overview:
+
+"Auto mode lets Claude execute without routine permission prompts. A separate
+classifier model reviews actions before they run, blocking anything that
+escalates beyond your request, targets unrecognized infrastructure, or
+appears driven by hostile content Claude read. Explicit ask rules still force
+a prompt."
+
+Verbatim excerpt — Warning box:
+
+"Auto mode reduces permission prompts but does not guarantee safety. Use it
+for tasks where you trust the general direction, not as a replacement for
+review on sensitive operations."
+
+Verbatim excerpt — "What the classifier blocks by default", "Blocked by
+default" list (full list, order preserved as published):
+
+- Downloading and executing code, like `curl | bash`
+- Sending sensitive data to external endpoints
+- Production deploys and migrations
+- Mass deletion on cloud storage
+- Granting IAM or repo permissions
+- Modifying shared infrastructure
+- Irreversibly destroying files that existed before the session
+- Force push
+- Committing or pushing a change that would send secrets or sensitive data
+  outside the repository when it runs, or widen what a deploy exposes. [...]
+- `git reset --hard`, `git checkout -- .`, `git restore .`, `git clean -fd`,
+  `git stash drop`, or `git stash clear`, which the classifier presumes would
+  discard uncommitted changes
+- `git commit --amend` when the commit at HEAD was not created in this
+  session
+- From v2.1.198, `git commit --amend` when the commit at HEAD has already
+  been pushed. [...]
+- `terraform destroy`, `pulumi destroy`, `cdk destroy`, or `terragrunt
+  destroy`, and applying a plan that destroys resources
+
+Claude Code v2.1.195 and later block more categories by default (additional
+items, order preserved, non-downtime items abbreviated with [...]):
+
+- Writing to a secret manager, or changing DNS records or TLS certificates
+- Merging a pull request no human has approved, approving Claude's own pull
+  request, or disabling CI checks
+- Posting a comment that is itself a command to automation, such as
+  `atlantis apply` or a bot's `/deploy` or `/merge`
+- Toggling, ramping, or deleting a production feature flag
+- Applying infrastructure changes to a protected IaC scope, or draining and
+  removing cluster nodes
+- Writes to a shared compute cluster that reach beyond the resource you
+  named, such as a label selector or `--all` that catches other users' jobs
+- [...]
+- Running a command with a flag that disarms a safety guard, like
+  `--insecure`
+- Launching an autonomous agent loop that runs without human approval or a
+  sandbox, such as one started with `--dangerously-skip-permissions` or
+  `--no-sandbox`. [...]
+- [...]
+
+Claude Code v2.1.200 and later also block these by default (non-downtime
+items abbreviated):
+
+- Commenting out, deleting, or force-passing a test or assertion that guards
+  security behavior, such as auth, access control, input validation, or
+  sandboxing
+- Deleting or tearing down a stateful resource Claude didn't create in the
+  session, when no more specific deletion rule applies and you didn't name
+  that resource
+- Repointing an API base URL, proxy endpoint, webhook receiver, or registry
+  mirror at a third-party host that doesn't fit the task, including in
+  example files like `.env.example`
+- [...]
+
+Verbatim excerpt — "Boundaries you state in conversation":
+
+"The classifier treats boundaries you state in the conversation as a block
+signal. If you tell Claude "don't push" or "wait until I review before
+deploying", the classifier blocks matching actions even when the default
+rules would allow them. A boundary stays in force until you lift it in a
+later message. Claude's own judgment that a condition was met does not lift
+it."
+
+"Boundaries are not stored as rules. The classifier re-reads them from the
+transcript on each check, so a boundary can be lost if context compaction
+removes the message that stated it. For a hard guarantee, add a deny rule
+instead."
+
+Verbatim excerpt — "How the classifier evaluates actions" (decision order):
+
+"Each action goes through a fixed decision order. The first matching step
+wins:
+
+1. Actions matching your allow, ask, or deny rules resolve immediately. [...]
+2. Read-only actions and file edits in your working directory are
+   auto-approved, except writes to protected paths
+3. Everything else goes to the classifier. [...]
+4. If the classifier blocks, Claude receives the reason and tries an
+   alternative. [...]"
+
+Verbatim excerpt — permission mode table (relevant rows only):
+
+| Mode                | What runs without asking                                        |
+|---------------------|-------------------------------------------------------------------|
+| default             | Reads only                                                        |
+| acceptEdits         | Reads, file edits, and common filesystem commands                 |
+| auto                | Everything, with background safety checks                         |
+| bypassPermissions   | Everything                                                         |
+
+Note on scope: 4Shark's environment (per this session's system context, the
+SubagentStart injection and settings.json) runs the default permission mode
+with an explicit allow/ask/deny list and PreToolUse hooks — NOT auto mode's
+classifier. This source is cited for what ANTHROPIC ITSELF considers the
+correct default posture for "production deploys and migrations" and
+"modifying shared infrastructure" (both blocked-by-default in auto mode),
+which is evidence about the vendor's own risk model for this category of
+action, not a description of a mechanism currently active in 4Shark's
+Claude Code configuration.

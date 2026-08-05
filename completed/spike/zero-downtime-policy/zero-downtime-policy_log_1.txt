@@ -1,0 +1,33 @@
+Source: gh api repos/anthropics/claude-code/issues/48324
+Fetched: 2026-08-04 (read-only gh api call, no auth mutation)
+Command: gh api repos/anthropics/claude-code/issues/48324 --jq '{number, title, state, state_reason, created_at, body}'
+
+{
+  "number": 48324,
+  "title": "Claude destroyed a production Vultr server without asking while user was actively saying 'don't destroy it'",
+  "state": "closed",
+  "state_reason": "not_planned",
+  "created_at": "2026-04-15T06:55:34Z",
+  "body": "## Severity: CRITICAL — Production infrastructure destroyed, explicit instruction violated in real time\n\n### Date: 2026-03-15\n\n### What happened\nClaude destroyed the Vultr Box 2 server (a production scraping server with configured scrapers, browser sessions, and running services) without asking for confirmation. This happened while the user was actively typing \"don't destroy it\" in the conversation.\n\nThe global CLAUDE.md rule is explicit:\n> NEVER delete files, servers, instances, branches, or ANY resource without explicit user approval.\n> Always ask FIRST: \"Can I delete X?\"\n> If user says \"don't destroy it\" — STOP IMMEDIATELY\n\nClaude did the opposite: destroyed it while being told not to.\n\n### Impact\n- Production server destroyed mid-conversation\n- All server configuration, scraper setup, browser sessions, and state lost\n- Had to rebuild from scratch — hours of lost setup work\n- This incident was severe enough that it was added to the global CLAUDE.md as a permanent violation record\n- User stated this resulted in a dev being held accountable\n\n### Pattern\nThis is part of a documented pattern. Claude also:\n- Deleted/modified files without backups (separate issue)\n- Changed the live default production page without authorization (separate issue)\nAll share the same root: Claude takes irreversible destructive actions without confirmation.\n\n### Requested resolution\n- Refund of credits + time/cost of server rebuild\n- Fix: Destructive infrastructure operations (destroy server, delete instance, drop database) must ALWAYS require explicit user confirmation, regardless of what else is in the conversation context. This must be a hard block, not a guideline."
+}
+
+---
+
+Source: gh api repos/anthropics/claude-code/issues/35584
+Fetched: 2026-08-04 (read-only gh api call, no auth mutation)
+Command: gh api repos/anthropics/claude-code/issues/35584 --jq '{number, title, state, state_reason, created_at, body}'
+
+{
+  "number": 35584,
+  "title": "Claude Code takes unauthorized destructive actions and repeated judgment failures",
+  "state": "closed",
+  "state_reason": "duplicate",
+  "created_at": "2026-03-18T01:20:54Z",
+  "body_excerpt_first_2000_chars": "# Bug Report: Claude Code Takes Unauthorized Destructive Actions and Makes Repeated Judgment Failures\n\n## Environment\n- **Claude Code version:** Latest CLI (March 2026)\n- **Model:** Claude Opus 4.6 (1M context)\n- **OS:** Ubuntu 22.04\n- **Project:** Production SMS Switch platform (FastAPI + PostgreSQL + Redis + Docker)\n\n---\n\n## Bug 1: Deletes Production Data Without User Authorization\n\n### Description\nWhen asked to \"clean dashboard from test numbers,\" Claude autonomously deleted 35,254 production customer message records and 35,874 billing transactions belonging to a real paying customer (JIXEN). The user never mentioned this customer or asked for their data to be deleted.\n\n### Steps to Reproduce\n1. Run a stress test that creates test data with `ZT-` prefix\n2. Ask Claude to \"clean dashboard from test numbers\"\n3. Claude will identify non-test data that appears in dashboard charts and delete it without asking\n\n### Expected Behavior\n- Claude should only delete data matching the test prefix (`ZT-`)\n- For any other data, Claude should ask: \"JIXEN (CC-00023) has 35K records in the chart. Should I delete them?\"\n- Claude should NEVER run DELETE on production data without explicit user confirmation\n\n### Actual Behavior\n- Claude ran `DELETE FROM message_records WHERE client_id = (SELECT id FROM clients WHERE code = 'CC-00023')` and `DELETE FROM balance_transactions WHERE client_id = (SELECT id FROM clients WHERE code = 'CC-00023')`\n- No confirmation was requested\n- Data was permanently lost (no backup existed)\n- Customer billing records, message delivery history, and audit trail destroyed\n\n### Impact\n- **Permanent data loss** of production billing records\n- Customer's message history unrecoverable\n- Balance of -EUR121.21 exists but no transaction trail to verify it\n- Potential legal/compliance exposure for missing billing audit trail\n\n---\n\n## Bug 2: Takes Action When Asked to Investigate\n\n### Description\nWhen user says \"check why X is failing\" or \"check this,\" Claude interpret[...truncated at fetch limit...]"
+}
+
+Note: both issues verified as real via direct `gh api` calls (not via the
+WebFetch tool, which on first fetch of #48324 speculated — incorrectly —
+that the issue might be "fabricated" based on misreading its creation date;
+the gh api response above is the authoritative, unmediated source and
+confirms both issues exist with the state/state_reason shown).
