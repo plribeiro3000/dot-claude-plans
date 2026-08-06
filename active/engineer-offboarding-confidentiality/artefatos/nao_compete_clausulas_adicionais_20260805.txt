@@ -1,0 +1,126 @@
+CLÁUSULAS ADICIONAIS E AJUSTES — INSTRUMENTO DE NÃO CONCORRÊNCIA E CONFIDENCIALIDADE
+Texto limpo para inserção no documento. 5 de agosto de 2026.
+
+
+=====================================================================
+PARTE 1 — LACUNAS QUE PRECISAM SER PREENCHIDAS ANTES DA ASSINATURA
+=====================================================================
+
+Nenhuma destas pode ir em branco. As quatro primeiras decidem a validade da obrigação de não concorrência.
+
+1. Cláusula 2.1 — prazo da não concorrência. Referência: 12 meses foi validado pelo TST em caso concreto; 24 meses é o teto confortável na jurisprudência.
+
+2. Cláusula 2.2 — atividade concorrente protegida. Precisa ser estreita e nomeada: soluções de remuneração variável, comissionamento e incentivo de força de vendas. Jamais "tecnologia" ou "desenvolvimento de software", que caracterizam impedimento genérico e derrubam a cláusula.
+
+3. Cláusula 2.4 — limitação territorial. Deve corresponder ao mercado em que a EMPRESA efetivamente atua.
+
+4. Cláusula 9.1 — contrapartida. É o requisito sem o qual nada se sustenta. Referência prática do precedente do TST: seis salários para doze meses de restrição.
+
+5. Cláusula 2.5 — lista exemplificativa de concorrentes. Pode ficar sem lista; se usada, manter o caráter exemplificativo já previsto.
+
+6. Cláusula 3.1 — prazo da não solicitação de clientes.
+
+7. Cláusula 5.1 — prazo do não aliciamento.
+
+8. Cláusula 10.1 — valor da multa. Recomenda-se limitá-la ao total da contrapartida prevista na Cláusula 9.
+
+9. Cláusula 12.3 — prazo da confidencialidade.
+
+10. Cláusula 17.2 — foro.
+
+11. Qualificação das partes — razão social, CNPJ, endereço, nome completo, RG, CPF, datas de admissão e desligamento, cargo.
+
+
+=====================================================================
+PARTE 2 — CLÁUSULAS A ACRESCENTAR
+=====================================================================
+
+
+--- 2.1 — AUTONOMIA DA CONFIDENCIALIDADE (inserir após a Cláusula 14) ---
+
+CLÁUSULA 14-A — DA AUTONOMIA DAS OBRIGAÇÕES DE CONFIDENCIALIDADE E PROPRIEDADE INTELECTUAL
+
+14-A.1. As obrigações de confidencialidade, não uso, proteção de dados pessoais e propriedade intelectual previstas nas Cláusulas 6, 7 e 8 são autônomas e possuem fundamento legal próprio, notadamente no artigo 195, inciso XI, da Lei nº 9.279/1996, na Lei nº 9.609/1998 e na legislação de proteção de dados pessoais aplicável, subsistindo independentemente da validade, da eficácia ou da exigibilidade da obrigação de não concorrência prevista na Cláusula 2 e da contrapartida prevista na Cláusula 9.
+
+14-A.2. A eventual declaração de invalidade, redução ou inexigibilidade da Cláusula 2, por qualquer fundamento, não afeta, não reduz e não extingue as obrigações referidas no item anterior, que permanecem plenamente exigíveis pelos prazos nelas previstos.
+
+
+--- 2.2 — MECÂNICA DA CONTRAPARTIDA (acrescentar à Cláusula 9) ---
+
+9.2. A contrapartida prevista nesta Cláusula possui natureza exclusivamente indenizatória, não integra a remuneração do EX-COLABORADOR para nenhum efeito e não configura verba salarial.
+
+9.3. O pagamento será realizado mensalmente, até o 5º (quinto) dia útil de cada mês, mediante depósito em conta bancária indicada por escrito pelo EX-COLABORADOR.
+
+9.4. O inadimplemento da contrapartida por mais de 30 (trinta) dias, não sanado em 10 (dez) dias contados do recebimento de notificação escrita, desonera o EX-COLABORADOR da obrigação de não concorrência prevista na Cláusula 2, sem prejuízo das obrigações de confidencialidade, não uso, proteção de dados e propriedade intelectual, que permanecem íntegras.
+
+
+--- 2.3 — REDUÇÃO CONSERVATIVA (acrescentar à Cláusula 14) ---
+
+14.3. Caso a Cláusula 2 venha a ser considerada excessivamente ampla quanto ao prazo, ao território ou à atividade restringida, as PARTES desde já convencionam que ela deverá ser interpretada e aplicada nos limites máximos admitidos pela legislação e pela jurisprudência aplicáveis, preservando-se sua eficácia na maior extensão possível, em lugar de ser declarada integralmente inválida.
+
+
+--- 2.4 — NÃO USO EXPLÍCITO (acrescentar à Cláusula 6) ---
+
+6.4. Independentemente de divulgação a terceiros, é vedado ao EX-COLABORADOR usar, explorar, reproduzir, adaptar, resumir ou aproveitar, em benefício próprio ou de terceiro, qualquer informação confidencial, inclusive para abreviar o desenvolvimento de solução de terceiro, para orientar ou validar solução com base em decisões reservadas da EMPRESA, ou para confirmar hipótese obtida a partir de conhecimento interno.
+
+
+--- 2.5 — REVELAÇÕES LEGÍTIMAS (acrescentar à Cláusula 6) ---
+
+6.5. Não constitui violação deste Instrumento o cumprimento de ordem judicial ou administrativa, a comunicação de possível ilícito a autoridade competente, a colaboração com investigação oficial, a obtenção de orientação jurídica sob dever de sigilo, o exercício de direito trabalhista ou a defesa em processo. Quando juridicamente permitido, o EX-COLABORADOR comunicará previamente a EMPRESA, limitará o conteúdo ao estritamente necessário e requererá tratamento sigiloso.
+
+
+--- 2.6 — NOTIFICAÇÃO DE INCIDENTE E COOPERAÇÃO (acrescentar após a Cláusula 8) ---
+
+CLÁUSULA 8-A — DA COMUNICAÇÃO E DA COOPERAÇÃO
+
+8-A.1. Ao tomar ciência de qualquer acesso, perda, retenção, envio, exposição ou suspeita de incidente envolvendo informação confidencial ou dados pessoais da EMPRESA, o EX-COLABORADOR comunicará o fato à EMPRESA em até 24 (vinte e quatro) horas, interromperá a conduta, preservará as evidências e cooperará de boa-fé com as medidas de contenção, investigação e mitigação.
+
+8-A.2. A cooperação não autoriza acesso irrestrito a dispositivos ou contas pessoais do EX-COLABORADOR. Eventual verificação técnica dependerá de indício objetivo, escopo proporcional, proteção de dados de terceiros e, quando necessário, de acordo específico ou de ordem da autoridade competente.
+
+
+=====================================================================
+PARTE 3 — ANEXO A ACRESCENTAR
+=====================================================================
+
+Este anexo é a peça de maior retorno prático do instrumento, e vale independentemente do que ocorra com a obrigação de não concorrência: uma declaração assinada transforma uma alegação difícil de provar em uma alegação simples de provar.
+
+
+ANEXO I — DECLARAÇÃO DE DEVOLUÇÃO E ELIMINAÇÃO
+
+Eu, [NOME COMPLETO], inscrito no CPF sob nº [CPF], declaro, sob minha responsabilidade, que concluí as providências abaixo ou identifiquei por escrito à EMPRESA qualquer exceção pendente:
+
+a) devolvi todos os equipamentos, dispositivos, mídias, documentos, chaves, crachás e demais bens pertencentes à EMPRESA, sem reter cópias;
+
+b) eliminei cópias de código, documentação, dados, propostas, contratos, apresentações, mensagens, credenciais e demais informações confidenciais de computadores, telefones, tablets, mídias removíveis, contas de e-mail, mensageria, armazenamento em nuvem, repositórios, anotações, ferramentas de inteligência artificial e qualquer outro ambiente sob meu controle;
+
+c) revoguei compartilhamentos, links, sincronizações, sessões, tokens, chaves, certificados e acessos pessoais relacionados à EMPRESA;
+
+d) não mantive cópia em repositório, nuvem, e-mail, mensageria, dispositivo, mídia, anotação, ferramenta de inteligência artificial ou backup pessoal acessível;
+
+e) não transferi informação confidencial a terceiro e comuniquei à EMPRESA qualquer envio ou exposição de que tenha ciência;
+
+f) não tentei acessar sistemas, servidores, repositórios, bancos de dados ou ambientes da EMPRESA após o encerramento do vínculo; e
+
+g) compreendo que cópia automática inacessível em backup deverá permanecer sem uso e ser eliminada no ciclo ordinário de retenção.
+
+Exceções ou pendências identificadas: [DESCREVER OU REGISTRAR "NENHUMA"].
+
+[CIDADE/UF], ____ de __________________ de 2026.
+
+
+_________________________________________
+[NOME COMPLETO]
+CPF: [CPF]
+
+
+=====================================================================
+PARTE 4 — OBSERVAÇÕES SOBRE O PREENCHIMENTO
+=====================================================================
+
+Sobre a multa da Cláusula 10.1: o padrão de mercado é limitá-la ao valor total da contrapartida prevista na Cláusula 9. Uma multa muito superior ao que se paga pela restrição é o principal indício de desequilíbrio e é a porta pela qual a penalidade é reduzida, ou o conjunto anulado, nos termos dos artigos 412 e 413 do Código Civil.
+
+Sobre a Cláusula 7 (propriedade intelectual): a redação atual diz que os ativos "permanecem de propriedade de seus respectivos titulares", o que é circular e não afirma nada. Convém substituir por reconhecimento expresso de que os direitos sobre softwares desenvolvidos no curso do vínculo pertencem à EMPRESA, nos termos do artigo 4º da Lei nº 9.609/1998.
+
+Sobre o foro da Cláusula 17.2: matéria decorrente da relação de trabalho pode atrair a competência da Justiça do Trabalho independentemente de eleição de foro. Convém ressalvar isso na redação para evitar discussão preliminar.
+
+Sobre o instrumento anterior: caso o EX-COLABORADOR tenha assinado contrato de confidencialidade na admissão, convém incluir novação expressa nominando aquele instrumento e sua data, declarando que este o substitui integralmente quanto a prazo, escopo e foro. Sem isso, prazos divergentes entre os dois documentos geram discussão.

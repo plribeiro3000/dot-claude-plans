@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Regras de negócio do app — inventário de ativos</title>
+<style>
+:root{--bg:#fff;--fg:#16181d;--muted:#5b6270;--line:#e2e5ea;--card:#f7f8fa;--accent:#1f5fbf;
+--forte:#1d6f42;--medio:#b26a00;--fraco:#b3261e;--code:#f2f3f6;}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8ec;--muted:#a0a7b4;--line:#2b2f37;--card:#1b1e24;--accent:#79aaf5;
+--forte:#79d69f;--medio:#ffbe5c;--fraco:#ff8b80;--code:#1f232a;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1120px;margin:0 auto;padding:32px 20px 90px}
+h1{font-size:1.75rem;margin:0 0 6px;line-height:1.25}
+h2{font-size:1.28rem;margin:44px 0 4px;padding-top:18px;border-top:1px solid var(--line)}
+h2 .fam{color:var(--accent);font:600 .78rem ui-monospace,Menlo,monospace;display:block;margin-bottom:3px}
+h3{font-size:1rem;margin:24px 0 6px}
+p,li{max-width:78ch}
+.sub{color:var(--muted);margin:0 0 22px}
+.famdesc{color:var(--muted);font-size:.94rem;margin:0 0 16px;max-width:78ch}
+code{background:var(--code);padding:.12em .38em;border-radius:4px;font:.85em/1.4 ui-monospace,Menlo,monospace}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;font:.8rem/1.55 ui-monospace,Menlo,monospace;margin:10px 0}
+pre .cm{color:var(--muted)}
+pre b{color:var(--accent);font-weight:600}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:18px 0}
+.box.key{border-left:4px solid var(--accent)}
+.regra{border:1px solid var(--line);border-radius:10px;margin:14px 0;overflow:hidden}
+.regra>header{background:var(--card);padding:11px 15px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.regra>header .id{font:600 .76rem ui-monospace,Menlo,monospace;color:var(--accent)}
+.regra>header .nm{font-weight:600;flex:1;min-width:210px}
+.regra .body{padding:13px 15px}
+.regra .body>p{margin:0 0 9px;font-size:.93rem}
+.regra .body>p:last-child{margin-bottom:0}
+.lbl{font-weight:600;color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+.forca{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.f-forte{color:var(--forte)} .f-medio{color:var(--medio)} .f-fraco{color:var(--fraco)}
+.avalia{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);font-size:.85rem;color:var(--muted)}
+.avalia b{color:var(--fg)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:.87rem;min-width:640px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--card);font-weight:600}
+tr:last-child td{border-bottom:none}
+ul.tight{margin:6px 0;padding-left:20px}
+ul.tight li{margin:3px 0;font-size:.93rem}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin:20px 0}
+.toc ol{margin:6px 0;padding-left:22px;columns:2;column-gap:28px}
+.toc li{margin:3px 0;font-size:.92rem;break-inside:avoid}
+.toc a{color:var(--accent);text-decoration:none}
+.toc a:hover{text-decoration:underline}
+@media (max-width:640px){.toc ol{columns:1}}
+.fonte{font-size:.83rem;color:var(--muted)}
+@media print{.regra{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Regras de negócio do <code>app</code> — inventário de ativos</h1>
+<p class="sub">Varredura completa do repositório principal · 5 de agosto de 2026 · <strong>12 famílias, 47 regras identificadas</strong> · cada uma com a evidência em código e um campo para você corrigir</p>
+
+<div class="box key">
+<h3 style="margin-top:0">O que essa varredura procurou</h3>
+<p>Depois da sua calibragem, mudei a lente. Não procurei "código bom" nem "arquitetura" — procurei <strong>invariantes de negócio</strong>: regras da forma <em>"X não pode ser alterado depois que Y"</em>, <em>"só pode Z se W"</em>, <em>"cancela mas não apaga"</em>, <em>"clona para contornar"</em>. Cada uma dessas é uma decisão comercial que alguém tomou depois de um problema real.</p>
+<p style="margin-bottom:0">O achado central: <strong>o padrão que você descreveu não é um caso isolado do incentivo — é uma família aplicada a seis entidades diferentes, de forma consistente.</strong> Isso é muito mais forte juridicamente do que uma regra solta, porque demonstra desenho deliberado e não coincidência.</p>
+</div>
+
+<div class="toc">
+<strong>As 12 famílias</strong>
+<ol>
+<li><a href="#f1">Reutilização, imutabilidade e clone</a></li>
+<li><a href="#f2">Ciclo de vida do plano</a></li>
+<li><a href="#f3">O calendário como unidade de tempo separada</a></li>
+<li><a href="#f4">O aceite do plano</a></li>
+<li><a href="#f5">Hierarquia e quem pode ser responsável</a></li>
+<li><a href="#f6">Participação por histórico, não por estado atual</a></li>
+<li><a href="#f7">O motor de fórmulas e sua taxonomia de erros</a></li>
+<li><a href="#f8">Metas — direção, baseline e identidade composta</a></li>
+<li><a href="#f9">Módulos que mudam a regra por cliente</a></li>
+<li><a href="#f10">Nunca apagar — desativar, cancelar, anonimizar</a></li>
+<li><a href="#f11">Concorrência e reprocessamento</a></li>
+<li><a href="#f12">Rollback com trilha</a></li>
+</ol>
+</div>
+
+<!-- ================= F1 ================= -->
+<h2 id="f1"><span class="fam">FAMÍLIA 1</span>Reutilização, imutabilidade e clone</h2>
+<p class="famdesc">Esta é a família que você descreveu, e ela é maior do que o incentivo. A regra completa é: <strong>um objeto de configuração pode ser reutilizado por vários consumidores; no instante em que ganha o primeiro consumidor, torna-se imutável; e o clone existe para permitir a variação sem quebrar a imutabilidade.</strong> Está aplicada a seis entidades.</p>
+
+<article class="regra">
+<header><span class="id">F1.1</span><span class="nm">Incentivo amarrado a plano não pode ser alterado</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Um incentivo pode ser usado por vários planos. Assim que o primeiro plano o usa, ele congela — nem o dono nem um administrador consegue editá-lo, e isso independe de o plano estar ativo, cancelado ou desativado.</p>
+<pre><span class="cm"># app/app/policies/incentive_policy.rb:12-19</span>
+def update?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <b>return false if record.plans.any?</b>
+  return true if role.permission?('incentive_update')
+
+  record.owner_id == user.id &amp;&amp; user.permission?('incentive_update')
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>A alternativa óbvia — versionar o incentivo, ou permitir editar e recalcular — é o que um sistema novo faria. Vocês escolheram congelar, porque uma comissão já paga precisa continuar explicável com a regra que a gerou. Essa é uma decisão de produto financeiro, não de engenharia.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F1.2</span><span class="nm">O clone é a válvula de escape — e a assimetria é deliberada</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Como o incentivo congelado não pode mudar, o cliente clona, ajusta o detalhe que precisa e usa o clone no plano novo. O clone é permitido mesmo em incentivo já amarrado a plano.</p>
+<pre><span class="cm"># app/app/policies/incentive_policy.rb:28-34</span>
+def clone?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <span class="cm"># ← note: NÃO existe `return false if record.plans.any?` aqui</span>
+  return true if role.permission?('incentive_clone')
+
+  record.owner_id == user.id &amp;&amp; user.permission?('incentive_clone')
+end</pre>
+<p><span class="lbl">Por que é ativo, e por que é difícil de negar</span><br>A regra não está escrita em lugar nenhum como frase — ela existe como <strong>a diferença entre dois métodos vizinhos</strong>: um guard presente no <code>update?</code> e ausente no <code>clone?</code>. E o clone tem permissão própria (<code>incentive_clone</code>), separada de criação e de edição — ou seja, o cliente pode dar a alguém o direito de clonar sem dar o de criar do zero. Reproduzir essa combinação por acaso é implausível.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F1.3</span><span class="nm">A mesma regra, um nível acima: rankificador usado por incentivo congela</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>O rankificador (que define como se ranqueia) pode ser reutilizado por vários incentivos. Assim que o primeiro incentivo o usa, congela.</p>
+<pre><span class="cm"># app/app/policies/rankifier_policy.rb:19-22</span>
+def update?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <b>return false if record.incentives.any?</b></pre>
+<p><span class="lbl">Por que isso importa mais do que parece</span><br>É a <strong>mesma regra, uma camada acima</strong>: rankificador → incentivo → plano. Vocês aplicaram o congelamento em cadeia, de forma que a imutabilidade se propaga por toda a árvore de configuração. Isso é desenho deliberado, e é o que transforma seis regras isoladas em um princípio arquitetural — juridicamente muito mais forte.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F1.4</span><span class="nm">Calendário usado por plano ou por análise de performance congela</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>O calendário congela quando qualquer plano ou qualquer análise de performance passa a usá-lo. E há uma assimetria: você pode <em>desativar</em> um calendário usado por planos, mas não um usado por análises de performance.</p>
+<pre><span class="cm"># app/app/policies/calendar_policy.rb:12-16 e :36-40</span>
+def update?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <b>return false if record.plans.any?</b>
+  <b>return false if record.performance_analyses.any?</b>
+  ...
+
+def disable?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <b>return false if record.performance_analyses.any?</b>   <span class="cm"># plans.any? NÃO bloqueia aqui</span></pre>
+<p><span class="lbl">A assimetria é o ativo</span><br>Congelar edição em ambos os casos, mas bloquear desativação só num deles, é uma decisão fina: um plano já rodado sobrevive ao calendário desativado, mas uma análise de performance não. Alguém descobriu isso quebrando um relatório. <strong>Isso é conhecimento negativo cristalizado em código.</strong></p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F1.5</span><span class="nm">Cargo com pessoa alocada congela</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Um cargo (role) só pode ser editado enquanto nenhuma pessoa estiver ocupando-o.</p>
+<pre><span class="cm"># app/app/policies/role_policy.rb:19-22</span>
+def update?
+  return false if user.company_id != record.company_id
+  return false if record.disabled?
+  <b>return false if record.seats.any?</b></pre>
+<p><span class="lbl">Por que é ativo</span><br>Mesma família, aplicada à estrutura organizacional. Se um cargo pudesse mudar de nível hierárquico com gente dentro, toda a árvore de comando — e portanto todo cálculo que depende dela — mudaria retroativamente.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F1.6</span><span class="nm">Motivo de aceite já usado congela; análise de performance com calendário congela</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Duas aplicações a mais da mesma família, fechando o conjunto em seis.</p>
+<pre><span class="cm"># app/app/policies/acceptment_reason_policy.rb:13-15</span>
+<b>return false if record.acceptments.any?</b>
+
+<span class="cm"># app/app/policies/performance_analysis_policy.rb:20-22</span>
+<b>return false if record.calendars.any?</b></pre>
+<p><span class="lbl">O conjunto completo</span><br>Incentivo→planos, Rankificador→incentivos, Calendário→planos e análises, Cargo→pessoas, Motivo de aceite→aceites, Análise de performance→calendários. <strong>Seis entidades, mesma forma, mesmo raciocínio.</strong> É esse conjunto que se reivindica — não cada guard isolado.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ falta alguma entidade: ______________</p>
+</div>
+</article>
+
+<!-- ================= F2 ================= -->
+<h2 id="f2"><span class="fam">FAMÍLIA 2</span>Ciclo de vida do plano</h2>
+<p class="famdesc">O plano tem seis estados e um caminho estreito entre eles. As transições que <em>não existem</em> são tão significativas quanto as que existem.</p>
+
+<article class="regra">
+<header><span class="id">F2.1</span><span class="nm">O plano só é editável no estado inicial</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Depois que o cadastro é finalizado, o plano nunca mais pode ser editado — nem para corrigir um nome.</p>
+<pre><span class="cm"># app/app/policies/plan_policy.rb:19-26</span>
+def update?
+  return false if user.company_id != record.company_id
+  <b>return false unless record.initial?</b>
+  return false if record.disabled?</pre>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F2.2</span><span class="nm">Cancelado é estado terminal — e só se cancela um plano aprovado sem nenhuma declaração aceita</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Isso é exatamente o que você descreveu. O plano só pode ser cancelado se estiver aprovado (<code>final</code>), ativo, e <strong>nenhuma declaração tiver sido aceita por ninguém</strong>. Uma vez cancelado, não há volta: nenhuma transição sai de <code>canceled</code>.</p>
+<pre><span class="cm"># app/app/models/plan.rb:117-144 — a máquina de estados</span>
+state_machine :status, initial: :initial do
+  event :finish_registration { transition initial: :processing }
+  event :finish_processing   { transition processing: :review,  if: manager_legal_module?
+                               transition processing: :final,   unless: manager_legal_module? }
+  event :approve             { transition review: :approving }
+  event :finish_approving    { transition approving: :final }
+  event :rollback            { transition review: :initial }
+  event :cancel              { <b>transition final: :canceled</b> }
+  <span class="cm"># não existe nenhuma transição PARTINDO de :canceled</span>
+end
+
+<span class="cm"># app/app/policies/plan_policy.rb:56-64</span>
+def cancel?
+  <b>return false unless record.final?</b>
+  return false unless record.enabled?
+  <b>return false if record.statements.with_status(:accepted).any?</b></pre>
+<p><span class="lbl">Por que é ativo</span><br>A regra "não pode cancelar se alguém já aceitou a declaração" é pura decisão de negócio: uma vez que o participante aceitou o extrato dele, a empresa perdeu o direito de desfazer o plano. Isso é uma proteção do <em>participante</em> embutida no produto, e nenhum técnico deduz que ela deveria existir.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F2.3</span><span class="nm">Não se desativa um plano com cálculo em andamento</span><span class="forca f-medio">Ativo médio</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Um plano com comissão ou comissão parcial em estado inicial ou processando não pode ser desativado — a desativação esperaria o cálculo terminar.</p>
+<pre><span class="cm"># app/app/policies/plan_policy.rb:36-45</span>
+def disable?
+  return false if record.processing?
+  <b>return false if record.commissions.with_status(%i[processing initial]).any?</b>
+  <b>return false if record.partial_commissions.with_status(%i[processing initial]).any?</b></pre>
+<p><span class="lbl">Ressalva honesta</span><br>Marquei como médio porque "não mexa em algo em processamento" é um princípio razoavelmente óbvio. O que é específico de vocês é <em>quais dois estados</em> contam como em andamento e o fato de cobrir comissão parcial junto.</p>
+<p class="avalia"><b>Concorda com "médio"?</b> ☐ sim ☐ é forte, porque: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F2.4</span><span class="nm">O caminho de aprovação depende de um módulo do cliente</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Ao terminar o processamento, o plano vai para "aguardando aprovação" se o cliente tem o módulo jurídico-gestor, ou direto para "aprovado" se não tem. O mesmo código produz dois fluxos de negócio diferentes conforme a contratação do cliente.</p>
+<pre><span class="cm"># app/app/models/plan.rb:130-133</span>
+event :finish_processing do
+  transition processing: :review, if:     -> (plan) { plan.company.manager_legal_module? }
+  transition processing: :final,  unless: -> (plan) { plan.company.manager_legal_module? }
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>É produtização de compliance: o cliente que precisa de trilha de aprovação formal contrata o módulo, e o fluxo muda. A decisão de fazer isso como bifurcação de máquina de estados — em vez de dois produtos, ou de um campo de configuração lido em runtime — é uma escolha de arquitetura de produto.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F3 ================= -->
+<h2 id="f3"><span class="fam">FAMÍLIA 3</span>O calendário como unidade de tempo separada</h2>
+<p class="famdesc">Você citou a separação calendário↔plano como ativo. Ela é maior do que uma separação de tabelas — o calendário carrega um conjunto de regras de fechamento que codifica como o ciclo de comissão se encaixa no ciclo de folha do cliente.</p>
+
+<article class="regra">
+<header><span class="id">F3.1</span><span class="nm">O dia de fechamento tem de bater com a data de início</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Um calendário mensal que começa dia 16 tem de fechar dia 15. Um semanal que começa na segunda tem de fechar no domingo. E há um atalho: se começa dia 1 e fecha no último dia do mês, é sempre válido. Clientes no modo <em>easy</em> não passam por essa validação.</p>
+<pre><span class="cm"># app/app/models/calendar.rb:110-120</span>
+def correct_closing_day
+  return if starts_at.blank? || closing_day.blank? || ends_at.blank?
+  <b>return if company.easy?</b>
+  <b>return if starts_at.day == 1 &amp;&amp; closing_day.to_i == ends_at.end_of_month.day</b>
+
+  if weekly? || biweekly?
+    errors.add(:closing_day, :invalid) unless starts_at.wday == <b>(WeekDayCalculator.call(closing_day) + 1) % 7</b>
+  else
+    errors.add(:closing_day, :invalid) unless <b>(starts_at - 1.day).day == closing_day.to_i</b>
+  end
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>Essa aritmética — <code>(starts_at - 1.day).day == closing_day</code>, e o deslocamento <code>+1 % 7</code> para semanas — é a codificação de como um ciclo de apuração se alinha ao fechamento de folha no Brasil e na América Latina. Não está em manual nenhum. E a carve-out do dia 1 existe porque o caso mais comum precisava passar sem depender do cálculo.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F3.2</span><span class="nm">Nem todo calendário aceita métricas</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Calendário semanal sempre aceita métrica. Mensal só aceita se cobrir o mês inteiro (começa dia 1 e termina no último dia). Qualquer outra frequência não aceita.</p>
+<pre><span class="cm"># app/app/models/calendar.rb:102-108</span>
+def valid_for_metrics?
+  <b>return true if weekly?</b>
+  <b>return false unless monthly?</b>
+
+  next_date = ends_at + 1.day
+  <b>starts_at.day == 1 &amp;&amp; next_date.day == 1</b>
+end</pre>
+<p><span class="lbl">E a regra que a consome, no plano</span><br>O plano só é válido se toda métrica com intervalo estiver contida em algum período do calendário dele:</p>
+<pre><span class="cm"># app/app/models/plan.rb:474-493</span>
+def metric_rules
+  return if calendar.nil?
+  return if metrics.with_intervals.blank?
+  <b>return if calendar.valid_for_metrics? &amp;&amp; valid_metrics?</b>
+
+  errors.add(:incentivations, :invalid_metrics)
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br><strong>Esta é a separação calendário↔plano no seu ponto mais afiado.</strong> A mensagem de erro que o cliente vê é "Combinação de métricas das incentivações é inválida" — e por trás dela existe um casamento de três objetos (calendário, período, métrica) com regras de compatibilidade que só fazem sentido depois de anos vendo clientes montarem ciclos incompatíveis.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F3.3</span><span class="nm">Períodos e intervalos são derivados, e regerados quando o calendário muda</span><span class="forca f-medio">Ativo médio</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Ao criar um calendário, o sistema gera automaticamente seus períodos e intervalos conforme a frequência — geradores diferentes para semanal/quinzenal, avulso e mensal. Se o calendário for editado, tudo é apagado e regerado; mas se a mudança foi só ativar/desativar, não regera.</p>
+<pre><span class="cm"># app/app/models/calendar.rb:122-153</span>
+def create_periods
+  if weekly? || biweekly? then WeeklyPeriodsGenerator.call(calendar: self)
+  elsif single?               then periods.create(starts_at:, ends_at:, number: 1)
+  else                             MonthlyPeriodsGenerator.call(calendar: self)
+  end
+end
+
+def update_periods
+  <b>return if saved_change_to_attribute?(:disabled_at)</b>   <span class="cm"># desativar não regera</span>
+  periods.destroy_all
+  create_periods
+end</pre>
+<p><span class="lbl">Ressalva</span><br>Médio: a geração em si é mecânica. O ativo é a guarda do <code>disabled_at</code> — sem ela, desativar um calendário destruiria e recriaria todos os períodos, invalidando comissões históricas. Alguém descobriu isso do jeito difícil.</p>
+<p class="avalia"><b>Concorda com "médio"?</b> ☐ sim ☐ é forte, porque: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F3.4</span><span class="nm">O calendário fecha a janela de aceite da declaração</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>O participante só pode aceitar a declaração dele enquanto o calendário não terminou. Passou a data final, a janela fecha — e fecha também se o plano foi cancelado ou desativado.</p>
+<pre><span class="cm"># app/app/policies/plan_statement_policy.rb:16-21</span>
+def accept?
+  return false if company.client? &amp;&amp; user.company_id != record.company_id
+  <b>return false if record.user_id != user.id</b>          <span class="cm"># só o próprio dono aceita</span>
+  return false if record.plan.canceled?
+  return false if record.plan.disabled?
+  <b>return false if Time.zone.now.to_date &gt; record.calendar.ends_at</b>
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>É o calendário atuando como <em>relógio de direitos</em>, não só como agrupador de períodos. E o guard <code>record.user_id != user.id</code> garante que nem um administrador aceita no lugar do participante — outra proteção do participante embutida no produto.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F4 ================= -->
+<h2 id="f4"><span class="fam">FAMÍLIA 4</span>O aceite do plano</h2>
+
+<article class="regra">
+<header><span class="id">F4.1</span><span class="nm">Cinco pré-condições simultâneas para aceitar um plano</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Para o gestor aceitar um plano, cinco coisas precisam ser verdade ao mesmo tempo: o plano não pode estar desativado; o plano <strong>já tem de ter terminado</strong> (não pode estar rodando); tem de existir ao menos uma declaração pendente; a comissão tem de estar em revisão ou travada; e a empresa tem de ter o módulo jurídico-operador.</p>
+<pre><span class="cm"># app/app/models/plan_acceptment.rb:39-73</span>
+def plan_status
+  errors.add(:plan_id, :disabled) if plan.disabled?
+end
+
+def plan_time_window
+  <b>errors.add(:plan_id, :running) if plan.running?</b>       <span class="cm"># só aceita plano encerrado</span>
+end
+
+def pending_plan_statements_presence
+  <b>errors.add(:plan_id, :statements_pending) if plan.statements.with_status(:pending).blank?</b>
+end
+
+def commission_status
+  return if commission.review? || commission.locked?
+  errors.add(:commission_id, :status)
+end
+
+def operator_legal_module_presence
+  <b>errors.add(:company_id, :presence) unless company.operator_legal_module?</b>
+end
+
+<span class="cm"># e o efeito colateral:</span>
+after_create <b>:process_commission</b>   <span class="cm"># → commission.reprocess!</span>
+</pre>
+<p><span class="lbl">Por que é ativo</span><br>Cinco condições independentes, cada uma vinda de um problema diferente, mais um efeito colateral não óbvio: <strong>aceitar dispara o reprocessamento da comissão</strong>. Ninguém adivinha que o aceite recalcula. Essa é a definição de regra de negócio acumulada.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F5 ================= -->
+<h2 id="f5"><span class="fam">FAMÍLIA 5</span>Hierarquia e quem pode ser responsável</h2>
+
+<article class="regra">
+<header><span class="id">F5.1</span><span class="nm">O gestor tem de estar estritamente acima — e níveis podem ser pulados</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Um cargo só pode se reportar a um cargo estritamente mais alto, e pode pular níveis. A regra está codificada como comparação de posição num array ordenado de 11 níveis.</p>
+<pre><span class="cm"># app/app/models/seat.rb:6-8, 33-39</span>
+TYPES = %w[SuperAdmin Admin President VicePresident Director Superintendent
+           GeneralManager Manager Coordinator Supervisor SalesRepresentative].freeze
+
+def correct_parent
+  return if parent.blank?
+  return unless TYPES.find_index(type)
+  <b>return if TYPES[0, TYPES.find_index(type)].include?(parent.type)</b>
+  errors.add(:parent_id, :invalid)
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>A expressão <code>TYPES[0, índice_do_meu_tipo]</code> — "todos os tipos que vêm antes do meu" — é a regra "estritamente acima, pulando níveis" escrita em uma linha. Organizações reais têm ramos rasos e ramos profundos; forçar todos os níveis a existirem tornaria o modelo uma ficção. Essa foi uma escolha.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F5.2</span><span class="nm">Vendedor não pode ser responsável por plano</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Existem 11 níveis de cargo, mas só 9 podem ser responsáveis por um plano — <code>SuperAdmin</code> e <code>SalesRepresentative</code> ficam de fora. E o número mínimo de responsáveis muda: dois no geral, um só se a empresa está no modo <em>easy</em>.</p>
+<pre><span class="cm"># app/app/models/plan.rb:4 e 403-417</span>
+RESPONSIBLE_TYPES = %w[Admin President VicePresident Director Superintendent
+                       GeneralManager Manager Coordinator Supervisor].freeze
+<span class="cm"># ← SuperAdmin e SalesRepresentative ausentes, deliberadamente</span>
+
+def responsibility
+  return unless company.manager_legal_module?
+  return unless responsible_ids_changed? || new_record?
+
+  if company.easy?
+    errors.add(:responsible_ids, :size) if responsible_ids.count &lt; 1
+  <b>elsif responsible_ids.count &lt; 2</b>
+    errors.add(:responsible_ids, :size)
+  end
+
+  errors.add(:responsible_ids, :invalid) unless unique_responsible_types.included_in?(RESPONSIBLE_TYPES)
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>A exigência de <strong>dois responsáveis</strong> é segregação de funções: ninguém aprova um plano de comissão sozinho. O vendedor excluído é conflito de interesse — quem recebe não homologa. São regras de governança financeira, não de software, e a mensagem que o cliente vê já está em português: <em>"Plano não tem o número mínimo de responsáveis"</em>.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F6 ================= -->
+<h2 id="f6"><span class="fam">FAMÍLIA 6</span>Participação por histórico, não por estado atual</h2>
+
+<article class="regra">
+<header><span class="id">F6.1</span><span class="nm">Quem participa do plano é quem esteve no grupo durante a janela — não quem está hoje</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Para saber quem entra no cálculo, o sistema não olha quem está no grupo agora. Ele consulta o <em>histórico</em> de entradas e saídas e pega todo mundo cuja permanência teve qualquer sobreposição com a janela do calendário.</p>
+<pre><span class="cm"># app/app/models/plan.rb:173-190</span>
+def user_ids(starts_at: nil, ends_at: nil)
+  starts_at ||= calendar.starts_at
+  ends_at   ||= calendar.ends_at
+
+  groupification_history_range_condition =
+    <b>'groupification_histories.starts_at &lt;= ? AND (? &lt;= groupification_histories.ends_at
+      OR groupification_histories.ends_at IS NULL)'</b>
+
+  groupification_ids =
+    groupification_histories
+      .where(groupification_history_range_condition, <b>ends_at, starts_at</b>)
+      .pluck(:groupification_id).uniq
+
+  Groupification.where(id: groupification_ids).pluck(:user_id)
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>Note a inversão dos argumentos (<code>ends_at, starts_at</code>): é o teste clássico de sobreposição de intervalos, e ele garante que quem entrou no meio do período ou saiu no meio <strong>entra no cálculo mesmo assim</strong>, para ser rateado. A alternativa óbvia — olhar quem está no grupo hoje — produziria comissão errada para todo mundo que se movimentou. Essa é uma regra que só se descobre quando um cliente reclama do pagamento de alguém que mudou de célula.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F6.2</span><span class="nm">Metas por participação puxam a equipe do gestor pelo histórico de hierarquia</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Quando o plano está no modo "metas por participação" (<code>override</code>), além dos participantes diretos ele traz também os subordinados de cada um — e de novo pelo histórico de hierarquia na janela, não pela hierarquia atual. Fora desse modo, a lista de subordinados é vazia.</p>
+<pre><span class="cm"># app/app/models/plan.rb:199-212</span>
+def subordinate_ids(starts_at: nil, ends_at: nil)
+  <b>return [] unless override?</b>
+
+  parent_seat_ids = Seat.where(user_id: user_ids).pluck(:id)
+
+  SeatHistory
+    .joins(:seat)
+    .where('seat_histories.parent_id': parent_seat_ids)
+    .where(<b>'starts_at &lt; ? AND (? &lt; ends_at or ends_at is null)'</b>, ends_at, starts_at)
+    .pluck(:user_id)
+end</pre>
+<p><span class="lbl">E a regra que proíbe a combinação</span><br>Um plano não pode ser ao mesmo tempo "metas compartilhadas" e "metas por participação" — os dois conceitos se excluem:</p>
+<pre><span class="cm"># app/app/models/plan.rb:385-390</span>
+def shared_conditions
+  <b>return unless shared? &amp;&amp; override?</b>
+  errors.add(:shared, :invalid)
+  errors.add(:override, :invalid)
+end</pre>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F7 ================= -->
+<h2 id="f7"><span class="fam">FAMÍLIA 7</span>O motor de fórmulas e sua taxonomia de erros</h2>
+
+<article class="regra">
+<header><span class="id">F7.1</span><span class="nm">Doze erros de fórmula, cada um com mensagem própria em linguagem de negócio</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>O sistema reprova uma fórmula antes de salvar, com doze diagnósticos distintos. Não é "fórmula inválida" — é "usa a variável X, que não existe", "usa a variável de texto Y em uma conta", "chama a função Z sem argumentos".</p>
+<pre><span class="cm"># app/config/locales/pt-BR/models/rule.yml:12-24</span>
+value:
+  division_by_zero:               'divide por zero'
+  invalid_date:                   'usa uma data inválida: %{excerpt}'
+  node_invalid:                   'tem uma estrutura incompleta'
+  parse_error:                    'tem um trecho não reconhecido: %{excerpt}'
+  too_few_operands:               'tem uma operação com valores faltando (esperados %{expected}, encontrados %{actual})'
+  too_many_closing_parentheses:   'tem um parêntese fechado a mais'
+  too_many_opening_parentheses:   'tem um parêntese que não foi fechado'
+  too_many_operands:              'tem uma operação com valores em excesso'
+  <b>text_in_arithmetic:             'usa a variável de texto %{variable} em uma conta'</b>
+  too_few_arguments:              'chama a função %{function} sem argumentos'
+  undefined_function:             'usa a função %{function}, que não existe'
+  unknown_variable:               'usa a variável %{variable}, que não existe'</pre>
+<p><span class="lbl">Por que é ativo</span><br>Este arquivo é o ativo na sua forma mais comunicável: <strong>a regra de negócio escrita em português, para o cliente ler</strong>. Cada linha corresponde a uma classe de erro que alguém decidiu que valia a pena detectar e nomear. A biblioteca de fórmulas é pública; esta lista não é.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F7.2</span><span class="nm">Regra que não calcula rende zero — não interrompe a comissão</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Se, no momento do cálculo, uma regra estourar, ela vale zero e o processamento continua. O fechamento não trava.</p>
+<pre><span class="cm"># app/app/models/rule.rb:11-13, 67-71</span>
+<span class="cm"># A formula that raises one of these is not calculable, and a rule that is not calculable</span>
+<span class="cm"># earns nothing — #calculate answers zero rather than halting the commission.</span>
+PARSE_EXCEPTIONS =
+  [Dentaku::Error, Dentaku::ZeroDivisionError, Dentaku::ArgumentError,
+   NoMethodError, ArgumentError, NameError].freeze
+
+def calculate(values = {})
+  calculate!(values)
+rescue *PARSE_EXCEPTIONS =&gt; _exception
+  <b>0</b>
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>É uma escolha de produto financeiro com consequência direta: prioriza o fechamento acontecer sobre o resultado ser perfeito. A alternativa — parar tudo — é o que um sistema novo faz, e é o que trava o pagamento de milhares de pessoas por causa de uma regra malformada. <strong>O comentário no código registra o raciocínio, datado.</strong></p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F7.3</span><span class="nm">Cada tipo de regra enxerga um vocabulário próprio de variáveis</span><span class="forca f-forte">Ativo forte — o mais forte do inventário</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Uma regra de Ranking pode usar quartil e quintil; uma de Resgate só pode usar pontos. Tudo em português e inglês. Mais sete famílias de prefixo de acumulação combinadas com cada status habilitado da empresa.</p>
+<pre><span class="cm"># app/app/models/rule/options.rb:14-31</span>
+BUILT_IN_VARIABLES_BY_TYPE = {
+  'FormulaRule'    =&gt; %w[dias_em_aberto estado horas_trabalhadas meta parcela quantidade valor
+                         open_days status work_hours goal installment quantity value],
+  'IndicatorRule'  =&gt; %w[meta orcamento premio quantidade_transacoes goal budget premium deal_quantity],
+  'RankingRule'    =&gt; %w[alcance meta orcamento premio quantidade_transacoes <b>quartil quintil</b> ranking
+                         resultado reach goal budget premium deal_quantity quartile quintile result],
+  'LimiterRule'    =&gt; %w[alcance_orcamento meta orcamento premio <b>premio_grupo</b> quantidade_transacoes
+                         budget_reach goal budget premium group_premium deal_quantity],
+  'RedemptionRule' =&gt; %w[pontos points]
+}.freeze
+
+STATUS_PREFIXES = %w[group_total_quantity quantidade_total quantidade_total_grupo total
+                     group_total total_grupo total_quantity].freeze</pre>
+<p><span class="lbl">E a assimetria documentada</span><br>O próprio arquivo registra que a lista de validação é <em>mais larga</em> que a de execução: uma fórmula pode passar na validação e resolver para zero no cálculo. Está no comentário do topo: <em>"This set is the wider of the two"</em>.</p>
+<p><span class="lbl">Por que é o mais forte</span><br>É uma lista literal, arbitrária no sentido técnico, construída ao longo de anos de pedidos de cliente. Se um produto concorrente aparecer com ela, a comparação é textual e direta — nenhuma perícia complexa necessária.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F8 ================= -->
+<h2 id="f8"><span class="fam">FAMÍLIA 8</span>Metas — direção, baseline e identidade composta</h2>
+
+<article class="regra">
+<header><span class="id">F8.1</span><span class="nm">A direção da meta define qual lado do baseline é erro</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Numa meta ascendente (quanto maior melhor), o baseline não pode ser maior que o alvo. Numa descendente (quanto menor melhor), não pode ser menor. E as duas validações só rodam se a empresa tem o módulo de cálculo de metas e a variável é do tipo "timetable".</p>
+<pre><span class="cm"># app/app/models/goal.rb:120-142</span>
+def ascending_interval
+  return unless company.goal_calculation_module?
+  return unless variable.timetable?
+  ...
+  <b>errors.add(:baseline, :bigger_than_value) if direction.ascending? &amp;&amp; formatted_baseline &gt; format</b>
+end
+
+def descending_interval
+  ...
+  <b>errors.add(:baseline, :smaller_than_value) if direction.descending? &amp;&amp; formatted_baseline &lt; format</b>
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>O conceito de meta com <em>direção</em> — e portanto de baseline que pode ser piso ou teto conforme a direção — é modelagem de domínio de remuneração variável. Absenteísmo e tempo médio de atendimento são metas descendentes; venda é ascendente. Um sistema ingênuo trata toda meta como "atingir ou superar".</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F8.2</span><span class="nm">Meta de usuário e meta de grupo coexistem, garantidas por índices parciais</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Existe uma única meta por (usuário, variável, período) e uma única por (grupo, variável, período) — e as duas podem existir ao mesmo tempo para a mesma pessoa. O cálculo lê as duas.</p>
+<pre><span class="cm"># app/app/models/goal.rb:47-48 — a identidade composta</span>
+rescue_unique_constraint index: <b>:group_goals_unique_index</b>, field: :variable_id
+rescue_unique_constraint index: <b>:user_goals_unique_index</b>,  field: :variable_id
+
+<span class="cm"># app/app/models/goal.rb:73-82 — a chave de cache reflete a mesma dualidade</span>
+def self.cache_id(attributes)
+  if attributes['group_id'].present?
+    "goals.cid.#{...}.vid.#{...}.<b>gid</b>.#{...}.edt.#{...}.sdt.#{...}"
+  else
+    "goals.cid.#{...}.vid.#{...}.<b>uid</b>.#{...}.edt.#{...}.sdt.#{...}"
+  end
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>A coexistência não é descuido — é contrato de cálculo. Uma pessoa pode ter meta individual E participar de uma meta de grupo, e as duas entram na apuração. Garantir isso com dois índices únicos <em>parciais</em> que não se sobrepõem é a implementação de uma regra de negócio no nível do banco.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F8.3</span><span class="nm">Incentivo de resgate exige um incentivo de pontos no mesmo plano</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Não faz sentido resgatar sem antes acumular. Um plano com incentivo de resgate precisa ter também ao menos um incentivo que gere pontos.</p>
+<pre><span class="cm"># app/app/models/plan.rb:392-401</span>
+def redemption_incentive_requirements
+  return unless incentivations.any?
+  incentive_ids = incentivations.map(&amp;:incentive_id)
+
+  return unless Incentive.where(id: incentive_ids).redemptions.any?
+  <b>return if Incentive.where(id: incentive_ids).points.any?</b>
+
+  errors.add(:incentivations, :points_incentive)
+end</pre>
+<p><span class="lbl">A mensagem que o cliente vê</span><br><em>"Incentivos de resgate requerem um incentivo de pontos"</em> — <code>config/locales/pt-BR/models/plan.yml:26</code>. Regra de economia interna do produto, escrita em linguagem de negócio.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F9 ================= -->
+<h2 id="f9"><span class="fam">FAMÍLIA 9</span>Módulos que mudam a regra por cliente</h2>
+
+<article class="regra">
+<header><span class="id">F9.1</span><span class="nm">Seis chaves de módulo produzem comportamentos de negócio diferentes no mesmo código</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Cada empresa cliente tem seis chaves que ligam ou desligam regras inteiras. Não são feature flags de engenharia — são <strong>produtos vendidos separadamente</strong>, e cada um altera o fluxo de aprovação, a validação ou o cálculo.</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th>Módulo</th><th>Padrão</th><th>O que muda quando ligado</th><th>Usos no código</th></tr></thead>
+<tbody>
+<tr><td><code>manager_legal_module</code></td><td>ligado</td><td>Plano e comissão passam por etapa de aprovação formal antes de virar final; exige mínimo de responsáveis</td><td>21</td></tr>
+<tr><td><code>operator_legal_module</code></td><td>ligado</td><td>Habilita o aceite do plano pelo gestor</td><td>30</td></tr>
+<tr><td><code>subsidiaries_module</code></td><td>desligado</td><td>A empresa opera como grupo de pessoas jurídicas; identificadores passam a ser escopados por filial</td><td>73</td></tr>
+<tr><td><code>goal_calculation_module</code></td><td>ligado</td><td>Ativa as validações de direção/baseline da meta</td><td>2</td></tr>
+<tr><td><code>deal_eligibility_module</code></td><td>desligado</td><td>Elegibilidade de transação</td><td>2</td></tr>
+<tr><td><code>payment_api_exportation_module</code></td><td>desligado</td><td>Exportação de pagamento por API</td><td>—</td></tr>
+</tbody>
+</table>
+</div>
+<p><span class="lbl">Por que é ativo</span><br>O mapa <em>módulo → quais regras mudam</em> é a decomposição comercial do produto. Ele diz o que a 4Shark aprendeu que os clientes compram separado, e onde estão as costuras que permitem vender assim. Um concorrente com esse mapa sabe como empacotar o produto dele sem descobrir por tentativa e erro.</p>
+<p><span class="lbl">Um detalhe que reforça</span><br>O <code>subsidiaries_module</code> é referenciado <strong>73 vezes</strong>. Isso mede o custo real de suportar grupo econômico — e é exatamente o tipo de informação que um concorrente usaria para decidir se entra nesse mercado.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F10 ================= -->
+<h2 id="f10"><span class="fam">FAMÍLIA 10</span>Nunca apagar — desativar, cancelar, anonimizar</h2>
+
+<article class="regra">
+<header><span class="id">F10.1</span><span class="nm">Desativação carrega quem desativou, em toda entidade relevante</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Nenhum registro de negócio é apagado. Cada um carrega duas colunas — quando foi desativado e <em>quem</em> desativou. Plano carrega ainda quem cancelou e de qual endereço.</p>
+<pre><span class="cm"># padrão repetido em Plan, Incentive, Calendar, Client, Product, Group, User, Deal, Commission...</span>
+belongs_to :disabler, class_name: 'User', inverse_of: :disabled_plans, optional: true
+belongs_to <b>:canceler</b>,  class_name: 'User', inverse_of: :canceled_plans, optional: true
+validates <b>:canceled_from, ip: true</b>       <span class="cm"># o IP de quem cancelou</span></pre>
+<p><span class="lbl">Por que é ativo</span><br>Guardar o IP de quem cancelou um plano de comissão é decisão de rastreabilidade financeira, não de engenharia. O mesmo padrão aparece no aceite (<code>from</code> validado como IP) e na aprovação. É a explicabilidade do produto materializada no esquema.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F10.2</span><span class="nm">Usuário anonimizado é imutável</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Depois que um usuário é anonimizado por retenção de dados, nem editar nem reativar é possível — a anonimização é irreversível por construção, e o produto trata isso como estado terminal.</p>
+<pre><span class="cm"># app/app/policies/user_policy.rb:13-25</span>
+def update?
+  <b>return false if record.anonymized?</b>
+  ...
+def enable?
+  <b>return false if record.anonymized?</b></pre>
+<p><span class="lbl">Por que é ativo</span><br>Conecta o produto à LGPD: a anonimização (art. 12) é válida como forma de atender o direito de eliminação justamente porque é irreversível. Codificar a irreversibilidade na camada de autorização — e não confiar só no processo — é a evidência de que o desenho é intencional.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F10.3</span><span class="nm">A empresa não fica sem status mínimo</span><span class="forca f-medio">Ativo médio</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Não é possível desativar um status se isso deixaria a empresa com menos de três status ativos.</p>
+<pre><span class="cm"># app/app/policies/status_policy.rb:28-31</span>
+def disable?
+  return false if record.disabled?
+  <b>return false if user.company.statuses.enabled.count &lt; 3</b>
+end</pre>
+<p><span class="lbl">Ressalva</span><br>Médio porque "não deixe o sistema sem configuração mínima" é um princípio comum. O específico é o <strong>número três</strong> — por que três e não dois? Isso vem do domínio (provavelmente o mínimo para uma transação ter ciclo: aberta, ganha, perdida). <strong>Você sabe se o três tem uma razão nomeável.</strong></p>
+<p class="avalia"><b>Por que três?</b> ______________</p>
+</div>
+</article>
+
+<!-- ================= F11 ================= -->
+<h2 id="f11"><span class="fam">FAMÍLIA 11</span>Concorrência e reprocessamento</h2>
+
+<article class="regra">
+<header><span class="id">F11.1</span><span class="nm">Uma trava impede disparar duas vezes a mesma operação pesada</span><span class="forca f-medio">Ativo médio</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Onze operações caras — auditorias, lotes de comissão, relatórios, pagamento — verificam uma trava antes de permitir o disparo. Se já existe uma rodando, o botão simplesmente não aparece.</p>
+<pre><span class="cm"># padrão repetido em 11 policies</span>
+def create?
+  <b>return false if Lock.exists?(lock_key)</b></pre>
+<p><span class="lbl">Onde aparece</span><br><code>variable_audit</code>, <code>responsible_audit</code>, <code>user_audit</code>, <code>user_identifier_audit</code>, <code>group_audit</code>, <code>calendar_audit</code>, <code>statement_audit</code>, <code>plan_statement_audit</code>, <code>plan_goal_audit</code>, <code>commission_indicator_audit</code>, <code>security_event_audit</code>, <code>commission_creation_batch</code>, <code>commission_report_creation_batch</code>, <code>payment</code>, <code>payment_report</code>.</p>
+<p><span class="lbl">Ressalva</span><br>Médio: travas de concorrência são técnica comum. O que é de vocês é <em>quais</em> quinze operações mereceram trava — ou seja, o mapa de onde a duplicação dói.</p>
+<p class="avalia"><b>Concorda com "médio"?</b> ☐ sim ☐ é forte, porque: ______________</p>
+</div>
+</article>
+
+<article class="regra">
+<header><span class="id">F11.2</span><span class="nm">Comissão com relatório gerado não reprocessa</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Uma vez que o relatório da comissão foi gerado, o reprocessamento é bloqueado — o relatório é o artefato que foi para o cliente, e recalcular por baixo dele criaria divergência entre o que foi entregue e o que está no sistema.</p>
+<pre><span class="cm"># app/app/policies/commission_policy.rb:76-82</span>
+def reprocess?
+  return false if record.disabled?
+  return false if record.pending?
+  return false if record.invalid?
+  return false if record.plan.disabled?
+  <b>return false if record.report.present?</b></pre>
+<p><span class="lbl">Por que é ativo</span><br>É a mesma filosofia do congelamento de incentivo, aplicada ao artefato entregue: <strong>o que saiu para o cliente vira imutável.</strong> A consistência desse princípio ao longo de todo o produto é o que faz dele um ativo arquitetural e não uma coleção de regras.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= F12 ================= -->
+<h2 id="f12"><span class="fam">FAMÍLIA 12</span>Rollback com trilha</h2>
+
+<article class="regra">
+<header><span class="id">F12.1</span><span class="nm">Voltar um plano registra o estado anterior antes de destruí-lo</span><span class="forca f-forte">Ativo forte</span></header>
+<div class="body">
+<p><span class="lbl">A regra em português</span><br>Devolver um plano de "aguardando aprovação" para "inicial" apaga as aprovações e as metas. Antes de apagar, o sistema grava um registro de rollback capturando quantas metas existiam, quem eram os responsáveis e quem já tinha aprovado.</p>
+<pre><span class="cm"># app/app/models/plan.rb:345-361 — grava a trilha ANTES</span>
+def reset(user_id:, from:, company_id:)
+  transaction do
+    rollbacks.create!(
+      owner_id: user_id, from: from, plan_id: id,
+      <b>goal_quantity: goals.count,</b>
+      <b>responsible_ids: responsible_ids,</b>
+      <b>approver_ids: approvals.pluck(:user_id),</b>
+      company_id: company_id
+    )
+    rollback!
+  end
+end
+
+<span class="cm"># app/app/models/plan.rb:457-468 — e só então destrói</span>
+def clear
+  transaction do
+    approvals.destroy_all
+    goal_plans.destroy_all
+    plan_variables.update_all(goal_type: nil)
+    update!(finished_at: nil)
+  end
+  Goal::DatasetsDestroyer.perform_async(id)
+end</pre>
+<p><span class="lbl">Por que é ativo</span><br>A ordem importa e é deliberada: capturar quem aprovou <em>antes</em> de apagar as aprovações. Sem isso, um plano que voltou para edição perderia a memória de que já tinha sido aprovado por alguém — e a auditoria de "quem aprovou o quê e quando" ficaria com um buraco. Essa é uma decisão de rastreabilidade que só se toma depois de precisar responder a pergunta.</p>
+<p class="avalia"><b>Confere?</b> ☐ sim ☐ corrigir: ______________</p>
+</div>
+</article>
+
+<!-- ================= RESUMO ================= -->
+<h2>O que a varredura mediu</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Camada</th><th>Volume</th><th>O que carrega de ativo</th></tr></thead>
+<tbody>
+<tr><td>Policies (autorização)</td><td>100 arquivos, <strong>515 guards</strong></td><td>Praticamente todas as regras de "quando pode e quando não pode". É a camada mais densa em regra de negócio de todo o repositório</td></tr>
+<tr><td>Validações customizadas</td><td><strong>74 validações</strong> em ~35 modelos</td><td>Cada uma tem nome de domínio (<code>circular_dependency</code>, <code>redemption_incentive_requirements</code>, <code>plan_time_window</code>) e uma mensagem em português para o cliente</td></tr>
+<tr><td>Máquinas de estado</td><td><strong>36 diagramas</strong></td><td>Os ciclos de vida e, sobretudo, as transições que não existem</td></tr>
+<tr><td>Locales pt-BR</td><td><strong>111 arquivos</strong></td><td>As regras escritas na linguagem do negócio — a forma mais comunicável do ativo</td></tr>
+<tr><td>Esquema</td><td>166 tabelas, 655 índices</td><td>Índices únicos parciais que impõem identidade composta; colunas de rastreabilidade (<code>disabler</code>, <code>canceler</code>, <code>canceled_from</code>)</td></tr>
+<tr><td>Módulos por empresa</td><td>6 chaves</td><td>A decomposição comercial do produto</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box key">
+<h3 style="margin-top:0">A conclusão que mudou com esta varredura</h3>
+<p>Antes eu descrevia os ativos como itens soltos — uma lista, um mecanismo, um catálogo. Depois de varrer com a sua lente, o quadro é outro: <strong>existe um princípio de desenho aplicado consistentemente ao produto inteiro</strong>, que é "configuração é reutilizável até ser usada; a partir daí é imutável, e a variação se faz por cópia". Ele aparece em seis entidades de configuração (Família 1), no plano (Família 2), no artefato entregue (F11.2) e no usuário anonimizado (F10.2).</p>
+<p style="margin-bottom:0">Isso importa juridicamente por uma razão específica: uma regra isolada pode ser coincidência, mas <strong>um princípio aplicado em nove lugares diferentes, do mesmo jeito, não é.</strong> Se um produto de terceiro reproduzir esse desenho, a convergência é evidência muito mais forte do que qualquer trecho de código copiado.</p>
+</div>
+
+<p class="fonte" style="margin-top:26px">Todas as 47 regras foram lidas diretamente no código, com arquivo e linha. Nenhuma foi inferida a partir de nome de método ou de documentação. Marque o que estiver errado, acrescente o que faltou — e me diga especialmente onde eu classifiquei como "médio" algo que você sabe que é forte, porque nesses casos falta contexto de negócio que só você tem.</p>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,49 @@
+Source: https://code.claude.com/docs/en/desktop
+Fetched: 2026-08-05 (two independent fetches, one full-page dump via offset paging, one targeted prompt asking specifically for partition/scoping/settings language — both returned the same text for the overlapping sections)
+Page: "Desktop application" (Code tab reference)
+
+This auxiliary captures the sections most relevant to Investigation Question 1 (does Anthropic document per-project/per-session/per-workspace storage partitioning for the Browser pane) and Question 2 (any user-settable config for cookie/session persistence or profile sharing across projects). The full page is much longer (session management, worktrees for CODE isolation, permission modes, etc.) — only the Browser-pane-relevant passages and the passages needed to establish what "session" and "project folder" mean in this app are kept here, at their original line numbers from the fetched page.
+
+---
+
+Line 29:
+"In the Code tab, each conversation is a **session**: it has its own chat history, project folder, and code changes, independent of any other session. The sidebar lists your sessions and lets you run several in parallel."
+
+Lines 45-50 ("Start a session" — what you configure before sending the first message):
+"Before you send your first message, configure four things in the prompt area:
+* **Environment**: choose where Claude runs. ...
+* **Project folder**: select the folder or repository Claude works in. For cloud sessions, you can add multiple repositories. ...
+* **Model**: pick a model from the dropdown ...
+* **Permission mode**: choose how much autonomy Claude has ..."
+
+Lines 109-119 ("Preview your app" section — the ONLY place cookie/session persistence language appears on this page):
+"From the Browser pane, you can:
+* Interact with your running app directly in the Browser pane
+* Watch Claude verify its own changes automatically: it takes screenshots, inspects the DOM, clicks elements, fills forms, and fixes issues it finds
+* Start or stop servers from the server dropdown in the session toolbar
+* Persist cookies and local storage across server restarts by selecting **Persist sessions** in the dropdown, so you don't have to re-login during development
+* Edit the server configuration or stop all servers at once
+
+Claude creates the initial server configuration based on your project. If your app uses a custom dev command, edit `.claude/launch.json` to match your setup. See Configure preview servers for the full reference.
+
+To clear saved session data, or to turn the Browser off entirely, use the toggles in Settings → Claude Code."
+
+Lines 121-123 ("Browse external sites" — the section that covers github.com, immediately after the "Persist sessions" paragraph, with NO cross-reference back to it):
+"The Browser pane is a tabbed browser, so you can open documentation, issue trackers, or any other site next to your running app. To open the Browser, press Cmd+Shift+B on macOS or Ctrl+Shift+B on Windows, or select it from the Views menu. When you click an external link in the chat, a chooser offers Open in app to use the Browser pane or Default browser to use your own; Cmd-click on macOS or Ctrl-click on Windows opens a link in your system browser directly. You can sign in to sites in the pane, including popup sign-in flows such as Google OAuth."
+
+Lines 136-138 ("Choose between the Browser and the Chrome extension"):
+"The Browser pane uses a clean browser profile, separate from your personal browser, with none of your saved logins or history. Use it for building and testing your app and for sites that don't need your identity. When you want Claude to act as you in your logged-in sessions, use the Claude in Chrome extension instead, which shares your browser's login state."
+
+Lines 140-144 ("Restrict external browsing for your organization" — the only other browser-cookie-adjacent passage, and it is about ADMIN allow/block lists, not persistence):
+"The Browser follows the same site allowlist and blocklist controls as the Claude in Chrome extension. If your organization already configured those lists for the extension, the Browser respects them automatically. Administrators can also turn off Claude's tools on external pages with the browserExternalPageTools managed setting. With tools disabled, users can still navigate to external sites; Claude's tools can't read or act on them.
+
+To turn off external browsing entirely, set the disableBrowserExternalNavigation managed setting to true. This blocks all external navigation in the Browser, including sites on your organization's allowlist; localhost dev servers and file previews keep working."
+
+Lines 321-333 ("Work in parallel with sessions" — CODE isolation via git worktrees, included here ONLY to establish that this mechanism is documented and named, and to show it is explicitly a mechanism for CODE, distinct from anything said about the Browser pane's cookie storage, which this page never connects to worktrees anywhere):
+"Click **+ New session** in the sidebar ... to work on multiple tasks in parallel. ... For Git repositories, each session gets its own isolated copy of your project using Git worktrees, so changes in one session don't affect other sessions until you commit them.
+
+... Worktrees are stored in `<project-root>/.claude/worktrees/` by default. You can change this to a custom directory in Settings → Claude Code under "Worktree location"."
+
+---
+
+NEGATIVE RESULT (confirmed by direct text search of the full fetched page, both fetches): the words "partition", "hash", "MD5", and any statement of "storage is scoped per project directory" or "per session" for the BROWSER PANE specifically do not appear anywhere on this page. The word "worktree" appears only in the CODE-isolation context (git worktrees for file changes), never in a sentence connecting it to the Browser pane's cookie/session storage. No settings.json key for cookie/session persistence (only `browserExternalPageTools` and `disableBrowserExternalNavigation`, both managed-settings-only and both about navigation permission, not persistence) appears on this page.

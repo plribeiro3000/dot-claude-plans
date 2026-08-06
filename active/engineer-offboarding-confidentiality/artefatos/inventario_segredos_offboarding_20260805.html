@@ -1,0 +1,1102 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inventário de Segredos Empresariais — Desligamento de Engenheiro-Chave</title>
+<style>
+:root{
+  --bg:#ffffff; --fg:#16181d; --muted:#5b6270; --line:#e2e5ea; --card:#f7f8fa;
+  --accent:#1f5fbf; --crit:#b3261e; --high:#b26a00; --med:#1f5fbf; --low:#4a5261;
+  --ok:#1d6f42; --warn:#8a5a00; --bad:#b3261e; --code:#f2f3f6;
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#14161a; --fg:#e6e8ec; --muted:#a0a7b4; --line:#2b2f37; --card:#1b1e24;
+  --accent:#79aaf5; --crit:#ff8b80; --high:#ffbe5c; --med:#79aaf5; --low:#98a0ad;
+  --ok:#79d69f; --warn:#ffbe5c; --bad:#ff8b80; --code:#1f232a;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:1.9rem;line-height:1.25;margin:0 0 6px}
+h2{font-size:1.35rem;margin:44px 0 12px;padding-top:18px;border-top:1px solid var(--line)}
+h3{font-size:1.06rem;margin:26px 0 8px}
+h4{font-size:.95rem;margin:18px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+p,li{max-width:78ch}
+.sub{color:var(--muted);margin:0 0 24px}
+code,kbd{background:var(--code);padding:.12em .38em;border-radius:4px;font:.86em/1.4 ui-monospace,SFMono-Regular,Menlo,monospace}
+pre{background:var(--code);padding:12px 14px;border-radius:8px;overflow-x:auto;font:.82rem/1.5 ui-monospace,SFMono-Regular,Menlo,monospace}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:16px 0}
+.box.crit{border-left:4px solid var(--crit)}
+.box.warn{border-left:4px solid var(--high)}
+.box.ok{border-left:4px solid var(--ok)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:.87rem;min-width:720px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--card);font-weight:600;position:sticky;top:0;z-index:1}
+tr:last-child td{border-bottom:none}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.t-crit{color:var(--crit)} .t-high{color:var(--high)} .t-med{color:var(--med)} .t-low{color:var(--low)}
+.t-ok{color:var(--ok)} .t-warn{color:var(--warn)} .t-bad{color:var(--bad)}
+.ficha{border:1px solid var(--line);border-radius:10px;margin:18px 0;overflow:hidden}
+.ficha>header{background:var(--card);padding:12px 16px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.ficha>header .id{font:600 .8rem ui-monospace,Menlo,monospace;color:var(--accent)}
+.ficha>header .nm{font-weight:600;flex:1;min-width:220px}
+.ficha .body{padding:14px 16px}
+.kv{display:grid;grid-template-columns:minmax(150px,220px) 1fr;gap:2px 16px;font-size:.88rem}
+.kv dt{color:var(--muted);font-weight:600;padding:5px 0;border-top:1px solid var(--line)}
+.kv dd{margin:0;padding:5px 0;border-top:1px solid var(--line)}
+.kv dt:first-of-type,.kv dd:first-of-type{border-top:none}
+@media (max-width:680px){.kv{grid-template-columns:1fr}.kv dd{padding-bottom:10px;border-top:none}}
+ul.tight{margin:6px 0;padding-left:20px}
+ul.tight li{margin:3px 0}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+.toc ol{margin:6px 0;padding-left:22px}
+.toc a{color:var(--accent);text-decoration:none}
+.toc a:hover{text-decoration:underline}
+.fonte{font-size:.82rem;color:var(--muted)}
+.filterbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}
+.filterbar button{font:inherit;font-size:.82rem;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.filterbar button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+mark{background:#ffe9a8;color:#000;padding:0 2px;border-radius:3px}
+@media (prefers-color-scheme: dark){mark{background:#5a4a12;color:#fff}}
+hr{border:none;border-top:1px solid var(--line);margin:32px 0}
+@media print{.filterbar{display:none}.ficha{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Inventário de informações confidenciais, segredos empresariais e ativos de PI</h1>
+<p class="sub">Desligamento de engenheiro-chave · investigação de codebase e documentos jurídicos · 5 de agosto de 2026 · <strong>Etapa 1 — diagnóstico. Nenhum documento jurídico foi alterado.</strong></p>
+
+<div class="toc">
+<strong>Conteúdo</strong>
+<ol>
+<li><a href="#exec">Resumo executivo</a></li>
+<li><a href="#mapa">Mapa dos repositórios e sistemas examinados</a></li>
+<li><a href="#docs">Comparação dos três documentos jurídicos</a></li>
+<li><a href="#camada1">Camada 1 — Inventário interno restrito</a></li>
+<li><a href="#camada2">Camada 2 — Anexo contratual comunicável (proposta)</a></li>
+<li><a href="#exclusoes">Exclusões expressas</a></li>
+<li><a href="#gaps">Gap analysis — medidas técnicas, documentais e operacionais</a></li>
+<li><a href="#matriz">Matriz inventário × cláusulas dos três documentos</a></li>
+<li><a href="#alteracoes">Alterações recomendadas, priorizadas</a></li>
+<li><a href="#pendentes">Questões genuinamente pendentes</a></li>
+<li><a href="#fontes">Fontes jurídicas verificadas</a></li>
+</ol>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="exec">1. Resumo executivo</h2>
+
+<p><strong>A conclusão principal é que a 4Shark tem ativos protegíveis reais, específicos e demonstráveis — e que o obstáculo hoje não é a redação do contrato, é a prova.</strong> O código, a arquitetura e a documentação interna contêm dezenas de escolhas não públicas, não evidentes para um técnico do setor e economicamente valiosas justamente por serem reservadas. Essas escolhas estão documentadas, datadas e atribuídas no histórico de commits — o que sustenta autoria e anterioridade. O que ainda não está sustentado é o <em>terceiro</em> requisito legal: <strong>medidas razoáveis de proteção comprovadas e vigentes à época do vínculo</strong>.</p>
+
+<p>O limite jurídico não pode ser contornado por redação, e ele foi confirmado no próprio STJ. No REsp 2.047.758/SP o tribunal registrou que <em>"o sigilo não engloba todo conhecimento e informação obtida pelo empregado em sua atividade, porquanto, em seu exercício, ele também desenvolve know-how próprio decorrente da especialidade e anos de experiência"</em>, e decidiu que o desvio de clientela após a dispensa <strong>não é acionável na ausência de cláusula de não concorrência</strong>. No REsp 1.498.829/SP o mesmo tribunal devolveu o caso ao TJSP porque referências genéricas a "conhecimento em vendas e distribuição" não permitiam verificar quais elementos seriam <em>secretos e originais</em>. Traduzindo para este caso: um instrumento que proteja "tudo que ele aprendeu" é inexequível; um instrumento que proteja itens identificáveis, com anexo de categorias e inventário interno detalhado, é exequível.</p>
+
+<p>Três achados factuais mudam a prioridade do trabalho, e nenhum deles é de redação contratual.</p>
+
+<p><strong>Primeiro, a razão social usada nos três documentos está em branco e a escolha certa não é óbvia.</strong> Os três DOCX trazem <code>[RAZÃO SOCIAL DA EMPRESA]</code>, <code>[CNPJ]</code>, <code>[NOME DO EX-COLABORADOR]</code> — nenhum dado formal foi confirmado por eles. A codebase, porém, carrega o registro autoritativo: existem <strong>quatro pessoas jurídicas no grupo</strong>, e o documento de governança determina que o NDA interno é celebrado pela <strong>entidade empregadora</strong>, hoje <strong>4Shark Soluções Financeiras Ltda, CNPJ 49.673.485/0001-73</strong> — não pela 4SHARK TECNOLOGIA LTDA, que é a entidade principal mas <em>"holds no client contracts today"</em>. Assinar com a entidade errada é um vício de legitimidade que nenhuma cláusula corrige depois.</p>
+
+<p><strong>Segundo, existe um NDA anterior em vigor que conflita frontalmente com a v2.</strong> O modelo padrão da empresa (<code>compliance/internal/contrato-de-confidencialidade.md</code>, versão 1.0) é <em>escopado a projeto</em> — "durante o desenvolvimento do projeto denominado [Nome do Projeto]" — e estipula sigilo pós-projeto de <em>"[12 meses ou outro prazo]"</em>. A v2 estipula cinco anos, mais prazo indeterminado para segredos de negócio. Se o ex-colaborador assinou o modelo padrão na admissão, a cláusula de conflito genérica da v2 (Décima Quinta) não resolve: ela manda prevalecer "a disposição mais específica", e um prazo de 12 meses é mais específico que "5 anos". Essa colisão precisa ser resolvida por novação expressa, não por regra de interpretação.</p>
+
+<p><strong>Terceiro, e mais urgente, a superfície técnica ainda não foi fechada.</strong> O plano de offboarding executado em 31/07 reduziu o acesso AWS a somente-leitura por permissions boundary e desativou o MFA, e em 04/08 o engenheiro foi removido do stack de identidade. Mas o próprio <code>TASKS.md</code> lista pendências em aberto, e há duas que pesam: <strong>a chave de acesso IAM ainda não foi deletada</strong> e <strong>a revogação da VPN (Pritunl) é passo separado, fora do stack, ainda não executado</strong>. Além disso, o repositório <code>app</code> versiona <code>config/credentials.yml.enc</code>, cuja chave de decifragem (<code>config/master.key</code>) é git-ignored mas <strong>existe na cópia local de qualquer pessoa que já clonou o repositório</strong> — inclusive na dele. Isso significa que ele detém, hoje, material capaz de decifrar as credenciais versionadas de todo o histórico. Isso não é uma questão contratual; é rotação de credencial, e é o item mais caro de adiar.</p>
+
+<p><strong>O que o modelo escolhido resolve e o que ele não resolve.</strong> Sem pagar contrapartida, a empresa não obtém — e não deve tentar simular — o resultado "ele não pode desenvolver remuneração variável para terceiros". O que ela obtém, e o material levantado sustenta bem, é impedir e responsabilizar o <em>uso</em> de código, esquema de dados, regras de exceção, fórmulas, decisões de arquitetura, catálogo de modos de falha e dados de cliente específicos da 4Shark. A lacuna residual — um profissional experiente reconstruir do zero, de forma independente, outra solução de remuneração variável — é o preço jurídico de não contratar uma não concorrência válida, e a v2 já está corretamente construída para conviver com ela.</p>
+
+<div class="box crit">
+<strong>Recomendação fundamentada.</strong> Não redigir a v3 ainda. A ordem correta é: (1) fechar as pendências técnicas de offboarding — deletar a chave IAM, revogar a VPN, e <strong>rotacionar o <code>secret_key_base</code></strong> por conta do <code>master.key</code>; (2) confirmar com o contador qual entidade do grupo assina e qual NDA anterior o ex-colaborador efetivamente assinou; (3) datar, aprovar e coletar assinatura das políticas internas que hoje estão com data em branco — elas são a prova das "medidas razoáveis"; (4) só então redigir a v3 sobre esse alicerce, com o Anexo de categorias da Camada 2. Redigir a v3 primeiro produz um documento cuja premissa probatória ainda não existe.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="mapa">2. Mapa dos repositórios e sistemas examinados</h2>
+
+<p>Foram examinados os 23 repositórios da organização GitHub <code>4shark</code> presentes em <code>~/Projects/4Shark/</code>, mais os quatro documentos jurídicos indicados. <strong>Todos os repositórios são privados, com uma única exceção pública</strong> — o que é relevante porque delimita o que pode ser reivindicado como não público.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Repositório</th><th>Visibilidade</th><th>Papel</th><th>Commits</th><th>Arquivos</th><th>Janela</th><th>Ex-colab.</th></tr></thead>
+<tbody>
+<tr><td><code>app</code></td><td>PRIVATE</td><td>Backend principal — API e lógica de domínio do produto</td><td>14.539</td><td>5.860</td><td>2015-11 → 2026-08</td><td class="t-crit"><strong>Sim — 1.004 commits</strong></td></tr>
+<tr><td><code>app-webclient</code></td><td>PRIVATE</td><td>Cliente web Angular (whitelabel por cliente, Netlify)</td><td>11.761</td><td>2.701</td><td>2019-08 → 2026-08</td><td class="t-crit"><strong>Sim — 770 commits</strong></td></tr>
+<tr><td><code>integrator</code></td><td>PRIVATE</td><td>Integração dos sistemas do cliente com a API 4Shark</td><td>4.918</td><td>865</td><td>2018-10 → 2026-08</td><td class="t-crit"><strong>Sim — 239 commits</strong></td></tr>
+<tr><td><code>terraform</code></td><td>PRIVATE</td><td>Toda a infraestrutura AWS, stack de identidade, stacks por cliente</td><td>1.812</td><td>606</td><td>2025-08 → 2026-08</td><td class="t-high">Sim — 8 commits + maintainer do time <code>infrastructure</code></td></tr>
+<tr><td><code>setup</code></td><td>PRIVATE</td><td>Configuração do super-app móvel white-label via QR code</td><td>721</td><td>128</td><td>2025-02 → 2026-08</td><td>Não (commits)</td></tr>
+<tr><td><code>onboarding</code></td><td>PRIVATE</td><td>Onboarding de cliente — Q&amp;A guiado que define regras e setup</td><td>220</td><td>155</td><td>2026-03 → 2026-08</td><td class="t-med">Sim — 8 commits</td></tr>
+<tr><td><code>lambda</code></td><td>PRIVATE</td><td>Controle de escala de processamento do app (autoscaling por volume)</td><td>168</td><td>50</td><td>2025-08 → 2026-06</td><td>Não</td></tr>
+<tr><td><code>simplex-harvester</code></td><td>PRIVATE</td><td>ETL .NET direto da fonte para a base normalizada</td><td>63</td><td>42</td><td>2026-06 → 2026-07</td><td>Não</td></tr>
+<tr><td><code>app-mobileclient</code></td><td>PRIVATE</td><td>Cliente móvel nativo (Dart/Flutter), super-app white-label</td><td>53</td><td>297</td><td>2024-12 → 2026-06</td><td>Não (mas maintainer do time front-end)</td></tr>
+<tr><td><code>app-sdk-dotnet</code> / <code>app-sdk-advpl</code></td><td>PRIVATE</td><td>SDKs embarcados no sistema do cliente (.NET; Protheus/TOTVS)</td><td>23 / 15</td><td>64 / 57</td><td>2025-11 → 2026-06</td><td>Não</td></tr>
+<tr><td><code>keycloak</code>, <code>pgbouncer</code>, <code>pritunl</code>, <code>mongodb</code>, <code>ansible-role-mongodb</code></td><td>PRIVATE</td><td>Imagens e AMIs de infraestrutura (wrappers sobre software de terceiros)</td><td>31/35/30/33/17</td><td>—</td><td>2025-01 → 2026-08</td><td>Não</td></tr>
+<tr><td><code>compliance</code></td><td>PRIVATE</td><td><strong>Documentos legais e de compliance — fonte da verdade em markdown</strong></td><td>21</td><td>25</td><td>2026-06 → 2026-07</td><td>Não</td></tr>
+<tr><td><code>data-privacy</code></td><td>PRIVATE</td><td>Ferramental privilegiado de privacidade (LGPD, redação, direitos do titular)</td><td>51</td><td>13</td><td>2026-06 → 2026-07</td><td class="t-ok"><strong>Não — time <code>data-privacy</code> tinha só 1 membro</strong></td></tr>
+<tr><td><code>google-analytics-manager</code></td><td>PRIVATE</td><td>GA4 como código</td><td>7</td><td>8</td><td>2026-06</td><td>Não</td></tr>
+<tr><td><code>ansible</code></td><td>PRIVATE</td><td>Descontinuado — mantido só por histórico</td><td>645</td><td>1</td><td>2016-12 → 2026-07</td><td>Não</td></tr>
+<tr><td><code>dot-claude</code></td><td>PRIVATE</td><td>Configuração de engenharia compartilhada do time</td><td>984</td><td>303</td><td>2025-11 → 2026-08</td><td class="t-med">Sim — 8 commits</td></tr>
+<tr><td><code>rubocop-fourshark</code></td><td class="t-bad"><strong>PUBLIC</strong></td><td>Extensão RuboCop com as convenções Ruby/Rails/RSpec da 4Shark</td><td>59</td><td>50</td><td>2026-05 → 2026-08</td><td>Não</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>2.1 Identidade e acesso do ex-colaborador — evidência factual</h3>
+
+<p>O commit <code>aecf872</code> no repositório <code>terraform</code> (04/08/2026, "chore(identity): remove platform access for a departed engineer", já em <code>develop</code>) registra <strong>exatamente</strong> o que a identidade concedia antes da remoção. Esta é a matriz de acesso mais forte disponível, porque é declarativa e versionada:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Plataforma</th><th>Nível concedido</th><th>Evidência</th></tr></thead>
+<tbody>
+<tr><td>GitHub — org</td><td><code>member</code> (não admin)</td><td><code>identity/terraform.tfvars</code>, bloco removido em <code>aecf872</code></td></tr>
+<tr><td>GitHub — times</td><td><strong><code>maintainer</code></strong> em <code>analytics</code>, <code>app-back-end-development</code>, <code>app-front-end-development</code>, <code>infrastructure</code>, <code>integration-development</code></td><td><code>identity/github.tf</code>, 5 linhas removidas</td></tr>
+<tr><td>AWS</td><td>Usuário IAM + login de console (<code>aws_console_access = true</code>) + SSO <code>ReadOnlyAccess</code>; grupo <code>engineers</code> com 10 políticas gerenciadas</td><td><code>identity/engineers.tf:26-46</code>; plano de offboarding</td></tr>
+<tr><td>MongoDB Atlas</td><td><code>ORG_MEMBER</code>, time <code>baseline</code> (efetivo <code>GROUP_READ_ONLY</code>)</td><td><code>identity/mongodb_teams.tf:76-78</code></td></tr>
+<tr><td>Cloudflare</td><td><code>Administrator Read Only</code></td><td><code>identity/terraform.tfvars</code></td></tr>
+<tr><td>Rollbar</td><td>times <code>backend</code> e <code>frontend</code></td><td><code>identity/terraform.tfvars</code></td></tr>
+<tr><td class="t-crit"><strong>ECS Exec (produção)</strong></td><td class="t-crit"><strong><code>ecs:ExecuteCommand</code> em <code>task/*</code> e <code>cluster/*</code> sem condição de MFA</strong> — console Rails em qualquer task de produção: leitura, escrita e exclusão sobre todo o banco de produção e todos os dados de cliente</td><td><code>identity/policies_baseline.tf:96-142</code>, verificado contra o documento publicado, não só contra o Terraform</td></tr>
+<tr><td>VPN (Pritunl)</td><td class="t-crit">Fora do stack <code>identity/</code> — <strong>revogação ainda pendente</strong></td><td><code>TASKS.md</code> § Pending, item aberto</td></tr>
+</tbody>
+</table>
+</div>
+
+<div class="box warn">
+<strong>Leitura da linha do tempo.</strong> O último commit dele em <code>app</code> é de <strong>30/07/2026</strong>; a redução de acesso AWS foi aplicada em <strong>31/07</strong>; a remoção do stack de identidade em <strong>04/08</strong>. Existe portanto uma janela documentada de trabalho normal até 30/07 com <code>ecs:ExecuteCommand</code> irrestrito em produção. Isso não indica nada de irregular por si — era o acesso legítimo dele —, mas define o universo de dados a que ele teve acesso e é o que torna o inventário de <em>dados de cliente</em> tão relevante quanto o de código.
+</div>
+
+<!-- ============================================================ -->
+<h2 id="docs">3. Comparação dos três documentos jurídicos</h2>
+
+<h3>3.1 Dados formais — nenhum foi confirmado pelos documentos</h3>
+
+<p>Os três DOCX trazem exclusivamente placeholders para razão social, CNPJ, endereço, nome, RG, CPF, cargo, datas de admissão e desligamento, cidade e foro. <strong>Nenhum dado formal pode ser confirmado a partir deles.</strong> O registro autoritativo está na codebase, em <code>compliance/records/entidades-do-grupo.md</code>, e ele contradiz a suposição intuitiva de que "a empresa" é a 4SHARK TECNOLOGIA:</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Razão social</th><th>CNPJ</th><th>Papel declarado</th></tr></thead>
+<tbody>
+<tr><td>4SHARK TECNOLOGIA LTDA</td><td>23.839.883/0001-23</td><td>Entidade <strong>principal/original</strong>. Entidade dos documentos <em>públicos</em> e do RoPA. <em>"Holds no client contracts today."</em></td></tr>
+<tr class="t-ok"><td><strong>4Shark Soluções Financeiras Ltda</strong></td><td><strong>49.673.485/0001-73</strong></td><td><strong>Empregadora de todo o quadro (CLT + prestadores)</strong> — entidade dos documentos <em>internos</em>. Também operadora para parte dos clientes.</td></tr>
+<tr><td>4T Soluções Ltda</td><td>55.317.063/0001-68</td><td>Operadora para parte dos clientes (contratos comerciais)</td></tr>
+<tr><td>Incentive Gestão de Incentivos Ltda ("4Shark Pay")</td><td>62.901.678/0001-00</td><td>Operadora para parte dos clientes (contratos comerciais)</td></tr>
+</tbody>
+</table>
+</div>
+
+<p>O mesmo documento mapeia explicitamente a categoria: <em>"Confidentiality agreement (NDA) | Internal (per relationship) | the contracting entity (current staff: 4Shark Soluções Financeiras Ltda)"</em>. E adverte: <em>"The authoritative source for the CNPJs and the client distribution is accounting (Sérgio). <strong>Confirm before each generation</strong>."</em> Ou seja: a codebase indica a entidade correta, mas o próprio registro manda validar com a contabilidade antes de usar.</p>
+
+<h3>3.2 O que foi mantido, removido e transformado na v2</h3>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Tema</th><th>Doc 1 — Termo Pós-Contratual</th><th>Doc 2 — Não Concorrência</th><th>Doc 3 — v2 gerada</th><th>Avaliação</th></tr></thead>
+<tbody>
+<tr><td><strong>Não concorrência</strong></td><td>Ausente por opção (cl. 9.1: "não estabelece obrigação geral de não concorrência")</td><td><strong>Núcleo do documento</strong> (cl. 2), com prazo, território e lista de concorrentes em branco</td><td class="t-ok"><strong>Removida integralmente.</strong> Cl. 2ª afirma liberdade de trabalhar "inclusive concorrente da EMPRESA ou atuante em remuneração variável"</td><td class="t-ok">Correto. Sem contrapartida, a cl. 2 do Doc 2 é de alto risco de invalidade</td></tr>
+<tr><td><strong>Contrapartida financeira</strong></td><td>Ausente</td><td>Cl. 9 — mensal ou parcela única, valores em branco</td><td class="t-ok">Removida (coerente com a remoção do não compete)</td><td class="t-ok">Coerente</td></tr>
+<tr><td><strong>Não solicitação de clientes</strong></td><td>Cl. 7 — 12 meses, condicionada ao <em>uso de informação confidencial</em></td><td>Cl. 3 e 4 — 12 meses, <strong>sem</strong> condicionar ao uso de informação</td><td class="t-warn"><strong>Transformada</strong>: cl. 9ª, §3º — não é mais prazo autônomo, é proibição de usar dados confidenciais para desviar oportunidade</td><td class="t-ok">Transformação correta e mais defensável. Ver §3.3</td></tr>
+<tr><td><strong>Não aliciamento</strong></td><td>Cl. 8 — 12 meses</td><td>Cl. 5 — prazo em branco</td><td class="t-warn">Absorvida na cl. 9ª §3º, <strong>sem prazo próprio</strong></td><td class="t-warn">Perde-se um prazo objetivo; ganha-se o vínculo com uso de informação. Decisão consciente a validar</td></tr>
+<tr><td><strong>Definições</strong></td><td>Lista de categorias na cl. 2.2, sem definir termos</td><td>Lista na cl. 6.2, sem definir termos</td><td class="t-ok"><strong>Cláusula 1ª nova</strong> — seis definições: Informação Confidencial, Segredo de Negócio (com remissão ao art. 195, XI), Material Proprietário, Conhecimento Profissional Geral, Desenvolvimento Independente, Infração Material</td><td class="t-ok">Maior ganho estrutural da v2</td></tr>
+<tr><td><strong>Exclusões</strong></td><td>Só cl. 4.1 (conhecimentos gerais), genérica</td><td>Cl. 6.3 — quatro hipóteses clássicas</td><td class="t-ok">Cl. 3ª §3º — quatro hipóteses <strong>+ ônus documental do ex-colaborador + ressalva da combinação não pública de elementos públicos</strong></td><td class="t-ok">Superior aos dois originais</td></tr>
+<tr><td><strong>Desenvolvimento independente</strong></td><td>Ausente</td><td>Só como exceção (cl. 6.3.b)</td><td class="t-ok"><strong>Definido</strong> (cl. 1ª) e operacionalizado (cl. 4ª): pode desenvolver upload de indicadores, auditoria, dashboards, médias, cálculos, relatórios e fluxos de aprovação para terceiro</td><td class="t-ok">É o que descaracteriza o não compete disfarçado</td></tr>
+<tr><td><strong>Não uso (vs. não divulgação)</strong></td><td>Implícito (cl. 3.2)</td><td>Implícito (cl. 3.4)</td><td class="t-ok">Explícito e central — cl. 3ª e cl. 9ª "Proibição de Aproveitamento Indevido"</td><td class="t-ok">É a obrigação que realmente protege</td></tr>
+<tr><td><strong>Multa</strong></td><td>"R$ [VALOR]", com ressalva de redução</td><td>"R$ [VALOR]", com perdas e danos adicionais</td><td class="t-warn"><strong>R$ 500.000,00 por ocorrência autônoma</strong>, corrigida pelo IPCA-E, + Componente Variável Adicional cumulativo</td><td class="t-warn">Ver análise em §3.4 — há um problema real</td></tr>
+<tr><td><strong>Prazo de confidencialidade</strong></td><td>5 anos + indeterminado para segredo</td><td>"[___] anos"</td><td>5 anos + indeterminado para Segredo de Negócio</td><td class="t-warn">Colide com o NDA padrão de 12 meses — ver §3.5</td></tr>
+<tr><td><strong>Devolução / eliminação</strong></td><td>Cl. 5, declaratória</td><td>Cl. 8, declaratória</td><td class="t-ok">Cl. 8ª + <strong>Anexo I — declaração assinada com 7 itens</strong> e prazo de 2 dias úteis</td><td class="t-ok">Ganho probatório importante</td></tr>
+<tr><td><strong>Cooperação e preservação de prova</strong></td><td>Ausente</td><td>Ausente</td><td class="t-ok">Cl. 10ª — comunicação em 24h, cessação, preservação de evidências, com limites de privacidade</td><td class="t-ok">Novo e correto</td></tr>
+<tr><td><strong>Notificação de incidente</strong></td><td>Ausente</td><td>Ausente</td><td class="t-ok">Cl. 6ª §2º — 24h para incidente envolvendo dados pessoais ou Informação Confidencial</td><td class="t-ok">Novo</td></tr>
+<tr><td><strong>Revelações legítimas</strong></td><td>Ausente</td><td>Cl. 6.3.d, mínima</td><td class="t-ok">Cl. 13ª — ordem judicial, denúncia a autoridade, orientação jurídica, direito trabalhista, defesa</td><td class="t-ok">Reduz risco de nulidade por cerceamento</td></tr>
+<tr><td><strong>Ferramentas de IA generativa</strong></td><td>Ausente</td><td>Ausente</td><td class="t-ok">Cl. 3ª §2º e cl. 8ª §2º + Anexo I</td><td class="t-ok">Vetor real e atual, bem coberto</td></tr>
+<tr><td><strong>Foro</strong></td><td>"foro competente nos termos da legislação"</td><td>"[CIDADE/UF]"</td><td>Competência legal, "inclusive à Justiça do Trabalho"</td><td class="t-warn">Divergente do NDA padrão, que elege São Paulo/SP</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>3.3 A transformação da não solicitação é acertada — e o STJ explica por quê</h3>
+<p>O Doc 2 proíbe abordar clientes por 12 meses <em>independentemente</em> de uso de informação confidencial. É exatamente a hipótese que o STJ tratou no REsp 2.047.758/SP: o desvio de clientela durante a vigência configura concorrência desleal, mas <strong>não se estende após a dispensa na ausência de cláusula de não concorrência</strong> — e cláusula de não concorrência, sem contrapartida, é o que se decidiu não usar. A v2 acertou ao converter a proibição de <em>abordar</em> em proibição de <em>usar dados confidenciais para</em> abordar: o evento juridicamente relevante passa a ser o uso da informação, que sobrevive ao fim do contrato por força do art. 195, XI, da LPI.</p>
+
+<h3>3.4 A multa da v2 tem um problema aritmético, não retórico</h3>
+<div class="box warn">
+<p>O art. 412 do Código Civil é literal: <em>"O valor da cominação imposta na cláusula penal não pode exceder o da obrigação principal."</em> A obrigação principal aqui não é pecuniária — é um dever de não fazer —, e a jurisprudência costuma tomar como referência de proporcionalidade o valor do contrato de trabalho. <strong>R$ 500.000,00 por ocorrência autônoma</strong>, cumulável com um Componente Variável Adicional ilimitado, contra um vínculo de engenheiro sênior de ~8 anos, é o tipo de valor que o art. 413 autoriza o juiz a reduzir por ser "manifestamente excessivo".</p>
+<p>Há um segundo ponto, mais sutil e mais perigoso: <strong>uma multa desproporcional é usada como argumento de que a obrigação é, na substância, um não compete disfarçado.</strong> O valor alto sinaliza que o que se quer coibir é a atuação, não o uso da informação — exatamente a leitura que a v2 se esforça para afastar em cinco cláusulas diferentes. O desenho tecnicamente correto já está lá: o art. 416, parágrafo único, exige que a indenização suplementar seja <em>convencionada</em> — <em>"não pode o credor exigir indenização suplementar se assim não foi convencionado. Se o tiver sido, a pena vale como mínimo da indenização, competindo ao credor provar o prejuízo excedente"</em> — e a cl. 11ª §5º faz essa convenção expressamente. Com a suplementar convencionada e provável, a multa base não precisa ser alta: ela é <em>piso</em>, não teto. Baixá-la fortalece o instrumento em vez de enfraquecê-lo.</p>
+</div>
+
+<h3>3.5 O conflito com o NDA anterior não está resolvido</h3>
+<p>O modelo padrão vigente da empresa (<code>compliance/internal/contrato-de-confidencialidade.md</code> v1.0) tem três características incompatíveis com a v2: escopo <em>de projeto</em> ("o projeto denominado [Nome do Projeto]"), prazo pós-projeto de <em>12 meses</em>, e foro eleito de <em>São Paulo/SP</em>. A cl. 15ª da v2 manda prevalecer "a disposição mais específica sobre confidencialidade" em caso de conflito — o que é ambíguo justamente onde precisa ser claro: 12 meses é mais específico que 5 anos. Isso se resolve com novação expressa nominando o instrumento anterior, sua data e o efeito pretendido — não com regra de interpretação.</p>
+
+<!-- ============================================================ -->
+<h2 id="camada1">4. Camada 1 — Inventário interno restrito</h2>
+
+<p>Fichas ordenadas por criticidade. Cada ficha traz os 18 campos exigidos. <strong>Nenhum valor de credencial, dado pessoal ou dado concreto de cliente é reproduzido</strong> — apenas categoria, local e risco.</p>
+
+<div class="filterbar" role="group" aria-label="Filtrar por criticidade">
+  <button type="button" data-f="all" aria-pressed="true">Todas (18)</button>
+  <button type="button" data-f="crit" aria-pressed="false">Crítica</button>
+  <button type="button" data-f="high" aria-pressed="false">Alta</button>
+  <button type="button" data-f="med" aria-pressed="false">Média</button>
+</div>
+
+<!-- ---------- SEC-01 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">SEC-01</span><span class="nm">Material criptográfico e credenciais retidas na cópia local</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>O repositório <code>app</code> versiona <code>config/credentials.yml.enc</code> (credenciais cifradas do Rails, contendo ao menos o <code>secret_key_base</code>, que assina sessões e JWT). A chave de decifragem é <code>config/master.key</code>, que é git-ignored — <strong>mas existe no disco de qualquer pessoa que tenha clonado o repositório e configurado o ambiente</strong>. Somam-se a chave de acesso IAM ainda não deletada, a semente do dispositivo MFA no 1Password pessoal dele, e o acesso VPN ainda não revogado.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/config/credentials.yml.enc</code> (versionado); <code>app/.gitignore:53</code> → <code>/config/master.key</code>; <code>~/.claude/scripts/setup-worktree.sh</code> (linka <code>master.key</code> em cada worktree); <code>dot-claude-plans/active/engineer-offboarding-access-reduction/PLAN.md:92-101,119-121</code> e <code>TASKS.md:16-46</code></dd>
+<dt>Sistema / processo</dt><dd>Autenticação de todo o produto (assinatura de sessão e JWT); acesso programático AWS; acesso de rede via VPN</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + informação confidencial contratual. <strong>Não é matéria de contrato — é matéria de rotação.</strong></dd>
+<dt>Elemento específico protegido</dt><dd>O valor do <code>secret_key_base</code> e demais chaves em <code>credentials.yml.enc</code>; o par de chaves IAM; a semente TOTP; o perfil VPN</dd>
+<dt>Por que não é público nem evidente</dt><dd>São valores gerados aleatoriamente, sem qualquer relação com conhecimento de domínio. Não há como derivá-los por técnica</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Não é vantagem competitiva — é controle de acesso. Um <code>secret_key_base</code> conhecido permite forjar sessão/JWT de qualquer usuário de qualquer cliente</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Arquivo versionado com histórico completo; par de chaves e MFA registrados no inventário da conta AWS <code>405749097490</code></dd>
+<dt>Quem tinha acesso</dt><dd>Todo engenheiro com clone do <code>app</code> configurado. O ex-colaborador era <code>maintainer</code> do time <code>app-back-end-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd>1.004 commits em <code>app</code> exigindo ambiente funcional; commits registrados a partir de hostname de máquina pessoal (<code>MacBook-Pro-de-Emerson.local</code>); <code>PasswordLastUsed</code> 2026-03-20 com trabalho exclusivamente por chave de acesso programático</dd>
+<dt>Medidas atuais</dt><dd>Permissions boundary <code>ReadOnlyAccess</code> aplicado 31/07; MFA desativado; usuário removido do stack de identidade em 04/08 (commit <code>aecf872</code>, em <code>develop</code>)</dd>
+<dt class="t-crit">Gaps</dt><dd class="t-crit"><strong>(a) chave de acesso IAM ainda não deletada; (b) VPN Pritunl ainda não revogada; (c) <code>secret_key_base</code> NÃO rotacionado — a boundary não alcança material que já está no disco dele; (d) sem varredura de segredos no CI (nenhum gitleaks/trufflehog nos workflows de <code>app</code> e <code>integrator</code>)</strong></dd>
+<dt>Risco / impacto</dt><dd>Máximo. Forja de sessão em produção multi-cliente; acesso residual de rede</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Nula — valores não são deriváveis</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> — mas irrelevante: a proteção correta é técnica, não contratual</dd>
+<dt>Destino recomendado</dt><dd><strong>Melhoria operacional imediata</strong> (rotação + revogação) + menção categórica no Anexo contratual. Nunca detalhar no contrato</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-01 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">IP-01</span><span class="nm">Motor de fórmulas de remuneração variável e sua taxonomia de erros</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Camada proprietária construída <em>sobre</em> a biblioteca pública Dentaku, que decide o que uma regra de comissão pode expressar. Inclui: a detecção de fórmulas que acumulam transações por padrão de identificador; a taxonomia de erros que reprova fórmulas sintaticamente válidas mas inutilizáveis (divisão por zero escrita, função sem argumento, literal de data ilegível, aritmética sobre variável de texto); e a decisão de que uma regra não calculável <strong>rende zero em vez de interromper a comissão</strong>.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/app/models/formula.rb:7</code> (<code>ACCUMULATION_KEY_PATTERN</code>), <code>:33-49</code> (<code>#error</code>); <code>app/app/models/formula/</code> (5 classes de erro); <code>app/app/models/rule.rb:12-13</code> (<code>PARSE_EXCEPTIONS</code>), <code>:67-71</code> (<code>#calculate</code> → 0), <code>:95-110</code> (<code>#syntax</code>)</dd>
+<dt>Sistema / processo</dt><dd>Cadastro e validação de regras de incentivo; cálculo de comissão em produção</dd>
+<dt>Categoria jurídica</dt><dd>Software / direito autoral (expressão literal) <strong>+</strong> segredo empresarial (a combinação de escolhas)</dd>
+<dt>Elemento específico protegido</dt><dd>Não "um motor de fórmulas" — mas: (a) o conjunto exato de exceções tratadas como não-calculáveis; (b) a decisão de responder zero e não halt; (c) a lista de formas mal-formadas verificadas <em>na árvore sintática</em> antes de salvar; (d) o padrão de prefixo que classifica um identificador como acumulador</dd>
+<dt>Por que não é público nem evidente</dt><dd>Dentaku é público; o que não é público é <em>qual</em> subconjunto de falhas foi julgado inaceitável em produção e por quê. Cada item da taxonomia é a cicatriz de um caso real de cliente. Um técnico partindo do zero não deriva essa lista — ele a descobre ao longo de anos</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É o que impede que um plano de comissão mal configurado pare o fechamento do mês. Encurta em anos o caminho de um concorrente até um motor de regras confiável</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Histórico de commits do <code>app</code> desde 2015-11; comentários de decisão no próprio código</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>app-back-end-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time; 1.004 commits em <code>app</code> entre 2018-10-02 e 2026-07-30</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado; acesso por time; política de gestão de identidade e acesso (não datada — ver GAP-02)</dd>
+<dt>Gaps</dt><dd>Sem registro INPI do software; sem marcação de confidencialidade no cabeçalho dos arquivos; sem hash de versão arquivado</dd>
+<dt>Risco / impacto</dt><dd>Alto — reprodução acelera materialmente um concorrente</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média para a <em>função</em> (avaliar fórmula); <strong>baixa</strong> para a taxonomia específica</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> — atende os três requisitos do art. 195, XI, e é identificável pontualmente como exige o REsp 1.498.829/SP</dd>
+<dt>Destino recomendado</dt><dd>Anexo contratual (categoria) + inventário interno (detalhe) + <strong>registro de software no INPI com hash</strong></dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-02 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">IP-02</span><span class="nm">Vocabulário de identificadores permitidos por tipo de regra</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Tabela que define, por tipo de regra (Fórmula, Indicador, Ranking, Limitador, Resgate), exatamente quais nomes de variável a fórmula pode referenciar — em português e inglês simultaneamente —, mais as sete famílias de prefixo de acumulação geradas por status habilitado da empresa, e a distinção entre variáveis que carregam texto e as que carregam número.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/app/models/rule/options.rb:14-24</code> (<code>BUILT_IN_VARIABLES_BY_TYPE</code>), <code>:27</code> (<code>TEXT_BUILT_IN_VARIABLES</code>), <code>:30-31</code> (<code>STATUS_PREFIXES</code>), <code>:37-45</code> (composição por tipo), <code>:60-74</code> (formas <code>_goal</code> / <code>meta_</code>)</dd>
+<dt>Sistema / processo</dt><dd>Validação de regra no cadastro do incentivo; contraparte em tempo de execução nos processadores de comissão</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software/direito autoral</dd>
+<dt>Elemento específico protegido</dt><dd>A <strong>lista literal</strong> de nomes por tipo, o bilinguismo deliberado, os sete prefixos de acumulação e a assimetria documentada — o próprio comentário do arquivo registra que <em>"This set is the wider of the two"</em>, ou seja, uma fórmula pode passar na validação e resolver para zero no cálculo</dd>
+<dt>Por que não é público nem evidente</dt><dd>Cada nome corresponde a uma convenção comercial negociada com clientes reais ao longo de anos. A convivência pt/en existe porque a base de clientes é BR + hispano-americana. Nada disso é derivável</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É a interface entre o time comercial/onboarding e o motor. Copiá-la entrega, de graça, o modelo mental de como se configura um plano</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Histórico de commits; comentários de decisão no arquivo</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>app-back-end-development</code>; parcialmente refletido para o time de onboarding</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time back-end</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado; acesso por time</dd>
+<dt>Gaps</dt><dd>Não marcado como confidencial; sem registro; a assimetria validação↔runtime não está documentada fora do código</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd><strong>Muito baixa</strong> — a lista exata é arbitrária no sentido técnico; qualquer coincidência substancial é indício forte</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> — é o exemplo canônico de elemento "secreto e original" identificável pontualmente</dd>
+<dt>Destino recomendado</dt><dd>Anexo contratual (categoria) + inventário interno (lista completa) + <strong>candidato prioritário a registro com hash</strong></dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-03 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">IP-03</span><span class="nm">Modelo de dados do domínio de remuneração variável</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Esquema relacional com <strong>166 tabelas e 655 índices</strong>, mais ~1.900 migrations desde 2015, modelando planos, fatias de plano, incentivos, regras, comissionamentos, comissões parciais, extratos, pagamentos, resgates, vouchers, campanhas, fundos de premiação e o histórico completo por usuário. Acompanham 36 diagramas de máquina de estado dos objetos financeiros.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/db/schema.rb</code> (3.095 linhas); <code>app/db/migrate/</code> (2015→2026); <code>app/app/models/</code> (~440 modelos); <code>app/docs/state_machines/</code> (36 diagramas, ex. <code>Commission_status.png</code>, <code>Payment_status.png</code>, <code>PlanSliceCommission_status.png</code>)</dd>
+<dt>Sistema / processo</dt><dd>Todo o núcleo do produto</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software/direito autoral (a expressão do esquema e das migrations)</dd>
+<dt>Elemento específico protegido</dt><dd>A <strong>decomposição</strong> escolhida: separar <code>Plan</code> de <code>PlanSlice</code> de <code>PlanSliceCommission</code>; separar <code>Commission</code> de <code>PartialCommission</code>; ter <code>Commissioning</code> como elo entre regra e resultado; os índices únicos parciais que sustentam identidade composta; as transições de estado admitidas em cada máquina</dd>
+<dt>Por que não é público nem evidente</dt><dd>Não existe um modelo canônico de remuneração variável. Esta decomposição absorve variações de dezenas de clientes de setores diferentes — é o resultado de dez anos de refinamento, não de uma leitura de manual</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>O modelo de dados é o que permite absorver a próxima variação sem reescrever o produto. É o ativo mais difícil de reproduzir e o mais caro de errar</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Histórico de migrations datadas desde 2015-11; cada migration é um artefato datado e atribuído</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>app-back-end-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code>; presença em migrations ao longo de ~8 anos</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Sem registro INPI; sem marcação; sem diagrama ER versionado além do PDF (<code>docs/entity_relationship.pdf</code>)</dd>
+<dt>Risco / impacto</dt><dd>Máximo entre os ativos de produto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Baixa para o conjunto; média para tabelas isoladas</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Alta no conjunto, média item a item.</strong> Uma tabela <code>users</code> é óbvia; a decomposição <code>Plan/PlanSlice/PlanSliceCommission/Commissioning</code> não é. O anexo precisa proteger a <em>combinação</em>, não cada tabela</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "modelos e esquemas de dados") + inventário interno + registro do software</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-04 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-04</span><span class="nm">Processadores de opções de comissão em tempo de execução</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Seis serviços que montam, por usuário e por comissão, o conjunto de valores que a fórmula enxerga no momento do cálculo — resolvendo metas de usuário e de grupo, orçamento do plano, indicadores agregados, e o comportamento de fallback quando o indicador agregado não existe.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/app/services/commission/</code>: <code>deal_options_processor.rb</code> (127 linhas), <code>deal_options_v2_processor.rb</code>, <code>indicator_options_processor.rb:5-60</code>, <code>limiter_options_processor.rb</code>, <code>ranking_options_processor.rb</code>, <code>redemption_options_processor.rb</code></dd>
+<dt>Sistema / processo</dt><dd>Cálculo de comissão (workers <code>Commission::Producer</code>/<code>Consumer</code>)</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software</dd>
+<dt>Elemento específico protegido</dt><dd>A ordem de resolução (metas de usuário antes das de grupo, ambas alimentadas na mesma chave); a dupla nomeação <code>&lt;chave&gt;_goal</code> e <code>meta_&lt;chave&gt;</code>; o fallback para <code>variable.format_default</code> quando não há indicador agregado (<code>indicator_options_processor.rb:58-59</code>) — uma <strong>regra de exceção</strong> que decide silenciosamente o resultado financeiro</dd>
+<dt>Por que não é público nem evidente</dt><dd>O fallback é a definição de uma regra de exceção de negócio: o que acontece quando o dado do cliente não chegou. Cada escolha dessas é uma decisão comercial embutida em código</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Determina o valor efetivamente pago. Reproduzi-lo é reproduzir o comportamento financeiro do produto</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Histórico de commits; a existência de um <code>v2</code> ao lado do original documenta a evolução</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>app-back-end-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code></dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>As regras de exceção não estão documentadas fora do código — o que dificulta demonstrar a terceiro <em>qual</em> era o segredo</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Baixa para as regras de exceção específicas</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong></dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "regras e exceções de cálculo") + inventário interno com extração das exceções para documento próprio</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-05 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">IP-05</span><span class="nm">Padrão de tradução de identidade cliente→plataforma (Redis + PostgreSQL, dois níveis)</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Mecanismo pelo qual toda chamada de API do cliente referencia entidades pelos <em>identificadores do próprio cliente</em>, nunca por IDs da 4Shark. Cada modelo declara como construir a chave de cache a partir de suas colunas identificadoras e um TTL próprio; a resolução consulta Redis primeiro (~300µs) e cai para PostgreSQL (~5-10ms); callbacks mantêm a coerência com ordem deliberada de <em>delete-then-write</em> no update.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/docs/architecture/API_DOMAIN.md:7-52</code> — descrito como <em>"a deliberate platform choice and a real differentiator"</em>; implementação em <code>ApplicationRecord</code> e nos modelos com <code>get</code>/<code>get_id</code></dd>
+<dt>Sistema / processo</dt><dd>Toda a superfície REST <code>/api/v3/</code> e todo o pipeline de integração</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software</dd>
+<dt>Elemento específico protegido</dt><dd>A arquitetura de dois níveis com TTL por recurso; a ordem delete-then-write que cobre mudança das colunas que formam a chave; a decisão de absorver o custo do mapeamento em vez de exigi-lo do cliente; a justificativa documentada de por que o cliente não consegue fazê-lo (identidade composta de 2-3 colunas + políticas de expurgo do cliente)</dd>
+<dt>Por que não é público nem evidente</dt><dd>Cache com fallback é público; <em>esta</em> aplicação — como diferencial comercial de integração, com TTL calibrado por padrão de uso do recurso — é uma escolha de produto documentada como tal</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É explicitamente descrito no doc interno como diferencial: estreita a superfície de integração e é o que torna a venda viável para clientes sem time de engenharia</dd>
+<dt>Evidência de criação / titularidade</dt><dd><code>API_DOMAIN.md</code> versionado; implementação no histórico do <code>app</code></dd>
+<dt>Quem tinha acesso</dt><dd>Times <code>app-back-end-development</code> e <code>integration-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> de <strong>ambos</strong> os times</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>O documento não carrega marcação de confidencialidade no cabeçalho</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média para o padrão técnico; baixa para o pacote com justificativa comercial e calibração</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong></dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "decisões e padrões de arquitetura") + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-06 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-06</span><span class="nm">Pipeline de integração — sequência fixa de 25 streams e sua justificativa</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>O integrador executa, em cada estágio (Extract → Transform → Load), uma sequência fixa de 25 streams. A ordem não é arbitrária: <code>Hierarchy</code> (promoção/rebaixamento) roda em 2º lugar, <em>antes</em> de qualquer usuário ser registrado, e <code>ParentUpdate</code> (troca de gestor imediato) em 14º, <em>depois</em> de todos registrados. Há um stream <code>User::Unknown</code> que captura registros cujo tipo não casa com nenhum dos 10 níveis e os empurra à API deliberadamente, para que o erro fique visível ao cliente em vez de ser silenciado.</dd>
+<dt>Onde foi identificado</dt><dd><code>integrator/CLAUDE.md</code> § Stream Order, § User::Unknown, § Hierarchy and ParentUpdate; <code>integrator/docs/architecture/INTEGRATOR_DOMAIN.md</code> cap. 4 (1.723 linhas no total)</dd>
+<dt>Sistema / processo</dt><dd>Execução da integração de cada cliente</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (processo interno) + software</dd>
+<dt>Elemento específico protegido</dt><dd>A sequência exata; o <em>porquê</em> de cada posição (um representante promovido a supervisor precisa estar em nível de supervisor <em>antes</em> de novos representantes serem pendurados abaixo, senão ficam sob outro representante); a decisão de não descartar silenciosamente o tipo desconhecido</dd>
+<dt>Por que não é público nem evidente</dt><dd>A ordem é a destilação de falhas reais de carga. Um técnico partindo do zero descobre a necessidade de <code>Hierarchy</code> antes de <code>User</code> depois de corromper uma árvore em produção</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Encurta drasticamente o tempo de um concorrente até uma integração que não corrompe hierarquia</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Histórico do <code>integrator</code> desde 2018-10; documento de domínio versionado</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>integration-development</code></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time; 239 commits no <code>integrator</code>, o primeiro em <strong>2018-10-16</strong> — duas semanas após o repositório ser criado</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado; o próprio <code>INTEGRATOR_DOMAIN.md</code> registra a decisão de <strong>nunca entregar o integrador ao cliente</strong>, justamente porque <em>"it encodes 4Shark's per-customer integration logic"</em> e <em>"that intellectual capital is exactly what differentiates 4Shark from 'a commissions API'"</em></dd>
+<dt>Gaps</dt><dd>Essa declaração de valor está num doc de engenharia, não num documento de classificação de informação — vale trazê-la para o inventário formal</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Baixa para a ordem exata com as justificativas</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> — há declaração interna, datada e versionada, de que a empresa trata isso como capital intelectual reservado. Isso é prova de "medida razoável" em sentido substantivo</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "processos e fluxos de integração") + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-07 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-07</span><span class="nm">Catálogo de modos de falha de integração (conhecimento negativo)</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Documentação sistemática de como cada dimensão da integração <em>deriva</em> — o que dá errado, como se manifesta e como se recupera. Exemplos: dependência circular na hierarquia do cliente falha só no elo que fecha o ciclo, deixando a árvore meio construída; ausência de <code>Variable</code> criada pelo time causa rejeição em cascata cujo sintoma parece falha profunda; o cliente que trata remoção como ausência de linha e o integrador que traduz ausência em delete quando o padrão correto é desativação.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/docs/architecture/API_DOMAIN.md</code> — seções "Implication for the integrator" e "Drift in this dimension", ex. <code>:99-103</code>, <code>:292-296</code>, <code>:406-410</code>, <code>:480-488</code></dd>
+<dt>Sistema / processo</dt><dd>Onboarding de cliente; suporte; reconciliação de integração</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial — <strong>conhecimento negativo</strong>, a categoria mais valiosa e a mais frequentemente esquecida em inventários</dd>
+<dt>Elemento específico protegido</dt><dd>Cada par (modo de falha → diagnóstico → recuperação). Não a existência de falhas, mas o catálogo</dd>
+<dt>Por que não é público nem evidente</dt><dd>Conhecimento negativo é, por definição, o que não se publica. Só se adquire operando integrações reais por anos</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Um concorrente com esse catálogo pula a fase mais cara: os primeiros anos de onboardings que falham</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Documento versionado no <code>app</code></dd>
+<dt>Quem tinha acesso</dt><dd>Times back-end e integration</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> de ambos</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd><strong>Não há post-mortems formais</strong> — só um spike sobre boas práticas (<code>dot-claude-plans/active/spike/post-mortem-best-practices</code>). O conhecimento negativo está disperso em prosa de documentação, não consolidado em registro de incidentes datado</dd>
+<dt>Risco / impacto</dt><dd>Alto e frequentemente subestimado</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Baixa no prazo curto; inevitável no prazo longo, ao custo dos mesmos anos</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Média-alta.</strong> É claramente não público e valioso, mas <em>provar</em> apropriação de conhecimento negativo é difícil: só se demonstra por convergência de indícios</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria própria — "abordagens testadas, limitações conhecidas e soluções descartadas") + inventário interno + <strong>instituir post-mortems formais</strong></dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-08 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-08</span><span class="nm">Decisões de arquitetura com alternativas rejeitadas (ADRs)</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Treze registros de decisão de arquitetura documentando não apenas o que foi escolhido, mas <strong>o que foi rejeitado e por quê</strong> — backend de estado, Terramate, topologia de rede, modelo de identidade, padrão multi-cluster ECS, padrão outbound por cliente, ferramental de observabilidade, retenção de CloudTrail, pooler de conexão obrigatório, convenção de nomes, "mandatory by construction"; e no <code>app</code>, refresh de OpenSearch gerenciado pela aplicação e separação de usuário writer/reader.</dd>
+<dt>Onde foi identificado</dt><dd><code>terraform/docs/adr/ADR-001</code>…<code>ADR-011</code>; <code>app/docs/adr/0001-*</code>, <code>0002-*</code>. Exemplo literal de alternativa rejeitada em <code>ADR-009:30-31</code></dd>
+<dt>Sistema / processo</dt><dd>Infraestrutura e arquitetura de plataforma</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (decisões técnicas + conhecimento negativo)</dd>
+<dt>Elemento específico protegido</dt><dd>O conjunto decisão + alternativas rejeitadas + motivo do descarte</dd>
+<dt>Por que não é público nem evidente</dt><dd>A decisão final às vezes é inferível pelo comportamento externo; <em>o descarte</em> nunca é. O caminho não tomado é informação pura de custo evitado</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Cada ADR poupa a um terceiro o ciclo completo de tentar, falhar e reverter</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Arquivos versionados e datados no <code>terraform</code> (desde 2025-08) e no <code>app</code></dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>infrastructure</code> e back-end</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time <code>infrastructure</code>; 8 commits no <code>terraform</code></dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Sem marcação de confidencialidade</dd>
+<dt>Risco / impacto</dt><dd>Médio-alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Média.</strong> Várias decisões seguem recomendação pública de fornecedor (HashiCorp) — a parte protegível é a <em>aplicação ao contexto</em> e o descarte fundamentado, não o princípio geral</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "decisões técnicas e alternativas descartadas") + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-09 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-09</span><span class="nm">Desnormalização por widget (PostgreSQL → MongoDB) do dashboard</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Dez coleções MongoDB, uma por formato de widget, alimentadas por pares Producer/Consumer no Sidekiq. Duas invariantes deliberadas: os documentos guardam <strong>IDs e valores computados, nunca nomes</strong>; nomes e rótulos são resolvidos do PostgreSQL <strong>no momento da leitura</strong>, no tipo GraphQL. A duplicação (às vezes triplicação) dos dados entre coleções é intencional, para que cada widget seja respondido por uma única agregação sem joins.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/docs/architecture/DASHBOARD_DENORMALIZATION.md:18-95</code>; modelos <code>*Dataset</code> em <code>app/app/models/</code>; <code>indicator_dataset.rb:7-11,33</code> (inclusive o rename de coleção para <code>modifier_datasets</code>)</dd>
+<dt>Sistema / processo</dt><dd>Dashboard web e móvel, "tens of thousands of concurrent users"</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software</dd>
+<dt>Elemento específico protegido</dt><dd>O mapeamento widget→coleção; a invariante IDs-sem-nomes com enriquecimento na leitura; a decisão de construir isso em vez de comprar BI; o rename histórico de coleção que denuncia a evolução do domínio</dd>
+<dt>Por que não é público nem evidente</dt><dd>Desnormalizar é técnica pública; <em>esta</em> divisão em dez formatos, com essa invariante e essa fronteira de enriquecimento, é escolha de produto</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É a razão de o dashboard sustentar a concorrência de leitura sem custo de BI de terceiro</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Documento versionado com referências file:line; código no histórico</dd>
+<dt>Quem tinha acesso</dt><dd>Times back-end e front-end</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> de ambos; 770 commits no <code>app-webclient</code></dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Sem marcação; sem registro</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> para o mapeamento concreto; média para o princípio</dd>
+<dt>Destino recomendado</dt><dd>Anexo + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-10 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-10</span><span class="nm">Garantia de completude do processamento distribuído (classe Computation)</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Mecanismo que garante que um cálculo encadeado de comissão chegue ao fim mesmo com interrupção: dois contadores atômicos em Redis (<code>queue</code> e <code>executions</code>) cuja igualdade sinaliza estágio concluído, protegidos por lock distribuído <code>SETNX</code>, com semântica at-least-once + idempotência e a decisão explícita de <strong>estagnar em vez de avançar</strong> (segurança sobre vivacidade).</dd>
+<dt>Onde foi identificado</dt><dd><code>app/app/models/computation.rb</code>; <code>integrator/CLAUDE.md</code> § Coordination (<code>increment_queue</code> / <code>increment_executions</code> / <code>done?</code>); <code>~/.claude/docs/DATA-PROCESSING.md</code></dd>
+<dt>Sistema / processo</dt><dd>Todo processamento em lote — comissão, dashboards, integração multi-conector</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial + software</dd>
+<dt>Elemento específico protegido</dt><dd>A derivação da chave dos contadores; o par exato de contadores; a escolha de estagnar em vez de avançar; a integração com o deploy (é o que permite deploy sem downtime interrompendo jobs sem perder saldo)</dd>
+<dt>Por que não é público nem evidente</dt><dd>Detecção de término distribuído é conceito acadêmico conhecido (contagem de linhagem Dijkstra–Scholten); <em>esta</em> realização com contadores centralizados em Redis, acoplada à garantia de fechamento financeiro, não é</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É o que torna o deploy a qualquer hora seguro num sistema financeiro. Diretamente ligado ao diferencial operacional de zero downtime</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Código e documentação versionados</dd>
+<dt>Quem tinha acesso</dt><dd>Times back-end e integration</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> de ambos</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Sem marcação; sem registro</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média-baixa</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> para a realização concreta; <strong>baixa</strong> para o conceito de detecção de término — o anexo deve dizer "a implementação", não "o conceito"</dd>
+<dt>Destino recomendado</dt><dd>Anexo + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-11 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-11</span><span class="nm">Plataforma de eventos de segurança (trilha SIEM-ready)</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Armazém de eventos de autenticação, identidade e token de API com 13 tipos de evento, 4 métodos de autenticação, 3 canais, severidades alinhadas a OCSF e um mapa congelado tipo→severidade. Inclui a regra que classifica requisições como vindas do app nativo por assinatura de User-Agent — mecanismo escolhido por ser o único que não exige nova publicação em loja.</dd>
+<dt>Onde foi identificado</dt><dd><code>app/docs/architecture/SECURITY_EVENTS.md:1-80</code>; <code>app/app/models/security_event.rb</code>; regex documentada em <code>SECURITY_EVENTS.md:66</code></dd>
+<dt>Sistema / processo</dt><dd>Auditoria de segurança; entrega futura a SIEM de cliente. Opt-in por empresa (<code>security_events_module</code>)</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (mecanismo de segurança) + dado pessoal na instância (os eventos referenciam titulares)</dd>
+<dt>Elemento específico protegido</dt><dd>A taxonomia de 13 tipos com o mapa de severidade; o mecanismo de detecção de canal por assinatura de UA e o contrato de UA do app; a decisão de deixar <code>api</code> reservado sem produtor na v1</dd>
+<dt>Por que não é público nem evidente</dt><dd>OCSF é padrão público; a taxonomia específica e o contrato de UA não. <strong>A regex de detecção é, adicionalmente, um dado de segurança</strong> — quem a conhece sabe como forjar a classificação de canal</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>É requisito de venda para clientes com exigência de SIEM. Divulgar o mecanismo de classificação enfraquece a própria trilha</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Documento e código versionados; recente (o primeiro cliente a habilitar está nomeado no doc)</dd>
+<dt>Quem tinha acesso</dt><dd>Time back-end</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code>; a plataforma foi desenvolvida dentro da janela dele (plano ativo <code>security-events-platform</code>)</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Um mecanismo de segurança documentado em texto claro em repositório sem marcação nem controle de leitura por sensibilidade</dd>
+<dt>Risco / impacto</dt><dd>Médio-alto (segurança), médio (competitivo)</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong> — a v2 já nomeia "vulnerabilidades" e "controles de segurança" expressamente na definição de Informação Confidencial</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "controles de segurança e vulnerabilidades") + inventário interno</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-12 ---------- -->
+<article class="ficha" data-crit="high">
+<header><span class="id">IP-12</span><span class="nm">Topologia de infraestrutura, isolamento por cliente e modelo de identidade</span><span class="tag t-high">Alta</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>441 arquivos Terraform descrevendo VPCs, peering entre regiões, stacks dedicados por cliente, o padrão outbound (subredes dedicadas com tabela de rotas própria, isolando a rota do banco de produção), o pooler de conexão obrigatório, o modelo de identidade em dois níveis com conta break-glass e segregação de funções, e a retenção de CloudTrail.</dd>
+<dt>Onde foi identificado</dt><dd><code>terraform/</code> (441 <code>.tf</code>, 11 ADRs, <code>docs/NETWORK-ACCESS-MODEL.md</code>); <code>terraform/identity/</code> (18 arquivos); <code>~/.claude/docs/OUTBOUND-INTEGRATION-NETWORK.md</code></dd>
+<dt>Sistema / processo</dt><dd>Toda a operação de nuvem</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (topologia e controles) — <strong>e informação de segurança</strong></dd>
+<dt>Elemento específico protegido</dt><dd>Faixas de endereçamento, fronteiras de isolamento, quais rotas existem e onde, quais políticas condicionam a MFA e quais não, a existência e o escopo da conta break-glass</dd>
+<dt>Por que não é público nem evidente</dt><dd>Nenhuma topologia concreta é derivável de fora. É o mapa de onde bater</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Dupla: reduz o tempo de um concorrente a uma arquitetura multi-cliente segura, <em>e</em> mantém a superfície de ataque não mapeada</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Repositório desde 2025-08; 800 commits do sócio, 8 do ex-colaborador; ADRs datados</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>infrastructure</code> — <strong>dois membros, ambos <code>maintainer</code></strong></dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time <code>infrastructure</code>; console AWS habilitado; MongoDB Atlas; Cloudflare</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado; identidade como código com revisão por PR; segregação de funções pela break-glass; acesso revogado em 04/08</dd>
+<dt class="t-warn">Gaps</dt><dd class="t-warn">O plano de offboarding registra <strong>um item aberto de segurança independente do desligamento</strong>: <code>iam:PutUserPermissionsBoundary</code> e <code>iam:DeactivateMFADevice</code> contra <em>outro</em> usuário funcionaram, mas não constam de nenhuma política publicada no grupo <code>engineers</code>. Ou é concessão não documentada, ou é drift. Enquanto não for rastreado, o modelo de menor privilégio descrito na ADR-004 não está comprovado</dd>
+<dt>Risco / impacto</dt><dd>Alto</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média para os padrões; nula para a topologia concreta</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Alta</strong></dd>
+<dt>Destino recomendado</dt><dd>Anexo (categorias "infraestrutura, topologia e configurações" + "controles de segurança") + inventário interno + rastrear o item aberto</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-13 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-13</span><span class="nm">Estratégia de deploy sem indisponibilidade</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Conjunto que torna o deploy invisível ao usuário: blue/green via CodeDeploy no web, Sidekiq faseado (quiet → drain → rolling), tarefa efêmera de migração antes do código novo entrar, e lock de autoscaling em Redis durante o deploy. Complementado por uma escada deliberada de ambientes e por um gate operacional que bloqueia o deploy produtivo se a fila do Sidekiq não estiver limpa.</dd>
+<dt>Onde foi identificado</dt><dd><code>~/.claude/docs/DEPLOYMENT-STRATEGY.md</code>; <code>app/.github/workflows/DEPLOY-BLUEGREEN.md</code> e os 4 workflows <code>deploy-*.yaml</code>; <code>app/CLAUDE.md</code> § Deploy — <em>"In 10 years of 4Shark there has been exactly one deploy with downtime, at the very beginning of the company"</em></dd>
+<dt>Sistema / processo</dt><dd>Entrega contínua de todos os serviços</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (processo interno) — parcialmente conhecimento geral</dd>
+<dt>Elemento específico protegido</dt><dd>A combinação e a ordem; o gate de profundidade de fila com sua janela de validade; a interação com a classe <code>Computation</code>, que é o que torna a interrupção segura</dd>
+<dt>Por que não é público nem evidente</dt><dd>Blue/green e drain de worker são públicos. Não é público que a segurança da interrupção venha do mecanismo de contadores, nem o gate de fila com seus critérios</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Argumento comercial verificável (dez anos, um único downtime). O detalhe operacional é o que sustenta a afirmação</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Workflows e documentos versionados</dd>
+<dt>Quem tinha acesso</dt><dd>Times back-end e infrastructure</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> de ambos</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado</dd>
+<dt>Gaps</dt><dd>Parte da estratégia é conhecimento de engenharia amplamente difundido — o anexo precisa proteger a combinação específica, nunca a prática geral</dd>
+<dt>Risco / impacto</dt><dd>Médio</dd>
+<dt>Prob. desenvolvimento independente</dt><dd><strong>Alta</strong> para os componentes; média para a combinação com o gate</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Média.</strong> Item de risco: exigir sigilo sobre "deploy blue/green" seria exatamente o excesso que o REsp 2.047.758/SP repudia</dd>
+<dt>Destino recomendado</dt><dd>Anexo apenas na forma "a combinação específica e os parâmetros operacionais"; <strong>nunca</strong> a técnica</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-14 ---------- -->
+<article class="ficha" data-crit="crit">
+<header><span class="id">IP-14</span><span class="nm">Dados de clientes, titulares e configuração por cliente em produção</span><span class="tag t-crit">Crítica</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Dados operacionais reais nas bases de produção multi-cliente: identidade e hierarquia de dezenas de milhares de empregados dos clientes, transações de venda, metas, indicadores, comissões apuradas e pagamentos. Mais a configuração por cliente — quais variáveis existem, como os planos são compostos, quais regras foram escritas para cada um.</dd>
+<dt>Onde foi identificado</dt><dd>Bases de produção (não no repositório). Volumes citados na documentação interna: <em>"A Mexico tenant has 5,000 people in a single plan"</em> (<code>API_DOMAIN.md:400</code>); <code>Company::Anonymizer</code> e a janela de anonimização em <code>~/.claude/docs/runbooks/compliance/LGPD-DATA-ERASURE.md</code></dd>
+<dt>Sistema / processo</dt><dd>Operação do produto para todos os clientes</dd>
+<dt>Categoria jurídica</dt><dd><strong>Dado pessoal (LGPD)</strong> + informação confidencial de terceiro recebida sob dever de sigilo + segredo comercial do <em>cliente</em>, não da 4Shark</dd>
+<dt>Elemento específico protegido</dt><dd>Qualquer registro individualizável; a configuração comercial de cada cliente (que revela como aquele cliente remunera sua força de vendas)</dd>
+<dt>Por que não é público nem evidente</dt><dd>São dados de titulares e estrutura de remuneração de empresas terceiras</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Aqui a lógica se inverte: o valor não é vantagem competitiva da 4Shark, é <strong>responsabilidade</strong>. Vazamento gera dever de notificação, sanção regulatória e responsabilidade perante o cliente</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Dados do cliente, tratados pela 4Shark como operadora — ver <code>compliance/records/registro-de-operacoes-de-tratamento-ropa.md</code></dd>
+<dt>Quem tinha acesso</dt><dd>Quem tivesse <code>ecs:ExecuteCommand</code>. Conforme o plano de offboarding, essa permissão estava <strong>sem condição de MFA</strong> e dava console Rails em qualquer task de produção</dd>
+<dt class="t-crit">Evidência de acesso do ex-colab.</dt><dd class="t-crit">Documentada e ampla: <code>ecs:ExecuteCommand</code> em <code>task/*</code> e <code>cluster/*</code> até 31/07/2026, com <em>"read, write and delete across the whole production database and all customer data"</em> (<code>PLAN.md:38-41</code>)</dd>
+<dt>Medidas atuais</dt><dd>Acesso revogado; anonimização automática por janela; políticas de tratamento de dados existentes no repositório <code>compliance</code></dd>
+<dt class="t-crit">Gaps</dt><dd class="t-crit"><strong>Não há registro de quais consultas ele executou.</strong> Sem trilha de acesso a dados por engenheiro, não é possível afirmar nem negar extração. Além disso, a cl. 8ª da v2 exige eliminação em 2 dias úteis, mas <strong>não há inventário do que ele possa ter extraído legitimamente durante o vínculo</strong> — planilhas de suporte, exports para depuração, arquivos em <code>~/Downloads</code></dd>
+<dt>Risco / impacto</dt><dd>Máximo — regulatório, contratual e reputacional</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Nula por definição</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-ok"><strong>Máxima</strong> — a proteção é legal e independe de contrato (LGPD + dever de sigilo perante o cliente)</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria destacada "dados pessoais e dados de clientes") + inventário interno + <strong>declaração específica do Anexo I sobre extrações de dados</strong></dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-15 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-15</span><span class="nm">Contrato do banco normalizado e Organizador de Dados</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Especificações que a 4Shark entrega ao cliente para que ele exponha os dados: esquema do banco normalizado para MSSQL e PostgreSQL (versões prefixada e não prefixada), mais o "Organizador de Dados" com procedures prefixadas. Cerca de 8.700 linhas em quatro conjuntos bilíngues, com matriz de compatibilidade entre versão do integrador e versão do organizador.</dd>
+<dt>Onde foi identificado</dt><dd><code>integrator/docs/mssql/</code>, <code>mssql-prefixed/</code>, <code>pgsql-prefixed/</code>, <code>mssql-data_organizer/</code>, <code>pgsql-data_organizer/</code>; ciclo de vida em <code>integrator/CLAUDE.md</code> § Normalized Database Schema Lifecycle</dd>
+<dt>Sistema / processo</dt><dd>Onboarding técnico do cliente</dd>
+<dt>Categoria jurídica</dt><dd class="t-warn"><strong>Informação confidencial contratual — não segredo empresarial em sentido estrito</strong></dd>
+<dt>Elemento específico protegido</dt><dd>O esquema exato, os índices únicos exigidos, as premissas operacionais e a matriz de compatibilidade</dd>
+<dt>Por que não é público nem evidente</dt><dd class="t-warn">Aqui há uma ressalva importante: <strong>estes documentos são entregues aos clientes</strong>. Não são secretos por obscuridade — são confidenciais por contrato. Um concorrente que atenda o mesmo cliente pode legitimamente vê-los pela via do cliente</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Moderada — o valor está mais na integração operacional que na especificação</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Versionados com ciclo de release próprio, independente da versão do integrador</dd>
+<dt>Quem tinha acesso</dt><dd>Time <code>integration-development</code> + clientes sob NDA</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd><code>maintainer</code> do time</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado; entrega ao cliente sob contrato</dd>
+<dt>Gaps</dt><dd>Não há registro de quais versões foram entregues a quais clientes, sob qual instrumento — o que enfraquece a alegação de tratamento como confidencial</dd>
+<dt>Risco / impacto</dt><dd>Médio</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Média-alta</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Média-baixa como segredo; alta como informação confidencial contratual.</strong> Tratar como segredo empresarial num litígio seria frágil, porque a informação circula fora da empresa</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria "documentação técnica"), <strong>sem</strong> rotular como segredo de negócio + registro de entregas por cliente</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-16 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-16</span><span class="nm">Roadmap, prioridades e funcionalidades não divulgadas</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Trabalho em curso e planejado: portal de validação de integração, autenticação com escopo por tenant, migração de chave KMS do RDS, coordenação de autoscaling de workers, split de fases do loader, durabilidade de cron, entre outros — mais de 50 tópicos ativos.</dd>
+<dt>Onde foi identificado</dt><dd><code>dot-claude-plans/active/</code> (54 tópicos) — <strong>repositório pessoal do sócio, não compartilhado com o time</strong>; sinais parciais nos <code>CHANGELOG.md</code> de cada repositório sob <code>## [Unreleased]</code></dd>
+<dt>Sistema / processo</dt><dd>Planejamento de produto e engenharia</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial (planos e prioridades)</dd>
+<dt>Elemento específico protegido</dt><dd>Quais capacidades estão sendo construídas, em que ordem e por quê</dd>
+<dt>Por que não é público nem evidente</dt><dd>Roadmap não anunciado é, por definição, não público</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Antecipação competitiva. Um concorrente que conheça a fila de entregas pode se posicionar antes</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Repositório de planos versionado e datado</dd>
+<dt>Quem tinha acesso</dt><dd class="t-ok"><strong>O repositório de planos é pessoal do sócio.</strong> O ex-colaborador não tinha acesso a ele</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd class="t-warn"><strong>Indireta e parcial.</strong> Não pelo repositório de planos, mas por convivência: seções <code>[Unreleased]</code> nos changelogs, PRs abertos, discussões de time. A exposição é real, mas menor que a das demais fichas</dd>
+<dt>Medidas atuais</dt><dd>Separação de repositório; acesso do time por PR</dd>
+<dt>Gaps</dt><dd>Não há marco temporal do que ele conhecia do roadmap na data do desligamento — o que dificultaria demonstrar que um lançamento de terceiro derivou de informação e não de coincidência de mercado</dd>
+<dt>Risco / impacto</dt><dd>Médio</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Alta — funcionalidades óbvias do setor tendem a convergir</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Média.</strong> A v2 já nomeia "roadmap; prioridades; pesquisas" na cl. 1ª. O ponto fraco é probatório, não redacional</dd>
+<dt>Destino recomendado</dt><dd>Anexo (já coberto) + <strong>congelar um instantâneo datado do roadmap na data do desligamento</strong>, guardado como prova</dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-17 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-17</span><span class="nm">Informações comerciais — preços, propostas, margens, pipeline</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Condições comerciais, precificação, propostas, custos, margens e pipeline de oportunidades.</dd>
+<dt>Onde foi identificado</dt><dd class="t-warn"><strong>Não estão na codebase.</strong> A varredura por termos comerciais em <code>app/docs</code>, <code>integrator/docs</code> e <code>onboarding</code> não retornou nenhuma ocorrência real (apenas dois falsos positivos: um <code>Dockerfile</code> e um <code>.css</code> de cobertura). Esses ativos vivem fora dos repositórios — Google Workspace, contabilidade, ferramentas comerciais</dd>
+<dt>Sistema / processo</dt><dd>Comercial e financeiro</dd>
+<dt>Categoria jurídica</dt><dd>Segredo empresarial / informação confidencial contratual</dd>
+<dt>Elemento específico protegido</dt><dd>Tabela de preços praticada, descontos concedidos por cliente, margem por contrato, oportunidades em negociação na data do desligamento</dd>
+<dt>Por que não é público nem evidente</dt><dd>Condição comercial negociada não é pública</dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Alta — preço praticado é o ativo comercial mais diretamente explorável por um concorrente</dd>
+<dt>Evidência de criação / titularidade</dt><dd class="t-warn"><strong>Fora do escopo desta investigação de codebase.</strong> Precisa de levantamento próprio</dd>
+<dt>Quem tinha acesso</dt><dd>Indeterminado a partir do código. O papel dele era técnico, mas atuava como backup técnico da liderança</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd class="t-warn"><strong>Não estabelecida.</strong> Nenhuma evidência na codebase de que tenha tido acesso a dados comerciais. Isso é um dado positivo, mas não conclusivo</dd>
+<dt>Medidas atuais</dt><dd>Desconhecidas fora do código</dd>
+<dt class="t-warn">Gaps</dt><dd class="t-warn"><strong>Gap de inventário, não de proteção.</strong> Reivindicar proteção sobre informação comercial sem levantar o que ele efetivamente acessou reintroduz exatamente a generalidade que o REsp 1.498.829/SP rejeitou</dd>
+<dt>Risco / impacto</dt><dd>Médio a alto, condicionado à confirmação de acesso</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Nula para valores específicos</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Alta em tese; indeterminada neste caso</strong> até que o acesso seja apurado</dd>
+<dt>Destino recomendado</dt><dd>Anexo (categoria já prevista na v2) + <strong>levantamento comercial separado, com responsável nomeado</strong></dd>
+</dl>
+</div>
+</article>
+
+<!-- ---------- IP-18 ---------- -->
+<article class="ficha" data-crit="med">
+<header><span class="id">IP-18</span><span class="nm">Ferramental interno de engenharia e automações</span><span class="tag t-med">Média</span></header>
+<div class="body">
+<dl class="kv">
+<dt>Descrição objetiva</dt><dd>Configuração compartilhada de engenharia com 303 arquivos: agentes especializados, skills operacionais (gestão de clusters ECS, depuração de integração, reprovisionamento de MongoDB, triagem de PR, elevação de acesso por MFA), hooks de validação e um corpo extenso de documentação de convenções.</dd>
+<dt>Onde foi identificado</dt><dd><code>dot-claude/</code> (984 commits; o ex-colaborador contribuiu 8, entre 2026-04-10 e 2026-07-12)</dd>
+<dt>Sistema / processo</dt><dd>Processo de engenharia</dd>
+<dt>Categoria jurídica</dt><dd class="t-warn">Mistura — parte segredo empresarial (skills operacionais com detalhe de infraestrutura), parte <strong>já público</strong> (as convenções codificadas em <code>rubocop-fourshark</code>)</dd>
+<dt>Elemento específico protegido</dt><dd>Só as skills que embutem topologia, nomes de stack, procedimentos de acesso e runbooks operacionais</dd>
+<dt>Por que não é público nem evidente</dt><dd class="t-warn">Com uma ressalva decisiva: <strong><code>rubocop-fourshark</code> é PÚBLICO</strong>. As convenções de Ruby/Rails/RSpec da 4Shark estão publicadas por decisão da própria empresa e <strong>não podem ser reivindicadas como confidenciais</strong></dd>
+<dt>Vantagem econômica do sigilo</dt><dd>Baixa a média. Ganho de produtividade, não diferencial de produto</dd>
+<dt>Evidência de criação / titularidade</dt><dd>Repositório versionado</dd>
+<dt>Quem tinha acesso</dt><dd>Todo o time de engenharia</dd>
+<dt>Evidência de acesso do ex-colab.</dt><dd>8 commits</dd>
+<dt>Medidas atuais</dt><dd>Repositório privado (exceto a parte publicada)</dd>
+<dt>Gaps</dt><dd>Não há linha clara entre o que foi publicado e o que permanece reservado</dd>
+<dt>Risco / impacto</dt><dd>Baixo-médio</dd>
+<dt>Prob. desenvolvimento independente</dt><dd>Alta</dd>
+<dt>Confiança na protegibilidade</dt><dd class="t-warn"><strong>Baixa no geral, média para as skills operacionais.</strong> Reivindicar sigilo sobre convenções que a própria empresa publicou seria contraproducente em juízo</dd>
+<dt>Destino recomendado</dt><dd>Inventário interno apenas para as skills operacionais. <strong>Excluir expressamente</strong> as convenções publicadas</dd>
+</dl>
+</div>
+</article>
+
+<!-- ============================================================ -->
+<h2 id="camada2">5. Camada 2 — Anexo contratual comunicável (proposta)</h2>
+
+<p>Esta é a redação proposta para o <strong>Anexo II — Categorias de Informação Protegida</strong>, a ser entregue ao ex-colaborador junto com o instrumento. Ela é específica o bastante para afastar a alegação de que "tudo que ele aprendeu" seria confidencial, e genérica o bastante para não entregar o conteúdo dos segredos no próprio contrato. <strong>Não é lista de proibições de emprego, de clientes, de concorrentes nem de funcionalidades.</strong></p>
+
+<div class="box">
+<h3 style="margin-top:0">ANEXO II — CATEGORIAS DE INFORMAÇÃO PROTEGIDA</h3>
+
+<p><em>Este Anexo delimita, por categoria, o que constitui Informação Confidencial e Material Proprietário para os fins do Instrumento. Ele não descreve o conteúdo das informações e não amplia as obrigações da Cláusula Segunda: nada aqui restringe onde o EX-COLABORADOR trabalha, para quem presta serviços, com quais clientes se relaciona ou que espécie de produto desenvolve.</em></p>
+
+<h4>1. Código, esquemas e artefatos de software</h4>
+<ul class="tight">
+<li>Código-fonte e código-objeto dos sistemas da EMPRESA, em qualquer versão, inclusive quando reescrito, traduzido, resumido ou adaptado.</li>
+<li>Esquemas de banco de dados, migrações, índices e a decomposição adotada entre entidades do domínio de remuneração variável.</li>
+<li>Testes automatizados, critérios de aceite e dados de teste derivados de casos reais.</li>
+</ul>
+
+<h4>2. Regras, fórmulas e exceções de cálculo</h4>
+<ul class="tight">
+<li>O vocabulário de identificadores admitidos por tipo de regra e suas variações de nomenclatura.</li>
+<li>As formas de expressão reprovadas na validação, os erros tratados e o comportamento adotado quando um cálculo não pode ser realizado.</li>
+<li>As regras de exceção que determinam o resultado quando o dado esperado não está disponível.</li>
+<li>Os critérios de apuração, rateio, proporcionalidade, elegibilidade, limitação e resgate.</li>
+</ul>
+
+<h4>3. Arquitetura, integração e processos internos</h4>
+<ul class="tight">
+<li>Decisões e padrões de arquitetura, inclusive os motivos registrados de cada escolha.</li>
+<li>O mecanismo de tradução entre identificadores do cliente e identificadores internos, sua estrutura e seus parâmetros.</li>
+<li>A sequência de execução da integração, as dependências entre etapas e as razões da ordenação.</li>
+<li>Mapeamentos, normalizações e estratégias de compatibilidade com sistemas de terceiros.</li>
+<li>Mecanismos de auditoria, rastreabilidade, reconciliação, conclusão de processamento e explicabilidade de cálculo.</li>
+</ul>
+
+<h4>4. Segurança, infraestrutura e operação</h4>
+<ul class="tight">
+<li>Topologia de rede, fronteiras de isolamento, endereçamento e configurações de ambiente.</li>
+<li>Controles de acesso, mecanismos de autenticação e autorização, e seus parâmetros.</li>
+<li>Vulnerabilidades conhecidas, incidentes e as medidas de contenção adotadas.</li>
+<li>Credenciais, chaves, certificados, segredos e qualquer material criptográfico, em qualquer suporte.</li>
+<li>Procedimentos de implantação, recuperação e continuidade, e os parâmetros que os condicionam.</li>
+</ul>
+
+<h4>5. Conhecimento negativo</h4>
+<ul class="tight">
+<li>Abordagens técnicas testadas e descartadas, com o motivo do descarte.</li>
+<li>Limitações identificadas, modos de falha conhecidos e seus diagnósticos.</li>
+<li>Incidentes ocorridos, suas causas e as soluções que não funcionaram.</li>
+</ul>
+
+<h4>6. Produto e planejamento</h4>
+<ul class="tight">
+<li>Funcionalidades não divulgadas publicamente, prioridades e sequência de entregas.</li>
+<li>Pesquisas, protótipos e avaliações internas.</li>
+</ul>
+
+<h4>7. Informações comerciais</h4>
+<ul class="tight">
+<li>Preços praticados, descontos, propostas, condições contratuais, custos e margens.</li>
+<li>Oportunidades comerciais em curso, avaliações de clientes e prospects, e o histórico de relacionamento.</li>
+</ul>
+
+<h4>8. Dados de clientes e de titulares</h4>
+<ul class="tight">
+<li>Quaisquer dados pessoais de empregados, clientes, usuários, prestadores ou terceiros.</li>
+<li>Dados operacionais de clientes: hierarquias, transações, metas, indicadores, apurações e pagamentos.</li>
+<li>A configuração de cada cliente — variáveis, planos e regras — que revela como aquele cliente remunera sua equipe.</li>
+<li>Informação de terceiro recebida pela EMPRESA sob dever de sigilo.</li>
+</ul>
+
+<hr>
+
+<h4>9. O que este Anexo NÃO alcança</h4>
+<p>Não constituem Informação Confidencial nem Material Proprietário, e o EX-COLABORADOR permanece inteiramente livre para usar:</p>
+<ul class="tight">
+<li>conhecimento de domínio público, ou que se torne público sem violação deste Instrumento e sem participação do EX-COLABORADOR;</li>
+<li>informação que ele já conhecia legitimamente antes do vínculo, ou que receba licitamente de terceiro sem dever de sigilo;</li>
+<li>sua experiência profissional, capacidade técnica, julgamento e habilidades — inclusive linguagens, frameworks, bibliotecas de código aberto, padrões públicos, práticas de arquitetura, testes, revisão e qualidade de código, infraestrutura e gestão;</li>
+<li>as convenções de codificação da EMPRESA que ela própria publicou em repositório de acesso público;</li>
+<li>soluções evidentes para um técnico no assunto;</li>
+<li>criações que ele desenvolva de forma independente, sem consulta, uso, reprodução, adaptação ou revelação de Informação Confidencial ou Material Proprietário — ainda que produzam funcionalidade de finalidade semelhante à existente nos produtos da EMPRESA.</li>
+</ul>
+
+<p><em>Semelhança funcional entre um produto de terceiro e um produto da EMPRESA não constitui, por si só, violação deste Instrumento.</em></p>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="exclusoes">6. Exclusões expressas — o que NÃO deve entrar no inventário</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Item</th><th>Categoria</th><th>Por que deve ser excluído</th></tr></thead>
+<tbody>
+<tr><td><strong>Convenções de código da 4Shark</strong> (<code>rubocop-fourshark</code>)</td><td>Publicado pela própria empresa</td><td>Repositório <strong>PUBLIC</strong> no GitHub. Reivindicar sigilo sobre o que a empresa publicou enfraquece o instrumento inteiro por contradição</td></tr>
+<tr><td>Dentaku, Rails, Sidekiq, Mongoid, Angular, Flutter, Terraform, Keycloak, PgBouncer, Pritunl</td><td>Software livre / de terceiro</td><td>Componentes públicos. O que é protegível é a camada construída <em>sobre</em> eles, nunca eles</td></tr>
+<tr><td>Blue/green deployment, drain de worker, cache com fallback, desnormalização, padrão produtor/consumidor</td><td>Prática de engenharia difundida</td><td>Evidente para um técnico do setor — o art. 195, XI exclui expressamente</td></tr>
+<tr><td>Detecção de término distribuído como <em>conceito</em></td><td>Conhecimento acadêmico público</td><td>Dijkstra–Scholten é literatura. Só a realização concreta em <code>Computation</code> é protegível</td></tr>
+<tr><td>OCSF, padrões de severidade de evento de segurança</td><td>Padrão aberto</td><td>Público. Só a taxonomia interna específica é protegível</td></tr>
+<tr><td>Ideia de "sistema de remuneração variável", "dashboard de metas", "upload de indicadores", "fluxo de aprovação"</td><td>Ideia funcional</td><td>Ideia não é protegida — o INPI é explícito: <em>"softwares apenas conceituais... não são passíveis de proteção"</em>. A v2 já trata isso corretamente na cl. 4ª §1º</td></tr>
+<tr><td>Capacidade de escrever, revisar e arquitetar software; liderança; comunicação</td><td>Habilidade profissional geral</td><td>Patrimônio profissional do indivíduo. O STJ: <em>"ele também desenvolve know-how próprio decorrente da especialidade e anos de experiência"</em></td></tr>
+<tr><td>Especificações do banco normalizado e do Organizador de Dados, <em>enquanto segredo</em></td><td>Informação confidencial contratual, não segredo</td><td>Circulam fora da empresa, entregues a clientes. Devem permanecer no anexo como documentação técnica, <strong>sem</strong> o rótulo de segredo de negócio</td></tr>
+<tr><td>Nomes de clientes conhecidos publicamente</td><td>Domínio público quando divulgado</td><td>Cliente cuja relação é pública (site, case, imprensa) não sustenta alegação de sigilo sobre a existência da relação</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="gaps">7. Gap analysis — medidas técnicas, documentais e operacionais</h2>
+
+<p>Esta seção responde à pergunta que decide um litígio: <strong>a empresa consegue provar que tratava cada informação como segredo?</strong> Os gaps estão ordenados por urgência, e os quatro primeiros são independentes do contrato.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>#</th><th>Gap</th><th>Evidência</th><th>Impacto</th><th>Ação</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>GAP-01</strong></td>
+<td class="t-crit"><strong>Material criptográfico não rotacionado após o desligamento</strong></td>
+<td><code>app/config/credentials.yml.enc</code> versionado; <code>master.key</code> git-ignored mas presente na cópia local de qualquer clone configurado</td>
+<td class="t-crit">Máximo — forja de sessão/JWT em produção multi-cliente</td>
+<td>Rotacionar <code>secret_key_base</code> e reciclar <code>credentials.yml.enc</code>. Deletar a chave de acesso IAM. Revogar VPN Pritunl. Deletar o dispositivo MFA órfão</td>
+</tr>
+<tr>
+<td><strong>GAP-02</strong></td>
+<td class="t-crit"><strong>Políticas internas sem data de emissão, sem aprovação e sem registro de assinatura</strong></td>
+<td>As 13 políticas em <code>compliance/internal/</code> trazem <code>**Data de emissão:** [DD/MM/AAAA]</code> e campos de assinatura em branco. O repositório foi criado em <strong>2026-06-24</strong> — um mês antes da saída</td>
+<td class="t-crit">Máximo — <strong>é a prova das "medidas razoáveis de proteção"</strong>, sem a qual o art. 195, XI não se aplica</td>
+<td>Datar, aprovar formalmente e coletar assinatura. Buscar registro de que ele assinou versões anteriores; se não houver, reconhecer a lacuna em vez de alegar o que não se pode provar</td>
+</tr>
+<tr>
+<td><strong>GAP-03</strong></td>
+<td class="t-crit"><strong>Nenhuma trilha de acesso a dados por engenheiro</strong></td>
+<td><code>ecs:ExecuteCommand</code> sem condição de MFA em <code>task/*</code> e <code>cluster/*</code> (<code>policies_baseline.tf:96-142</code>); nenhum registro de quais consultas foram executadas</td>
+<td class="t-crit">Alto — impossível afirmar <em>ou negar</em> extração de dados</td>
+<td>Instituir registro de sessão ECS Exec. Para o passado: preservar CloudTrail do período (retido em <code>s3://4shark-cloudtrail</code>) antes de qualquer expiração</td>
+</tr>
+<tr>
+<td><strong>GAP-04</strong></td>
+<td class="t-crit"><strong>Pendências de offboarding em aberto</strong></td>
+<td><code>TASKS.md</code> § Pending: chave de acesso não deletada, MFA órfão não removido, VPN Pritunl não revogada, política <code>DestructiveActionGuardrail</code> não removida</td>
+<td class="t-crit">Alto — acesso residual</td>
+<td>Executar as pendências e registrar a data de cada uma. O registro é tão importante quanto a execução</td>
+</tr>
+<tr>
+<td><strong>GAP-05</strong></td>
+<td class="t-warn"><strong>Entidade contratante indefinida nos três documentos</strong></td>
+<td>Todos com <code>[RAZÃO SOCIAL DA EMPRESA]</code>. O registro interno indica <strong>4Shark Soluções Financeiras Ltda</strong> como empregadora, mas manda <em>"Confirm before each generation"</em></td>
+<td class="t-warn">Alto — vício de legitimidade não sanável depois</td>
+<td>Confirmar com a contabilidade qual entidade consta do contrato de trabalho dele</td>
+</tr>
+<tr>
+<td><strong>GAP-06</strong></td>
+<td class="t-warn"><strong>Colisão com o NDA anterior</strong></td>
+<td>Modelo padrão v1.0: escopo de projeto, sigilo pós-projeto de "[12 meses ou outro prazo]", foro de São Paulo/SP</td>
+<td class="t-warn">Alto — argumento pronto de que o prazo pactuado era 12 meses</td>
+<td>Localizar o instrumento efetivamente assinado por ele e sua data. Redigir novação expressa, nominando-o</td>
+</tr>
+<tr>
+<td><strong>GAP-07</strong></td>
+<td class="t-warn"><strong>Sem cessão expressa de PI nem acordo de invenções</strong></td>
+<td>Nenhum PIIA/CIIAA em <code>compliance/</code>. A titularidade repousa apenas na presunção legal do art. 4º da Lei 9.609/1998</td>
+<td class="t-warn">Médio-alto — a presunção legal é boa, mas o § 2º abre a discussão quando o programa é gerado sem uso de recursos da empresa</td>
+<td>Adotar cessão expressa no onboarding de toda contratação futura. Para este caso, a cl. 5ª da v2 é <em>reconhecimento</em>, não cessão — o que é o correto agora</td>
+</tr>
+<tr>
+<td><strong>GAP-08</strong></td>
+<td class="t-warn"><strong>Nenhum software registrado no INPI</strong></td>
+<td>Nenhum registro localizado nos repositórios</td>
+<td class="t-warn">Médio-alto — o INPI afirma que o registro é <em>"fundamental para comprovar a autoria de seu desenvolvimento perante o Poder Judiciário"</em></td>
+<td>Registrar os ativos de maior valor (IP-01, IP-02, IP-03) com hash arquivado. O git prova anterioridade interna; o registro prova perante terceiro</td>
+</tr>
+<tr>
+<td><strong>GAP-09</strong></td>
+<td class="t-warn"><strong>Ausência de marcação de confidencialidade</strong></td>
+<td>Nenhum documento de arquitetura nem arquivo de código carrega rótulo de classificação</td>
+<td class="t-warn">Médio — a marcação é evidência clássica de tratamento como segredo</td>
+<td>Rotular os documentos de arquitetura e os arquivos de maior valor</td>
+</tr>
+<tr>
+<td><strong>GAP-10</strong></td>
+<td class="t-warn"><strong>Sem varredura de segredos no CI</strong></td>
+<td>Nenhum <code>gitleaks</code>/<code>trufflehog</code> nos workflows de <code>app</code> e <code>integrator</code></td>
+<td class="t-warn">Médio</td>
+<td>Adicionar varredura. Reforça a alegação de diligência</td>
+</tr>
+<tr>
+<td><strong>GAP-11</strong></td>
+<td class="t-warn"><strong>Conhecimento negativo não consolidado</strong></td>
+<td>Nenhum post-mortem escrito — apenas um spike de boas práticas</td>
+<td class="t-warn">Médio — dificulta demonstrar <em>qual</em> era o conhecimento negativo apropriado</td>
+<td>Instituir post-mortems formais. Consolidar retroativamente os incidentes relevantes já conhecidos</td>
+</tr>
+<tr>
+<td><strong>GAP-12</strong></td>
+<td class="t-warn"><strong>Item de segurança em aberto no modelo de identidade</strong></td>
+<td><code>iam:PutUserPermissionsBoundary</code> e <code>iam:DeactivateMFADevice</code> contra outro usuário funcionaram sem constar de política publicada</td>
+<td class="t-warn">Médio-alto — o menor privilégio descrito na ADR-004 não está comprovado</td>
+<td>Rastrear contra as versões publicadas das políticas; documentar na ADR-004 ou reconciliar como drift</td>
+</tr>
+<tr>
+<td><strong>GAP-13</strong></td>
+<td class="t-warn"><strong>Sem inventário de ativos e materiais em poder dele</strong></td>
+<td>Nenhum registro de equipamentos, extrações legítimas, planilhas de suporte ou documentos locais</td>
+<td class="t-warn">Médio-alto — a cl. 8ª exige eliminar o que não se sabe que existe</td>
+<td>Levantar antes da assinatura, para que o Anexo I seja declaração sobre um universo conhecido</td>
+</tr>
+<tr>
+<td><strong>GAP-14</strong></td>
+<td>Sem instantâneo datado do roadmap</td>
+<td>Não há marco do que ele conhecia na data da saída</td>
+<td>Médio</td>
+<td>Congelar e arquivar um instantâneo datado</td>
+</tr>
+<tr>
+<td><strong>GAP-15</strong></td>
+<td>Sem registro de entregas das especificações a clientes</td>
+<td>Não há controle de qual versão foi a qual cliente sob qual instrumento</td>
+<td>Baixo-médio</td>
+<td>Instituir o registro — sustenta a alegação de circulação controlada</td>
+</tr>
+<tr>
+<td><strong>GAP-16</strong></td>
+<td>Sem entrevista de saída documentada nem lembrete escrito de obrigações</td>
+<td>Nenhum registro localizado</td>
+<td>Médio</td>
+<td>Documentar. É a prática padrão de offboarding probatório</td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="matriz">8. Matriz — inventário × cláusulas dos três documentos</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Categoria do inventário</th><th>Doc 1 — Termo</th><th>Doc 2 — Não Conc.</th><th>Doc 3 — v2</th><th>Situação</th></tr></thead>
+<tbody>
+<tr><td>IP-01 Motor de fórmulas</td><td>2.2 "algoritmos"</td><td>6.2 "algoritmos"</td><td>1ª "algoritmos"; 4ª §2º "fórmula"</td><td class="t-warn">Genérico demais — falta o elemento identificável</td></tr>
+<tr><td>IP-02 Vocabulário de identificadores</td><td class="t-bad">Não coberto</td><td class="t-bad">Não coberto</td><td class="t-warn">1ª "regras e exceções de negócio"</td><td class="t-warn">Coberto só por inferência</td></tr>
+<tr><td>IP-03 Modelo de dados</td><td>2.2 "bancos e modelos de dados"</td><td>6.2 "bancos de dados"</td><td class="t-ok">1ª "modelos, esquemas e fluxos de dados"; 4ª §2º "esquema de dados"</td><td class="t-ok">Adequado</td></tr>
+<tr><td>IP-04 Regras de exceção de cálculo</td><td class="t-bad">Não coberto</td><td class="t-bad">Não coberto</td><td class="t-ok">1ª "regras e exceções de negócio; fórmulas; cálculos"; 4ª §2º</td><td class="t-ok">Adequado — ganho da v2</td></tr>
+<tr><td>IP-05 Tradução de identidade</td><td>2.2 "arquitetura dos sistemas"</td><td>6.2 "arquitetura tecnológica"</td><td class="t-ok">1ª "decisões e padrões de arquitetura"</td><td class="t-ok">Adequado</td></tr>
+<tr><td>IP-06 Sequência de 25 streams</td><td>2.2 "metodologias e processos internos"</td><td>6.2 "processos e procedimentos internos"</td><td class="t-warn">1ª "integrações"; 4ª §2º "fluxo"</td><td class="t-warn">Genérico — o valor está na <em>ordem e no porquê</em></td></tr>
+<tr><td>IP-07 Modos de falha (conhec. negativo)</td><td class="t-bad">Não coberto</td><td class="t-bad">Não coberto</td><td class="t-warn">1ª "incidentes"; 4ª §3º cita "erros, exceções" como <em>prova</em>, não como objeto</td><td class="t-bad"><strong>Lacuna real</strong> — conhecimento negativo não é nomeado como categoria protegida</td></tr>
+<tr><td>IP-08 ADRs / alternativas rejeitadas</td><td class="t-bad">Não coberto</td><td class="t-bad">Não coberto</td><td class="t-warn">1ª "decisões e padrões de arquitetura"; 4ª §2º "decisão de produto"</td><td class="t-warn">Coberto quanto à decisão; <strong>não</strong> quanto ao descarte</td></tr>
+<tr><td>IP-09 Desnormalização do dashboard</td><td>2.2 "arquitetura"</td><td>6.2 "arquitetura"</td><td class="t-ok">1ª "modelos, esquemas e fluxos de dados"</td><td class="t-ok">Adequado</td></tr>
+<tr><td>IP-10 Computation</td><td class="t-bad">Não coberto</td><td class="t-bad">Não coberto</td><td class="t-warn">1ª "decisões e padrões de arquitetura"</td><td class="t-warn">Coberto por inferência</td></tr>
+<tr><td>IP-11 Eventos de segurança</td><td>2.2 "credenciais e informações relacionadas à segurança"</td><td>6.2 "informações de segurança"</td><td class="t-ok">1ª "vulnerabilidades; controles de segurança; incidentes"</td><td class="t-ok">Adequado — melhor dos três</td></tr>
+<tr><td>IP-12 Infraestrutura e identidade</td><td>2.2 "infraestrutura, ambientes e configurações"</td><td class="t-warn">Genérico</td><td class="t-ok">1ª "infraestrutura; topologia; configurações"</td><td class="t-ok">Adequado</td></tr>
+<tr><td>IP-13 Deploy sem indisponibilidade</td><td>2.2 "metodologias e processos"</td><td>6.2 "processos"</td><td class="t-warn">1ª (implícito em "decisões... de arquitetura")</td><td class="t-warn">Deliberadamente fraco — <strong>e assim deve permanecer</strong>, ver ficha</td></tr>
+<tr><td>IP-14 Dados de clientes e titulares</td><td>11.1 + 2.2 "informações sobre clientes"</td><td>6.2 "listas e informações de clientes"</td><td class="t-ok">1ª "dados... de clientes ou prospects; dados pessoais"; <strong>cl. 6ª inteira</strong></td><td class="t-ok">Bem coberto — melhor dos três</td></tr>
+<tr><td>IP-15 Especificações entregues a clientes</td><td>2.2 "documentação técnica"</td><td>6.2 "especificações técnicas"</td><td class="t-warn">1ª "documentação"</td><td class="t-warn">Coberto, mas <strong>nenhum</strong> dos três distingue confidencial-contratual de segredo</td></tr>
+<tr><td>IP-16 Roadmap</td><td>2.2 "roadmap de produtos"</td><td class="t-bad">Não coberto</td><td class="t-ok">1ª "roadmap; prioridades; pesquisas"</td><td class="t-ok">Adequado</td></tr>
+<tr><td>IP-17 Informações comerciais</td><td>2.2 (5 itens)</td><td>6.2 (5 itens)</td><td class="t-ok">1ª "preços; propostas; contratos; margens"</td><td class="t-ok">Adequado na redação; frágil na prova</td></tr>
+<tr><td>IP-18 Ferramental interno</td><td>2.2 "metodologias"</td><td>6.2 "metodologias"</td><td class="t-warn">1ª (implícito)</td><td class="t-bad"><strong>Nenhum</strong> dos três exclui as convenções publicadas — risco de contradição</td></tr>
+<tr><td>SEC-01 Credenciais</td><td>6.2 + 5.2</td><td>8.1</td><td class="t-ok">1ª "credenciais; chaves; certificados"; cl. 7ª inteira</td><td class="t-ok">Adequado</td></tr>
+</tbody>
+</table>
+</div>
+
+<h3>8.1 Trechos que merecem atenção nos três documentos</h3>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Trecho</th><th>Documento</th><th>Problema</th></tr></thead>
+<tbody>
+<tr><td class="t-bad">Cl. 2 inteira — não concorrência com prazo, território e lista de concorrentes</td><td>Doc 2</td><td class="t-bad"><strong>Não compete sem contrapartida definida</strong> (cl. 9 com valores em branco). Alto risco de invalidade. Corretamente removido na v2</td></tr>
+<tr><td class="t-bad">Cl. 3 e 4 — não solicitação de clientes por prazo, desvinculada do uso de informação</td><td>Doc 2</td><td class="t-bad">É restrição de atuação disfarçada. O REsp 2.047.758/SP afasta a pretensão pós-dispensa sem cláusula de não concorrência</td></tr>
+<tr><td class="t-warn">Cl. 7.1 — não solicitação por 12 meses</td><td>Doc 1</td><td class="t-warn">Melhor que o Doc 2 (condiciona ao uso de informação), mas ainda cria prazo autônomo. A v2 transformou corretamente</td></tr>
+<tr><td class="t-warn">Cl. 2.1 — "manter absoluto sigilo sobre <strong>todas</strong> as informações confidenciais às quais teve acesso"</td><td>Docs 1 e 2</td><td class="t-warn">Amplitude sem definição do que é confidencial. É a formulação que o REsp 1.498.829/SP considerou insuficiente</td></tr>
+<tr><td class="t-warn">Cl. 11ª §1º — multa de R$ 500.000,00 por ocorrência</td><td>Doc 3 (v2)</td><td class="t-warn">Risco sob os arts. 412 e 413; e serve de argumento de que a obrigação é não compete disfarçado. Ver §3.4</td></tr>
+<tr><td class="t-warn">Cl. 15ª §2º — "prevalecerá a disposição mais específica"</td><td>Doc 3 (v2)</td><td class="t-warn">Não resolve a colisão com o NDA de 12 meses — 12 meses é <em>mais</em> específico que 5 anos</td></tr>
+<tr><td class="t-warn">Cl. 1ª — "inclusive quando legitimamente recordada"</td><td>Doc 3 (v2)</td><td class="t-warn">Tecnicamente correto e necessário, mas é o trecho mais vulnerável à leitura de que se proíbe usar a própria memória. Precisa ser lido junto com a definição de Conhecimento Profissional Geral — vale reforçar a remissão cruzada</td></tr>
+<tr><td class="t-warn">Cl. 9ª §3º — não aliciamento sem prazo</td><td>Doc 3 (v2)</td><td class="t-warn">Obrigação sem termo final. Aceitável porque condicionada ao uso de informação, mas convém explicitar que acompanha a vigência da cl. 12ª</td></tr>
+<tr><td class="t-bad">"Este contrato é celebrado em caráter irrevogável e irretratável"</td><td>NDA padrão v1.0</td><td class="t-bad">Combinado com "vigente durante toda a execução do projeto" e "[12 meses]", cria o conflito do GAP-06</td></tr>
+<tr><td class="t-warn">Termos indefinidos: "prestadores estratégicos", "contato profissional relevante", "informações comerciais relevantes"</td><td>Docs 1 e 2</td><td class="t-warn">Impossíveis de provar objetivamente. A v2 eliminou a maioria</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="alteracoes">9. Alterações recomendadas para a próxima versão, priorizadas</h2>
+
+<p class="fonte">Recomendações — <strong>não executadas</strong>, conforme instruído.</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>#</th><th>Prioridade</th><th>Alteração</th><th>Fundamento</th></tr></thead>
+<tbody>
+<tr><td>R-01</td><td class="t-crit"><strong>Bloqueante</strong></td><td>Preencher a qualificação com a <strong>entidade empregadora confirmada pela contabilidade</strong> — indício forte de ser 4Shark Soluções Financeiras Ltda, CNPJ 49.673.485/0001-73</td><td><code>compliance/records/entidades-do-grupo.md:14,40</code>; GAP-05</td></tr>
+<tr><td>R-02</td><td class="t-crit"><strong>Bloqueante</strong></td><td>Inserir <strong>novação expressa</strong> nominando o NDA anterior (instrumento, data) e declarando que este o substitui integralmente quanto a prazo, escopo e foro</td><td>GAP-06; colisão de 12 meses vs. 5 anos</td></tr>
+<tr><td>R-03</td><td class="t-crit"><strong>Alta</strong></td><td><strong>Reduzir a multa base</strong> e ancorá-la em referência proporcional ao contrato de trabalho, mantendo o Componente Variável Adicional como está</td><td>Art. 412 (<em>"não pode exceder o da obrigação principal"</em>) e art. 413 (redução por excesso manifesto); art. 416 p.ú. já convencionado na cl. 11ª §5º</td></tr>
+<tr><td>R-04</td><td class="t-crit"><strong>Alta</strong></td><td>Anexar o <strong>Anexo II — Categorias de Informação Protegida</strong> (Camada 2)</td><td>REsp 1.498.829/SP — referências genéricas não bastam</td></tr>
+<tr><td>R-05</td><td class="t-crit"><strong>Alta</strong></td><td>Nomear <strong>conhecimento negativo</strong> como categoria protegida autônoma — abordagens descartadas, limitações conhecidas, modos de falha e incidentes</td><td>IP-07, IP-08; hoje aparece só como <em>elemento de prova</em> na cl. 4ª §3º, não como objeto</td></tr>
+<tr><td>R-06</td><td class="t-crit"><strong>Alta</strong></td><td>Inserir <strong>exclusão expressa das convenções publicadas</strong> em repositório de acesso público da própria empresa</td><td>IP-18; <code>rubocop-fourshark</code> é PUBLIC — a contradição enfraquece o instrumento inteiro</td></tr>
+<tr><td>R-07</td><td class="t-warn"><strong>Média</strong></td><td>Distinguir, no Anexo, <strong>segredo de negócio</strong> de <strong>informação confidencial contratual</strong>, colocando as especificações entregues a clientes na segunda categoria</td><td>IP-15 — reivindicar segredo sobre o que circula fora da empresa é frágil</td></tr>
+<tr><td>R-08</td><td class="t-warn"><strong>Média</strong></td><td>Ampliar o Anexo I com <strong>declaração específica sobre extrações de dados</strong> feitas durante o vínculo (exports, planilhas de suporte, consultas salvas), com campo para listar exceções</td><td>GAP-13, IP-14 — a cl. 8ª exige eliminar o que ninguém inventariou</td></tr>
+<tr><td>R-09</td><td class="t-warn"><strong>Média</strong></td><td>Reforçar a remissão cruzada entre "inclusive quando legitimamente recordada" (cl. 1ª) e Conhecimento Profissional Geral / Desenvolvimento Independente</td><td>É o trecho mais exposto à leitura de restrição indevida da liberdade profissional</td></tr>
+<tr><td>R-10</td><td class="t-warn"><strong>Média</strong></td><td>Fixar termo final expresso para a obrigação de não aproveitamento da cl. 9ª §3º, alinhado à cl. 12ª</td><td>Obrigação sem termo tende a ser lida como perpétua</td></tr>
+<tr><td>R-11</td><td class="t-warn"><strong>Média</strong></td><td>Explicitar que a <strong>combinação</strong> de práticas públicas é protegida, mas <strong>nenhuma prática pública isolada</strong> o é — nomeando as principais (deploy blue/green, desnormalização, cache com fallback)</td><td>IP-13; evita que o instrumento pareça reivindicar conhecimento comum</td></tr>
+<tr><td>R-12</td><td>Baixa</td><td>Alinhar a cláusula de foro com o NDA anterior ou justificar a divergência</td><td>NDA v1.0 elege São Paulo/SP; a v2 remete à competência legal</td></tr>
+<tr><td>R-13</td><td>Baixa</td><td>Prever obrigação recíproca de a empresa confirmar por escrito o cumprimento do Anexo I</td><td>Reduz assimetria e reforça a boa-fé, útil se o instrumento for questionado</td></tr>
+</tbody>
+</table>
+</div>
+
+<!-- ============================================================ -->
+<h2 id="pendentes">10. Questões genuinamente pendentes</h2>
+
+<p>Estas não puderam ser respondidas pela codebase nem pelos documentos, e cada uma altera materialmente a próxima versão.</p>
+
+<ol>
+<li><strong>Qual entidade do grupo consta do contrato de trabalho dele?</strong> O registro interno aponta a empregadora, mas manda confirmar com a contabilidade antes de cada geração. Sem isso, R-01 fica em aberto.</li>
+<li><strong>Ele assinou o NDA padrão? Qual versão, em que data, com qual prazo preenchido?</strong> O modelo tem "[12 meses ou outro prazo]" em branco — o valor efetivamente acordado decide o desenho da novação.</li>
+<li><strong>Ele assinou os termos de ciência das políticas internas?</strong> As políticas trazem campo de assinatura, mas o repositório foi criado um mês antes da saída. Havia versões anteriores assinadas? Sem isso, a prova de "medidas razoáveis" fica materialmente mais fraca.</li>
+<li><strong>Ele teve acesso efetivo a informação comercial?</strong> Nenhuma evidência na codebase. Reivindicar proteção sobre preços e margens sem apurar o acesso reintroduz a generalidade que o STJ rejeitou.</li>
+<li><strong>Que dados ele extraiu legitimamente durante o vínculo?</strong> Não há trilha. Sem inventário, o Anexo I é declaração sobre universo desconhecido.</li>
+<li><strong>Os equipamentos foram devolvidos e há inventário?</strong> Nada no material examinado.</li>
+<li><strong>Houve entrevista de saída documentada ou lembrete escrito das obrigações?</strong> Nenhum registro localizado.</li>
+<li><strong>A VPN foi revogada?</strong> Consta como pendente em <code>TASKS.md</code>; não há confirmação posterior no material examinado.</li>
+<li><strong>O <code>secret_key_base</code> foi rotacionado?</strong> Nenhuma evidência. É o item de maior consequência prática.</li>
+<li><strong>Qual o texto literal do art. 195, XI, da LPI?</strong> Não consegui obtê-lo de fonte oficial — o Planalto retornou erro de conexão em todas as tentativas e a página do MDIC trunca antes do art. 195. O <em>conteúdo</em> está confirmado indiretamente pelo próprio REsp 1.498.829/SP, que aplica o dispositivo, e por fontes secundárias convergentes. <strong>Confirmar o texto literal no Planalto antes de citá-lo no instrumento.</strong></li>
+<li><strong>Existe alguma cessão de PI em contrato anterior?</strong> Nada em <code>compliance/</code>. Se existir fora do repositório, muda a redação da cl. 5ª.</li>
+<li><strong>Qual a remuneração dele?</strong> Necessária para calibrar a multa sob o art. 412. Não está na codebase.</li>
+</ol>
+
+<!-- ============================================================ -->
+<h2 id="fontes">11. Fontes jurídicas verificadas</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Fonte</th><th>Status</th><th>Trecho literal confirmado</th></tr></thead>
+<tbody>
+<tr>
+<td><a href="https://processo.stj.jus.br/jurisprudencia/externo/informativo/?acao=pesquisarumaedicao&livre=%270849%27.cod.">STJ, Informativo 849 — REsp 2.047.758/SP</a></td>
+<td class="t-ok"><strong>VERIFICADO</strong></td>
+<td><em>"Cumpre registrar que o sigilo não engloba todo conhecimento e informação obtida pelo empregado em sua atividade, porquanto, em seu exercício, ele também desenvolve know-how próprio decorrente da especialidade e anos de experiência."</em> Tese: o desvio de clientela durante a vigência configura concorrência desleal, mas não se estende após a dispensa na ausência de cláusula de não concorrência</td>
+</tr>
+<tr>
+<td><a href="https://www.stj.jus.br/sites/portalp/Paginas/Comunicacao/Noticias-antigas/2015/2015-05-21_09-53_TJSP-tera-de-julgar-novamente-conflito-entre-Stock-e-Campari.aspx">STJ — REsp 1.498.829/SP</a></td>
+<td class="t-ok"><strong>VERIFICADO</strong></td>
+<td>O relator exigiu identificar os elementos <em>"secretos e originais"</em> para verificar a proteção do art. 195 da LPI; menções genéricas à <em>"utilização indevida do conhecimento em vendas e distribuição"</em> não bastaram, e o caso voltou ao TJSP</td>
+</tr>
+<tr>
+<td><a href="https://www.gov.br/inpi/pt-br/acesso-a-informacao/perguntas-frequentes/programas-de-computador">INPI — Programas de computador</a></td>
+<td class="t-ok"><strong>VERIFICADO</strong></td>
+<td><em>"A Lei de Direito Autoral conferem proteção ao programa de computador em si, isto significa, à expressão literal do software, isto é, suas linhas de código-fonte."</em> · <em>"softwares apenas conceituais, ou seja, programas de computador que ainda se encontrem meramente no campo da ideia, não são passíveis de proteção."</em> · registro <em>"fundamental para comprovar a autoria de seu desenvolvimento perante o Poder Judiciário"</em></td>
+</tr>
+<tr>
+<td><a href="https://www.tjdft.jus.br/institucional/imprensa/campanhas-e-produtos/direito-facil/edicao-semanal/clausula-penal">TJDFT — Cláusula Penal (arts. 412 e 413, CC)</a></td>
+<td class="t-ok"><strong>VERIFICADO</strong></td>
+<td>Art. 412: <em>"O valor da cominação imposta na cláusula penal não pode exceder o da obrigação principal."</em> · Art. 413: <em>"A penalidade deve ser reduzida eqüitativamente pelo juiz se a obrigação principal tiver sido cumprida em parte, ou se o montante da penalidade for manifestamente excessivo, tendo-se em vista a natureza e a finalidade do negócio."</em></td>
+</tr>
+<tr>
+<td><a href="https://www.jusbrasil.com.br/topicos/10704989/artigo-416-da-lei-n-10406-de-10-de-janeiro-de-2002">Código Civil, art. 416, parágrafo único</a></td>
+<td class="t-warn"><strong>Texto confirmado, fonte secundária</strong></td>
+<td><em>"Ainda que o prejuízo exceda ao previsto na cláusula penal, não pode o credor exigir indenização suplementar se assim não foi convencionado. Se o tiver sido, a pena vale como mínimo da indenização, competindo ao credor provar o prejuízo excedente."</em> — confirmar no Planalto</td>
+</tr>
+<tr>
+<td><a href="https://www.planalto.gov.br/ccivil_03/leis/l9279.htm">Lei 9.279/1996, art. 195, XI</a></td>
+<td class="t-bad"><strong>NÃO VERIFICADO literalmente</strong></td>
+<td>Planalto retornou erro de conexão em todas as tentativas; a página do MDIC trunca antes do art. 195. Conteúdo confirmado indiretamente pelo REsp 1.498.829/SP, que aplica o dispositivo. <strong>Não citar o texto literal no instrumento sem confirmar na fonte oficial</strong></td>
+</tr>
+<tr>
+<td><a href="https://www.planalto.gov.br/ccivil_03/leis/l9609.htm">Lei 9.609/1998, art. 4º</a></td>
+<td class="t-bad"><strong>NÃO VERIFICADO literalmente</strong></td>
+<td>Planalto inacessível. Conteúdo confirmado por fontes secundárias convergentes: os direitos pertencem exclusivamente ao empregador quando o programa decorre da natureza dos encargos; o § 2º ressalva o programa gerado <em>sem</em> uso de recursos, informações tecnológicas e segredos do empregador. <strong>Confirmar antes de citar</strong></td>
+</tr>
+</tbody>
+</table>
+</div>
+
+<p class="fonte" style="margin-top:28px">Distinção de natureza das afirmações · <strong>Fatos</strong>: tudo referenciado com arquivo, linha ou commit, e as citações marcadas VERIFICADO. <strong>Inferências</strong>: a identificação do ex-colaborador a partir das assinaturas de commit e do commit de revogação de acesso; a atribuição de exposição por pertencimento a time; a leitura de que o NDA padrão foi o assinado na admissão. <strong>Recomendações</strong>: as seções 9 e 10 na íntegra e os destinos sugeridos em cada ficha.</p>
+
+<p class="fonte">Este relatório é apoio técnico à decisão. Não substitui parecer de advogado trabalhista e de propriedade intelectual com acesso aos contratos efetivamente assinados, ao histórico do vínculo e às medidas de proteção comprovadamente vigentes à época.</p>
+
+<script>
+document.querySelectorAll('.filterbar button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var f = btn.dataset.f;
+    document.querySelectorAll('.filterbar button').forEach(function(b){ b.setAttribute('aria-pressed', String(b === btn)); });
+    document.querySelectorAll('.ficha').forEach(function(card){
+      card.style.display = (f === 'all' || card.dataset.crit === f) ? '' : 'none';
+    });
+  });
+});
+</script>
+
+</div>
+</body>
+</html>

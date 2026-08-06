@@ -1,0 +1,45 @@
+Source: https://code.claude.com/docs/en/settings
+Fetched: 2026-08-05, two passes:
+  Pass A -- summarized WebFetch query ("search for folder/directory/cwd/workspace/recent/last/path settings keys")
+  Pass B -- raw-markdown WebFetch pass ("Settings files" section + "Available settings" table), persisted at
+    /Users/plribeiro3000/.claude/projects/-/5535f1d3-ff1b-4f9e-8917-96ccd1bfb91e/tool-results/toolu_01NnzE3LjxSPSUUh72YgscyA.txt
+
+=== Pass A result (verbatim model summary, not page markdown -- kept for traceability of the query, not cited as a quote in SPIKE.md) ===
+
+"Based on my search of the provided documentation, I found no setting that controls what folder a new session in the desktop app opens with... there is no key related to: Default project folder / Default working directory / Default repository / Recent folder / last folder / startDirectory (outside SSH configs) / Initial session folder for the desktop app... The documentation does not appear to include a setting for controlling the default folder when opening a new desktop app session."
+
+=== Pass B: raw markdown, "Settings files" intro (lines 1-59 of the persisted fetch) ===
+
+# Settings files
+
+The `settings.json` file is the official mechanism for configuring Claude
+Code through hierarchical settings:
+
+* **User settings** are defined in `~/.claude/settings.json` and apply to all
+  projects.
+* **Project settings** are saved in your project directory:
+  * `.claude/settings.json` for settings that are checked into source control and shared with your team
+  * `.claude/settings.local.json` for settings that are not checked in, useful for personal preferences and experimentation. [...]
+
+    Claude Code reads and writes this file at the root of the git repository, resolved through worktrees to the main checkout, so one file covers sessions started in any subdirectory or worktree of the repository. [...]
+
+None of this intro section names a session-default-folder key.
+
+=== Pass B: raw markdown, "Available settings" table, alphabetical range advisorModel..fastMode (lines 141-202 of the persisted fetch) ===
+
+Table header:
+
+| Key | Description | Example |
+| :--- | :--- | :--- |
+
+Every row from `advisorModel` through `fastMode` (52 rows, the full alphabetically-early range) was read verbatim. No row's Key column contains any of: folder, directory, dir, cwd, workspace, path (as a standalone concept), recent, last, default*Project, default*Working, default*Folder. The full row list in this range: advisorModel, agent, agentPushNotifEnabled, allowAllClaudeAiMcps, allowedChannelPlugins, allowedHttpHookUrls, allowedMcpServers, allowManagedHooksOnly, allowManagedMcpServersOnly, allowManagedPermissionRulesOnly, alwaysThinkingEnabled, apiKeyHelper, askUserQuestionTimeout, attribution, autoCompactEnabled, autoCompactWindow, autoMemoryDirectory, autoMemoryEnabled, autoMode, autoMode.classifyAllShell, autoScrollEnabled, autoUpdatesChannel, availableModels, awaySummaryEnabled, awsAuthRefresh, awsCredentialExport, axScreenReader, blockedMarketplaces, browserExternalPageTools, channelsEnabled, claudeMd, claudeMdExcludes, cleanupPeriodDays, companyAnnouncements, defaultShell, deniedMcpServers, disableAgentView, disableAllHooks, disableArtifact, disableAutoMode, disableBrowserExternalNavigation, disableBundledSkills, disableClaudeAiConnectors, disableDeepLinkRegistration, disabledMcpjsonServers, disableMobileSimulatorTools, disableRemoteControl, disableSideloadFlags, disableSkillShellExecution, disableWorkflows, editorMode, effortLevel, emojiCompletionEnabled, enableAllProjectMcpServers, enableArtifact, enabledMcpjsonServers, enforceAvailableModels, env, fallbackModel, fastMode.
+
+The one candidate that matched a search keyword is `autoMemoryDirectory` -- verified NOT relevant: it configures where auto-memory files are stored, unrelated to session project-folder defaults. `defaultShell` matched only because the word "default" is in its name; it configures the shell used for `!` commands, not a folder.
+
+The table continues past `fastMode` (harness truncated the fetch at ~25k tokens); this excerpt does not cover the full alphabet. Pass A's full-page summarization pass (a separate WebFetch call over the complete page, not subject to the same truncation) is the evidence that covers the rest of the alphabet; Pass B corroborates the alphabetically-early portion with literal table rows.
+
+=== Pass B: the one settings.json key that names a URL-scheme / deep-link mechanism (row 186) ===
+
+| `disableDeepLinkRegistration` | Set to `"disable"` to prevent Claude Code from registering the `claude-cli://` protocol handler with the operating system when you send the first prompt of an interactive session. [Deep links](/docs/en/deep-links) let external tools open a Claude Code session with a pre-filled prompt. Useful in environments where protocol handler registration is restricted or managed separately | `"disable"` |
+
+This row is what led to fetching https://code.claude.com/docs/en/deep-links in full -- see claude-app-default-session-folder_doc_3.txt.

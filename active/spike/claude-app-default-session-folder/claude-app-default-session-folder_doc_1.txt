@@ -1,0 +1,80 @@
+Source: https://code.claude.com/docs/en/desktop
+Fetched: 2026-08-05 (full-page raw-markdown WebFetch pass, tool call toolu_019TWp3KjsfeovdqZhzmeaAS)
+Persisted full fetch (965 lines): /Users/plribeiro3000/.claude/projects/-/5535f1d3-ff1b-4f9e-8917-96ccd1bfb91e/tool-results/toolu_019TWp3KjsfeovdqZhzmeaAS.txt
+
+This file extracts the sections relevant to SPIKE.md sub-questions 1-2 and 5. Line numbers below refer to the persisted full-fetch file above, not to this excerpt.
+
+=== "Start a session" (lines 43-52) ===
+
+## Start a session
+
+Before you send your first message, configure four things in the prompt area:
+
+* **Environment**: choose where Claude runs. Select **Local** for your machine, **Cloud** for Anthropic-hosted cloud sessions, an [**SSH connection**](#ssh-sessions) for a remote machine you manage, or on Windows a [**WSL distribution**](/docs/en/desktop-wsl). See [environment configuration](#environment-configuration).
+* **Project folder**: select the folder or repository Claude works in. For cloud sessions, you can add [multiple repositories](#run-long-running-tasks-remotely).
+* **Model**: pick a [model](/docs/en/model-config#available-models) from the dropdown next to the send button. You can change this during the session.
+* **Permission mode**: choose how much autonomy Claude has from the [mode selector](#choose-a-permission-mode). You can change this during the session.
+
+Type your task and press **Enter** to start. Each session tracks its own context and changes independently.
+
+No sentence in this section, or anywhere else on the page, describes a default value, a remembered value, or a way to pre-set the "Project folder" field for a session not yet started.
+
+=== "Work in parallel with sessions" (lines 321-329), including the Cmd+N binding ===
+
+### Work in parallel with sessions
+
+Click **+ New session** in the sidebar, or press **Cmd+N** on macOS or **Ctrl+N** on Windows, to work on multiple tasks in parallel. Press **Ctrl+Tab** and **Ctrl+Shift+Tab** to cycle through sessions in the sidebar. For Git repositories, each session gets its own isolated copy of your project using [Git worktrees](/docs/en/worktrees), so changes in one session don't affect other sessions until you commit them.
+
+To view two sessions at once, hold **Cmd** on macOS or **Ctrl** on Windows and click a session in the sidebar. The session opens in a second pane alongside the one you already have open. While the split is active, clicking another sidebar session replaces whichever pane has focus. Press **Cmd+\** on macOS or **Ctrl+\** on Windows to close the focused pane and return to a single session.
+
+Worktrees are stored in `<project-root>/.claude/worktrees/` by default. You can change this to a custom directory in Settings → Claude Code under "Worktree location". You can also set a branch prefix that gets prepended to every worktree branch name, which is useful for keeping Claude-created branches organized. To remove a worktree when you're done, hover over the session in the sidebar and click the archive icon. To have sessions archive themselves when their pull request merges or closes, turn on **Auto-archive after PR merge or close** in Settings → Claude Code. Auto-archive only applies to local sessions that have finished running.
+
+To include gitignored files like `.env` in new worktrees, create a [`.worktreeinclude` file](/docs/en/worktrees#copy-gitignored-files-into-worktrees) in your project root.
+
+Note: "Worktree location" (Settings -> Claude Code) controls where the git worktree COPY of an already-chosen project folder is stored on disk. It is not a default/pinned PROJECT FOLDER setting -- it presumes a project folder has already been picked and only redirects where its worktree lands.
+
+=== Keyboard shortcuts table (lines 217-241) ===
+
+### Keyboard shortcuts
+
+Press **Cmd+/** on macOS or **Ctrl+/** on Windows to see all shortcuts available in the Code tab. On Windows, use **Ctrl** in place of **Cmd** for the shortcuts below. Session cycling, the terminal toggle, and the view-mode toggle use **Ctrl** on every platform.
+
+| Shortcut                              | Action                           |
+| -------------------------------------- | --------------------------------- |
+| `Cmd` `/`                              | Show keyboard shortcuts           |
+| `Cmd` `N`                              | New session                       |
+| `Cmd` `W`                              | Close session                     |
+| `Ctrl` `Tab` / `Ctrl` `Shift` `Tab`    | Next or previous session          |
+| `Cmd` `Shift` `]` / `Cmd` `Shift` `[`  | Next or previous session          |
+| `Esc`                                  | Stop Claude's response            |
+| `Cmd` `Shift` `D`                      | Toggle diff pane                  |
+| `Cmd` `Shift` `B`                      | Toggle Browser pane               |
+| `Cmd` `Shift` `S`                      | Select an element in the Browser  |
+| `Ctrl` `` ` ``                         | Toggle terminal pane              |
+| `Cmd` `\`                              | Close focused pane                |
+| `Cmd` `;`                              | Open side chat                    |
+| `Ctrl` `O`                             | Cycle view modes                  |
+| `Cmd` `Shift` `M`                      | Open permission mode menu         |
+| `Cmd` `Shift` `I`                      | Open model menu                   |
+| `Cmd` `Shift` `E`                      | Open effort menu                  |
+| `1`-`9`                                | Select item in an open menu       |
+
+These shortcuts apply only to the Code tab. The terminal-based interactive mode shortcuts, such as `Shift+Tab` to cycle modes, do not apply in Desktop.
+
+No shortcut or menu item in this table opens a "set default folder" dialog.
+
+=== Browser pane storage-isolation language (lines 136-138, re-confirming SPIKE-v2 Finding 1 with today's fetch) ===
+
+#### Choose between the Browser and the Chrome extension
+
+The Browser pane uses a clean browser profile, separate from your personal browser, with none of your saved logins or history. Use it for building and testing your app and for sites that don't need your identity. When you want Claude to act as you in your logged-in sessions, use the [Claude in Chrome extension](/docs/en/chrome) instead, which shares your browser's login state.
+
+This sentence is the only one anywhere on the page connecting the Browser pane to any notion of "profile" scoping. It never mentions a project folder, a partition, or a hash. No other passage on the page (verified by full-text read of all 965 lines) ties a session's "Project folder" selection to how the Browser pane's storage is scoped.
+
+=== "Failed to load session" troubleshooting entry (lines 922-924) ===
+
+### "Failed to load session"
+
+If you see `Failed to load session`, the selected folder may no longer exist, a Git repository may require Git LFS that isn't installed, or file permissions may prevent access. Try selecting a different folder or restarting the app.
+
+This confirms the folder is a per-session, per-load concept ("the selected folder") -- consistent with no persistent cross-session default existing.

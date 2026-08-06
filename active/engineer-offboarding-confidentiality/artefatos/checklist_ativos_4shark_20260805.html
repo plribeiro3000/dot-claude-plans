@@ -1,0 +1,384 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Checklist de ativos — o que é e o que não é segredo da 4Shark</title>
+<style>
+:root{--bg:#fff;--fg:#16181d;--muted:#5b6270;--line:#e2e5ea;--card:#f7f8fa;--accent:#1f5fbf;
+--sim:#1d6f42;--nao:#b3261e;--talvez:#b26a00;--code:#f2f3f6;}
+@media (prefers-color-scheme:dark){:root{--bg:#14161a;--fg:#e6e8ec;--muted:#a0a7b4;--line:#2b2f37;--card:#1b1e24;--accent:#79aaf5;
+--sim:#79d69f;--nao:#ff8b80;--talvez:#ffbe5c;--code:#1f232a;}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+.wrap{max-width:1100px;margin:0 auto;padding:32px 20px 90px}
+h1{font-size:1.75rem;margin:0 0 6px;line-height:1.25}
+h2{font-size:1.25rem;margin:40px 0 10px;padding-top:16px;border-top:1px solid var(--line)}
+h3{font-size:1rem;margin:22px 0 6px}
+p,li{max-width:76ch}
+.sub{color:var(--muted);margin:0 0 22px}
+code{background:var(--code);padding:.12em .38em;border-radius:4px;font:.85em/1.4 ui-monospace,Menlo,monospace}
+.box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:18px 0}
+.box.key{border-left:4px solid var(--accent)}
+.teste{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin:16px 0}
+.teste div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.teste strong{display:block;color:var(--accent);font-size:.9rem;margin-bottom:4px}
+.teste span{font-size:.86rem;color:var(--muted)}
+.item{border:1px solid var(--line);border-radius:10px;margin:14px 0;overflow:hidden}
+.item>header{background:var(--card);padding:11px 15px;border-bottom:1px solid var(--line);display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+.item>header .id{font:600 .78rem ui-monospace,Menlo,monospace;color:var(--accent)}
+.item>header .nm{font-weight:600;flex:1;min-width:200px}
+.item .body{padding:13px 15px}
+.item .body p{margin:0 0 9px;font-size:.93rem}
+.item .body p:last-child{margin-bottom:0}
+.lbl{font-weight:600;color:var(--muted);font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
+.veredito{display:inline-block;font-size:.73rem;font-weight:700;padding:3px 9px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.v-sim{color:var(--sim)} .v-nao{color:var(--nao)} .v-talvez{color:var(--talvez)}
+.avalia{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);font-size:.86rem;color:var(--muted)}
+.avalia b{color:var(--fg)}
+.filterbar{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.filterbar button{font:inherit;font-size:.82rem;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--fg);cursor:pointer}
+.filterbar button[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:var(--accent)}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:.88rem;min-width:600px}
+th,td{text-align:left;padding:9px 11px;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--card);font-weight:600}
+tr:last-child td{border-bottom:none}
+.fonte{font-size:.83rem;color:var(--muted)}
+@media print{.filterbar{display:none}.item{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Checklist de ativos — o que é e o que não é segredo da 4Shark</h1>
+<p class="sub">Lista para validação · 5 de agosto de 2026 · linguagem simples, sem jargão jurídico · <strong>25 candidatos, cada um com um veredito preliminar para você confirmar, corrigir ou completar</strong></p>
+
+<div class="box key">
+<h3 style="margin-top:0">Antes de olhar a lista: os três níveis</h3>
+<p><strong>Nível 1 — a ideia.</strong> "Um sistema de remuneração variável." "Um dashboard de metas." Ninguém protege isso, nunca. Se ele construir outro do zero, é legítimo.</p>
+<p><strong>Nível 2 — a técnica geral.</strong> "Cache com fallback." "Deploy blue/green." "Producer/consumer." Está em livro e em documentação de fornecedor. Também não é protegível — e tentar proteger enfraquece o resto.</p>
+<p><strong>Nível 3 — a escolha concreta que vocês fizeram.</strong> Não "usar cache", mas <em>qual TTL para qual recurso</em>. Não "ter regras", mas <em>a lista exata de nomes que cada tipo de regra aceita</em>. <strong>É aqui que está todo o ativo.</strong></p>
+<p style="margin-bottom:0">O código não é o ativo em si — é o <em>suporte</em> onde as decisões de nível 3 estão escritas. E por ser o suporte, ele é protegido junto, por direito autoral e pela Lei do Software.</p>
+</div>
+
+<h3>O teste — quatro perguntas</h3>
+<div class="teste">
+<div><strong>1. É específico?</strong><span>Dá pra apontar o arquivo, a lista, o número, o limite? "Nossa arquitetura" não passa. "A tabela que define quais 11 nomes uma regra de Ranking aceita" passa.</span></div>
+<div><strong>2. É não público?</strong><span>Está no site, num case, num repositório público, numa doc entregue a cliente? Se sim, morreu.</span></div>
+<div><strong>3. É não evidente?</strong><span>Um sênior competente, com o mesmo problema, chegaria na mesma resposta sozinho? Se chegaria, é nível 2.</span></div>
+<div><strong>4. Vale por estar escondido?</strong><span>Se você publicasse amanhã, algum concorrente andaria mais rápido? Se não, é só coisa interna — não é segredo.</span></div>
+</div>
+
+<div class="filterbar" role="group" aria-label="Filtrar">
+<button type="button" data-f="all" aria-pressed="true">Todos (25)</button>
+<button type="button" data-f="sim" aria-pressed="false">É ativo (15)</button>
+<button type="button" data-f="talvez" aria-pressed="false">Duvidoso (5)</button>
+<button type="button" data-f="nao" aria-pressed="false">Não é ativo (5)</button>
+</div>
+
+<!-- ===================== CÁLCULO ===================== -->
+<h2>A. Cálculo de remuneração variável</h2>
+
+<article class="item" data-v="sim">
+<header><span class="id">A1</span><span class="nm">A lista de nomes de variável que cada tipo de regra aceita</span><span class="veredito v-sim">É ativo — o mais forte</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Uma tabela que diz, para cada um dos cinco tipos de regra, exatamente quais palavras a fórmula pode usar. Regra de Ranking aceita <code>alcance, meta, orcamento, premio, quantidade_transacoes, quartil, quintil, ranking, resultado</code> e os equivalentes em inglês. Regra de Resgate aceita só <code>pontos</code> e <code>points</code>. Mais sete prefixos de acumulação que se combinam com cada status habilitado da empresa.</p>
+<p><span class="lbl">Onde está</span><br><code>app/app/models/rule/options.rb:14-31</code></p>
+<p><span class="lbl">Por que é ativo</span><br>Passa nas quatro perguntas com folga. Cada nome dessa lista existe porque um cliente real pediu, ao longo de anos. Não há como um técnico derivar por que Ranking tem <code>quartil</code> e <code>quintil</code> e Limitador não tem. E o bilinguismo existe porque a base é Brasil mais hispano-América — outra decisão comercial.</p>
+<p><span class="lbl">O que isso vale na prática</span><br>Se um produto concorrente aparecer com essa mesma lista, não é coincidência. É a impressão digital mais forte que vocês têm — e a mais fácil de demonstrar num litígio, porque é uma comparação literal.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">A2</span><span class="nm">As regras de exceção do cálculo — o que acontece quando falta dado</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Espalhadas pelo código de cálculo há decisões do tipo "quando o indicador agregado não existe, use o valor padrão da variável em vez de falhar". São regras de negócio disfarçadas de código: elas decidem, silenciosamente, quanto uma pessoa recebe quando o dado do cliente não chegou.</p>
+<p><span class="lbl">Onde está</span><br><code>app/app/services/commission/indicator_options_processor.rb:58-59</code> e equivalentes nos outros cinco processadores da mesma pasta</p>
+<p><span class="lbl">Por que é ativo</span><br>Cada uma dessas exceções foi uma decisão comercial tomada depois de um caso real. Nenhuma é derivável — a alternativa óbvia (falhar) é o que um sistema novo faria, e é o que causa fechamento de mês travado.</p>
+<p><span class="lbl">Onde isso é frágil hoje</span><br>Essas regras <strong>só existem no código</strong>. Não há documento que as liste. Num litígio, isso dificulta mostrar a um perito o que era o segredo — vale extrair para um documento próprio.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">A3</span><span class="nm">Quais erros de fórmula vocês decidiram reprovar, e o que acontece quando a regra não calcula</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Vocês usam uma biblioteca pública para avaliar fórmulas. Em cima dela construíram uma camada que reprova fórmulas que a biblioteca aceitaria: divisão por zero escrita literalmente, função chamada sem argumento, data ilegível, conta aritmética sobre variável que guarda texto. E uma decisão de fundo: quando uma regra não consegue calcular, ela <strong>rende zero em vez de interromper a comissão inteira</strong>.</p>
+<p><span class="lbl">Onde está</span><br><code>app/app/models/formula.rb:33-49</code>, as cinco classes em <code>app/app/models/formula/</code>, e <code>app/app/models/rule.rb:12-13,67-71</code></p>
+<p><span class="lbl">Por que é ativo</span><br>A biblioteca é pública — isso é nível 2. Mas <em>qual</em> subconjunto de falhas vocês julgaram inaceitável em produção é nível 3, e cada item da lista é a cicatriz de um caso real. A decisão de render zero em vez de parar é uma escolha de produto: prioriza o fechamento acontecer sobre o resultado ser exato.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">A4</span><span class="nm">A decomposição do modelo de dados do comissionamento</span><span class="veredito v-sim">É ativo — no conjunto</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>166 tabelas e 655 índices modelando planos, fatias de plano, incentivos, regras, comissionamentos, comissões parciais, extratos, pagamentos, resgates e o histórico por usuário. Mais 36 diagramas de máquina de estado dos objetos financeiros.</p>
+<p><span class="lbl">Onde está</span><br><code>app/db/schema.rb</code> (3.095 linhas), <code>app/db/migrate/</code> (~1.900 migrations desde 2015), <code>app/docs/state_machines/</code></p>
+<p><span class="lbl">Por que é ativo — e a ressalva importante</span><br>Uma tabela <code>users</code> é óbvia e não protege nada. O que é ativo é a <strong>decomposição</strong>: separar <code>Plan</code> de <code>PlanSlice</code> de <code>PlanSliceCommission</code>; separar <code>Commission</code> de <code>PartialCommission</code>; ter <code>Commissioning</code> como elo entre a regra e o resultado. Não existe modelo canônico de remuneração variável — essa decomposição absorve variações de dezenas de clientes de setores diferentes.</p>
+<p><span class="lbl">Como reivindicar</span><br>Sempre como conjunto, nunca tabela a tabela. "O modelo de dados do domínio de remuneração variável", não "a tabela de usuários".</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="talvez">
+<header><span class="id">A5</span><span class="nm">As máquinas de estado dos objetos financeiros</span><span class="veredito v-talvez">Duvidoso — preciso da sua leitura</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>36 diagramas definindo as transições permitidas de cada objeto — Comissão, Pagamento, Extrato, Campanha, Fundo de premiação, Documento. O de Comissão tem 421 linhas de definição; o de Pagamento, 476.</p>
+<p><span class="lbl">Onde está</span><br><code>app/docs/state_machines/</code></p>
+<p><span class="lbl">Por que estou em dúvida</span><br>As transições refletem o processo de negócio do cliente, que em parte é conhecido do setor: apurar, revisar, aprovar, pagar. Isso seria nível 2. Mas os <em>estados intermediários</em> e as transições de exceção — reversão, rollback de plano, comissão parcial — provavelmente são nível 3. <strong>Eu não sei dizer quanto disso é convenção do mercado de comissionamento e quanto é escolha de vocês.</strong> Você sabe.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ é ativo ☐ é convenção do mercado ☐ misto — quais partes? ______________</p>
+</div>
+</article>
+
+<!-- ===================== INTEGRAÇÃO ===================== -->
+<h2>B. Integração com os sistemas do cliente</h2>
+
+<article class="item" data-v="sim">
+<header><span class="id">B1</span><span class="nm">A ordem das 25 etapas da integração e o motivo de cada posição</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>A integração roda 25 etapas numa ordem fixa. <code>Hierarchy</code> (promoção e rebaixamento) roda em segundo lugar, <em>antes</em> de qualquer usuário ser cadastrado. <code>ParentUpdate</code> (troca de gestor) roda em décimo quarto, <em>depois</em> de todos cadastrados.</p>
+<p><span class="lbl">Onde está</span><br><code>integrator/CLAUDE.md</code> § Stream Order; <code>integrator/docs/architecture/INTEGRATOR_DOMAIN.md</code>, capítulo 4</p>
+<p><span class="lbl">Por que é ativo</span><br>A ordem não é arbitrária e o motivo está documentado: um vendedor promovido a supervisor precisa <em>já estar</em> em nível de supervisor antes de novos vendedores serem pendurados abaixo dele — senão ficam sob outro vendedor e a árvore inteira sai errada. Um técnico partindo do zero descobre isso <strong>depois</strong> de corromper uma hierarquia em produção. A ordem é a destilação de falhas reais.</p>
+<p><span class="lbl">Um detalhe que ajuda muito</span><br>A própria documentação de vocês já declara, datada e versionada, que o integrador nunca é entregue ao cliente porque <em>"encodes 4Shark's per-customer integration logic"</em> e <em>"that intellectual capital is exactly what differentiates 4Shark from 'a commissions API'"</em>. Isso é prova escrita de que vocês tratavam como reservado.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">B2</span><span class="nm">O mecanismo de tradução dos identificadores do cliente</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Toda chamada de API usa os identificadores <em>do próprio cliente</em>, nunca IDs da 4Shark. Cada modelo declara como montar sua chave de busca e um tempo de vida próprio no cache. A busca vai no Redis primeiro e cai para o Postgres. E na atualização a ordem é apagar-depois-gravar, para cobrir o caso em que as colunas que formam a chave mudaram.</p>
+<p><span class="lbl">Onde está</span><br><code>app/docs/architecture/API_DOMAIN.md:7-52</code></p>
+<p><span class="lbl">Por que é ativo</span><br>"Cache com fallback" é nível 2, público. O que é nível 3: o tempo de vida calibrado por padrão de uso de cada recurso, a ordem apagar-depois-gravar, e sobretudo a <em>decisão de produto</em> de absorver esse custo em vez de exigir do cliente. A documentação de vocês chama isso de <em>"a deliberate platform choice and a real differentiator"</em>, e explica por que o cliente não consegue fazer sozinho: a identidade dele costuma ser composta de duas ou três colunas, e as políticas de expurgo dele apagariam o mapeamento.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">B3</span><span class="nm">O catálogo de "como a integração dá errado"</span><span class="veredito v-sim">É ativo — e é o mais esquecido</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Documentação sistemática dos modos de falha: dependência circular na hierarquia do cliente falha só no elo que fecha o ciclo, deixando a árvore meio construída; variável não criada pelo time causa rejeição em cascata cujo sintoma parece falha profunda; cliente que trata remoção como "a linha sumiu" e integrador que traduz isso em delete quando o correto é desativar.</p>
+<p><span class="lbl">Onde está</span><br><code>app/docs/architecture/API_DOMAIN.md</code>, seções "Implication for the integrator" e "Drift in this dimension"</p>
+<p><span class="lbl">Por que é ativo</span><br>Isso tem nome: <strong>conhecimento negativo</strong>. É o que você só aprende errando, e é a categoria mais valiosa e a que mais gente esquece de inventariar. Um concorrente com esse catálogo pula a fase mais cara — os primeiros anos de onboardings que falham.</p>
+<p><span class="lbl">Onde é frágil</span><br>Provar apropriação de conhecimento negativo é difícil. Só se demonstra por convergência: o concorrente evita exatamente os mesmos erros, na mesma ordem, sem ter passado pelo aprendizado.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="talvez">
+<header><span class="id">B4</span><span class="nm">Os mapeamentos de campo configurados por cliente</span><span class="veredito v-talvez">Duvidoso — depende de onde mora</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Para cada cliente, quais colunas da fonte dele viram quais atributos da API, quais chaves são mascaradas no log, qual o formato de paginação. A documentação diz que a diferença entre duas instâncias é "purely configuration data" no MongoDB do integrador.</p>
+<p><span class="lbl">Por que estou em dúvida</span><br>Isso é <strong>configuração, não código</strong> — mora no banco, não no repositório. Não consigo ver o conteúdo daqui. Se cada mapeamento é uma tradução trivial de nome de coluna, é pouco valioso. Se carrega decisões de normalização acumuladas por cliente, é ativo forte. <strong>Você sabe qual dos dois é.</strong></p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ é ativo forte ☐ é trivial ☐ varia por cliente — comente: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="nao">
+<header><span class="id">B5</span><span class="nm">As especificações do banco normalizado entregues ao cliente</span><span class="veredito v-nao">Não é segredo — é confidencial por contrato</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Cerca de 8.700 linhas em quatro conjuntos bilíngues: esquema para MSSQL e PostgreSQL, versões prefixada e não prefixada, mais o Organizador de Dados com suas procedures.</p>
+<p><span class="lbl">Onde está</span><br><code>integrator/docs/mssql/</code>, <code>mssql-prefixed/</code>, <code>pgsql-prefixed/</code>, <code>mssql-data_organizer/</code>, <code>pgsql-data_organizer/</code></p>
+<p><span class="lbl">Por que NÃO é segredo</span><br>Falha na pergunta 2: <strong>vocês entregam isso a todo cliente</strong>. Num litígio, o outro lado mostra que a informação está na mão de dezenas de terceiros, e a alegação de segredo cai. Continua protegida — mas como <em>informação confidencial contratual</em>, que é outra categoria e outro remédio.</p>
+<p><span class="lbl">Por que isso importa na prática</span><br>Misturar as duas categorias no mesmo balde enfraquece o instrumento inteiro. Um documento que chama de "segredo" algo que circula fora da empresa perde credibilidade sobre o que é segredo de verdade.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ concordo com a distinção ☐ discordo — comente: ______________</p>
+</div>
+</article>
+
+<!-- ===================== PLATAFORMA ===================== -->
+<h2>C. Plataforma e processamento</h2>
+
+<article class="item" data-v="sim">
+<header><span class="id">C1</span><span class="nm">O mapeamento de cada widget do dashboard para sua coleção própria</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Dez coleções no Mongo, uma por formato de widget, cada uma pré-montada com exatamente as colunas daquele widget. Duas regras deliberadas: os documentos guardam <strong>IDs e valores calculados, nunca nomes</strong>; os nomes são resolvidos do Postgres <em>no momento da leitura</em>. Os dados são duplicados de propósito entre coleções.</p>
+<p><span class="lbl">Onde está</span><br><code>app/docs/architecture/DASHBOARD_DENORMALIZATION.md:18-95</code> e os modelos <code>*Dataset</code> em <code>app/app/models/</code></p>
+<p><span class="lbl">Por que é ativo</span><br>Desnormalizar é nível 2. Nível 3 é <em>esta</em> divisão em dez formatos específicos, a regra de nunca guardar nome, e a decisão de construir em vez de comprar uma ferramenta de BI — que é o que segura o custo.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">C2</span><span class="nm">O mecanismo que garante que um cálculo encadeado chegue ao fim</span><span class="veredito v-sim">É ativo — a implementação, não o conceito</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Dois contadores atômicos no Redis — quantos jobs foram enfileirados e quantos executaram. Quando ficam iguais, a etapa acabou. Protegido por trava distribuída, com garantia de execução ao menos uma vez e a decisão de <strong>travar em vez de avançar</strong> quando há dúvida.</p>
+<p><span class="lbl">Onde está</span><br><code>app/app/models/computation.rb</code>; <code>integrator/CLAUDE.md</code> § Coordination</p>
+<p><span class="lbl">Por que é ativo — com um limite claro</span><br>O <em>conceito</em> (detecção de término distribuído) é literatura acadêmica dos anos 80 e não protege nada. O que é ativo é a realização concreta: qual chave, quais dois contadores, e a escolha de travar em vez de avançar. É isso que torna seguro derrubar um worker no meio de um fechamento de comissão — e é por isso que vocês conseguem deployar a qualquer hora sem quebrar saldo.</p>
+<p><span class="lbl">Como reivindicar</span><br>Sempre "a implementação", nunca "o mecanismo de detecção de término". A segunda formulação reivindica um conceito público.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">C3</span><span class="nm">A taxonomia de eventos de segurança e a regra que identifica o app nativo</span><span class="veredito v-sim">É ativo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>13 tipos de evento, 4 métodos de autenticação, 3 canais, com um mapa fixo de tipo para severidade. E uma regra que identifica se a requisição veio do app nativo pela assinatura que o app envia — mecanismo escolhido por ser o único que não exige nova publicação em loja.</p>
+<p><span class="lbl">Onde está</span><br><code>app/docs/architecture/SECURITY_EVENTS.md</code>; <code>app/app/models/security_event.rb</code></p>
+<p><span class="lbl">Por que é ativo, e por dois motivos</span><br>Comercialmente, é requisito de venda para cliente que exige integração com SIEM. Mas há um segundo motivo, mais direto: <strong>quem conhece a regra de identificação sabe como forjar a classificação de canal</strong>. Isso é informação de segurança, não só de produto.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="talvez">
+<header><span class="id">C4</span><span class="nm">Os relatórios de auditoria e conferência (work books)</span><span class="veredito v-talvez">Duvidoso — não investiguei a fundo</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>13 geradores de planilha de auditoria: auditoria de comissão por indicador, de extrato, de grupo, de meta de plano, de uso mensal, de variável, de histórico de usuário.</p>
+<p><span class="lbl">Onde está</span><br><code>app/app/work_books/</code></p>
+<p><span class="lbl">Por que estou em dúvida</span><br>Identifiquei que existem e o que cobrem, mas não abri o conteúdo de cada um. O valor depende de uma coisa que só você sabe: <strong>esses relatórios são o que o cliente usa para contestar um cálculo?</strong> Se sim, o formato e as colunas escolhidas são a explicabilidade do produto — ativo forte. Se são conferências internas, valem menos.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ é ativo forte ☐ é interno ☐ misto — comente: ______________</p>
+</div>
+</article>
+
+<!-- ===================== INFRA ===================== -->
+<h2>D. Infraestrutura e segurança</h2>
+
+<article class="item" data-v="sim">
+<header><span class="id">D1</span><span class="nm">A topologia de rede e o isolamento por cliente</span><span class="veredito v-sim">É ativo — e é dado de segurança</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>441 arquivos descrevendo VPCs, conexões entre regiões, stacks dedicados por cliente, e o padrão de saída para o cliente com sub-redes dedicadas e tabela de rotas própria — desenhada para que só ela alcance o banco de produção.</p>
+<p><span class="lbl">Onde está</span><br><code>terraform/</code>, incluindo <code>docs/NETWORK-ACCESS-MODEL.md</code> e 11 ADRs</p>
+<p><span class="lbl">Por que é ativo — e o motivo é duplo</span><br>Comercialmente, encurta o caminho de um concorrente até uma arquitetura multi-cliente segura. Mas o motivo mais forte é outro: <strong>é o mapa de onde bater</strong>. Faixas de endereçamento, fronteiras de isolamento, quais políticas exigem autenticação de dois fatores e quais não. Nada disso é derivável de fora.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">D2</span><span class="nm">As decisões de arquitetura com as alternativas descartadas</span><span class="veredito v-sim">É ativo — a parte descartada</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>13 registros de decisão documentando não só o que foi escolhido, mas <strong>o que foi rejeitado e por quê</strong>: backend de estado, topologia de rede, modelo de identidade, padrão multi-cluster, pooler obrigatório, retenção de auditoria.</p>
+<p><span class="lbl">Onde está</span><br><code>terraform/docs/adr/ADR-001</code> a <code>ADR-011</code>; <code>app/docs/adr/</code></p>
+<p><span class="lbl">Por que é ativo — e onde está o limite</span><br>A decisão final às vezes é inferível de fora, pelo comportamento do sistema. <strong>O descarte nunca é.</strong> "Tentamos X e não funcionou porque Y" é informação pura de custo evitado. A ressalva: várias decisões seguem recomendação pública de fornecedor — a parte protegível é a aplicação ao contexto de vocês e o motivo do descarte, não o princípio geral.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ discordo ☐ falta detalhe — anote aqui: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="nao">
+<header><span class="id">D3</span><span class="nm">A estratégia de deploy sem indisponibilidade</span><span class="veredito v-nao">Quase tudo é nível 2</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Blue/green pelo CodeDeploy, Sidekiq em fases (silenciar, drenar, rolar), tarefa efêmera de migração antes do código novo entrar, trava de autoscaling durante o deploy.</p>
+<p><span class="lbl">Por que NÃO é ativo</span><br>Cada peça está na documentação pública da AWS e do Sidekiq. Um sênior monta isso sozinho. Reivindicar sigilo aqui <strong>enfraquece o resto do instrumento</strong>, porque escancara tentativa de proteger conhecimento comum — e é exatamente o tipo de excesso que faz um juiz olhar o documento inteiro com desconfiança.</p>
+<p><span class="lbl">O que sobra de ativo, e é pequeno</span><br>O critério exato do gate que decide se pode deployar em produção — como se mede a fila, qual o limiar, qual a janela de validade da liberação. Isso sim é escolha de vocês.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ concordo ☐ discordo, acho que tem mais — o quê? ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">D4</span><span class="nm">Credenciais, chaves e material criptográfico</span><span class="veredito v-sim">É ativo — mas resolve-se com rotação, não com contrato</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Senhas, chaves de API, certificados, chaves de acesso, semente de autenticação de dois fatores, perfil de VPN.</p>
+<p><span class="lbl">Por que é diferente de todos os outros</span><br>Aqui não há vantagem competitiva — há <strong>controle de acesso</strong>. E o contrato não protege: uma cláusula não impede alguém de usar uma chave que ainda funciona. <strong>A única proteção real é trocar a chave.</strong></p>
+<p><span class="lbl">O ponto que precisa da sua atenção</span><br>O repositório <code>app</code> versiona o arquivo de credenciais cifradas. A chave que o decifra não está no git — mas <strong>está no disco de qualquer pessoa que tenha clonado e configurado o projeto</strong>. Enquanto a chave de assinatura não for trocada, quem tem essa cópia consegue decifrar as credenciais de todo o histórico.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ ciente, vou rotacionar ☐ já foi rotacionado ☐ comentar: ______________</p>
+</div>
+</article>
+
+<!-- ===================== NEGÓCIO ===================== -->
+<h2>E. Produto, dados e negócio</h2>
+
+<article class="item" data-v="sim">
+<header><span class="id">E1</span><span class="nm">Dados de clientes e de pessoas</span><span class="veredito v-sim">É ativo — por responsabilidade, não por vantagem</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Identidade e hierarquia de dezenas de milhares de empregados dos seus clientes, transações de venda, metas, indicadores, comissões apuradas, pagamentos. E a configuração de cada cliente — quais variáveis, como os planos são compostos — que revela <em>como aquele cliente remunera a força de vendas dele</em>.</p>
+<p><span class="lbl">Por que a lógica se inverte aqui</span><br>Nos outros itens o valor é vantagem competitiva. Aqui o valor é <strong>responsabilidade</strong>: vazamento gera dever de notificar, sanção regulatória e responsabilidade perante o cliente. E parte disso não é segredo seu — é segredo do <em>seu cliente</em>, que você guarda por dever.</p>
+<p><span class="lbl">O que precisa da sua atenção</span><br>Ele tinha permissão de abrir console em qualquer serviço de produção, sem exigência de segundo fator, com leitura e escrita sobre todo o banco. Isso era o acesso legítimo dele. Mas <strong>não há registro de quais consultas ele rodou</strong> — então hoje não dá para afirmar nem negar que houve extração.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ confirmo ☐ ele não usava isso ☐ comentar: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="talvez">
+<header><span class="id">E2</span><span class="nm">Roadmap e funcionalidades ainda não lançadas</span><span class="veredito v-talvez">Duvidoso — depende do que ele sabia</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>O que está sendo construído e em que ordem: portal de validação de integração, autenticação com escopo por cliente, migração de chave de criptografia do banco, coordenação de autoscaling, entre outros.</p>
+<p><span class="lbl">Por que estou em dúvida</span><br>O repositório onde isso vive é <strong>pessoal seu</strong> — ele não tinha acesso. A exposição dele foi indireta: seções "não lançado" nos changelogs, PRs abertos, conversa de time. Real, mas bem menor que nos outros itens. <strong>Você tem noção melhor do que ele efetivamente sabia do roadmap.</strong></p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ ele sabia bastante ☐ ele sabia pouco ☐ comentar: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="talvez">
+<header><span class="id">E3</span><span class="nm">Preços, propostas, margens e pipeline</span><span class="veredito v-talvez">Duvidoso — não achei evidência de acesso</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Tabela de preços praticada, descontos por cliente, margem por contrato, oportunidades em negociação.</p>
+<p><span class="lbl">O que encontrei</span><br><strong>Nada disso está nos repositórios.</strong> Procurei por termos comerciais em toda a documentação e não houve uma ocorrência real. Isso mora fora do código — Workspace, contabilidade, ferramenta comercial.</p>
+<p><span class="lbl">Por que estou em dúvida</span><br>Em tese é ativo forte — preço praticado é o que um concorrente explora mais rápido. Mas <strong>não há evidência de que ele tenha tido acesso</strong>. Reivindicar isso sem apurar reintroduz exatamente a generalidade que faz um instrumento cair. Ele era técnico, mas você mencionou que era backup técnico da liderança — <strong>isso incluía visibilidade comercial?</strong></p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ tinha acesso ☐ não tinha ☐ parcial — o quê? ______________</p>
+</div>
+</article>
+
+<!-- ===================== NÃO É ===================== -->
+<h2>F. O que NÃO é ativo — e por que reivindicar isso te prejudica</h2>
+
+<article class="item" data-v="nao">
+<header><span class="id">F1</span><span class="nm">As convenções de código da 4Shark</span><span class="veredito v-nao">Não é — vocês publicaram</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>As regras de estilo Ruby, Rails e RSpec da 4Shark, codificadas como ferramenta de análise.</p>
+<p><span class="lbl">Onde está</span><br>Repositório <code>rubocop-fourshark</code> — <strong>público no GitHub</strong>, por decisão de vocês</p>
+<p><span class="lbl">Por que isso importa mais do que parece</span><br>Se o instrumento reivindicar sigilo sobre "metodologias e processos internos" sem excluir o que a empresa publicou, o outro lado mostra o repositório público e usa isso para atacar a <em>credibilidade do documento inteiro</em>. Um instrumento que reivindica o que já é público perde peso sobre o que é segredo de verdade. <strong>É barato excluir explicitamente e caro não excluir.</strong></p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ concordo ☐ discordo — comente: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="nao">
+<header><span class="id">F2</span><span class="nm">Bibliotecas e ferramentas de terceiros</span><span class="veredito v-nao">Não é</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Dentaku, Rails, Sidekiq, Mongoid, Angular, Flutter, Terraform, Keycloak, PgBouncer, Pritunl.</p>
+<p><span class="lbl">Por que não é</span><br>São componentes públicos, de terceiros. O que é protegível é sempre a camada que <em>vocês</em> construíram em cima — nunca o componente. A distinção fica clara no item A3: a biblioteca de fórmulas é pública; a lista de erros que vocês decidiram reprovar não é.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ concordo ☐ discordo — comente: ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="nao">
+<header><span class="id">F3</span><span class="nm">A habilidade profissional dele</span><span class="veredito v-nao">Não é — e não tem discussão</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>Saber Ruby, saber modelar dados, saber revisar código, saber montar arquitetura, saber liderar. Tudo que ele levou de bagagem depois de oito anos.</p>
+<p><span class="lbl">Por que não é</span><br>É patrimônio profissional dele. O STJ registrou isso de forma direta: <em>"o sigilo não engloba todo conhecimento e informação obtida pelo empregado em sua atividade, porquanto, em seu exercício, ele também desenvolve know-how próprio decorrente da especialidade e anos de experiência"</em>.</p>
+<p><span class="lbl">Onde está a linha</span><br>Ele pode usar tudo que sabe. Não pode <em>consultar, copiar ou reproduzir</em> o que está registrado nos ativos acima. A diferença não é o que está na cabeça dele — é se ele reproduz uma escolha concreta identificável de vocês.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ entendi ☐ tenho dúvida — qual? ______________</p>
+</div>
+</article>
+
+<article class="item" data-v="sim">
+<header><span class="id">F4</span><span class="nm">Uma coisa que talvez você não tenha pensado: os testes</span><span class="veredito v-sim">É ativo — e costuma passar batido</span></header>
+<div class="body">
+<p><span class="lbl">O que é</span><br>O <code>app</code> tem cerca de 4.758 arquivos Ruby, boa parte deles testes: 136 de mutações GraphQL, 102 de resolvers, 72 de API.</p>
+<p><span class="lbl">Por que é ativo</span><br>Um conjunto de testes é o registro de <strong>todos os casos que vocês já viram dar errado</strong>. Cada teste de exceção existe porque alguém quebrou aquilo em produção. Um concorrente que tivesse a suíte de testes de vocês saberia, sem escrever uma linha, quais são os cem casos de borda do domínio de comissionamento — que é justamente o que leva anos para descobrir.</p>
+<p><span class="lbl">Por que costuma passar batido</span><br>Todo mundo inventaria "o código de produção" e esquece os testes. Mas os testes são conhecimento negativo em forma executável.</p>
+<p class="avalia"><b>Sua avaliação:</b> ☐ nunca tinha pensado, concordo ☐ discordo — comente: ______________</p>
+</div>
+</article>
+
+<!-- ===================== RESUMO ===================== -->
+<h2>Resumo em uma tabela</h2>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th>Nível</th><th>Exemplo</th><th>Protegível?</th><th>Por quê</th></tr></thead>
+<tbody>
+<tr><td><strong>Ideia</strong></td><td>"Um sistema de remuneração variável"</td><td style="color:var(--nao)"><strong>Não</strong></td><td>Ideia não se protege. O INPI é explícito quanto a software conceitual</td></tr>
+<tr><td><strong>Técnica geral</strong></td><td>"Cache com fallback", "deploy blue/green"</td><td style="color:var(--nao)"><strong>Não</strong></td><td>Evidente para um técnico do setor — a própria lei exclui</td></tr>
+<tr><td><strong>Habilidade</strong></td><td>Saber Ruby, saber arquitetar</td><td style="color:var(--nao)"><strong>Não</strong></td><td>Patrimônio profissional dele; o STJ é explícito</td></tr>
+<tr><td><strong>Escolha concreta</strong></td><td>A lista de 11 nomes que uma regra de Ranking aceita</td><td style="color:var(--sim)"><strong>Sim</strong></td><td>Específica, não pública, não evidente, vale por estar escondida</td></tr>
+<tr><td><strong>Expressão (código)</strong></td><td>Os arquivos que implementam a escolha acima</td><td style="color:var(--sim)"><strong>Sim</strong></td><td>Direito autoral sobre a expressão literal + Lei do Software, art. 4º: pertence ao empregador</td></tr>
+<tr><td><strong>Conhecimento negativo</strong></td><td>"Tentamos X, quebrou por Y"</td><td style="color:var(--sim)"><strong>Sim</strong></td><td>Nunca é público por definição. Difícil de provar, mas é o mais valioso</td></tr>
+<tr><td><strong>Dado</strong></td><td>Hierarquia e comissões dos clientes</td><td style="color:var(--sim)"><strong>Sim</strong></td><td>LGPD + dever de sigilo perante o cliente. Independe de contrato</td></tr>
+</tbody>
+</table>
+</div>
+
+<p class="fonte" style="margin-top:26px">Este documento é para você reagir, não para assinar. Marque cada item, corrija o que estiver errado e acrescente o que faltou — especialmente nos cinco marcados como duvidosos, onde a resposta depende de conhecimento de negócio que só você tem.</p>
+
+<script>
+document.querySelectorAll('.filterbar button').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    var f = btn.dataset.f;
+    document.querySelectorAll('.filterbar button').forEach(function(b){ b.setAttribute('aria-pressed', String(b===btn)); });
+    document.querySelectorAll('.item').forEach(function(c){ c.style.display = (f==='all'||c.dataset.v===f)?'':'none'; });
+  });
+});
+</script>
+
+</div>
+</body>
+</html>

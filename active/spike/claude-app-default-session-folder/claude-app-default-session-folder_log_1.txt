@@ -1,0 +1,88 @@
+Source: gh search issues --repo anthropics/claude-code, plus gh issue view for each hit
+Run: 2026-08-05
+
+=== Search query and raw result ===
+
+Command: gh search issues --repo anthropics/claude-code "default project folder" --limit 15 --json number,title,state,url
+
+Result (6 hits):
+[
+  {"number":44933,"state":"open","title":"[FEATURE REQUEST] Cowork: Set a default project folder that auto-loads on session start","url":"https://github.com/anthropics/claude-code/issues/44933"},
+  {"number":46053,"state":"closed","title":"[FEATURE] Desktop app: Remember/pin default project folder","url":"https://github.com/anthropics/claude-code/issues/46053"},
+  {"number":46052,"state":"closed","title":"[FEATURE] Desktop app: Remember/pin default project folder","url":"https://github.com/anthropics/claude-code/issues/46052"},
+  {"number":46176,"state":"closed","title":"Desktop app loses default working directory between sessions","url":"https://github.com/anthropics/claude-code/issues/46176"},
+  {"number":47050,"state":"closed","title":"Desktop app: Customize project selection doesn't persist, new sessions don't auto-select default folder","url":"https://github.com/anthropics/claude-code/issues/47050"},
+  {"number":57607,"state":"closed","title":"Desktop app should support a configurable default startup directory","url":"https://github.com/anthropics/claude-code/issues/57607"}
+]
+
+=== Issue #46053 -- CLOSED, stateReason: NOT_PLANNED ===
+Title: [FEATURE] Desktop app: Remember/pin default project folder
+
+Body (verbatim):
+"Every time I start a new session in the Claude Code desktop app, I have to click "Select folder" and navigate to my project directory. There's no way to set a default folder.
+Resuming old sessions is a workaround, but long conversations cause context confusion, so starting fresh sessions is preferred. But then I lose the convenience of auto-opening my project folder.
+Proposed Solution: A "Set as default" option when selecting a folder / Or a setting in preferences to configure a default project path. When a default folder is set, new sessions should automatically open in that directory without requiring manual folder selection each time.
+Alternatives: The CLI version doesn't have this problem since you just cd to your project and run claude. But the desktop app has the session sidebar which is valuable for managing conversations.
+Environment: Claude Code Desktop (Mac), macOS 15"
+
+Comments: one +1 ("Recent regression. Annoying step.", user danbvco, 2026-04-10); then auto-closed by github-actions bot for inactivity (2026-05-23), auto-locked 2026-07-14. No maintainer response anywhere in the thread.
+
+=== Issue #46052 -- CLOSED, stateReason: DUPLICATE (of #46053) ===
+Title: [FEATURE] Desktop app: Remember/pin default project folder
+Same body as #46053 (near-identical wording, filed same day). Auto-flagged as a probable duplicate by github-actions bot, then auto-closed as duplicate 2026-04-13. No maintainer comment.
+
+=== Issue #44933 -- OPEN, stateReason: (none, still open) ===
+Title: [FEATURE REQUEST] Cowork: Set a default project folder that auto-loads on session start
+
+Body (verbatim, key excerpt):
+"When starting a new Cowork session, users must manually select their working folder every time via the project picker. There's no way to set a persistent default.
+Current behaviour: Each new session starts with no folder selected. [...]
+Desired behaviour: Allow users to designate a folder as their default Cowork workspace, so it's automatically mounted at the start of every new session"
+
+NOTE: this issue's title and body are scoped to COWORK (the Dispatch/persistent-conversation tab), not the Code tab specifically. It is the most-commented and highest-signal issue found, with six community comments spanning 2026-04-08 to 2026-06-01, none from an Anthropic maintainer. Relevant comments, verbatim excerpts:
+
+- cameron-bales-telus-health (2026-04-09): "Global CLAUDE.md — Added a strong "BEFORE doing anything else" blocker instruction telling Claude to check for the mounted folder. It helps, but Claude still skips it sometimes [...] Config files — Checked claude_desktop_config.json and every other config location I could find. There's no defaultWorkspaceFolder key or anything similar. [...] Bottom line: There is no workaround. Every single Cowork session starts with a manual folder selection."
+
+- jinwharyu (2026-05-10): "The setting proposed in this issue (and in the duplicate-closed #34604) — cowork.defaultWorkspaceFolder in claude_desktop_config.json [...] Even better: change the dialog pre-fill default from ~/Documents/Claude/Projects to a platform-appropriate [...] location"
+
+- harela-stack (2026-06-01): "Confirming this on macOS too — it's not Windows-specific [...] My setup: a Cowork Project with a workspace folder explicitly set. New sessions still don't mount that folder — they fall back to the internal ~/.../local-agent-mode-sessions/<session-id>/outputs path. So even the Project-level workspace folder, which is supposed to be the persistence mechanism, doesn't reliably carry across sessions."
+
+=== Issue #46176 -- CLOSED, stateReason: NOT_PLANNED ===
+Title: Desktop app loses default working directory between sessions
+
+Body (verbatim, key excerpt):
+"The Claude Code desktop app no longer remembers the working directory between sessions. Previously (as of April 9, 2026), opening a new conversation in the desktop app would default to the last-used project folder. After an update, it now defaults back to the home directory (~).
+[...]
+Configuration context:
+- localAgentModeTrustedFolders and dispatchTrustedCodeWorkspaces are set in claude_desktop_config.json but don't influence the default working directory
+- window-state.json stores window geometry but no working directory
+- Session data in claude-code-sessions/ appears to store per-session paths, but this doesn't persist across app restarts/updates"
+
+This is a REPORTED regression claim by a single user (unconfirmed by any Anthropic maintainer in the thread) that the app used to default new sessions to the last-used folder and stopped doing so after an update. One +1 from vksadarangani (2026-04-11, "recent regression. Same issue on claude desktop on windows"). Auto-closed for inactivity 2026-05-27, no maintainer comment anywhere in the thread.
+
+=== Issue #47050 -- CLOSED, stateReason: DUPLICATE (of #46680, not separately fetched) ===
+Title: Desktop app: Customize project selection doesn't persist, new sessions don't auto-select default folder
+
+Body (verbatim, key excerpt):
+"In the Claude Desktop app (Code mode), the "Select folder" button on new sessions no longer auto-selects the configured default project folder. This used to work — the vault folder was always pre-selected when starting a new session.
+[...]
+3. The config file at ~/Library/Application Support/Claude/claude_desktop_config.json has the correct path set under preferences.chillingSlothLocation.customPath, but the app ignores it."
+
+This reporter's OWN claim of a preference key named `preferences.chillingSlothLocation.customPath` is UNVERIFIED by this spike -- it was not found in this machine's own claude_desktop_config.json (read directly in the main session; see SPIKE.md Finding), and no corroborating second source was found. Reported here as a claim, not confirmed as a real key.
+
+=== Issue #57607 -- CLOSED, stateReason: NOT_PLANNED ===
+Title: Desktop app should support a configurable default startup directory
+
+Body (verbatim, key excerpt):
+"The Claude Code desktop app always launches in the user's home directory (C:\Users\<name>). There is no way to configure a default startup directory — not in settings, not via a shortcut (the app is installed as a Windows Store/MSIX package, which doesn't support the "Start in" shortcut property).
+[...]
+Platform: Windows 11, Claude Code desktop app (MSIX/Store install), v2.1.128"
+
+Comment from JenniferEFrenchQE (2026-05-09), verbatim: "Issue: #46053 [...] What it is: Feature request: remember/pin a default project folder across sessions in the desktop app / Overlap with yours: High — same root need, different context (general desktop, not the embedded Claude Desktop feature)". Auto-closed for inactivity 2026-06-08, no maintainer comment.
+
+=== Summary across all six issues ===
+
+- Zero issues found with a maintainer (Anthropic-affiliated account) comment confirming, denying, or scheduling this feature. Every closure in this set is either `NOT_PLANNED` (auto-closed by the `github-actions` bot for inactivity -- the same bot behavior documented elsewhere in 4Shark's own CLAUDE.md as NOT evidence the underlying code was fixed, only that the thread went cold) or `DUPLICATE` (auto-closed pointing at another thread in this same set).
+- Two independent community members (cameron-bales-telus-health on #44933; the reporter of #46176 in "Configuration context") independently report checking `claude_desktop_config.json` and every config location they could find, and finding no default-folder key -- corroborating this spike's own settings-doc search (doc_2.txt).
+- One community member (#47050's reporter) claims a specific key (`preferences.chillingSlothLocation.customPath`) exists and is silently ignored by the app; this claim is UNVERIFIED and not corroborated elsewhere in this search.
+- #46176 and #47050 both allege a REGRESSION (folder-remembering behavior existed before an app update, then stopped) but neither claim is confirmed by Anthropic.

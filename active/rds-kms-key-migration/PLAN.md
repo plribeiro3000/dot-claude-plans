@@ -24,21 +24,33 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 - **The schema has no obstacle to logical replication in two of its four documented gaps**: 166 tables, every one with a simple primary key, and zero views or materialized views. The two remaining gaps (DDL, sequences) are steps below, not risks.
 - **Connectivity for the manual run is the VPN.** Each database security group admits PostgreSQL from the Management VPC, and RDS allows no host access, so the whole procedure runs as `psql` from the engineer's machine over the VPN — there is nothing to SSH into.
 
-## The first run — concrete values
+## State
 
-The non-productive single-instance environment, applied 2026-07-30. Both databases are `available` and the target is confirmed on the environment's own key.
+The non-productive single-instance environment is **done**. It runs on one database, `app-beta-001`, in `us-east-1b`, encrypted under the environment's own key, with the predecessor destroyed and its AWS Backup recovery points retained.
 
-| | Source | Target |
-|---|---|---|
-| Identifier | `app-beta-001` | `app-beta-001-2` |
-| Endpoint | `app-beta-001.cvw5l7p4adp1.us-east-1.rds.amazonaws.com` | `app-beta-001-2.cvw5l7p4adp1.us-east-1.rds.amazonaws.com` |
-| Master user | `postgres` | `postgres` |
-| Master secret | `arn:aws:secretsmanager:us-east-1:405749097490:secret:rds!db-389b3244-2300-47e0-9348-64484f2bcc5a-kiTdaQ` | `arn:aws:secretsmanager:us-east-1:405749097490:secret:rds!db-a8ed4c14-7f58-4841-8c90-1efdb86e2f17-JvRwbd` |
-| KMS key | shared master | `alias/app-beta-001` |
+Reaching that took **two** migrations rather than one. The first moved the data onto the environment's key but had to create the replacement under a suffixed identifier, because the original still held the name. The second corrected the name. An instance's identifier is fixed at creation as far as Terraform is concerned — AWS supports an in-place rename that the provider does not expose — so a name is not editable, it is a second copy. **Name the replacement the way the environment should be named forever, before any data moves.**
 
-Application database: `app_beta_001`. Pooler record the application resolves: `connection-pooler-beta-001.4shark.internal`.
+Three environments remain: the non-productive cluster, then the two productive ones. Each is Aurora, so each is also the first test of the cluster-shaped half of the procedure.
 
-The two masters have **different** passwords — each instance manages its own secret — so a dump-from-source-into-target sequence needs both, retrieved separately.
+## Paying nothing for the copy is a REQUIREMENT, not an optimization
+
+The replication that fills a replacement is ordinary network traffic and it is billed like any other. Transfer between two instances in the **same** Availability Zone over private addressing is free; crossing zones is metered on **both** ends. A migration is therefore free or expensive depending on one placement decision made at creation, and `availability_zone` is fixed at creation too — there is no correcting it afterwards.
+
+On beta this was settled by pinning the replacement to the source's zone and confirming both reported `us-east-1b` before any data moved. The same guarantee has to be **established** for each remaining environment rather than assumed, and two things make that harder than repeating the beta step:
+
+The first is size. The largest productive environment holds roughly 350 GB, so a cross-zone copy there is metered on both ends of 350 GB — and the identifier correction means the copy can happen twice. That is the whole reason the naming rule above is stated as a rule.
+
+The second is that **Aurora's pricing statements do not transfer to this case, and reading them as though they do is the trap.** Aurora documents that data transferred between Availability Zones for *DB cluster replication* is free — that covers a cluster replicating to its own members, not logical replication between two separate clusters, which is what a key migration runs. Nothing verified so far establishes how the second case is billed. **Before the first Aurora copy starts, that question has to be answered from AWS's own pricing documentation, and the placement has to be arranged so the answer does not matter** — same zone, proven by describing both sides, exactly as on beta.
+
+## Every environment needs its pooler checked BEFORE its cutover
+
+The cutover is zero-downtime only because the pooler can be told to hold clients, and that requires console access. The pooler decodes its userlist once, at container start, from a secret reference that carries no version — so a later change to the secret produces no new task definition, ECS never rolls the tasks, and the running process serves forever with the credentials it read at boot. Nothing reports the divergence; it surfaces as an authentication failure at the moment the console is needed.
+
+Measured across the fleet, all four environments were in that state: pooler tasks started around 14:00 and userlist secrets last changed between 16:07 and 16:32 the same day. Beta was resolved by rolling its pooler service, which drops the client connections the tasks hold — acceptable there, and the reason it must never be discovered inside a pause window.
+
+So each remaining environment needs, as a scheduled step of its own: compare each pooler task's `startedAt` against the userlist secret's `LastChangedDate`, prove console access with a real `SHOW DATABASES`, and roll the service if the tasks are older. On the productive environments that roll rides the existing Sidekiq queue check, the same window a deploy uses.
+
+The durable repairs — pinning the secret's version in the task definition so a content change produces a revision the service adopts, and enabling ECS Exec so a stale container is repairable in place with SIGHUP instead of a restart — are their own change to `modules/connection_pooler`, and they land before the productive environments.
 
 ## The procedure
 
@@ -251,17 +263,15 @@ Two properties of the running system are what the design rests on, and both are 
 
 That second one is the load-bearing fact. `PAUSE` *"tries to disconnect from all servers"*, and each disconnect *"waits for that server connection to be released according to the server pool's pooling mode"* — under transaction pooling that is the end of the current transaction, so `PAUSE` completes in milliseconds. Under session pooling it would wait for long-lived Rails connections to close, which is never. Meanwhile *"New client connections to a paused database will wait until RESUME is called"* — they block, they do not error, and that is precisely the difference between a pause and an outage.
 
-**Two prerequisites are missing today and both are module changes that must land before any cutover.**
+**Two properties of the pooler are what the cutover runs on, and both are worth restating because losing either one silently removes the zero-downtime option.**
 
-**5.0a — the pooler needs an admin user.** The console today lists only `stats_users`, which is *"allowed to connect and run read-only queries on the console. That means all SHOW commands"* — it cannot issue `PAUSE`. `admin_users` is the one *"allowed to connect and run all commands on the console"*. Add an `admin_user` variable to `modules/connection_pooler`, render it as `admin_users` in the `.ini`, and add that user to the userlist secret.
+The console has an `admin_users` entry, generated per environment by `modules/connection_pooler`. Only that user can issue `PAUSE` — a `stats_users` entry is *"allowed to connect and run read-only queries on the console. That means all SHOW commands"*, which is not enough. Whether the running tasks still accept that credential is the check in the pooler section above; a task older than the userlist secret does not, and that is the failure that takes `PAUSE` away exactly when it is needed.
 
-**5.0b — the backend host must be a DNS name we control, not the RDS endpoint.** With `host = module.rds_instance.address`, repointing rewrites the pooler's task definition, ECS replaces the tasks, and the paused PgBouncer process dies with every client connection it was holding — `PAUSE` would buy nothing. Put a CNAME in the shared `4shark.internal` private zone (already associated with each app VPC) pointing at the source endpoint, set the pooler's `host` to that name, and give the record a low TTL. The cutover then changes a DNS record and never touches the task definition.
+The pooler's backend `host` is a CNAME in the shared `4shark.internal` private zone, not an RDS endpoint. That is what keeps the repoint out of the task definition: naming the endpoint directly would make a repoint a new task-definition revision, ECS would replace the tasks, and the paused PgBouncer process would die holding every client connection — the pause would buy nothing. PgBouncer closes the loop natively, marking a server connection for recycling *"because a configuration file reload or DNS update changed the connection information or RECONNECT was issued"*, so a DNS change is a first-class trigger rather than a trick.
 
-PgBouncer closes that loop natively: a server connection is marked for recycling *"because a configuration file reload or DNS update changed the connection information or RECONNECT was issued"*. So a DNS change is a first-class trigger, not a trick.
+**Moving a pooler's `host` onto a CNAME is itself a task-replacing deploy**, so an environment that does not yet have one lands that change on an ordinary day, confirms the pooler is serving through the record, and lets cutover day change nothing but the record's target.
 
-**Making 5.0b live is itself a deploy and must happen well before the cutover, not as part of it** — moving `host` from the endpoint to the CNAME is a task-definition change, so it replaces tasks. Land it on an ordinary day, confirm the pooler is serving through the CNAME, and let the cutover day change nothing but the record's target.
-
-The cutover itself, once both prerequisites are in place:
+The cutover itself:
 
 1. **`PAUSE <dbname>` on every pooler task.** Clients block and stay connected; in-flight transactions finish first. From this moment the source receives nothing from the application, which is what makes the next two steps well-defined — and it is a *hold*, not a stop.
 2. **Confirm zero lag** with the Phase 3 queries. Not "small" — zero. The source is quiescent, so this converges immediately.
@@ -286,24 +296,32 @@ The cutover itself, once both prerequisites are in place:
 
 ### Phase 6 — Retire the source
 
-Only after a defined period of the target serving without incident. `deletion_protection` is `true` on every database here, so it comes off deliberately as the last step — that is the irreversible one.
+Only after a period of the replacement serving without incident, and it is **two applies whose order the provider forces**. The first sets `deletion_protection = false` and `skip_final_snapshot = true`; the second removes the module block. Both arguments reach AWS only at deletion, and the protection is editable only while the resource is still declared, so a single apply that lifted it and deleted the declaration fails.
 
-## What becomes the binary, and what stays with the engineer
+Skipping the final snapshot is deliberate and needs its evidence each time: AWS Backup already holds daily recovery points for these instances, so the snapshot would duplicate a backup that exists. Confirm the recovery points before accepting the skip — `aws backup list-recovery-points-by-resource --resource-arn <instance-arn>` answers it in one call.
 
-Following `mongodb-reprovision`'s split, which exists because the dangerous half of that procedure is repetitive and easy to get wrong by hand while the Terraform half needs judgment:
+Each apply is its own PR, which keeps one commit per pull request and makes each apply match a state a reviewer can read.
 
-**The script owns** the observation and the mechanical SQL — Phase 3's lag and per-table state, Phase 4's row-count comparison, Phase 5's sequence-advancement SQL generation, and the publication/subscription creation and teardown. These are the steps that are identical every time and where a typo is expensive.
+## What the binary owns, and what stays with the engineer
 
-**The engineer owns** the Terraform (declaring the target, repointing the pooler, retiring the source), every apply, the migration freeze, the write freeze, and the go/no-go at the cutover gate.
+`rds-key-migration.sh`, alongside this document, follows `mongodb-reprovision`'s split: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply. It carries `preflight`, `status`, `verify`, `hold` and `release`.
 
-**Phase 5 should be indivisible in the script**, the way `mongodb-reprovision`'s `cutover` is: between stopping writes and repointing the pooler there is a window where the system is neither fully on the source nor on the target, and a checkpoint parked inside it is worse than passing through it.
+**The script owns** the pre-conditions (client-versus-server version, logical replication, the network comparison, the zone match that keeps the copy free, the pooler-staleness check), the replication health queries, the catalog-and-boundaries verification, and the mechanical SQL of the window — the lag confirmation and the sequence advancement.
+
+**The engineer owns** the Terraform (declaring the replacement, repointing the record, retiring the predecessor), every apply, and the migration freeze.
+
+**The cutover is NOT one indivisible verb, and that is forced rather than chosen.** The apply that repoints the record sits inside the window where clients are held, and an apply is the engineer's approval — so the window opens with `hold` and closes with `release`, with the apply between them. Every other seam would park the system between two databases; this one already exists because the approval boundary creates it.
+
+What is owed in the script: `prepare` — the roles, the application database, the md5 verifier transplant and the schema load, which beta ran by hand.
 
 ## Order of execution across the four environments
 
-The non-productive single-instance environment goes first — it is the smallest, its data does not matter, and it exercises the identical pooler repoint. Then the non-productive cluster, which is the first Aurora run and validates the cluster-shaped half. The two productive environments follow, and by then nothing in this document should still be marked unverified.
+The order runs smallest and cheapest to fail first: the non-productive single-instance environment, then the non-productive cluster, then the two productive ones. The single-instance environment is complete. The non-productive cluster is next, and it is the first Aurora run — it validates the cluster-shaped half of every phase, and nothing in this document should still be unverified by the time a productive environment starts.
 
-**One PR per environment, not one PR for all four.** A PR that declares every environment's replacement database cannot be merged until every environment has been migrated, because 4Shark applies before merging — so the first environment's work sits unmerged behind three that have not started, and every branch cut afterwards has to be stacked on it or plan against infrastructure its own base does not describe. Scoping the PR to the environment being migrated keeps each one mergeable the moment its own apply is confirmed.
+**Before an environment's migration begins, three things are settled in this order.** Its replacement's zone placement and the billing question above, because both are fixed at creation. Its pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. And its replacement's identifier, which is the name the environment keeps forever.
 
-The consequence for the three environments still waiting: their replacement clusters are **not declared anywhere yet**. Each gets its own PR when its migration starts, shaped like the first one's — same arguments, `rds_aurora_cluster` instead of `rds_instance`, one instance, both immutable keys set at creation, and the self-ingress rule on the security group.
+**One PR per environment, not one PR for all four.** A PR that declares every environment's replacement cannot be merged until every environment has been migrated, because 4Shark applies before merging — so the first environment's work would sit unmerged behind three that have not started, and every branch cut afterwards would have to stack on it or plan against infrastructure its own base does not describe. Scoping the PR to the environment being migrated keeps each one mergeable the moment its own apply is confirmed. The cutover, and each of the two teardown applies, are their own PRs for the same reason.
+
+The three environments still waiting have **no replacement declared anywhere**. Each gets its own PR when its migration starts, shaped like the completed one's — same arguments, `rds_aurora_cluster` instead of `rds_instance`, one instance, the encryption key and the identifier and the zone all set at creation because none of them is editable afterwards, and the self-ingress rule on the security group so the replacement can be filled by replication.
 
 **The pooler indirection is the exception to that split, and deliberately so.** The records and the admin user are the *mechanism* the cutover runs on rather than a per-environment resource, so they land once for all four. Applying that PR touches no running task — the records are new and resolve nothing yet, and the pooler's service ignores task-definition changes, so the new revision is registered without being adopted.

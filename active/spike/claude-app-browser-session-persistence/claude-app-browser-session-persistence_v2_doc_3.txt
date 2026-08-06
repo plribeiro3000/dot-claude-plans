@@ -1,0 +1,49 @@
+Source: https://code.claude.com/docs/en/changelog
+Fetched: 2026-08-05, two passes: (1) a broad dump of every version entry from 2.1.198 through 2.1.212 in full, (2) a keyword-filtered pass (Browser, browser, cookie, session, partition, worktree, storage) for 2.1.213 through the most recent entry at fetch time (2.1.222, 2026-08-04).
+
+Purpose: answer Research Question 4 — is there a documented Claude Code change to the Browser pane, its storage, partitions, or session handling between 2026-07-17 (the prior spike's fetch date) and 2026-08-05 (today) that would explain a regression in that window.
+
+Every changelog bullet found across both passes that contains any of the keywords above, in chronological order, verbatim:
+
+2.1.198 (2026-07-01):
+- "Claude in Chrome is now generally available"
+- "Fixed 'no route to host' for local-network hosts in macOS background agent sessions by declaring Local Network entitlements"
+- "Fixed Claude in Chrome repeatedly opening the reconnect page when sessions run from different builds or config directories"
+
+2.1.205 (2026-07-08):
+- "Reserved the 'Claude Browser' MCP server name (alongside 'Claude Preview') ahead of the Claude Desktop pane rename; user-configured MCP servers can no longer register under either name"
+
+2.1.207 (2026-07-11):
+- "Changed Claude in Chrome to close the browser tabs it opens once it no longer needs them"
+
+2.1.210 (2026-07-14):
+- "Added a startup warning for Write(path), NotebookEdit(path), and Glob(path) permission rules — use Edit(path) or Read(path) instead" [permission-rules session, not Browser-pane cookies; kept because it matched keyword "session"]
+- "Fixed isolation: 'worktree' subagents being able to run git-mutating commands against the main repo checkout instead of their own isolated worktree" [code worktree isolation, not Browser pane]
+
+2.1.211 (2026-07-15):
+- "Changed 'always allow' permission rules to save at the repository root, so approvals granted in a git worktree persist across sessions and worktrees" [permission-rule persistence, not Browser-pane cookies]
+- "Fixed a startup hang when the Claude in Chrome extension is enabled but Chrome is not running"
+- "Fixed Claude in Chrome setup pages failing to open in the browser on Windows"
+- "Claude in Chrome: hardened file-upload path validation"
+- "Claude in Chrome: save_to_disk on screenshot actions now writes the image to disk and returns the path; previously it did nothing"
+
+2.1.212 (2026-07-17):
+- "Fixed worktree creation following a repository-committed symlink at .claude/worktrees, which could create files outside the repository" [code worktree, not Browser pane]
+- "Changed sessions forked with /fork to create a new worktree of their own instead of working in the original session's checkout" [code worktree, not Browser pane]
+
+2.1.214 (2026-07-18):
+- "Fixed worktree creation following a repository-committed symlink at .claude/worktrees, which could create files outside the repository" [duplicate of 2.1.212 entry as returned by the fetch]
+
+2.1.216 (2026-07-20):
+- "Fixed worktree-isolated subagents redirecting git into the shared checkout via git -C, --git-dir, or GIT_DIR/GIT_WORK_TREE" [code worktree, not Browser pane]
+
+2.1.218 (2026-07-22):
+- (no Browser/cookie/session/partition hit; the only match returned was a Windows path-corruption bug unrelated to this investigation)
+
+2.1.221 (2026-08-04):
+- "Fixed the thinking toggle having no effect for the rest of a session that started with thinking off; disabling an MCP server mid-connect no longer silently reverts" [unrelated "session" usage]
+
+2.1.222 (2026-08-04):
+- "Fixed worktree-isolated sessions and their subagents being able to run destructive git commands against the main checkout; isolation now applies to file edits and Bash in every session type" [code worktree, not Browser pane]
+
+NEGATIVE RESULT: no changelog entry in the fetched range (2.1.198 through 2.1.222, spanning 2026-07-01 to 2026-08-04) mentions the Browser pane's cookie storage, session/login persistence for external sites, or any partition/storage-directory mechanism. Every "worktree" hit concerns CODE isolation (git worktrees under `.claude/worktrees/`), a documented, separate mechanism from the Browser pane's per-project-folder cookie partitions observed on the local machine (see main SPIKE-v2.md Finding on local partition evidence). No entry states that an app update reset a Browser-pane-related setting or toggle.

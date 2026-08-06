@@ -128,10 +128,62 @@ Two things block it today. The console lists only `stats_users`, which may *"run
 
 **What is designed out rather than tested**: whether the application survives a pooler task replacement. Behind a CNAME the tasks are never replaced during a cutover, so the question leaves the critical path. Moving `host` from the endpoint onto the CNAME *is* a task-replacing deploy — it lands on an ordinary day, well before any cutover.
 
+### 14. An instance identifier is fixed at creation, so a wrong name costs a SECOND full migration
+
+`identifier` is ForceNew in the AWS provider: changing it in configuration destroys and recreates the instance rather than renaming it. AWS itself supports an in-place rename through `ModifyDBInstance`/`NewDBInstanceIdentifier` — a reboot, no data movement — but the provider does not expose it, and the request is old and unresolved upstream.
+
+The consequence is concrete rather than theoretical. The key migration produced a correct database under a suffixed name, and correcting that name required standing up a third instance and copying the data again. Two full migrations for one environment, the second one buying nothing but the name.
+
+**For the script**: name the replacement the way the environment should be named FOREVER, at creation, before any data moves. There is no cheap correction later — and on a large productive environment the second copy is the expensive one.
+
+### 15. Placing the replacement in the source's Availability Zone is what makes the copy free
+
+Transfer between instances in one Availability Zone over private addressing is not billed; crossing zones is metered on **both** ends. A subnet group spanning two zones lets AWS choose, so the placement is left to chance unless it is pinned.
+
+`availability_zone` is also ForceNew, which decides where the argument may be introduced: on the new instance at creation, never on a live one. Declaring it on an existing database risks a destroy-and-create plan for a value that is already correct.
+
+**For the script**: read the source's zone, pin the replacement to it, and refuse to proceed when they differ. On a 350 GB environment this is the difference between a free copy and a metered one, and it cannot be corrected after creation.
+
+### 16. The pooler serves the userlist it read at BOOT — and the task definition is why it never notices
+
+The userlist reaches the container as an environment variable resolved from the secret's **bare ARN**, which always means `AWSCURRENT` *at task start*. Changing the secret's content creates a new version but no new task-definition revision, so ECS never rolls the tasks and the running process keeps serving with the copy it decoded at boot. Nothing reports the divergence.
+
+It surfaced as an authentication failure on the console with the password Terraform's state holds, and it was not a stale task definition: the running tasks were on the only revision that exists. The tasks had started at 13:55, the secret last changed at 16:07, and the admin line differed between the two versions. Measured across the fleet, all four environments were in that state — tasks started around 14:00, secrets changed between 16:07 and 16:32.
+
+The cost is that the console is the only way to `PAUSE`, so a cutover cannot be zero-downtime while it is unreachable, and the only way to hand a running container a new userlist is to replace it — which drops every client connection it holds.
+
+**For the script**: before anything else in the cutover phase, compare each pooler task's `startedAt` against the userlist secret's `LastChangedDate` and prove console access with a real `SHOW DATABASES`. A task older than the secret is a Blocker to resolve on a scheduled window, never inside the pause. The durable repairs are pinning the secret's version in the task definition (a content change then produces a revision the service adopts) and enabling ECS Exec (pgbouncer reloads `auth_file` on SIGHUP, so a stale container is repairable in place with no connection dropped).
+
+### 17. A direct-connection secret lives outside SSM and Terraform, and a search of both will miss it
+
+The deploy strips `DATABASE_URL` from the migration task and injects `MIGRATION_DATABASE_URL`, a GitHub **environment** secret holding a direct RDS URL — because PgBouncer's transaction pooling breaks Rails' advisory-lock migrations. It is write-only through the API and declared in neither SSM nor Terraform.
+
+A search of both concluded nothing referenced the old database, and the next deploy broke. The value is reconstructed from the SSM application URL by rewriting the host and database to the direct endpoint — file to file, and with the trailing newline the CLI appends stripped, since it would otherwise be stored inside the connection string.
+
+**For the script**: enumerate the consumers by ASKING each system, not by grepping the two that are easy to search. Rewrite this secret as part of the cutover, before the source can be destroyed — it is the one consumer the CNAME does not cover.
+
+### 18. Retiring the source is two applies, and the order is forced by the provider
+
+`deletion_protection` is only editable while the resource is still declared, so a single apply that both lifts the flag and removes the module fails. The first apply lifts protection and records `skip_final_snapshot`; the second removes the block.
+
+`skip_final_snapshot` is deliberate rather than careless: AWS Backup already holds daily recovery points for the instance, so a final snapshot duplicates a backup that exists. Both it and `final_snapshot_identifier` are destroy-time arguments read from prior state, which means they must be recorded by an **earlier** apply than the one that removes the instance.
+
+**For the script**: emit the teardown as two plans with the order stated, and confirm the vault's recovery points before accepting the skip.
+
+## What the beta run measured
+
+The full cutover ran with clients held and none dropped. The pause window covered the lag check, the sequence advancement (142 statements of 166 sequences), the Terraform apply repointing the record and the backup selection, and `RECONNECT` on both pooler tasks. Immediately after `RESUME` the application role held ten connections on the replacement and zero on the predecessor.
+
+The initial copy of 168 tables on this dataset finished fast enough to be invisible — every table reached `r` before the first status query. That number is a property of beta's size and says nothing about the productive environments; it is the one figure the larger runs still have to produce.
+
+Beta is complete: one instance, the conventional identifier, the environment's own key, the predecessor destroyed through the two applies of finding 18 with its AWS Backup recovery points retained. The application stayed connected across both the cutover and the destroy.
+
 ## Still to do
 
-Beta's cutover is blocked on two module changes to `modules/connection_pooler`: an `admin_user` variable rendered as `admin_users` (with the user added to the userlist secret), and the backend `host` moved onto a CNAME in the `4shark.internal` zone. The CNAME move is itself a task-replacing deploy and belongs on an ordinary day, not on cutover day.
+The billing question in finding 15 is answered only for the single-instance case. Aurora states that transfer between Availability Zones for **DB cluster replication** is free, and that covers a cluster replicating to its own members — not logical replication between two separate clusters, which is what this migration runs. Nothing here establishes how the second case is billed. Answer it from AWS's own pricing pages before the first Aurora copy, and arrange the placement so the answer cannot cost anything: same zone on both sides, proven by describing them, exactly as on beta. The largest productive environment holds roughly 350 GB, and the identifier rule of finding 14 exists precisely so that volume is never copied twice.
 
-Then Phase 5 in full — pause, confirm zero lag, regenerate and run the sequence advancement, repoint the CNAME, reconnect, resume. The sequence statements must be **regenerated** at that moment; the ones produced during preparation are proof the generator works, not values to reuse.
+Demo is next and is the first Aurora run — it validates the cluster-shaped half of every phase. Shared and atento follow. Each needs finding 16's check resolved on a scheduled window BEFORE its cutover: the pooler tasks must be newer than the userlist secret, or the console is unreachable exactly when the pause window needs it.
 
-Then Phase 6 (retire the source), followed by demo, then shared and atento.
+The module changes that make finding 16 stop recurring — pinning the secret version in the task definition, enabling ECS Exec — are their own change and land before the productive environments.
+
+`rds-key-migration.sh` covers `preflight`, `status`, `verify`, `hold` and `release`, and has run against real infrastructure. What it still owes is `prepare`: the roles, the application database, the md5 verifier transplant and the atomic schema load, all of which beta ran by hand.

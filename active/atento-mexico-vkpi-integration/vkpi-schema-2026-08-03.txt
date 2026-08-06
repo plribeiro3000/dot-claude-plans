@@ -1,0 +1,119 @@
+VKPI Mexico — schema dump
+Server: MXDCQSIMBVP003
+Database: dbIndicadoresAt
+SQL Server: Microsoft SQL Server 2016 (SP2) (KB4052908) - 13.0.5026.0 (X64)
+            Enterprise Edition: Core-based Licensing (64-bit)
+            on Windows Server 2019 Standard 10.0 (Build 17763)
+Captured: 2026-08-03 by Paulo Ribeiro (SSMS, direct connection)
+Source: the queries in ../atento-colombia-vkpi-integration/vkpi-schema-queries.sql
+
+Scope: STRUCTURE of the VKPI Mexico source. The rows on this server are sample
+data; data analysis is done against files Atento sends, never against this base.
+Keep this file as the reference for the VKPI Mexico source structure.
+
+
+================================================================================
+QUERY 1 — TABLES AND VIEWS
+================================================================================
+
+table_schema  table_name                 table_type
+dbo           tbl_agentkpis_incentivos   BASE TABLE
+
+Exactly one object. No views, no catalogue table, no auxiliary tables.
+
+
+================================================================================
+QUERY 2 — COLUMNS
+================================================================================
+
+table_schema  table_name                position  column_name           data_type  max_length  numeric_precision  numeric_scale  is_nullable  column_default
+dbo           tbl_agentkpis_incentivos  1         idAgent               bigint     NULL        19                 0              NO           NULL
+dbo           tbl_agentkpis_incentivos  2         Fecha                 nvarchar   10          NULL               NULL           YES          NULL
+dbo           tbl_agentkpis_incentivos  3         SAP                   bigint     NULL        19                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  4         PBX                   int        NULL        10                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  5         UserID                bigint     NULL        19                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  6         Indicador             int        NULL        10                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  7         Servicio              int        NULL        10                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  8         Campaña               int        NULL        10                 0              YES          NULL
+dbo           tbl_agentkpis_incentivos  9         Numerador             float      NULL        53                 NULL           YES          NULL
+dbo           tbl_agentkpis_incentivos  10        Denominador           float      NULL        53                 NULL           YES          NULL
+dbo           tbl_agentkpis_incentivos  11        Fecha_Actualizacion   datetime   NULL        NULL               NULL           YES          (getdate())
+
+11 columns. `idAgent` is the only NOT NULL column. `Fecha_Actualizacion` is the
+only column with a default.
+
+
+================================================================================
+QUERY 3 — INDEXES, PRIMARY KEYS, UNIQUE CONSTRAINTS
+================================================================================
+
+table_schema  table_name                index_name                   type_desc  is_unique  is_primary_key  is_unique_constraint  column_name  key_ordinal
+dbo           tbl_agentkpis_incentivos  PK_tbl_agentkpis_incentivos  CLUSTERED  1          1               0                     idAgent      1
+
+One index: a single-column clustered primary key on `idAgent`. No other index,
+no unique constraint on any business-key combination.
+
+
+================================================================================
+QUERY 4 — FOREIGN KEYS
+================================================================================
+
+EMPTY RESULT SET.
+
+No foreign key is declared. There is no second table for one to point at.
+
+
+================================================================================
+QUERY 5 — ROW COUNTS
+================================================================================
+
+table_schema  table_name                row_count
+dbo           tbl_agentkpis_incentivos  617
+
+Sample data. The count says nothing about production volume.
+
+
+================================================================================
+READING NOTES
+================================================================================
+
+1. STRUCTURE SHAPE. The table is the equivalent of Colombia's
+   `tb_dim_indicadores_score` and nothing else. Colombia's catalogue
+   (`tb_dim_indicadores`) has no counterpart here, so an `Indicador` value
+   resolves to nothing — there is no place holding the indicator's name,
+   calculation, or any attribute.
+
+2. THE PRIMARY KEY IDENTIFIES A ROW, NOT A MEASUREMENT. `PK_tbl_agentkpis_incentivos`
+   covers `idAgent` alone, and that column is a surrogate identity —
+   `COLUMNPROPERTY(OBJECT_ID('dbo.tbl_agentkpis_incentivos'), 'idAgent', 'IsIdentity')`
+   returns 1. So the key is a row counter: it makes every row distinct while
+   guaranteeing nothing about period + person + service + indicator, which is
+   the combination the integration reads. This is Colombia's original defect,
+   where the proposed key repeated on 98% of its values.
+
+   The upside of the same fact: the table CAN hold one row per indicator per
+   period per person. Nothing in its shape prevents that; what is missing is
+   the constraint that would make it true.
+
+3. `idAgent` IS NOT A PERSON IDENTIFIER, DESPITE THE NAME. It is the identity
+   sequence from note 2 — a trap for whoever writes the load, because the name
+   reads as the agent's code. The person candidates are `SAP`, `PBX` and
+   `UserID`. Colombia settled this by confirming `NR_RE` is the Simplex code
+   the platform already receives; Mexico needs the same confirmation, naming
+   which one of the three it is.
+
+4. THE DATE IS A STRING. `Fecha` is `nvarchar(10)`, so its format is a
+   convention rather than a type — the ambiguity Colombia closed by delivering
+   `yyyymmdd`. `Fecha_Actualizacion` is a real `datetime` defaulting to
+   `getdate()`, which sets it at insert; whether it moves on update depends on
+   their load process. There is no creation date.
+
+5. THE VALUE IS SPLIT IN TWO. `Numerador` and `Denominador` are the shape
+   Colombia had before collapsing them into a single `RESULTADO`. The question
+   4Shark asked Colombia on 28-jul — which value represents the person's
+   performance — applies here unanswered.
+
+6. TWO SERVICE-SHAPED DIMENSIONS. `Servicio` and `Campaña` are both present,
+   where Colombia has one (`NR_SERVIVIO_CODIGO`). Whether a variable is per
+   indicator, per indicator+service, or per indicator+service+campaign is a
+   definition that must exist before the platform identity can be satisfied.

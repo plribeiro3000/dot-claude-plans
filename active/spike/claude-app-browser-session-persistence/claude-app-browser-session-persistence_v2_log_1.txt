@@ -1,0 +1,37 @@
+GitHub issue search log — anthropics/claude-code
+Run: 2026-08-05, via `gh search issues --repo anthropics/claude-code "<query>" --json number,title,state,url`
+
+Purpose: answer Research Question 3 — search for reports of (a) the Browser pane requiring repeated login, (b) per-project browser profiles, (c) cookie jars not shared between projects, (d) the desktop app resetting a browser-related setting on update. Deliberately used DIFFERENT terms than the prior spike (2026-07-17), which tried: "browser session cookie", "browser login", "Browser pane", "in-app browser cookies", "Claude_Browser", "browser pane github login", "ephemeral browser partition", "Browser pane persist", "browser profile storage partition", "re-login every day browser", "cookies not saved browser pane" — all zero or off-topic results, per the prior SPIKE.md Finding 5.
+
+Queries run today, each with its raw result count:
+
+1. "browser pane per project" — 0 results
+2. "browser pane isolated" — 0 results
+3. "browser cookies lost" — 0 results
+4. "browser session expire" — 0 results
+5. "browser profile scoped project" — 0 results
+6. "each project separate browser" — 0 results
+7. "github login browser pane" — 0 results
+8. "worktree browser session" — 0 results
+9. "clean browser profile" — 2 results, both off-topic (a `/usage` bug report and a 2026 React-hydration bug; neither mentions the Browser pane's login persistence)
+10. "launch-preview" — 30 results, all about the LOCAL DEV SERVER preview feature (crashes, cwd/worktree bugs for the dev-server process, GPU crashes when the Browser pane holds tabs) — none about external-site (e.g. github.com) cookie/session persistence. Two are adjacent in topic though not on point: #75908 "preview_start pins a stale per-project working directory to a deleted git worktree; ignores config cwd" and #78767 "Preview: switching projects leaks previous project's window and orphans its dev-server process, blocking new project's ports" — both are about the local dev-server PREVIEW process's working directory, not about the Browser pane's external-site cookie storage.
+11. "browser pane login" — 0 results
+12. "have to log in every day browser" — 0 results
+13. "sign in again browser pane" — 0 results
+14. "cookies not persisted" — 0 results
+15. "logged out every session" — 1 result, off-topic (Windows `.credentials.json` overwritten by a test fixture — the Claude account's own credential file, unrelated to the Browser pane)
+16. "GitHub PR built-in browser" — 0 results
+17. "private repo 404 browser" — 1 result, matched by issue NUMBER 404 (a stdin/Ink error), not by text content — false positive from `gh search`'s numeric matching
+18. "view pull request in browser pane" — 0 results
+19. "github private repository not authenticated browser" — 0 results
+20. "clear session data toggle" — 0 results
+21. "Persist sessions toggle" — 0 results
+22. "external site login not saved" — 0 results
+23. "session storage cleared restart app" — 0 results
+24. "cowork-file-preview" — 30 results, all about the Cowork tab's file-preview pane (Excel/HTML/docx rendering, GPU crashes) — a different pane entirely, and the query matched broadly on "cowork" + "preview" tokens rather than the literal partition-directory name; none relevant
+25. "share browser profile across sessions" — 0 results
+26. "settings reset after update Browser" — 0 results
+27. "single browser profile all projects" — 0 results
+28. "FEATURE persist browser login" — 0 results
+
+CONCLUSION: across 11 prior-spike queries + 28 queries run today (39 distinct search strings total), no GitHub issue was found describing (a) the Browser pane requiring repeated github.com (or any external site) login, (b) per-project/per-directory browser-profile scoping as a bug or feature request, (c) cookie jars failing to share or persist between project folders, or (d) an app update resetting a Browser-pane setting. This is consistent with the prior spike's Finding 5 and extends its search coverage substantially without finding a match. Absence of a matching issue is not proof the behavior is unreported — `gh search issues` full-text search coverage and ranking are not verified exhaustive — but no citable issue was found in either round.

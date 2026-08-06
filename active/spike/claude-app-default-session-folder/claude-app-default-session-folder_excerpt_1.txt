@@ -1,0 +1,173 @@
+Source: read-only inspection of the installed app bundle at /Applications/Claude.app/, 2026-08-05.
+App bundle version: CFBundleShortVersionString 1.25927.0 (from Info.plist), Resources directory mtime 2026-08-04.
+Method: `grep -o -b -a` for byte offsets, `tail -c +N | head -c M` to read a window, per the method notes in the spike briefing.
+
+=== 1. Info.plist -- CFBundleDocumentTypes and CFBundleURLTypes ===
+
+File: /Applications/Claude.app/Contents/Info.plist (read via `plutil -p`, no grep needed -- small file)
+
+Relevant excerpt (verbatim from plutil -p output):
+
+"CFBundleDocumentTypes" => [
+  ...
+  2 => {
+    "CFBundleTypeName" => "Folder"
+    "CFBundleTypeRole" => "Editor"
+    "LSItemContentTypes" => [
+      0 => "public.folder"
+    ]
+  }
+  ...
+]
+"CFBundleURLTypes" => [
+  0 => {
+    "CFBundleURLName" => "Claude"
+    "CFBundleURLSchemes" => [
+      0 => "claude"
+    ]
+  }
+  1 => {
+    "CFBundleURLName" => "MSAL"
+    "CFBundleURLSchemes" => [
+      0 => "msauth.com.anthropic.claudefordesktop"
+    ]
+  }
+]
+
+Significance: Claude.app is registered with macOS Launch Services as an "Editor" for `public.folder` (any folder). This is what makes `open -a Claude <folder-path>` or Finder's "Open With -> Claude" (or dragging a folder onto the Dock icon) a real, OS-level launch mechanism -- it fires Electron's `open-file` event inside the running/starting app (see section 2 below for what that event handler actually does).
+
+Also note: `Claude.app` registers the `claude://` scheme -- a DIFFERENT scheme from `claude-cli://` (registered separately, by a distinct helper app `~/Applications/Claude Code URL Handler.app`, per doc_3.txt). The two are not interchangeable.
+
+=== 2. app.asar -- the `open-file` Electron event handler ===
+
+File: /Applications/Claude.app/Contents/Resources/app.asar
+Byte offset of the `open-file` handler registration: 10127369 (first hit), context read via `tail -c +10126800 | head -c 2200`
+
+Verbatim code (deminified variable names preserved as shipped):
+
+  function Ki(e,t,n){F.app.isReady()?t(e):Bi.push({filePath:e,handler:t,label:n})}
+  async function qi(){ ... }
+  function Ji(){
+    if(F.app.on(`open-file`,(e,t)=>{
+      e.preventDefault(),
+      de.g(t)?Ki(t,ea,`skill file`)
+        :de.h(t)?Ki(t,$i,`DXT/MCPB file`)
+        :(Hi.push(t),Ui===null&&(Ui=setTimeout(()=>{let e=Hi;Hi=[],Ui=null,Xi(e)},0)))
+    }),
+    F.app.whenReady().then(()=>{qi()}),
+    process.platform!==`darwin`||!F.app.isPackaged){
+      let e=N.default.resolve(F.app.getAppPath());
+      Vi=Yi(process.argv.slice(1).filter(t=>!t.startsWith(`-`)&&!h.$a(t)&&Gi(t)&&N.default.resolve(t)!==e))
+    }
+  }
+  async function Yi(e){
+    let t=new Map(await Promise.all(e.map(async e=>[e,await Wi(e)]))),
+    n=(e,t,n)=>{Bi.push({filePath:e,handler:t,label:n})},
+    r=e.find(e=>de.g(e));r&&t.get(r)&&n(r,ea,`skill file`);
+    let i=e.find(e=>de.h(e));i&&t.get(i)&&n(i,$i,`DXT/MCPB file`);
+    let a=e.find(e=>t.get(e)?.isDirectory());
+    if(a){n(a,Zi,`folder`);return}
+    for(let r of e)!de.g(r)&&!de.h(r)&&t.get(r)&&n(r,e=>Qi([e]),`file`)
+  }
+  async function Xi(e){
+    try{
+      await F.app.whenReady(),await u.x();
+      let t=await Promise.all(e.map(Wi));
+      for(let n of e.filter((e,n)=>t[n]?.isDirectory()))await Zi(n);
+      let n=e.filter((e,n)=>!t[n]?.isDirectory());
+      n.length>0&&await Qi(n)
+    }catch(e){o.o.error(`Failed to handle batched open-file paths: %o`,e)}
+  }
+  async function Zi(e){
+    if(o.o.info(`Handling folder drop: ${e}`),!u.d?.webContents||u.d.webContents.isDestroyed()){
+      o.o.warn(`mainView not available for folder drop dispatch`);return
+    }
+    let t=f.j.getDispatcher(u.d.webContents);
+    if(!t){o.o.warn(`LocalAgentModeSessions dispatcher not available`);return}
+    t.dispatchOnCoworkFromMain({selectedDirectories:[e]}),
+    u.f&&!u.f.isDestroyed()&&(u.f.show(),u.f.focus())
+  }
+
+Significance: A folder passed to the app at launch (via `open -a Claude <folder>`, drag-and-drop onto the Dock icon, Finder "Open With", or -- on Windows/Linux/unpackaged builds -- a bare CLI argv path) is routed through `Zi()`, which logs "Handling folder drop: <path>" and calls `t.dispatchOnCoworkFromMain({selectedDirectories:[e]})`. The literal function/variable name `LocalAgentModeSessions` (the dispatcher `f.j.getDispatcher` looks up) and the method name `dispatchOnCoworkFromMain` both name **Cowork** (the Dispatch/persistent-conversation tab), NOT the Code tab. There is no branch in this code path that opens a NEW CODE-TAB SESSION anchored at the dropped folder -- the folder is handed to Cowork as a `selectedDirectories` array, and per the desktop docs (doc_1.txt), Cowork can later spawn a Code session from a task "you ask for one directly... or Dispatch decides the task is development work and spawns one on its own" -- an indirect, judgment-mediated path, not a direct one.
+
+=== 3. app.asar -- the `claude://resume` deep-link handler (a DIFFERENT mechanism from #2) ===
+
+File: /Applications/Claude.app/Contents/Resources/app.asar
+Byte offset: 10060577 (first of 21 hits for the string `claudeURLHandler`), context read via `tail -c +10060200 | head -c 3000`
+
+Verbatim (relevant fragment):
+
+  function te(e){let n=t.t();switch(e){
+    case`auth_expired`:return n.formatMessage({defaultMessage:`Couldn't open that session. Sign in to the desktop app and try again.`, ... description:`Error toast when a claude://resume deep link fails because the desktop app's own sign-in has expired or account info is unavailable.`});
+    case`network`:return n.formatMessage({defaultMessage:`Couldn't open that session. Check your network connection and try again.`, ... description:`Error toast when a claude://resume deep link fails because account info is unreachable (network).`});
+    case`transcript_missing`:return n.formatMessage({defaultMessage:`Couldn't open that session. Its transcript may have been removed.`, ... description:`Error toast when a claude://resume deep link references a CLI session whose transcript is not on disk.`});
+    ...
+  }
+
+Significance: The `claude://` scheme (registered by Claude.app itself, per Info.plist section 1) supports a `resume` path that RE-OPENS an existing session by referencing its CLI transcript. This is a resume/handoff mechanism, not a way to pin a NEW session's default project folder. No `folder=`, `cwd=`, or `path=` query parameter was found associated with `claude://` in the strings searched.
+
+=== 4. ion-dist renderer bundle -- the shared folder-picker component ("frecentTargets") ===
+
+File: /Applications/Claude.app/Contents/Resources/ion-dist/assets/v1/c0243d234-CX00KggP.js
+Byte offset: 0 (start of file), context read via `head -c 2600`
+
+Verbatim (relevant fragment, deminified names preserved as shipped):
+
+  var z=e(t()),q=o(),
+  G=i({
+    folder:{defaultMessage:"Folder",id:"ukQpDs7M+0"},
+    selectFolder:{defaultMessage:"Select folder",id:"K3Z1XCYM9J"},
+    noFolders:{defaultMessage:"No recent folders. Browse to choose one.",id:"uZDrCkKZ4T"},
+    browseFolder:{defaultMessage:"Choose a different folder…",id:"HfRYBfuQQR"},
+    ...
+  }),
+  ...
+  U=(0,z.memo)(function({value:e,frecentTargets:s,onSelect:a,onBrowse:t,disabled:o}){
+    const r=l();
+    return (0,q.jsx)(u,{
+      items:(0,z.useMemo)(()=>{const a=s.map(e=>e.path);return e&&!a.includes(e)?[e,...a]:a},[s,e]),
+      itemToLabel:(0,z.useCallback)(e=>y(e,void 0),[]),
+      renderItemIcon:()=>(0,q.jsx)(O,{name:"Folder1",size:"s"}),
+      value:e??null,
+      onSelect:a,
+      icon:"Folder1",
+      triggerLabel:e?y(e,void 0):r.formatMessage(G.selectFolder),
+      triggerAriaLabel:r.formatMessage(G.folder),
+      ...
+      placeholder:r.formatMessage(G.folder),
+      emptyMessage:r.formatMessage(G.noFolders),
+      disabled:o,side:"top",
+      footer: ...
+    })
+  })
+
+Significance: The composer's folder picker (component `U`) is fed by a prop literally named `frecentTargets` -- "frecent" is the established term (popularized by Firefox's address bar / Mozilla Places) for a ranked list combining FREQUENCY and RECENCY. The UI copy "No recent folders. Browse to choose one." confirms the dropdown's contents are the engineer's own recently/frequently used folders, not a single admin- or app-set default. When no `value` is supplied the trigger falls back to the literal placeholder string "Select folder" (`value:e??null`, `triggerLabel:e?y(e,void 0):r.formatMessage(G.selectFolder)`) -- i.e. the component's OWN default state, absent an incoming value, is unselected.
+
+This same component (`U`) is imported and reused by at least one other composer in the bundle -- the scheduled-routine ("Routine") creation dialog in this same file (`EpitaxyLocalRoutineFormDialog`, further down in the same file, not separately offset-cited here) passes it `value:e.cwd` where `e.cwd` is that composer's own local state. This spike did NOT locate, byte-verify, or read the initializer for the PLAIN sidebar "+ New session" (Cmd+N) composer's own `cwd`/folder state -- multiple `LocalSessions.start` call sites were found and traced (scheduled-task "Run now", a Cowork-launched task-suggestion "Fix in this session" flow, a "background task suggestion" chip), and the one confirmed per-folder persistence mechanism found in this bundle (`ccdFolderPath`, section 5 below) is scoped to a different composer (starting a Code session from within a claude.ai "Space" page), not to the plain sidebar composer described in the desktop docs' "Start a session" section.
+
+=== 5. ion-dist renderer bundle -- `ccdFolderPath`, a per-Space (NOT per-app) folder-remembering mechanism ===
+
+File: /Applications/Claude.app/Contents/Resources/ion-dist/assets/v1/c17beaa76-CssaINS2.js
+Byte offset: 98700 (context window start), read via `tail -c +98700 | head -c 1800`
+
+Verbatim (relevant fragment; `e` here is the claude.ai "Space" object, `S` is a mutation client):
+
+  h=(0,Ar.useCallback)(()=>{
+    const s=i.trim();
+    s&&!c&&(
+      1!==e.folders.length
+        ?e.ccdFolderPath?x(e.ccdFolderPath,s):(p.current=s,m(!0))
+        :x(e.folders[0].path,s)
+    )
+  },[i,c,e.folders,e.ccdFolderPath,x]),
+  f=(0,Ar.useCallback)(async(s,t)=>{
+    m(!1),
+    t&&S?.updateSpace?.(e.id,{ccdFolderPath:s}),
+    await x(s,p.current)
+  },[e.id,x]),
+  ...
+  placeholder: ... Zt(1===e.folders.length?e.folders[0].path:e.ccdFolderPath??t.formatMessage({defaultMessage:"Choose on start",id:"UtWNsA/DcV"}),void 0)
+
+Significance: this is a real, byte-verified persistence mechanism, but it is scoped to a DIFFERENT session-creation surface than the plain sidebar "+ New session"/Cmd+N flow the spike question is about. It fires inside a composer embedded in a claude.ai "Space" (Project) page -- the error-tag string `space_ccd_composer` appears earlier in the same function (not separately offset-cited). Behavior: if the Space has exactly ONE attached folder (`1===e.folders.length`), that folder is used automatically, every time, with no picker (`x(e.folders[0].path,s)`). If the Space has MULTIPLE folders, the composer checks `e.ccdFolderPath` -- a value persisted on the Space object itself via `updateSpace(e.id,{ccdFolderPath:s})` the first time the engineer picks a folder -- and reuses it silently on every subsequent session start from that same Space's composer, without re-prompting. If no `ccdFolderPath` is set yet and the Space has multiple folders, the placeholder reads "Choose on start" and a picker opens on first use.
+
+This does NOT answer the spike's Sub-question 1 in the affirmative for the plain Cmd+N flow: it is a distinct, Space-scoped composer, and this spike found no evidence connecting it to the sidebar's ordinary "+ New session" button. It IS evidence that the underlying product has, elsewhere, already built a "remember my folder choice for next time" pattern -- just not exposed as a general per-app or per-workspace-root default in the surface the question is about.
