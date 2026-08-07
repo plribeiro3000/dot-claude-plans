@@ -152,7 +152,7 @@ It surfaced as an authentication failure on the console with the password Terraf
 
 The cost is that the console is the only way to `PAUSE`, so a cutover cannot be zero-downtime while it is unreachable, and the only way to hand a running container a new userlist is to replace it — which drops every client connection it holds.
 
-**For the script**: before anything else in the cutover phase, compare each pooler task's `startedAt` against the userlist secret's `LastChangedDate` and prove console access with a real `SHOW DATABASES`. A task older than the secret is a Blocker to resolve on a scheduled window, never inside the pause. The durable repairs are pinning the secret's version in the task definition (a content change then produces a revision the service adopts) and enabling ECS Exec (pgbouncer reloads `auth_file` on SIGHUP, so a stale container is repairable in place with no connection dropped).
+**For the script**: before anything else in the cutover phase, compare each pooler task's `startedAt` against the userlist secret's `LastChangedDate` and prove console access with a real `SHOW DATABASES`. A task older than the secret is a Blocker to resolve on a scheduled window, never inside the pause. The durable repair is pinning the secret's version in the task definition, so a content change produces a revision the service adopts — see finding 21 for what that replacement actually costs, which is less than it sounds.
 
 ### 17. A direct-connection secret lives outside SSM and Terraform, and a search of both will miss it
 
@@ -178,12 +178,161 @@ The initial copy of 168 tables on this dataset finished fast enough to be invisi
 
 Beta is complete: one instance, the conventional identifier, the environment's own key, the predecessor destroyed through the two applies of finding 18 with its AWS Backup recovery points retained. The application stayed connected across both the cutover and the destroy.
 
+### 19. Aurora's free-transfer statement does NOT cover this migration — pin the zone instead of trusting it
+
+Aurora's pricing page makes exactly three statements about data transfer, and reading any of them as covering a key migration is the trap: *"Data transferred between Aurora and Amazon Elastic Compute Cloud (Amazon EC2) instances in the same Availability Zone is free"*, *"Data transferred between Availability Zones for DB cluster replication is free"*, and *"For data transferred between an Amazon EC2 instance and Aurora DB instance in different Availability Zones of the same Region, Amazon EC2 Regional Data Transfer charges apply."*
+
+The second is the one that looks like an answer and is not. *DB cluster replication* is a cluster replicating to its own members — the storage layer keeping replicas current. A key migration runs **logical replication between two separate clusters**, which is neither of the three cases. AWS's page does not state how that is billed, and no third-party blog is evidence about it.
+
+So the answer is not to find the price, it is to remove the question: place the replacement's writer in the same Availability Zone as the source's writer, and the traffic never crosses a zone. That is what beta did, and it is checkable in one call per side.
+
+The writers today, which are the placements each replacement must match: demo `us-east-1a`, shared `us-east-1b`, atento `us-east-1b`. Note that shared and atento each keep a reader in the *other* zone, so "the cluster's zone" is not a single value — it is the WRITER's zone that matters, because logical replication reads from the writer.
+
+`modules/rds_aurora_cluster` does not expose the argument yet. Its `aws_rds_cluster` has `availability_zones` in `ignore_changes`, which is a different thing — the list of zones the cluster MAY use, not where an instance sits. The one that matters is `availability_zone` on `aws_rds_cluster_instance`, documented by the provider as *"(Optional, Computed, Forces new resource) EC2 Availability Zone that the DB instance is created in."*
+
+**For the script**: read the SOURCE WRITER's zone, require the replacement to match it, and refuse to proceed otherwise — the argument is ForceNew on the cluster instance exactly as on the plain instance, so a mismatch is not correctable and the largest environment would pay for 350 GB on both ends.
+
+### 20. AWS states the pooler failure outright — the fix is a version-pinned reference
+
+Finding 16 was diagnosed from timestamps. AWS documents the behavior directly, which turns it from a discovery into a known property: *"Sensitive data is injected into your container when the container is initially started. If the secret is subsequently updated or rotated, the container will not receive the updated value automatically. You must either launch a new task or if your task is part of a service you can update the service and use the Force new deployment option to force the service to launch a fresh task."*
+
+The reference format carries the escape. The full syntax is `arn:aws:secretsmanager:{{region}}:{{aws_account_id}}:secret:{{secret-name}}:{{json-key}}:{{version-stage}}:{{version-id}}`, and *"If no version ID is specified, the default behavior is to retrieve the secret with the `AWSCURRENT` staging label"* — which is what a bare ARN does, and why a content change leaves the task definition identical. Pinning the version id (`...:secret:name-AbCdEf:::<version-id>`, the empty json-key and version-stage segments still required) makes each content change produce a different task definition, so Terraform shows it and the service rolls deliberately instead of drifting silently.
+
+One prerequisite comes with it: injecting *"a specific JSON key or version of a secret"* requires Fargate platform version `1.4.0` or later. Confirm each pooler service's platform version before pinning — a service pinned to an older version would fail to start rather than drift.
+
+**For the script**: this is a module change rather than a script one, but the `preflight` check stays either way — a task older than the secret is still the thing that removes `PAUSE` from the table, and the check costs two API calls.
+
+### 21. The pooler service adopts every revision Terraform declares — which is what makes the version pin work AND what makes every pooler apply a scheduled event
+
+A version-pinned secret reference only helps if the service actually picks up the revision it produces. Many 4Shark ECS services carry `lifecycle { ignore_changes = [task_definition] }`, because their deploy pipeline registers revisions and Terraform must not fight it. The pooler is deliberately not one of them, and `modules/connection_pooler/main.tf:475-477` says so inline: *"No `ignore_changes = [task_definition]` here: that rule is for a service whose pipeline registers its own task definitions. This one redeploys by family, so Terraform is the only author and the service must adopt what it declares."*
+
+Both halves matter and they point opposite ways. It is why pinning the version fixes the staleness at all — the revision is adopted, not merely registered. It is equally why **any** pooler apply that touches the task definition replaces the running tasks: environment variable, image, secret reference, all of them do.
+
+That replacement is graceful by construction, and the numbers say how graceful. Each pooler runs **two** tasks under `maximumPercent` 200 / `minimumHealthyPercent` 100 (provider defaults — the module sets neither; confirmed live on shared-001), so ECS starts two replacements and gates them on a real listener probe (`pg_isready`, `main.tf:389-398`) before touching the incumbents. The incumbents then get the image's `STOPSIGNAL` — `SIGINT`, declared at `pgbouncer/Dockerfile:25` — which pgbouncer documents as `SHUTDOWN WAIT_FOR_SERVERS`: *"Stop accepting new connections and shutdown after all servers are released."* Under `pool_mode = transaction` a server is released at every transaction boundary, so the drain is as long as the longest in-flight transaction and no longer, with `stopTimeout = 120` as the ceiling before SIGKILL. Cloud Map is MULTIVALUE at TTL 10 (`main.tf:206-210`), so clients follow within about ten seconds.
+
+**So a pooler apply costs no service interruption and no aborted transaction. What it costs is a reconnect** — the idle pooled client connections on the outgoing tasks close when the process exits. Whether the application absorbs that without a user-visible error is a property of the application, not of this module, and beta answered it.
+
+**Measured on beta, applying the version pin.** The service went from revision 5 to 6 with `runningCount` never below the desired 2; a mid-rollout sample caught the exact shape the guarantee predicts — the PRIMARY deployment on revision 6 at 0 running while the ACTIVE deployment on revision 5 still served 2. Both replacement tasks reported `HEALTHY`. The task definition's reference resolved to `...:secret:beta-001-connection-pooler-userlist-a2KXpy:::terraform-ItMhQFdhYiVMcBPiQ2PLHp1EYd`, matching the secret's `AWSCURRENT` version id exactly, and the replacement tasks started 2026-08-06 09:39–09:40 against a secret last changed 2026-08-04 16:07 — the staleness inverted. `SHOW DATABASES` on the console answered, so `PAUSE` is reachable. **The application logged zero connection errors**: the web log group carried 473 events across the rollout window with no `ConnectionBad` / `ConnectionNotEstablished` / `server closed the connection` / `ConnectionFailed` / `could not connect` match, and the system worker carried none either. Beta's app does route through the pooler (its `DATABASE_URL` host is the pooler's convention CNAME on port 6432), so the absence of errors is a real result rather than an untested path.
+
+**The same apply then ran on the other three, and volume did not change the outcome.** Every stack took the identical `1 to add, 1 to change, 1 to destroy` plan touching only the pooler's task definition and service, settled at two running tasks under a single deployment, and pinned its reference to its own secret's `AWSCURRENT` version id. Across the rollout window the web log groups carried **715 events on demo, 11,480 on shared and 31,429 on atento — zero connection errors in any of them**, and atento's system worker likewise. Atento is roughly sixty-six times beta's traffic, so the graceful-replacement property holds at productive volume rather than only in a quiet environment.
+
+One consumer was NOT exercised and should not be read as having passed: the outbound payroll worker that reaches shared's pooler across the region boundary logged nothing at all in the window, because that project rests at zero replicas by design. Its reconnect path is the longest in the fleet and remains untested; the first time it runs after a pooler replacement is the first real observation of it.
+
+**For the script**: unchanged. The scheduling rule is weaker than it first looks — a pooler apply is not a downtime window, and on a productive stack the Sidekiq queue check it rides is about not interrupting in-flight background work, not about the pooler itself.
+
+### 22. `terraform init` inside a module directory writes a lock file that does not belong to the repository
+
+Validating or formatting a module in place (`terraform.sh <repo>/modules/<name> validate`) runs `init` there, which creates `modules/<name>/.terraform.lock.hcl`. Modules in this repository do not carry lock files — only stacks do — so it shows up as an untracked file and would be committed by an `add .`. Delete it after the check; stage files by name rather than by wildcard.
+
+**For the script**: nothing. This is a working-practice note for module edits.
+
+### 23. `pg_dumpall` writes ONE ALTER ROLE per role, and the RDS master cannot execute it — the application role arrives unable to log in
+
+The roles dump emits a `CREATE ROLE` followed by a single `ALTER ROLE` carrying every attribute at once:
+
+```sql
+CREATE ROLE <app-role>;
+ALTER ROLE <app-role> WITH NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS;
+```
+
+PostgreSQL refuses that whole statement when the caller does not hold an attribute it names — *"Only roles with the SUPERUSER attribute may change the SUPERUSER attribute"*, and the same sentence for REPLICATION. The RDS master holds none of SUPERUSER, REPLICATION or BYPASSRLS, so the `ALTER` fails, the role exists from the `CREATE` alone, and **`LOGIN` is never applied**. The role is then present with the right name and the right password verifier and still cannot authenticate: `FATAL: role "<app-role>" is not permitted to log in`.
+
+Nothing upstream of the login attempt reports this. The dump succeeds, the load's per-statement errors look like the expected RDS-internal noise, and the schema loads normally because ownership only needs the role to EXIST.
+
+**The three tokens must be stripped before loading**, and stripping them is lossless — all three are already off for a role created here, and the master could not grant any of them:
+
+```
+sed -e 's/ NOSUPERUSER//g' -e 's/ NOREPLICATION//g' -e 's/ NOBYPASSRLS//g'
+```
+
+Stripping only `NOSUPERUSER` is not enough and is the trap inside the trap: the statement then fails on REPLICATION instead, with a near-identical message, which reads like the first fix not having taken.
+
+**For the script**: `prepare` filters the dump through that `sed` before loading it. It also counts errors with `grep -c 'ERROR:'` rather than `'^ERROR'` — psql prefixes every diagnostic with `psql:<file>:<line>: `, so the anchored form matches nothing and reports a clean load over a failed one. That false zero is what let the broken load pass unnoticed on the first run.
+
+### 24. Prove the application role by logging in as it, because every cheaper check passes on a broken target
+
+The verification the plan prescribes is not ceremony. On demo the role existed, owned all 168 tables, and carried the correct md5 verifier, and it still could not connect. A catalog query about the role, a check that the schema loaded, and a check that the verifier matched would each have reported success.
+
+```
+psql service=<target-as-app-role> --command "SELECT current_user, current_database();"
+```
+
+Then the grants, in the same connection — the count of tables against the count the role can `SELECT`. On demo both were **168**, which is what proves the schema load carried ownership and privileges rather than merely creating the tables.
+
+**For the script**: not yet automated. It needs the application's own password, which lives in `/<env>/DATABASE_URL` in SSM, and `prepare` deliberately never reads that — the md5 transplant works from the pooler's userlist precisely so the plaintext is never touched. The login test is the engineer's, or a separate verb that takes the SSM read explicitly.
+
+### 25. `psql --command` does not interpolate psql variables, and the obvious workarounds put the password where `ps` can read it
+
+The subscription is the one statement that carries a live password inside SQL. Passing the connection string as a psql variable and referencing it as `:'conninfo'` is the idiomatic way to get correct SQL quoting — and it does nothing under `--command`, which sends its argument to the server verbatim. The failure is a bare parse error, `syntax error at or near ":"`, which reads like a typo rather than a mode restriction.
+
+The two obvious repairs are both worse than the problem. Passing the conninfo as an argument — to `--set`, or interpolated straight into `--command` — places the password in the process's argv, where `ps` shows it to every user on the machine for as long as the command runs. Writing the statement to a file puts it on disk, where a failure between write and cleanup leaves it.
+
+**The statement goes through STDIN, written by a shell builtin.** A builtin forks nothing, so no process carrying the value ever appears in the process table, and nothing is written for a failure to leave behind. Both quoting layers are handled explicitly: inside the conninfo the password is single-quoted with `'` and `\` backslash-escaped, and the whole conninfo becomes a SQL literal with every `'` doubled. RDS permits any printable ASCII except `/ " @` and space, so an apostrophe in a generated password is possible rather than theoretical.
+
+**For the script**: `replicate` owns Phase 2 — publication on the source, subscription on the target — and composes the connection string internally. The plan's original framing, that this is the one command an operator must compose by hand, was reasoning about a document: a document cannot hold a password, so it delegated. A script that already reads master passwords from Secrets Manager for every other command has no such limit, and pasting a live credential into a terminal to keep a document self-contained is the worse of the two options.
+
+### 26. The fleet spans two PostgreSQL major versions, so a catalog query must not assume the newer one
+
+The single-instance environment runs PostgreSQL 18 and the three Aurora environments run 17. A query naming the per-conflict counters of `pg_stat_subscription_stats` — `confl_insert_exists` and its siblings, which exist only from 18 — therefore succeeds on the environment it was written against and fails on every other with `column "confl_insert_exists" does not exist`.
+
+The failure is not proportional to what is lost. PostgreSQL rejects the whole statement, so the columns that actually matter go with it: `apply_error_count` and `sync_error_count` are what reveal a halted subscription, and an apply error stops replication while every other indicator still looks healthy. A monitoring query that dies on a version difference is worse than one that reports less.
+
+**For the script**: `status` selects `*` from that view in expanded form, so each server returns whatever it has and the counters that exist everywhere are always present.
+
+### 27. The pooler console's password is only in Terraform state, and every way of handing it to a script leaks it
+
+`hold` and `release` are the two commands that drive the pooler console, and the admin password exists nowhere but the stack's state: the module generates it, publishes the user name as an output, and `terraform state show` redacts the value, so only the JSON form carries it.
+
+Taking it from the caller's environment sounds like the clean separation — the script then needs no knowledge of a stack's directory — and it does not survive contact with how the script is invoked. Every invocation is a fresh shell, so a caller can only supply it as a `VAR=value` prefix, which puts the password in that process's argv for `ps`, in shell history, and in the transcript of whoever ran it.
+
+**The script reads the state itself, via `--stack-dir`, and the value never leaves the process.** Only the two console commands take that argument.
+
+The **logical database name** is discovered rather than passed: it differs from the real database name, and the pooler is the authority on what it serves. `SHOW DATABASES` returns it alongside `pgbouncer`, which is the console's own administrative database and never the application's.
+
+**For the script**: `require_pooler_console` resolves both credentials from `--stack-dir`; `resolve_pooler_database` reads the logical name from the console.
+
+### 28. A pooler's task addresses come back one per line, and the first field of every line is not the first address
+
+`aws ecs describe-tasks` with a `--query` projecting one value per task returns them **newline-separated**, not tab-separated on a single line. Taking `awk '{print $1}'` over that output yields one field per line — every address, not the first — and the result reaches `psql --host` as a single string containing a newline: `could not translate host name "10.100.10.220\n10.100.9.212"`.
+
+The failure is benign only by luck of ordering. It happened inside `hold`, in the step that resolves the logical database name, which runs BEFORE the PAUSE loop — so it exited with the window still closed. Had the same expression been used one step later, it would have failed with clients already held.
+
+**For the script**: `awk '{print $1; exit}'`. The loop that iterates every address was always correct, since word splitting treats newlines as separators; only the take-the-first expression was wrong.
+
+### 29. The database's OWNER is the application role's ability to migrate, and a target created by the master silently loses it
+
+Since PostgreSQL 15 the `public` schema grants `USAGE` and `CREATE` to **`pg_database_owner`** — an implicit role whose only member is whoever owns the database. So the owner is not bookkeeping: it *is* the application role's `CREATE` privilege.
+
+A target whose database was created by the master therefore matches the source on every count `verify` compares, matches it on the schema ACL **text** (`public=pg_database_owner=UC/pg_database_owner,=U/pg_database_owner` on both), and still refuses the application role's DDL. `has_schema_privilege(<app-role>,'public','CREATE')` answers `t` on the source and `f` on the target while `nspacl` is byte-identical, because the ACL names a role whose membership differs.
+
+Nothing surfaces this until a deploy runs `db:migrate`, which is long after the migration has been declared finished.
+
+**For the script**: `prepare` creates the database `OWNER <application-role>` and then asserts it with an `ALTER DATABASE ... OWNER TO`, so a database that already existed is corrected rather than accepted. `verify` compares ownership alongside the counts — database, schema, and the per-owner table and sequence totals — since that comparison is the one that fails when everything else passes.
+
+**The requirement this serves is broader than the migration.** Every object belongs to the environment's single application role on the non-productive environments, and to the write-capable role on the productive ones, where a separate read-only role also exists. Copying ownership from the source carries this automatically for tables and sequences, because `pg_dump` preserves it — the database itself is the one object no dump covers.
+
+### 30. The value of a GitHub environment secret is not recoverable from anywhere
+
+`MIGRATION_DATABASE_URL` is a GitHub environment secret, injected as a container override onto the ephemeral task that runs `db:migrate`. Three places might plausibly hold its value and none does: GitHub secrets are write-only; a stopped ECS task is retained only briefly, and none survived; and **CloudTrail does not record `RunTask` overrides at all** — the `requestParameters` of a `RunTask` event stop at `taskDefinition`, with no `overrides` key, so the value never reaches the audit log.
+
+It does not need to be recovered. Every field is derivable from the system: the host and database from the environment's own records, and the credential from `/<env>/DATABASE_URL` in SSM, because `db:migrate` creates tables as the role that connects and every public table on the source is owned by the application role.
+
+**Two traps sit in that derivation, and both are caught by connecting with the constructed URL before writing it.** The database name in the pooler URL is the pooler's LOGICAL name (`demo001_master`), not the real one (`app_demo_001`) — a direct connection with the logical name fails outright. And the connection is what revealed finding 29: it succeeded, and then `has_schema_privilege` reported the role could not create.
+
+**The host is the internal record, not the endpoint.** `database-primary-<env>.4shark.internal` is maintained by Terraform, points at the database directly on 5432 rather than at the pooler on 6432, and is repointed by the cutover — so the secret follows every future database replacement instead of needing a manual edit each time.
+
+## Where this stands
+
+**Both non-productive environments run on their own key.** The single-instance one is complete, predecessor destroyed. The cluster one is through its cutover — the internal record resolves to `app-demo-001`, and the pooler's console reports every server connection open as the application role against that cluster, which is conclusive because the application reaches the database only through the pooler.
+
+**The fleet-wide prerequisites are done.** Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again (findings 16, 20, 21). `modules/rds_aurora_cluster` accepts `availability_zone`, so a replacement's writer can be pinned to its source's zone (finding 19). Both were applied to every stack before merging.
+
+**The script has run all seven verbs against real infrastructure**, and the four traps the first Aurora migration surfaced are fixed in it: the privileged attribute tokens in the roles dump (23), the anchored error count that hid the failed load (23), `--command`'s missing interpolation (25), and the two PostgreSQL major versions in the fleet (26).
+
 ## Still to do
 
-The billing question in finding 15 is answered only for the single-instance case. Aurora states that transfer between Availability Zones for **DB cluster replication** is free, and that covers a cluster replicating to its own members — not logical replication between two separate clusters, which is what this migration runs. Nothing here establishes how the second case is billed. Answer it from AWS's own pricing pages before the first Aurora copy, and arrange the placement so the answer cannot cost anything: same zone on both sides, proven by describing them, exactly as on beta. The largest productive environment holds roughly 350 GB, and the identifier rule of finding 14 exists precisely so that volume is never copied twice.
+**Retire the non-productive cluster's predecessor**, in an order that cannot be inverted: drop the subscription on the target and the publication on the source, rewrite `MIGRATION_DATABASE_URL` (finding 17 — a GitHub environment secret holding a direct RDS URL, outside SSM and outside Terraform, so a search of both misses it), then the two applies of finding 18. There is no hurry: the stopped predecessor costs little and is a fallback while the environment settles.
 
-Demo is next and is the first Aurora run — it validates the cluster-shaped half of every phase. Shared and atento follow. Each needs finding 16's check resolved on a scheduled window BEFORE its cutover: the pooler tasks must be newer than the userlist secret, or the console is unreachable exactly when the pause window needs it.
+**Then `shared-001`, then `atento-001`.** What differs for them is volume and timing rather than procedure — the largest holds roughly 350 GB, so its initial copy takes real time instead of finishing before it can be observed, and its window is scheduled rather than opened on the spot.
 
-The module changes that make finding 16 stop recurring — pinning the secret version in the task definition, enabling ECS Exec — are their own change and land before the productive environments.
-
-`rds-key-migration.sh` covers `preflight`, `status`, `verify`, `hold` and `release`, and has run against real infrastructure. What it still owes is `prepare`: the roles, the application database, the md5 verifier transplant and the atomic schema load, all of which beta ran by hand.
+**The billing question of finding 19 remains formally unanswered, and is made moot rather than resolved.** Neither AWS pricing page addresses logical replication between two separate clusters; both speak only of RDS↔EC2. What the account's own billing shows is that **no metered usage type exists for same-Availability-Zone RDS transfer**, while cross-zone appears as its own type (`USE1-DataTransfer-xAZ-*`). Pinning both sides to one zone therefore costs nothing and removes the variable, which is why the placement rule exists. The exposure if it were ever crossed is small — 350 GB metered on both ends is roughly US$7 — so the rule earns its place on certainty, not on the money.

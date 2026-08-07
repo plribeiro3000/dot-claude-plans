@@ -19,18 +19,25 @@
 # seam the approval boundary already creates.
 #
 # Discovery is by identifier. Endpoints, master secrets, pooler tasks and their
-# addresses are read from AWS — never passed in, never assumed.
+# addresses are read from AWS — never passed in, never assumed. An identifier may
+# name an Aurora cluster or a standalone instance; the caller does not say which.
 #
 # Usage:
 #   rds-key-migration.sh preflight --source <identifier> --target <identifier> --environment <stack>
+#   rds-key-migration.sh prepare   --source <identifier> --target <identifier> --environment <stack>
+#   rds-key-migration.sh replicate --source <identifier> --target <identifier>
 #   rds-key-migration.sh status    --source <identifier> --target <identifier>
 #   rds-key-migration.sh verify    --source <identifier> --target <identifier>
-#   rds-key-migration.sh hold      --source <identifier> --target <identifier> --environment <stack>
-#   rds-key-migration.sh release   --target <identifier> --environment <stack>
+#   rds-key-migration.sh hold      --source <identifier> --target <identifier> --environment <stack> --stack-dir <path>
+#   rds-key-migration.sh release   --target <identifier> --environment <stack> --stack-dir <path>
+#
+# `--stack-dir` is the stack's Terraform directory, and only the two commands
+# that drive the pooler console need it: the admin password exists nowhere but
+# that state.
 #
 # Examples:
 #   rds-key-migration.sh preflight --source app-beta-001-2 --target app-beta-001 --environment beta-001
-#   rds-key-migration.sh hold --source app-beta-001-2 --target app-beta-001 --environment beta-001
+#   rds-key-migration.sh prepare --source app-demo-001-cluster --target app-demo-001-cluster-2 --environment demo-001
 
 set -euo pipefail
 
@@ -41,11 +48,13 @@ REGION="us-east-1"
 # versioned formula onto PATH, so the client is called by absolute path.
 PSQL="/opt/homebrew/opt/postgresql@18/bin/psql"
 PG_DUMP="/opt/homebrew/opt/postgresql@18/bin/pg_dump"
+PG_DUMPALL="/opt/homebrew/opt/postgresql@18/bin/pg_dumpall"
 
 APPLICATION_DATABASE=""
 SOURCE_IDENTIFIER=""
 TARGET_IDENTIFIER=""
 ENVIRONMENT=""
+STACK_DIRECTORY=""
 
 COMMAND="${1:-}"
 shift || true
@@ -66,6 +75,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --database)
       APPLICATION_DATABASE="$2"
+      shift 2
+      ;;
+    --stack-dir)
+      STACK_DIRECTORY="$2"
       shift 2
       ;;
     --region)
@@ -100,12 +113,43 @@ require_environment() {
 # Never take an endpoint on faith: an identifier that does not resolve here does
 # not exist, and a typo that reaches psql reads as a network problem.
 
-describe_instance() {
+# An identifier is a cluster or a standalone instance, and the caller should not
+# have to say which — the single-instance environment and the Aurora ones run the
+# same procedure. Try the cluster first, fall back to the instance.
+#
+# A cluster needs TWO calls, and the reason is not symmetry: the cluster knows its
+# endpoint, master and security groups, but the AVAILABILITY ZONE is a property of
+# an instance. The cluster spans its subnet group; the writer is the endpoint the
+# copy actually flows through, so the writer's zone is the one that decides whether
+# the transfer is billed.
+describe_database() {
+  local identifier="$1" cluster_json writer_identifier writer_json
+
+  cluster_json=$(aws rds describe-db-clusters \
+    --db-cluster-identifier "$identifier" \
+    --region "$REGION" \
+    --query 'DBClusters[0].{Endpoint:Endpoint,Master:MasterUsername,Secret:MasterUserSecret.SecretArn,Status:Status,SecurityGroups:VpcSecurityGroups[].VpcSecurityGroupId,Key:KmsKeyId,Writer:DBClusterMembers[?IsClusterWriter].DBInstanceIdentifier|[0]}' \
+    --output json 2>/dev/null) || cluster_json=""
+
+  if [[ -n "$cluster_json" && "$cluster_json" != "null" ]]; then
+    writer_identifier=$(echo "$cluster_json" | jq -r '.Writer // empty')
+    [[ -n "$writer_identifier" ]] || die "Cluster '${identifier}' reports no writer instance."
+
+    writer_json=$(aws rds describe-db-instances \
+      --db-instance-identifier "$writer_identifier" \
+      --region "$REGION" \
+      --query 'DBInstances[0].{Zone:AvailabilityZone,Vpc:DBSubnetGroup.VpcId}' \
+      --output json 2>/dev/null) || die "Writer instance '${writer_identifier}' of cluster '${identifier}' could not be described."
+
+    echo "$cluster_json" "$writer_json" | jq -s '.[0] * .[1]'
+    return 0
+  fi
+
   aws rds describe-db-instances \
-    --db-instance-identifier "$1" \
+    --db-instance-identifier "$identifier" \
     --region "$REGION" \
     --query 'DBInstances[0].{Endpoint:Endpoint.Address,Master:MasterUsername,Secret:MasterUserSecret.SecretArn,Zone:AvailabilityZone,Status:DBInstanceStatus,Vpc:DBSubnetGroup.VpcId,SecurityGroups:VpcSecurityGroups[].VpcSecurityGroupId,Key:KmsKeyId}' \
-    --output json 2>/dev/null || die "No RDS instance named '$1' in ${REGION}."
+    --output json 2>/dev/null || die "No RDS cluster or instance named '${identifier}' in ${REGION}."
 }
 
 instance_field() {
@@ -178,22 +222,48 @@ pooler_userlist_is_current() {
   [[ "$oldest_task_start" > "$secret_changed" ]]
 }
 
-# The console credentials arrive through the environment because the module
-# generates them and publishes only half: the user name is a Terraform output,
-# and the password exists nowhere but the state — `terraform state show` redacts
-# it, so it comes from the state's JSON form. Neither belongs on a command line,
-# and the script has no business knowing a stack's directory.
+# The console credentials come from the stack's Terraform state, which is the
+# only place the admin password exists: the module generates it, publishes the
+# user name as an output, and keeps the password nowhere else. `terraform state
+# show` redacts it, so the JSON form is what carries it.
+#
+# Reading it here rather than taking it from the caller is a secrecy decision,
+# not a convenience. Every invocation of this script is a fresh shell, so a
+# caller could only supply the password as a `VAR=value` prefix — which puts it
+# in the process's argv for `ps`, and in the shell history and any session
+# transcript of whoever ran it. The value never leaves this process.
 require_pooler_console() {
-  [[ -n "${POOLER_ADMIN_USER:-}" ]] || die "POOLER_ADMIN_USER is not set. It is the connection_pooler module's admin_user output."
-  [[ -n "${POOLER_ADMIN_PASSWORD:-}" ]] || die "POOLER_ADMIN_PASSWORD is not set. It lives only in Terraform state — read it from 'terraform show -json' rather than 'state show', which redacts sensitive values."
-  [[ -n "${POOLER_DATABASE:-}" ]] || die "POOLER_DATABASE is not set. It is the logical name the pooler exposes, which differs from the real database name."
+  [[ -n "$STACK_DIRECTORY" ]] || die "Missing --stack-dir. The pooler's console password lives only in that stack's Terraform state."
+
+  local state_json
+  state_json=$(bash "${HOME}/.claude/scripts/terraform.sh" "$STACK_DIRECTORY" show -json | head -1)
+
+  POOLER_ADMIN_USER=$(echo "$state_json" | jq -r '[.. | objects | select(.address? | strings | test("connection_pooler.random_string.admin_user$"))][0].values.result // empty')
+  POOLER_ADMIN_PASSWORD=$(echo "$state_json" | jq -r '[.. | objects | select(.address? | strings | test("connection_pooler.random_password.admin_user$"))][0].values.result // empty')
+
+  [[ -n "$POOLER_ADMIN_USER" ]] || die "No connection_pooler admin user in the state at ${STACK_DIRECTORY}."
+  [[ -n "$POOLER_ADMIN_PASSWORD" ]] || die "No connection_pooler admin password in the state at ${STACK_DIRECTORY}."
+}
+
+# The logical name the pooler exposes differs from the real database name, and it
+# is read from the console rather than passed in — the pooler is the authority on
+# what it serves. `pgbouncer` is its own administrative database and never the
+# application's.
+resolve_pooler_database() {
+  local address="$1"
+
+  POOLER_DATABASE=$(pooler_console "$address" "SHOW DATABASES;" --tuples-only --no-align --field-separator='|' \
+    | awk -F'|' '$1 != "pgbouncer" && $1 != "" { print $1; exit }')
+
+  [[ -n "$POOLER_DATABASE" ]] || die "The pooler at ${address} exposes no application database."
 }
 
 pooler_console() {
   local address="$1" statement="$2"
+  shift 2
 
   PGPASSWORD="$POOLER_ADMIN_PASSWORD" "$PSQL" --host "$address" --port 6432 \
-    --username "$POOLER_ADMIN_USER" --dbname pgbouncer --no-password --command "$statement"
+    --username "$POOLER_ADMIN_USER" --dbname pgbouncer --no-password "$@" --command "$statement"
 }
 
 # --- commands --------------------------------------------------------------
@@ -205,8 +275,8 @@ command_preflight() {
 
   local source_json target_json
 
-  source_json=$(describe_instance "$SOURCE_IDENTIFIER")
-  target_json=$(describe_instance "$TARGET_IDENTIFIER")
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
 
   echo "Client and server versions"
   "$PG_DUMP" --version
@@ -244,14 +314,288 @@ command_preflight() {
   fi
 }
 
+# Brings the target from empty to subscribable: roles, then the application
+# role's password, then the database, then the schema. The order is forced —
+# roles are cluster-level and must exist before a schema that assigns ownership
+# to them, and the password is a cluster-level ALTER that cannot wait for a
+# database that does not exist yet.
+command_prepare() {
+  require_source
+  require_target
+  require_environment
+
+  local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password
+  local application_role owners existing
+
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  source_endpoint=$(instance_field "$source_json" Endpoint)
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+  source_master=$(instance_field "$source_json" Master)
+  target_master=$(instance_field "$target_json" Master)
+  source_password=$(master_password "$(instance_field "$source_json" Secret)")
+  target_password=$(master_password "$(instance_field "$target_json" Secret)")
+
+  resolve_application_database "$source_endpoint" "$source_master" "$source_password"
+
+  # --- roles ---------------------------------------------------------------
+  # Logical replication carries table data and nothing else. Roles are
+  # cluster-level objects, so without this step the schema load fails on
+  # ownership and the pooler cannot authenticate after cutover.
+  #
+  # --no-role-passwords is mandatory rather than cautious: the RDS master is not
+  # a superuser, so reading verifiers fails with `permission denied for table
+  # pg_authid` and the dump comes out EMPTY instead of partial.
+  echo "Dumping roles from the source"
+  PGPASSWORD="$source_password" "$PG_DUMPALL" --roles-only --no-role-passwords \
+    --host "$source_endpoint" --username "$source_master" --no-password \
+    --file /tmp/rds_migration_roles.sql
+
+  # The privileged attribute tokens are stripped, and without this the
+  # application role silently arrives unable to log in.
+  #
+  # pg_dumpall writes ONE ALTER ROLE carrying every attribute at once — `WITH
+  # NOSUPERUSER INHERIT NOCREATEROLE NOCREATEDB LOGIN NOREPLICATION NOBYPASSRLS`
+  # — and PostgreSQL refuses the WHOLE statement when it mentions an attribute
+  # the caller does not itself hold: "Only roles with the SUPERUSER attribute may
+  # change the SUPERUSER attribute", then the same for REPLICATION. The RDS
+  # master holds none of the three, so the role is created by the preceding
+  # CREATE ROLE and then never receives LOGIN — and nothing about that reads as a
+  # failure until an application tries to authenticate.
+  #
+  # Dropping the tokens is lossless: all three are already off for a role created
+  # here, and the master could not grant any of them anyway.
+  sed -e 's/ NOSUPERUSER//g' -e 's/ NOREPLICATION//g' -e 's/ NOBYPASSRLS//g' \
+    /tmp/rds_migration_roles.sql > /tmp/rds_migration_roles_loadable.sql
+
+  # Deliberately NOT ON_ERROR_STOP: pg_dumpall emits the RDS-internal roles too,
+  # and those either already exist or are protected. Those errors are expected;
+  # the count below is what separates them from a real failure.
+  echo "Loading roles into the target"
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" \
+    --dbname postgres --no-password --file /tmp/rds_migration_roles_loadable.sql \
+    > /tmp/rds_migration_roles_load.log 2>&1 || true
+
+  # psql prefixes every diagnostic with `psql:<file>:<line>: `, so an anchored
+  # `^ERROR` matches nothing and reports a clean load over a failed one.
+  echo "  errors reported: $(grep -c 'ERROR:' /tmp/rds_migration_roles_load.log || true) (RDS-internal roles are expected here — see /tmp/rds_migration_roles_load.log)"
+
+  # --- the application role's password -------------------------------------
+  # Discovered, not passed: on this application every public table is owned by
+  # the application role, so ownership IS the answer. More than one owner means
+  # the assumption no longer holds and the caller must decide.
+  owners=$(PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT DISTINCT tableowner FROM pg_tables WHERE schemaname='public';")
+  [[ $(echo "$owners" | grep -c .) -eq 1 ]] || die "Public tables on the source have more than one owner, so the application role is ambiguous: ${owners}"
+  application_role="$owners"
+  echo "Application role, from table ownership on the source: ${application_role}"
+
+  # The verifier is COPIED, never set from plaintext. password_encryption is
+  # scram-sha-256, so ALTER ROLE ... PASSWORD '<plaintext>' stores a SCRAM
+  # verifier — and the pooler authenticates with md5 and cannot compute SCRAM
+  # from it. Everything looks right until the repoint, and then the pooler cannot
+  # reach the target from INSIDE the cutover window.
+  #
+  # md5 is md5(password || rolename), bound to a role name identical on both
+  # sides, so the transplant is exact. The value moves file to file and never
+  # through this session.
+  aws secretsmanager get-secret-value --secret-id "${ENVIRONMENT}-connection-pooler-userlist" --region "$REGION" \
+    --query SecretString --output text > /tmp/rds_migration_userlist_b64.txt
+  base64 --decode -i /tmp/rds_migration_userlist_b64.txt -o /tmp/rds_migration_userlist.txt
+  sed -n "s/^\"${application_role}\" \"\(md5[0-9a-f]\{32\}\)\".*/ALTER ROLE \"${application_role}\" PASSWORD '\1';/p" \
+    /tmp/rds_migration_userlist.txt > /tmp/rds_migration_set_role_password.sql
+
+  [[ -s /tmp/rds_migration_set_role_password.sql ]] || die "No md5 verifier for '${application_role}' in the ${ENVIRONMENT} userlist. Without it the pooler cannot authenticate to the target after cutover."
+
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" \
+    --dbname postgres --no-password --set ON_ERROR_STOP=1 --file /tmp/rds_migration_set_role_password.sql > /dev/null
+  rm -f /tmp/rds_migration_userlist_b64.txt /tmp/rds_migration_userlist.txt /tmp/rds_migration_set_role_password.sql
+  echo "  md5 verifier transplanted onto the target"
+
+  # --- the database --------------------------------------------------------
+  # The modules do not expose database_name, so the database is created here.
+  # Skipping when it exists is what makes a re-run after an interrupted schema
+  # load possible.
+  existing=$(PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname postgres --no-password --tuples-only --no-align \
+    --command "SELECT 1 FROM pg_database WHERE datname = '${APPLICATION_DATABASE}';")
+
+  if [[ -n "$existing" ]]; then
+    echo "Database ${APPLICATION_DATABASE} already present on the target"
+  else
+    echo "Creating database ${APPLICATION_DATABASE} on the target, owned by ${application_role}"
+    PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname postgres --no-password \
+      --set ON_ERROR_STOP=1 --command "CREATE DATABASE \"${APPLICATION_DATABASE}\" OWNER \"${application_role}\";"
+  fi
+
+  # Ownership is asserted rather than assumed, because a database created by the
+  # master and left that way silently strips the application role of DDL — and
+  # nothing before a deploy's migration reveals it.
+  #
+  # Since PostgreSQL 15 the public schema grants USAGE and CREATE to
+  # `pg_database_owner`, an implicit role whose only member is whoever owns the
+  # database. So the owner is not bookkeeping: it IS the application role's
+  # CREATE privilege. A schema-level GRANT would not substitute for it, and
+  # comparing schema ACLs between the two databases shows them identical while
+  # the privilege differs.
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname postgres --no-password \
+    --set ON_ERROR_STOP=1 --command "ALTER DATABASE \"${APPLICATION_DATABASE}\" OWNER TO \"${application_role}\";" > /dev/null
+  echo "  database owned by ${application_role}"
+
+  # --- the schema ----------------------------------------------------------
+  # Ownership is PRESERVED (pg_dump's default). A --no-owner dump would leave
+  # every table owned by the master, and the application connects as its own role
+  # and could not write after cutover.
+  echo "Dumping the schema from the source"
+  PGPASSWORD="$source_password" "$PG_DUMP" --schema-only \
+    --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
+    --file /tmp/rds_migration_schema.sql
+
+  # Atomic, and this is not optional: without both flags an interrupted load
+  # leaves a half-built schema that the next run silently completes around,
+  # producing a database assembled from two runs. With them, an interruption
+  # rolls back to empty and the operator simply runs it again.
+  echo "Loading the schema into the target"
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password --single-transaction --set ON_ERROR_STOP=1 \
+    --file /tmp/rds_migration_schema.sql > /dev/null
+
+  echo
+  echo "Target prepared. Confirm the application role can actually log in before"
+  echo "starting replication — a successful login proves the verifier, and the"
+  echo "privilege count proves the schema load carried the grants."
+  echo "Then create the publication on the source and the subscription on the target."
+}
+
+# Starts the copy: a publication on the source, a subscription on the target.
+# `copy_data` is left at its default of true — that initial load is the whole
+# reason the target was created empty.
+#
+# The subscription's connection string carries the source master's password, and
+# it is composed HERE rather than handed to an operator to paste. The value is
+# read from Secrets Manager into a variable the same way every other command in
+# this script reads it, so it never reaches a terminal, a document or a session
+# transcript. Pasting a live credential to make a document self-contained is the
+# worse of the two options, not the safer one.
+command_replicate() {
+  require_source
+  require_target
+
+  local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password
+  local existing escaped_password connection_string
+
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  source_endpoint=$(instance_field "$source_json" Endpoint)
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+  source_master=$(instance_field "$source_json" Master)
+  target_master=$(instance_field "$target_json" Master)
+  source_password=$(master_password "$(instance_field "$source_json" Secret)")
+  target_password=$(master_password "$(instance_field "$target_json" Secret)")
+
+  resolve_application_database "$source_endpoint" "$source_master" "$source_password"
+
+  existing=$(PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT 1 FROM pg_publication WHERE pubname = 'key_migration';")
+
+  if [[ -n "$existing" ]]; then
+    echo "Publication already present on the source"
+  else
+    echo "Creating the publication on the source"
+    PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
+      --set ON_ERROR_STOP=1 --command "CREATE PUBLICATION key_migration FOR ALL TABLES;"
+  fi
+
+  # Two layers of quoting sit between the password and the server, and both are
+  # handled rather than hoped over. Inside the conninfo the value is single-quoted
+  # with `'` and `\` backslash-escaped; the whole conninfo then becomes a SQL
+  # literal, where every `'` is doubled. RDS permits any printable ASCII character
+  # except / " @ and space, so an apostrophe in a generated password is possible.
+  escaped_password=$(printf '%s' "$source_password" | sed "s/[\\\\']/\\\\&/g")
+  connection_string="host=${source_endpoint} port=5432 dbname=${APPLICATION_DATABASE} user=${source_master} password='${escaped_password}' sslmode=require"
+  quoted_connection_string=$(printf '%s' "$connection_string" | sed "s/'/''/g")
+
+  # The statement reaches psql through STDIN, written by a shell builtin. The
+  # alternatives both leak: `--command` cannot interpolate a psql variable at all
+  # (its argument must be parseable by the server as-is), and passing the conninfo
+  # as an argument would place the password in a process's argv, where `ps` shows
+  # it to every user on the machine for as long as the command runs. A builtin
+  # forks nothing, so nothing appears in the process table, and no file is
+  # written for a failure to leave behind.
+  echo "Creating the subscription on the target — this begins the initial copy"
+  printf "CREATE SUBSCRIPTION key_migration CONNECTION '%s' PUBLICATION key_migration;\n" "$quoted_connection_string" \
+    | PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname "$APPLICATION_DATABASE" --no-password \
+      --set ON_ERROR_STOP=1
+
+  echo
+  echo "Replication started. Watch it with:"
+  echo "  rds-key-migration.sh status --source ${SOURCE_IDENTIFIER} --target ${TARGET_IDENTIFIER}"
+  echo
+  echo "Schema migrations must stay frozen for the whole window: DDL is not"
+  echo "replicated, so a migration here desynchronises the target silently while"
+  echo "the subscription keeps reporting healthy."
+}
+
+# Severs the replication link once the application is off the source, which is
+# the first step of retiring it and the only reversible one — everything after
+# this destroys.
+#
+# Order is forced: the subscription goes first, because dropping it is what
+# releases the replication slot on the publisher. Dropping the publication first
+# would leave the slot behind with nothing feeding it.
+#
+# An orphaned slot is the reason this verb verifies rather than assumes. A slot
+# with no consumer pins WAL on the source indefinitely, and the source fills up
+# quietly — a failure that surfaces days later as a full disk on a database
+# nobody is watching any more.
+command_detach() {
+  require_source
+  require_target
+
+  local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password
+  local remaining_slots application_connections
+
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  source_endpoint=$(instance_field "$source_json" Endpoint)
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+  source_master=$(instance_field "$source_json" Master)
+  target_master=$(instance_field "$target_json" Master)
+  source_password=$(master_password "$(instance_field "$source_json" Secret)")
+  target_password=$(master_password "$(instance_field "$target_json" Secret)")
+
+  resolve_application_database "$target_endpoint" "$target_master" "$target_password"
+
+  # Refuse while the application still reaches the source. Dropping the
+  # subscription there would strand every write that had not yet replicated.
+  application_connections=$(PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT count(*) FROM pg_stat_activity WHERE datname = '${APPLICATION_DATABASE}' AND usename <> '${source_master}';")
+
+  [[ "$application_connections" == "0" ]] || die "${application_connections} non-master connections are still open on the source. The cutover has not finished; detaching now would strand their writes."
+
+  echo "Dropping the subscription on the target"
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname "$APPLICATION_DATABASE" --no-password \
+    --set ON_ERROR_STOP=1 --command "DROP SUBSCRIPTION key_migration;"
+
+  echo "Dropping the publication on the source"
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
+    --set ON_ERROR_STOP=1 --command "DROP PUBLICATION key_migration;"
+
+  remaining_slots=$(PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT count(*) FROM pg_replication_slots WHERE slot_name = 'key_migration';")
+
+  [[ "$remaining_slots" == "0" ]] || die "The replication slot 'key_migration' survives on the source. It pins WAL with nothing consuming it — drop it with pg_drop_replication_slot before the source is left unattended."
+
+  echo "  replication slot released on the source"
+}
+
 command_status() {
   require_source
   require_target
 
   local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password
 
-  source_json=$(describe_instance "$SOURCE_IDENTIFIER")
-  target_json=$(describe_instance "$TARGET_IDENTIFIER")
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
   source_endpoint=$(instance_field "$source_json" Endpoint)
   target_endpoint=$(instance_field "$target_json" Endpoint)
   source_master=$(instance_field "$source_json" Master)
@@ -272,9 +616,16 @@ command_status() {
   PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
     --command "SELECT application_name, state, pg_wal_lsn_diff(sent_lsn, replay_lsn) AS lag_bytes FROM pg_stat_replication;"
 
+  # `SELECT *` rather than a column list, because the fleet is not on one server
+  # version: the single-instance environment runs PostgreSQL 18 and the Aurora
+  # ones run 17, and the per-conflict counters (`confl_insert_exists` and its
+  # siblings) exist only from 18. Naming them makes the whole query fail on 17
+  # with `column does not exist` — losing the apply and sync error counters too,
+  # which are the ones that carry the weight, since an apply error HALTS
+  # replication while every other indicator still looks plausible.
   echo "Error counters on the target"
   PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname "$APPLICATION_DATABASE" --no-password \
-    --command "SELECT subname, apply_error_count, sync_error_count, confl_insert_exists, confl_update_origin_differs, confl_delete_missing FROM pg_stat_subscription_stats;"
+    --expanded --command "SELECT * FROM pg_stat_subscription_stats;"
 }
 
 # Structure reads the CATALOG, never information_schema — those views are
@@ -290,8 +641,8 @@ command_verify() {
 
   local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password
 
-  source_json=$(describe_instance "$SOURCE_IDENTIFIER")
-  target_json=$(describe_instance "$TARGET_IDENTIFIER")
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
   source_endpoint=$(instance_field "$source_json" Endpoint)
   target_endpoint=$(instance_field "$target_json" Endpoint)
   source_master=$(instance_field "$source_json" Master)
@@ -302,7 +653,12 @@ command_verify() {
   resolve_application_database "$source_endpoint" "$source_master" "$source_password"
 
   local structure_query bounds_query
-  structure_query="SELECT 'tables', count(*) FROM pg_tables WHERE schemaname='public' UNION ALL SELECT 'sequences', count(*) FROM pg_sequences WHERE schemaname='public' UNION ALL SELECT 'indexes', count(*) FROM pg_indexes WHERE schemaname='public' UNION ALL SELECT 'constraints', count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' UNION ALL SELECT 'columns', count(*) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped;"
+  # Ownership is compared alongside the counts, and it is not decoration. Since
+  # PostgreSQL 15 the public schema grants CREATE to `pg_database_owner`, so the
+  # database's owner IS the application role's ability to run a migration. A
+  # target created by the master matches the source on every count and on the
+  # schema ACL text, and still cannot accept a deploy's `db:migrate`.
+  structure_query="SELECT 'tables', count(*) FROM pg_tables WHERE schemaname='public' UNION ALL SELECT 'sequences', count(*) FROM pg_sequences WHERE schemaname='public' UNION ALL SELECT 'indexes', count(*) FROM pg_indexes WHERE schemaname='public' UNION ALL SELECT 'constraints', count(*) FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' UNION ALL SELECT 'columns', count(*) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind='r' AND a.attnum>0 AND NOT a.attisdropped UNION ALL SELECT 'owner:database:'||pg_get_userbyid(datdba), 1 FROM pg_database WHERE datname=current_database() UNION ALL SELECT 'owner:schema:'||pg_get_userbyid(nspowner), 1 FROM pg_namespace WHERE nspname='public' UNION ALL SELECT 'owner:table:'||tableowner, count(*) FROM pg_tables WHERE schemaname='public' GROUP BY tableowner UNION ALL SELECT 'owner:sequence:'||sequenceowner, count(*) FROM pg_sequences WHERE schemaname='public' GROUP BY sequenceowner ORDER BY 1;"
   bounds_query="SELECT c.relname||'='||coalesce((xpath('/row/lo/text()', x))[1]::text,'-')||':'||coalesce((xpath('/row/hi/text()', x))[1]::text,'-') FROM (SELECT c.oid, c.relname, query_to_xml(format('SELECT min(id) AS lo, max(id) AS hi FROM public.%I', c.relname), false, true, '') AS x FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_attribute a ON a.attrelid=c.oid AND a.attname='id' AND NOT a.attisdropped WHERE n.nspname='public' AND c.relkind='r') c ORDER BY c.relname;"
 
   PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --command "$structure_query" > /tmp/rds_migration_structure_source.txt
@@ -332,8 +688,8 @@ command_hold() {
 
   local source_json target_json source_endpoint target_endpoint source_master target_master source_password target_password address
 
-  source_json=$(describe_instance "$SOURCE_IDENTIFIER")
-  target_json=$(describe_instance "$TARGET_IDENTIFIER")
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
   source_endpoint=$(instance_field "$source_json" Endpoint)
   target_endpoint=$(instance_field "$target_json" Endpoint)
   source_master=$(instance_field "$source_json" Master)
@@ -352,7 +708,12 @@ command_hold() {
 
   require_pooler_console
 
-  for address in $(pooler_task_addresses); do
+  local addresses
+  addresses=$(pooler_task_addresses)
+  resolve_pooler_database "$(echo "$addresses" | awk '{print $1; exit}')"
+  echo "Pooler serves the application as '${POOLER_DATABASE}'"
+
+  for address in $addresses; do
     echo "Holding clients on ${address}"
     pooler_console "$address" "PAUSE ${POOLER_DATABASE};"
   done
@@ -384,7 +745,7 @@ command_release() {
 
   local target_json target_endpoint target_master target_password address
 
-  target_json=$(describe_instance "$TARGET_IDENTIFIER")
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
   target_endpoint=$(instance_field "$target_json" Endpoint)
   target_master=$(instance_field "$target_json" Master)
   target_password=$(master_password "$(instance_field "$target_json" Secret)")
@@ -393,7 +754,11 @@ command_release() {
 
   require_pooler_console
 
-  for address in $(pooler_task_addresses); do
+  local addresses
+  addresses=$(pooler_task_addresses)
+  resolve_pooler_database "$(echo "$addresses" | awk '{print $1; exit}')"
+
+  for address in $addresses; do
     echo "Reconnecting and releasing on ${address}"
     pooler_console "$address" "RECONNECT ${POOLER_DATABASE};"
     pooler_console "$address" "RESUME ${POOLER_DATABASE};"
@@ -414,9 +779,12 @@ command_release() {
 
 case "$COMMAND" in
   preflight) command_preflight ;;
+  prepare)   command_prepare ;;
+  replicate) command_replicate ;;
+  detach)    command_detach ;;
   status)    command_status ;;
   verify)    command_verify ;;
   hold)      command_hold ;;
   release)   command_release ;;
-  *)         die "Usage: rds-key-migration.sh {preflight|status|verify|hold|release} --source <identifier> --target <identifier> --environment <stack>" ;;
+  *)         die "Usage: rds-key-migration.sh {preflight|prepare|status|verify|hold|release} --source <identifier> --target <identifier> --environment <stack>" ;;
 esac
