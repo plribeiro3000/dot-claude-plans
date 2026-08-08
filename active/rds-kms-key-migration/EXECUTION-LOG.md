@@ -321,9 +321,84 @@ It does not need to be recovered. Every field is derivable from the system: the 
 
 **The host is the internal record, not the endpoint.** `database-primary-<env>.4shark.internal` is maintained by Terraform, points at the database directly on 5432 rather than at the pooler on 6432, and is repointed by the cutover — so the secret follows every future database replacement instead of needing a manual edit each time.
 
+### 31. A stale IPv6 prefix hangs the migration halfway, and the sharpest tell is that an INVALID secret answers while a valid one does not
+
+The workstation-side failure documented in `runbooks/engineer-access/IPV6-STALE-PREFIX.md` lands squarely on this procedure, because almost every verb starts by reading a master password from Secrets Manager. When the ISP renumbers the prefix and the router keeps advertising the old one, the machine holds valid non-deprecated addresses on a dead return path and keeps selecting them as the source — so dual-stack AWS endpoints hang while everything else works.
+
+**The discriminator that identifies it fastest here is not in the runbook.** `describe-secret` on a NON-EXISTENT id answers immediately with `ResourceNotFoundException`, while `get-secret-value` on a REAL secret hangs — because only the second has to decrypt through KMS, one more dual-stack endpoint. A probe with a deliberately wrong id therefore proves nothing about reachability, and reading it as "Secrets Manager is fine" sends the diagnosis in the wrong direction.
+
+Confirmation is two commands and thirty seconds: `ifconfig en0 | grep inet6` (two global prefixes is the tell), then `ping6 -c 3 -S <address-from-each-prefix> 2606:4700:4700::1111` — the dead prefix returns 100% loss while the live one answers in tens of milliseconds. The fix removes **every** address on the dead prefix, since the OS simply selects the next eligible one, and it needs `sudo` — so it is the engineer's to run.
+
+**For the script**: nothing to change. The failure is upstream of it and every verb inherits it; what this note buys is not re-diagnosing it from scratch mid-migration.
+
+### 32. A guard is worth writing wherever a command's FAILURE becomes another command's INPUT
+
+`require_pooler_console` reads the pooler's admin credentials out of `terraform show -json`. That command does not install providers, so a stack directory never initialised in this checkout returns an error message **on stdout** — which flowed straight into `jq` and produced `Invalid numeric literal`, a message that names neither Terraform nor the missing init.
+
+The shape generalises past this one call: whenever output is piped from a command that can fail into a parser that cannot know better, the parser's error replaces the real one. The guard is one line — assert the text parses before using it — and it converts a confusing failure into the exact remedy.
+
+**For the script**: `require_pooler_console` validates the state JSON and names the `init` to run.
+
+### 33. `pg_dumpall` records the GRANTOR of a role membership, and the target's master cannot act as it
+
+`pg_dumpall --roles-only` emits role memberships with the grantor preserved: `GRANT "<app-role>" TO postgres WITH INHERIT TRUE GRANTED BY rdsadmin`. On the source that membership was created by RDS's own internal role, so the dump says so — and on the target the master cannot grant privileges *as* `rdsadmin`, so the statement fails with `permission denied to grant privileges as role "rdsadmin"`.
+
+**What that costs is the database itself, not a privilege detail.** PostgreSQL requires whoever creates a database to be able to `SET ROLE` to the owner it names. The failed grant is exactly what would have made the master a member of the application role, so `CREATE DATABASE ... OWNER` dies with `must be able to SET ROLE`. The same dropped clause silently removes every other membership in the dump, and only this one announces itself.
+
+This is finding 23's family — `pg_dumpall` emitting statements the RDS master has no standing to execute — on a third attribute. It did not appear on the first Aurora migration because that environment's ownership was repaired by hand with `ALTER DATABASE`, so the `CREATE DATABASE ... OWNER` path added as the fix had never actually run against a target.
+
+**For the script**: the roles sed strips ` GRANTED BY <role>` alongside the three privileged attribute tokens. Lossless — the master created those roles moments earlier in the same load, so it holds admin over them and grants as itself; only the recorded grantor changes, and nothing reads it.
+
+### 34. The dump carries session settings that postdate the TARGET, and the newest client is a deliberate choice
+
+`pg_dump` refuses a server newer than itself, so the client is pinned to the newest version in the fleet — that is what makes one client able to read every environment. The cost lands on restore: the dump's header carries `SET transaction_timeout = 0`, a parameter PostgreSQL 17 introduced, and a 16 target rejects it with `unrecognized configuration parameter`.
+
+The first Aurora migration had a 17 target and accepted it. Both remaining environments are 16, so both meet it.
+
+**For the script**: the schema is filtered through a sed that drops that `SET` before the load. Removing it is lossless — these are restore-session settings, and a parameter the server does not implement has no behaviour to preserve. Anything else in the header that postdates the target fails identically, so a message naming a different parameter is this same case rather than a new one. Installing an older client instead was considered and rejected: it would not replace the newest one (the fleet still holds an 18 server), so it would mean maintaining three clients plus a rule selecting between them, against one line whose failure mode is loud and named.
+
+### 35. Two counts of "the same thing" were counting two different populations
+
+`certify` compared `count(*) FROM pg_tables WHERE schemaname='public'` against `count(DISTINCT table_name) FROM information_schema.table_privileges WHERE grantee = current_user` and required equality. The second is not scoped to a schema and includes views, so it legitimately exceeded the first — 174 against 171 — and the check reported a missing grant on a target where nothing was missing.
+
+The first Aurora migration passed this at 168 = 168, which was a property of that database rather than of the check: no views, nothing outside `public` granted to that role. A comparison that agrees by coincidence is indistinguishable from one that agrees by construction until a database differs.
+
+**For the script**: the check asks for the SET rather than two counts — the public base tables the role cannot read, which is empty on a healthy target and names the offenders on a broken one. `has_table_privilege` is also the right primitive over any privilege catalog, because it answers the question the application actually asks, counting grants held through role membership, through `PUBLIC`, and through ownership — none of which appear as a direct row for the grantee.
+
+### 36. A privilege function given a CONSTRUCTED NAME can be evaluated on rows the `WHERE` was meant to exclude
+
+The first version of that set-based check called `has_table_privilege(current_user, format('public.%I', t.tablename), 'SELECT')` while filtering `t.schemaname = 'public'`. It failed with `relation "public.pg_statistic" does not exist`: PostgreSQL does not guarantee the evaluation order of `WHERE` conditions, so the function ran against catalog rows before the schema filter removed them, with `public.` prepended to a name that lives elsewhere.
+
+**For the script**: the check passes the OID (`has_table_privilege(c.oid, 'SELECT')`) rather than a constructed name. An OID comes from the catalog row itself, so early evaluation on a row destined to be filtered returns a boolean instead of raising — the hazard disappears rather than being worked around. The general shape is worth carrying: a function over a name assembled from column values can be handed values the surrounding filter never intended.
+
+### 37. Sync workers run at wildly different speeds, and INDEX WEIGHT explains it — the lever is free before `replicate` and expensive after
+
+Initial sync copies a bounded number of tables at once, so at any moment a couple of workers hold a table each. Those two workers can differ by more than an order of magnitude, and the reason is not the worker: it is how much index the table carries per byte of heap.
+
+Measured on the productive cluster while both were in flight:
+
+```
+ commissionings     | 11 GB heap | 18 GB indexes | 10 indexes
+ accumulated_deals  | 29 GB heap | 11 GB indexes |  5 indexes
+```
+
+The first landed ~1 GiB/hour, the second ~4.5. Every row `commissionings` receives forces ten random index writes against more index than table, while its partner maintains half as many indexes over nearly three times the data. **A table count in `status` hides this entirely** — the number sits still for hours and reads like a stall. Naming the tables in flight, and profiling index weight in `measure`, is what turns it back into readable progress.
+
+**The lever is dropping secondary indexes on the TARGET and recreating them after the copy**, and its cost depends entirely on when it is taken. A table still queued (`srsubstate = 'i'`) is empty on the target with no sync running, so dropping its indexes conflicts with nothing. A table mid-copy (`'d'`) needs a lock that the running `COPY` holds, so the same action stalls or restarts that table's sync — discarding everything it has landed. **So the decision is nearly free before `replicate` and costs hours once the copy is running.** Raising `max_sync_workers_per_subscription` has the same shape for a different reason: it needs the subscription restarted, which aborts every in-flight table.
+
+**Nothing here can lose data, and that is worth stating because it is the first thing anyone asks.** The source is only ever read during the copy. Every target-side action risks redoing work, never losing any.
+
+**The lever is NOT taken on any environment — the target keeps every index through the whole copy.** The reason is the cutover, not the copy: dropping indexes puts a manual recreation step between a finished copy and a productive cutover, and a step that is forgotten or fails there promotes an unindexed database into production. That failure is far more expensive than the hours the drop would save, and it lands at the worst possible moment. A slow copy costs waiting; an unindexed productive database costs an outage.
+
+**What is NOT known, and stays unknown because the lever is not being taken**: whether `CREATE INDEX` after the copy actually beats the inline row-by-row maintenance on a `db.t4g.large`. The community consensus favours the bulk build, but with that instance's memory the sort spills to disk.
+
+**The index-weight profile is still worth reading before `replicate`** — not to decide whether to drop anything, but because it is what predicts the copy's duration. A table carrying more index than heap is where the hours go, and knowing that in advance is the difference between scheduling a window and discovering one.
+
+**One correction that keeps resurfacing**: the drop under discussion was always on the TARGET — the new database, still empty, serving no traffic. The SOURCE keeps every index for the entire migration and never stops serving; the copy only reads from it. Nothing in this procedure removes an index from a database in use, and no target-side action can duplicate data on the source.
+
 ## Where this stands
 
-**Both non-productive environments run on their own key.** The single-instance one is complete, predecessor destroyed. The cluster one is through its cutover — the internal record resolves to `app-demo-001`, and the pooler's console reports every server connection open as the application role against that cluster, which is conclusive because the application reaches the database only through the pooler.
+**Both non-productive environments run on their own key, both predecessors destroyed.** The cluster one migrated in a single copy — its replacement was born with the conventional identifier because `app-<env>-001` was free while `app-<env>-001-cluster` was the name in use, which is the whole payoff of settling the identifier before any data moves.
 
 **The fleet-wide prerequisites are done.** Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again (findings 16, 20, 21). `modules/rds_aurora_cluster` accepts `availability_zone`, so a replacement's writer can be pinned to its source's zone (finding 19). Both were applied to every stack before merging.
 
@@ -331,8 +406,6 @@ It does not need to be recovered. Every field is derivable from the system: the 
 
 ## Still to do
 
-**Retire the non-productive cluster's predecessor**, in an order that cannot be inverted: drop the subscription on the target and the publication on the source, rewrite `MIGRATION_DATABASE_URL` (finding 17 — a GitHub environment secret holding a direct RDS URL, outside SSM and outside Terraform, so a search of both misses it), then the two applies of finding 18. There is no hurry: the stopped predecessor costs little and is a fallback while the environment settles.
-
-**Then `shared-001`, then `atento-001`.** What differs for them is volume and timing rather than procedure — the largest holds roughly 350 GB, so its initial copy takes real time instead of finishing before it can be observed, and its window is scheduled rather than opened on the spot.
+**`shared-001`, then `atento-001`.** What differs for them is volume and timing rather than procedure — the largest holds roughly 350 GB, so its initial copy takes real time instead of finishing before it can be observed, and its window is scheduled rather than opened on the spot.
 
 **The billing question of finding 19 remains formally unanswered, and is made moot rather than resolved.** Neither AWS pricing page addresses logical replication between two separate clusters; both speak only of RDS↔EC2. What the account's own billing shows is that **no metered usage type exists for same-Availability-Zone RDS transfer**, while cross-zone appears as its own type (`USE1-DataTransfer-xAZ-*`). Pinning both sides to one zone therefore costs nothing and removes the variable, which is why the placement rule exists. The exposure if it were ever crossed is small — 350 GB metered on both ends is roughly US$7 — so the rule earns its place on certainty, not on the money.

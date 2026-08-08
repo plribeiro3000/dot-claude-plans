@@ -1,0 +1,14 @@
+Source: https://github.com/renovatebot/renovate/blob/main/lib/modules/manager/npm/post-update/yarn.ts
+and https://github.com/renovatebot/renovate/blob/main/lib/modules/manager/npm/post-update/pnpm.ts
+Fetched via: gh api repos/renovatebot/renovate/contents/lib/modules/manager/npm/post-update/{yarn,pnpm}.ts
+Retrieved: 2026-08-07 (base64-decoded, byte-for-byte GitHub content)
+
+Search performed (grep -n -i "before|cooldown|minimumReleaseAge|minimalAgeGate|npmRegistryServer" on both
+decoded files): ZERO matches in either file.
+
+This is the negative-result evidence for the finding that Renovate's cooldown/--before
+integration (transitive_updates_source_npm_1.ts) is scoped to the `npm` CLI tool
+specifically, inside the shared "npm" manager family that also handles Yarn and pnpm
+lock files. Neither yarn.ts nor pnpm.ts contains any reference to a release-age /
+before-date / cooldown mechanism of any kind — confirmed by the absence of every
+plausible keyword variant in both files.

@@ -23,21 +23,32 @@
 # name an Aurora cluster or a standalone instance; the caller does not say which.
 #
 # Usage:
-#   rds-key-migration.sh preflight --source <identifier> --target <identifier> --environment <stack>
-#   rds-key-migration.sh prepare   --source <identifier> --target <identifier> --environment <stack>
-#   rds-key-migration.sh replicate --source <identifier> --target <identifier>
-#   rds-key-migration.sh status    --source <identifier> --target <identifier>
-#   rds-key-migration.sh verify    --source <identifier> --target <identifier>
-#   rds-key-migration.sh hold      --source <identifier> --target <identifier> --environment <stack> --stack-dir <path>
-#   rds-key-migration.sh release   --target <identifier> --environment <stack> --stack-dir <path>
+# The verbs run in this order, one environment at a time. Everything before
+# `hold` is reversible; `hold` opens the window the engineer's apply sits in.
 #
-# `--stack-dir` is the stack's Terraform directory, and only the two commands
+#   measure    --source <id>
+#   preflight  --source <id> --target <id> --environment <stack>
+#   prepare    --source <id> --target <id> --environment <stack>
+#   certify    --target <id> --environment <stack>
+#   replicate  --source <id> --target <id>
+#   status     --source <id> --target <id>
+#   verify     --source <id> --target <id>
+#   hold       --source <id> --target <id> --environment <stack> --stack-dir <path>
+#     ... the engineer applies the record repoint, inside this window ...
+#   release    --target <id> --environment <stack> --stack-dir <path>
+#   confirm    --target <id> --environment <stack> --stack-dir <path>
+#   detach     --source <id> --target <id>
+#   rotate-migration-secret --target <id> --environment <stack>
+#                           --internal-record <name> --repo <owner/name>
+#
+# `--stack-dir` is the stack's Terraform directory, and only the three commands
 # that drive the pooler console need it: the admin password exists nowhere but
 # that state.
 #
-# Examples:
-#   rds-key-migration.sh preflight --source app-beta-001-2 --target app-beta-001 --environment beta-001
-#   rds-key-migration.sh prepare --source app-demo-001-cluster --target app-demo-001-cluster-2 --environment demo-001
+# Example, a whole environment:
+#   rds-key-migration.sh preflight --source app-shared-001-cluster --target app-shared-001 --environment shared-001
+#   rds-key-migration.sh prepare   --source app-shared-001-cluster --target app-shared-001 --environment shared-001
+#   rds-key-migration.sh certify   --target app-shared-001 --environment shared-001
 
 set -euo pipefail
 
@@ -55,6 +66,8 @@ SOURCE_IDENTIFIER=""
 TARGET_IDENTIFIER=""
 ENVIRONMENT=""
 STACK_DIRECTORY=""
+INTERNAL_RECORD=""
+GITHUB_REPOSITORY=""
 
 COMMAND="${1:-}"
 shift || true
@@ -79,6 +92,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --stack-dir)
       STACK_DIRECTORY="$2"
+      shift 2
+      ;;
+    --internal-record)
+      INTERNAL_RECORD="$2"
+      shift 2
+      ;;
+    --repo)
+      GITHUB_REPOSITORY="$2"
       shift 2
       ;;
     --region)
@@ -238,6 +259,13 @@ require_pooler_console() {
   local state_json
   state_json=$(bash "${HOME}/.claude/scripts/terraform.sh" "$STACK_DIRECTORY" show -json | head -1)
 
+  # `show -json` does not install providers, so a stack directory that has never
+  # been initialised here returns an ERROR MESSAGE on stdout. Without this check
+  # that text reaches jq, which fails on "Invalid numeric literal" — a message
+  # that says nothing about the actual cause.
+  echo "$state_json" | jq empty 2>/dev/null \
+    || die "Could not read Terraform state at ${STACK_DIRECTORY}. Initialise it first: bash ~/.claude/scripts/terraform.sh ${STACK_DIRECTORY} init"
+
   POOLER_ADMIN_USER=$(echo "$state_json" | jq -r '[.. | objects | select(.address? | strings | test("connection_pooler.random_string.admin_user$"))][0].values.result // empty')
   POOLER_ADMIN_PASSWORD=$(echo "$state_json" | jq -r '[.. | objects | select(.address? | strings | test("connection_pooler.random_password.admin_user$"))][0].values.result // empty')
 
@@ -267,6 +295,98 @@ pooler_console() {
 }
 
 # --- commands --------------------------------------------------------------
+
+# What the copy will cost, read from the source before anything is created.
+#
+# The number that matters is NOT the cluster's VolumeBytesUsed: an Aurora volume
+# carries bloat, old page versions and free space, and it never shrinks, so it
+# overstates what logical replication actually moves. Replication copies the
+# LOGICAL contents, which is what pg_database_size reports.
+#
+# The wall-clock floor is set by the LARGEST SINGLE TABLE, not by the total.
+# Initial sync assigns one worker per table and syncs several tables at a time
+# (max_sync_workers_per_subscription), so tables run in parallel but a single
+# table never does — its COPY is one stream in one worker. A database whose size
+# sits mostly in one table takes as long as that table, no matter how small the
+# rest is.
+#
+# Heap and total are both reported because they are different costs: the heap is
+# what crosses the wire, while the indexes are rebuilt on the target as the rows
+# land, so the target writes the total.
+command_measure() {
+  require_source
+
+  local source_json source_endpoint source_master source_password
+
+  source_json=$(describe_database "$SOURCE_IDENTIFIER")
+  source_endpoint=$(instance_field "$source_json" Endpoint)
+  source_master=$(instance_field "$source_json" Master)
+  source_password=$(master_password "$(instance_field "$source_json" Secret)")
+
+  resolve_application_database "$source_endpoint" "$source_master" "$source_password"
+
+  echo "Source: ${SOURCE_IDENTIFIER} / database ${APPLICATION_DATABASE}"
+
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT pg_size_pretty(pg_database_size(current_database())) AS logical_size, (SELECT count(*) FROM pg_tables WHERE schemaname='public') AS tables;"
+
+  echo "Largest tables — the biggest one sets the floor, it cannot be parallelised:"
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT c.relname AS table, pg_size_pretty(pg_relation_size(c.oid)) AS heap_over_the_wire, pg_size_pretty(pg_indexes_size(c.oid)) AS indexes_rebuilt_on_target, (SELECT count(*) FROM pg_index i WHERE i.indrelid = c.oid) AS index_count, pg_size_pretty(pg_total_relation_size(c.oid)) AS total_written_on_target FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' ORDER BY pg_total_relation_size(c.oid) DESC LIMIT 12;"
+
+  # The copy's DURATION is not the risk a long copy carries — the WAL the source
+  # must retain while the slot is open is. From the moment the subscription
+  # exists, the source may not recycle WAL the target has not confirmed, and a
+  # copy that spans days holds every byte written in those days. A slot left
+  # behind is the documented way to fill a primary's storage.
+  #
+  # Sampled rather than assumed: two LSN readings a minute apart give the real
+  # rate for THIS environment at THIS hour, which is what decides whether a
+  # weekend-long copy is safe. A weekday-afternoon sample is not the nightly
+  # peak, so read it as an order of magnitude.
+  echo "Sampling WAL generation for 60s — this is what the source must retain while the copy runs"
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT pg_current_wal_lsn();" > /tmp/rds_migration_wal_start.txt
+
+  sleep 60
+
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT pg_current_wal_lsn();" > /tmp/rds_migration_wal_end.txt
+
+  local wal_start wal_end
+  wal_start=$(cat /tmp/rds_migration_wal_start.txt)
+  wal_end=$(cat /tmp/rds_migration_wal_end.txt)
+
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT pg_size_pretty(('${wal_end}'::pg_lsn - '${wal_start}'::pg_lsn) * 60) AS wal_per_hour, pg_size_pretty(('${wal_end}'::pg_lsn - '${wal_start}'::pg_lsn) * 60 * 24) AS wal_per_day, pg_size_pretty(('${wal_end}'::pg_lsn - '${wal_start}'::pg_lsn) * 60 * 72) AS wal_over_a_three_day_window;"
+
+  # Whether the seeded path is even available here, asked of the cluster rather
+  # than of the documentation. AWS lists aurora_volume_logical_start_lsn as
+  # supported up to the 15 series and says nothing about 16 or 17, which is where
+  # these environments actually live — so the list settles nothing for us either
+  # way, and the catalog does.
+  #
+  # Read from pg_proc rather than by calling it: a missing function raises, and a
+  # raise here would kill a report that is otherwise complete.
+  echo "Seeded-path capability on this cluster:"
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT current_setting('server_version') AS version, count(*) > 0 AS aurora_volume_logical_start_lsn_available FROM pg_proc WHERE proname = 'aurora_volume_logical_start_lsn';"
+
+  # Every table needs a primary key or an identity column, and this is a
+  # requirement of logical replication itself, not of the seeded variant — a
+  # table without one replicates INSERTs and then fails on the first UPDATE or
+  # DELETE. It holds for both paths, so it is measured once, here.
+  echo "Tables with no primary key — logical replication cannot apply UPDATE or DELETE to these:"
+  PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" \
+    --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT t.tablename FROM pg_tables t WHERE t.schemaname = 'public' AND NOT EXISTS (SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid = i.indrelid JOIN pg_namespace n ON n.oid = c.relnamespace WHERE i.indisprimary AND c.relname = t.tablename AND n.nspname = 'public') ORDER BY t.tablename;"
+}
 
 command_preflight() {
   require_source
@@ -365,7 +485,24 @@ command_prepare() {
   #
   # Dropping the tokens is lossless: all three are already off for a role created
   # here, and the master could not grant any of them anyway.
+  # `GRANTED BY <role>` goes for the same reason, and it is what decides whether
+  # the database can be created at all. pg_dumpall preserves the grantor
+  # literally, so a membership the source recorded as `GRANTED BY rdsadmin`
+  # arrives as a statement the target's master cannot execute — "permission
+  # denied to grant privileges as role rdsadmin" — and the master never becomes a
+  # member of the application role.
+  #
+  # That membership is not bookkeeping: PostgreSQL requires the creator of a
+  # database to be able to SET ROLE to the owner it names, so without it
+  # `CREATE DATABASE ... OWNER` fails outright. The failure is loud here, but the
+  # same dropped grant silently removes every other role membership the
+  # application depends on.
+  #
+  # Dropping the clause is lossless: the master created these roles moments
+  # earlier in this same load, so it holds admin over them and grants as itself.
+  # Only the recorded grantor changes, and nothing reads it.
   sed -e 's/ NOSUPERUSER//g' -e 's/ NOREPLICATION//g' -e 's/ NOBYPASSRLS//g' \
+    -e 's/ GRANTED BY [^;]*//g' \
     /tmp/rds_migration_roles.sql > /tmp/rds_migration_roles_loadable.sql
 
   # Deliberately NOT ON_ERROR_STOP: pg_dumpall emits the RDS-internal roles too,
@@ -450,6 +587,23 @@ command_prepare() {
     --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
     --file /tmp/rds_migration_schema.sql
 
+  # The dump's header carries session settings the client believes in, and the
+  # client here is deliberately newer than every server in the fleet — pg_dump
+  # refuses a server newer than itself, so the newest client is the only one that
+  # can read all of them. The cost of that choice lands here: a setting
+  # introduced after the TARGET's major version arrives in the dump and the load
+  # dies on it, with `unrecognized configuration parameter`.
+  #
+  # `transaction_timeout` is the one that exists today — PostgreSQL 17 added it,
+  # and a 16 target rejects it. Removing it is lossless: these are restore-session
+  # settings, and a parameter the server does not implement has no behaviour to
+  # preserve.
+  #
+  # Anything in the header that postdates the target has the same shape, so a
+  # failure naming a different parameter is this same case and not a new one.
+  sed -e '/^SET transaction_timeout = /d' \
+    /tmp/rds_migration_schema.sql > /tmp/rds_migration_schema_loadable.sql
+
   # Atomic, and this is not optional: without both flags an interrupted load
   # leaves a half-built schema that the next run silently completes around,
   # producing a database assembled from two runs. With them, an interruption
@@ -457,13 +611,82 @@ command_prepare() {
   echo "Loading the schema into the target"
   PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" \
     --dbname "$APPLICATION_DATABASE" --no-password --single-transaction --set ON_ERROR_STOP=1 \
-    --file /tmp/rds_migration_schema.sql > /dev/null
+    --file /tmp/rds_migration_schema_loadable.sql > /dev/null
 
   echo
-  echo "Target prepared. Confirm the application role can actually log in before"
-  echo "starting replication — a successful login proves the verifier, and the"
-  echo "privilege count proves the schema load carried the grants."
-  echo "Then create the publication on the source and the subscription on the target."
+  echo "Target prepared. Run 'certify' before starting replication."
+}
+
+# Closes Phase 1 by CONNECTING as the application, because every cheaper check
+# passes on a target the application cannot use.
+#
+# A role can exist, own every table, and carry the correct password verifier and
+# still be unable to log in or run a migration. Catalog queries about the role,
+# the schema's ACL text, and the table counts all report success in that state —
+# only the connection does not.
+command_certify() {
+  require_target
+  require_environment
+
+  local target_json target_endpoint target_master target_password
+  local application_url application_role application_password
+  local can_create tables unreadable
+
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+  target_master=$(instance_field "$target_json" Master)
+  target_password=$(master_password "$(instance_field "$target_json" Secret)")
+
+  resolve_application_database "$target_endpoint" "$target_master" "$target_password"
+
+  # Only the ROLE and the PASSWORD come from this URL. It names the pooler — the
+  # LOGICAL database name it exposes, on port 6432 — while host, port and
+  # database come from the target itself. Reusing the URL wholesale is the trap:
+  # a direct connection carrying the pooler's logical name fails outright.
+  application_url=$(aws ssm get-parameter --name "/${ENVIRONMENT}/DATABASE_URL" --with-decryption --region "$REGION" --query 'Parameter.Value' --output text)
+  application_role=$(printf '%s' "$application_url" | sed -E 's#^[a-z]+://([^:]+):.*$#\1#')
+  application_password=$(printf '%s' "$application_url" | sed -E 's#^[a-z]+://[^:]+:([^@]*)@.*$#\1#')
+
+  [[ -n "$application_role" ]] || die "Could not read the application role from /${ENVIRONMENT}/DATABASE_URL."
+
+  echo "Logging in as the application role"
+  PGPASSWORD="$application_password" "$PSQL" --host "$target_endpoint" --username "$application_role" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT 'connected as '||current_user||' to '||current_database();" \
+    || die "The application role cannot log in to the target. Its verifier or its LOGIN attribute did not arrive — see findings 23 and 29."
+
+  # DDL is what a deploy's migration needs, and since PostgreSQL 15 the public
+  # schema grants CREATE to `pg_database_owner` — so this answers 'f' whenever
+  # the database ended up owned by the master instead of the application role.
+  can_create=$(PGPASSWORD="$application_password" "$PSQL" --host "$target_endpoint" --username "$application_role" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT has_schema_privilege(current_user,'public','CREATE');")
+
+  [[ "$can_create" == "t" ]] || die "The application role cannot CREATE in the public schema. The database is owned by someone else — 'prepare' asserts the owner, so re-run it against this target."
+
+  # The schema load carried ownership and privileges only if the role can read
+  # every table it owns. A mismatch means the load was partial.
+  # Asked as a SET, not as two counts. Counting invited a population mismatch
+  # that reads as a failure: `pg_tables` is base tables in `public`, while
+  # `information_schema.table_privileges` spans every schema and counts views
+  # too, so the second number can legitimately exceed the first and the
+  # comparison reports a missing grant where none is missing.
+  #
+  # `has_table_privilege` is also the right primitive rather than a privilege
+  # catalog: it answers the question the application will actually ask,
+  # accounting for grants held through role membership, through PUBLIC, and
+  # through ownership — none of which appear as a direct row for this grantee.
+  tables=$(PGPASSWORD="$application_password" "$PSQL" --host "$target_endpoint" --username "$application_role" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT count(*) FROM pg_tables WHERE schemaname='public';")
+  unreadable=$(PGPASSWORD="$application_password" "$PSQL" --host "$target_endpoint" --username "$application_role" \
+    --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r' AND NOT has_table_privilege(c.oid, 'SELECT') ORDER BY c.relname;")
+
+  echo "  tables in public: ${tables}"
+  [[ -z "$unreadable" ]] || die "The role cannot read these tables, so the schema load did not carry every grant: ${unreadable}"
+
+  echo "  DDL available, grants complete — the target is ready for replication"
 }
 
 # Starts the copy: a publication on the source, a subscription on the target.
@@ -611,6 +834,16 @@ command_status() {
   echo "Per-table state on the target — every table must reach 'r'"
   PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname "$APPLICATION_DATABASE" --no-password \
     --command "SELECT srsubstate, count(*) FROM pg_subscription_rel GROUP BY srsubstate;"
+
+  # The counts alone hide the only thing that governs the remaining time. Initial
+  # sync runs a bounded number of workers, so at any moment a handful of tables
+  # are copying and the rest are queued — and a single large table holds its
+  # worker for hours while the count stays put. Naming the tables in flight turns
+  # "the number did not move" into "these two are the ones being copied", which is
+  # the difference between suspecting a stall and reading progress.
+  echo "Tables being copied right now — these hold the workers:"
+  PGPASSWORD="$target_password" "$PSQL" --host "$target_endpoint" --username "$target_master" --dbname "$APPLICATION_DATABASE" --no-password \
+    --command "SELECT c.relname AS table, pg_size_pretty(pg_total_relation_size(c.oid)) AS landed_so_far FROM pg_subscription_rel sr JOIN pg_class c ON c.oid = sr.srrelid WHERE sr.srsubstate = 'd' ORDER BY pg_total_relation_size(c.oid) DESC;"
 
   echo "Stream and lag, from the source"
   PGPASSWORD="$source_password" "$PSQL" --host "$source_endpoint" --username "$source_master" --dbname "$APPLICATION_DATABASE" --no-password \
@@ -771,20 +1004,113 @@ command_release() {
     --command "SELECT usename, count(*) AS connections FROM pg_stat_activity WHERE datname='${APPLICATION_DATABASE}' GROUP BY usename;"
 
   echo
-  echo "Still owed, and neither is covered by the record change:"
-  echo "  - drop the subscription on the target and the publication on the source"
-  echo "  - rewrite MIGRATION_DATABASE_URL, a GitHub environment secret holding a"
-  echo "    direct RDS URL, before the predecessor can be destroyed"
+  echo "Run 'confirm' to prove the application actually moved, then 'rotate-migration-secret'."
+}
+
+# Proves the cutover landed, by asking the POOLER where its backend connections
+# go. The application reaches the database only through the pooler, so this is
+# conclusive in a way nothing on the database side is.
+#
+# Counting connections on the target is NOT conclusive and reads as a failure
+# when it is not: pgbouncer opens server connections on demand, so a quiet
+# environment shows none at all moments after a perfectly good cutover.
+command_confirm() {
+  require_target
+  require_environment
+
+  local target_json target_endpoint target_address addresses address
+  local server_addresses stray
+
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+
+  target_address=$(dig +short "$target_endpoint" | tail -1)
+  [[ -n "$target_address" ]] || die "Could not resolve ${target_endpoint}. The private zone is reachable only over the VPN."
+
+  require_pooler_console
+
+  addresses=$(pooler_task_addresses)
+  resolve_pooler_database "$(echo "$addresses" | awk '{print $1; exit}')"
+
+  for address in $addresses; do
+    server_addresses=$(pooler_console "$address" "SHOW SERVERS;" --tuples-only --no-align --field-separator='|' \
+      | awk -F'|' -v database="$POOLER_DATABASE" '$3 == database { print $6 }' | sort -u)
+
+    echo "Pooler task ${address} holds backend connections to: ${server_addresses:-none open}"
+
+    stray=$(echo "$server_addresses" | grep -v "^${target_address}$" | grep -v '^$' || true)
+    [[ -z "$stray" ]] || die "Pooler task ${address} still reaches ${stray}, not the replacement at ${target_address}. The cutover did not take on every task."
+  done
+
+  echo
+  echo "Every open backend connection points at the replacement (${target_address})."
+}
+
+# Repoints the migration secret, which is the one consumer that lives outside
+# both SSM and Terraform — a GitHub environment secret holding a DIRECT database
+# URL, so a search of either misses it and the predecessor cannot be destroyed
+# until it moves.
+#
+# The new host is the INTERNAL RECORD, never an endpoint. The record is
+# Terraform-maintained and the cutover already repoints it, so a secret naming it
+# follows every future replacement on its own instead of needing this command
+# again.
+command_rotate_migration_secret() {
+  require_target
+  require_environment
+
+  local target_json target_endpoint target_master target_password
+  local application_url migration_url migration_role migration_password
+
+  [[ -n "$INTERNAL_RECORD" ]] || die "Missing --internal-record. It is the Terraform-maintained name the cutover repoints, e.g. database-primary-<env>.4shark.internal"
+  [[ -n "$GITHUB_REPOSITORY" ]] || die "Missing --repo. It is the repository holding the environment secret, e.g. 4shark/app"
+
+  target_json=$(describe_database "$TARGET_IDENTIFIER")
+  target_endpoint=$(instance_field "$target_json" Endpoint)
+  target_master=$(instance_field "$target_json" Master)
+  target_password=$(master_password "$(instance_field "$target_json" Secret)")
+
+  resolve_application_database "$target_endpoint" "$target_master" "$target_password"
+
+  # The application URL supplies the credential and nothing else. Its host, port
+  # and database describe the POOLER — including the LOGICAL database name — and
+  # a direct connection carrying that logical name fails outright, which is the
+  # trap this substitution exists to avoid.
+  application_url=$(aws ssm get-parameter --name "/${ENVIRONMENT}/DATABASE_URL" --with-decryption --region "$REGION" --query 'Parameter.Value' --output text)
+  migration_url=$(printf '%s' "$application_url" | sed -E "s#@[^/]+/.*\$#@${INTERNAL_RECORD}:5432/${APPLICATION_DATABASE}#" | tr -d '\n')
+  migration_role=$(printf '%s' "$migration_url" | sed -E 's#^[a-z]+://([^:]+):.*$#\1#')
+  migration_password=$(printf '%s' "$migration_url" | sed -E 's#^[a-z]+://[^:]+:([^@]*)@.*$#\1#')
+
+  # Verified by USING it, before anything is written. A secret that does not
+  # connect is discovered by the next deploy's migration otherwise — long after
+  # this command reported success.
+  echo "Verifying the composed URL before writing it"
+  PGPASSWORD="$migration_password" "$PSQL" --host "$INTERNAL_RECORD" --port 5432 \
+    --username "$migration_role" --dbname "$APPLICATION_DATABASE" --no-password --tuples-only --no-align \
+    --command "SELECT 'reached '||current_database()||' at '||inet_server_addr();" \
+    || die "The composed migration URL does not connect. Nothing was written to GitHub."
+
+  # Through a file rather than an argument: `gh secret set --body <value>` would
+  # place the URL in argv, where `ps` shows it to every user on the machine.
+  printf '%s' "$migration_url" > /tmp/rds_migration_secret_value.txt
+  gh secret set MIGRATION_DATABASE_URL --env "$ENVIRONMENT" --repo "$GITHUB_REPOSITORY" < /tmp/rds_migration_secret_value.txt
+  rm -f /tmp/rds_migration_secret_value.txt
+
+  echo "  MIGRATION_DATABASE_URL now names ${INTERNAL_RECORD}"
 }
 
 case "$COMMAND" in
+  measure)   command_measure ;;
   preflight) command_preflight ;;
   prepare)   command_prepare ;;
+  certify)   command_certify ;;
   replicate) command_replicate ;;
-  detach)    command_detach ;;
   status)    command_status ;;
   verify)    command_verify ;;
   hold)      command_hold ;;
   release)   command_release ;;
-  *)         die "Usage: rds-key-migration.sh {preflight|prepare|status|verify|hold|release} --source <identifier> --target <identifier> --environment <stack>" ;;
+  confirm)   command_confirm ;;
+  detach)    command_detach ;;
+  rotate-migration-secret) command_rotate_migration_secret ;;
+  *)         die "Usage: rds-key-migration.sh {measure|preflight|prepare|certify|replicate|status|verify|hold|release|confirm|detach|rotate-migration-secret} --source <identifier> --target <identifier> --environment <stack>" ;;
 esac

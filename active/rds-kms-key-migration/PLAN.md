@@ -32,7 +32,7 @@ Reaching that took **two** migrations rather than one. The first moved the data 
 
 The non-productive cluster is **mid-migration**, and it is the first Aurora run — the one that validates the cluster-shaped half of every phase. Its replacement exists as `app-demo-001` with the writer `app-demo-001-instance001` pinned to `us-east-1a`, encrypted under the environment's own key. Phase 1 is complete and proven — the application role logs in, and the 168 tables it owns match the 168 it can read — and replication is running: all 168 tables reached state `r`, the stream reports `streaming` at zero lag with both error counters at zero, and an independent verification found structure and per-table row-id boundaries identical on both sides.
 
-**The cutover is done and the application runs on the replacement.** The internal record resolves to `app-demo-001`, and the pooler's own console reports every server connection open as the application role against that cluster's instance — which is conclusive, because the application reaches the database only through the pooler. What remains for demo is retirement: dropping the subscription and publication, rewriting the direct-connection secret that lives outside SSM and Terraform, and then the two applies that destroy the predecessor.
+**That environment is finished, predecessor destroyed.** Its single database is `app-demo-001` with the writer `app-demo-001-instance001`, encrypted under the environment's own key, and it migrated **once** — the identifier rule earned its place here rather than only being stated. The replication link was severed with its slot confirmed released, the direct-connection secret now names the internal record instead of an endpoint (so no future replacement touches it), and the predecessor's AWS Backup recovery points survive its deletion.
 
 The two productive clusters follow, in that order, and they inherit everything demo surfaces.
 
@@ -61,6 +61,76 @@ The repair is structural rather than procedural: `modules/connection_pooler` nam
 What it does cost is a reconnect: the idle pooled client connections on the outgoing tasks close, and clients open new ones. Applying the pin across the fleet exercised this at every scale — the application logged **zero** connection errors on all four stacks, against 715 log events on demo, 11,480 on shared and 31,429 on atento. **The one consumer never exercised is the outbound payroll worker**, which reaches shared's pooler across a region boundary and rests at zero replicas by design; its reconnect path is the longest in the fleet and the first run after a pooler replacement is the first real observation of it.
 
 Fargate platform version is a prerequisite for the pinned form (1.4.0+) and every pooler service runs on `LATEST`, so nothing else is owed.
+
+## The copy wants a quiet window; the cutover wants a STAFFED one
+
+These are different windows and they pull in opposite directions, so scheduling them as one event gets one of them wrong.
+
+**The copy is background and belongs on the quiet days.** It runs with the source serving normally, its cost is I/O on both clusters, and nothing about it touches the application. A weekend is the right place for it — not because it must finish there, but because that is when the heavy I/O competes with the least.
+
+**The cutover belongs at the START of a working week.** It is seconds long and engineered not to drop a connection, so the risk is not in the operation — it is in the hours and days after, when the application is running against a database it has never run against before. That is when a missing grant, a sequence, or a performance characteristic surfaces, and the thing that bounds the damage is people being available to see it and act. A Sunday-night cutover buys the quietest traffic and the emptiest on-call; a Monday or Tuesday morning cutover buys the opposite, and the opposite is what this risk needs.
+
+**So the copy finishing outside the weekend is not a failure of the plan.** Once the initial copy completes, the subscription stays in streaming mode and holds the target current indefinitely — completion and cutover are independent events, and the target can sit in sync for as long as the schedule wants.
+
+What bounds that waiting is the **migration freeze**: DDL is not replicated, so no schema migration may ship between `replicate` and `confirm`, and a migration that ships anyway diverges the target while replication keeps reporting healthy. The freeze is the reason the wait cannot be indefinite — it is not the two clusters' cost, which is minor.
+
+**Expect a cold cache after the cutover, and do not read it as a regression.** The replacement has never served this workload, so its buffer cache is empty against a working set far larger than the instance's memory; the first queries go to disk and latency is elevated until the cache fills. It resolves on its own. The reader instance is cold for the same reason. Reverting on this signal would trade a transient for a second full cutover.
+
+## The schema is loaded in THREE blocks, and the secondary indexes go on last
+
+The initial copy's cost is not moving rows — it is maintaining indexes while the rows land. A table carrying more index than heap pays that on every row: `commissionings` holds 18 GB of index across ten indexes over an 11 GB heap and copies at roughly a fifth the rate of a table with half the index count over three times the data. Building those indexes once, in bulk, after the data is in place is cheaper than maintaining them row by row during the copy.
+
+`pg_dump --section` splits the schema natively. Post-data holds *"definitions of indexes, triggers, rules, statistics for indexes, and constraints other than validated check and not-null constraints"*; pre-data holds everything else. So a plain two-way pre-data / post-data split defers the indexes — **and takes the primary keys with them, which breaks replication.**
+
+**The primary keys must be present before replication starts.** The subscriber locates each row an `UPDATE` or `DELETE` touches through the replica identity, which is the primary key by default. Without it PostgreSQL falls back to scanning: *"the search on the subscriber side can be very inefficient, therefore replica identity FULL should only be used as a fallback if no other solution is possible."* A sequential scan per modified row against a 61 GB table costs far more than the index maintenance the split was meant to avoid — and it costs it during the streaming phase, which runs until the cutover.
+
+The load is therefore three blocks, in this order:
+
+1. **pre-data** — tables, columns, defaults, sequences. No indexes, no constraints.
+2. **primary keys** (and any unique index serving as a replica identity) — everything replication needs to find a row.
+3. `replicate`, and the copy runs against a target carrying only the indexes it cannot work without.
+4. **the rest of post-data** — secondary indexes, foreign keys, triggers, remaining constraints — applied once the copy has caught up.
+
+Block 2 is not a `--section` value, so it is carved out of the post-data dump rather than dumped separately. Take the dump in the custom format and drive the selection with `pg_restore --list` / `--use-list`, which exists for exactly this: the TOC names every index and constraint individually, so the split is a filtered restore rather than text-editing SQL.
+
+**Nothing is ever dropped, and no window exists where an unindexed database serves traffic.** The indexes are created on a target that has never received a request, while the predecessor is still serving every client. The cutover happens after `verify` confirms the index count matches the source — so a missed index blocks the cutover instead of reaching production. That is what separates this from dropping indexes on a live database, which this procedure never does on either side.
+
+**What is NOT measured**: whether the bulk build actually beats the inline maintenance on a `db.t4g.large`. The community consensus favours it, and `pg_restore -j` can parallelise the index build in a way inline maintenance cannot, but two vCPUs and 8 GB of memory bound both halves and the sort spills to disk. The first environment to use this split is where that gets measured — `measure` reports index weight per table, so the prediction and the result can be compared.
+
+## The sequence, end to end
+
+One environment, in order. `<env>` is the stack (`shared-001`), `<source>` its existing cluster, `<target>` the replacement named per ADR-012. Everything up to `hold` is reversible.
+
+```
+S=app-<env>-cluster ; T=app-<env> ; E=<env>
+D=~/Projects/4Shark/terraform/app-<env>
+
+# PR 1 — declare the replacement (writer pinned to the source writer's zone,
+#        environment's own KMS key, `self` ingress on the database SG)
+rds-key-migration.sh preflight --source $S --target $T --environment $E
+rds-key-migration.sh prepare   --source $S --target $T --environment $E
+rds-key-migration.sh certify   --target $T --environment $E
+rds-key-migration.sh replicate --source $S --target $T
+rds-key-migration.sh status    --source $S --target $T     # until every table reads 'r'
+rds-key-migration.sh verify    --source $S --target $T
+
+# PR 2 — the cutover: repoint the internal record
+rds-key-migration.sh hold      --source $S --target $T --environment $E --stack-dir $D
+#   ... engineer applies PR 2 here, inside the window ...
+rds-key-migration.sh release   --target $T --environment $E --stack-dir $D
+rds-key-migration.sh confirm   --target $T --environment $E --stack-dir $D
+
+# Retirement — only after the environment has run on the replacement
+rds-key-migration.sh detach    --source $S --target $T
+rds-key-migration.sh rotate-migration-secret --target $T --environment $E \
+  --internal-record database-primary-<env>.4shark.internal --repo 4shark/app
+# PR 3 — deletion_protection = false, skip_final_snapshot = true
+# PR 4 — remove the module block, repoint backup.tf at the replacement
+```
+
+**Three things sit outside the script and each one has bitten.** The **MFA session is renewed BEFORE `hold`, never inside the window** — an apply needs a 15-minute margin, and discovering an expired session with clients held turns a window into an outage. The **schema-migration freeze** holds from `replicate` to `confirm`, because DDL is not replicated and a migration mid-window desynchronises the target silently while the subscription keeps reporting healthy. And **`backup.tf` names the predecessor**, so PR 4 repoints it in the same change — removing the module without that fails to plan, and the version that plans leaves the environment's cross-region recovery following a database that no longer exists.
+
+**Before accepting `skip_final_snapshot`, confirm the backups exist** — `aws backup list-recovery-points-by-resource --resource-arn <cluster-arn>`. That is what makes the skipped snapshot a duplicate rather than a loss, and it is checked per environment rather than assumed from the backup plan.
 
 ## The procedure
 
@@ -319,17 +389,21 @@ Each apply is its own PR, which keeps one commit per pull request and makes each
 | Verb | Phase | What it does |
 |---|---|---|
 | `preflight` | 0 | Client-versus-server version, zone match, network comparison, pooler-console currency |
-| `prepare` | 1 | Roles, the md5 verifier transplant, the database, the atomic schema load |
+| `prepare` | 1 | Roles, the md5 verifier transplant, the database with its owner asserted, the atomic schema load |
+| `certify` | 1 | Connects AS the application: login, DDL privilege, grant completeness |
 | `replicate` | 2 | Publication on the source, subscription on the target |
 | `status` | 3 | Per-table state, stream and lag, error counters |
-| `verify` | 4 | Structure by catalog, row-id boundaries per table |
+| `verify` | 4 | Structure and ownership by catalog, row-id boundaries per table |
 | `hold` / `release` | 5 | Opens and closes the cutover window around the engineer's apply |
+| `confirm` | 5 | Asks the pooler where its backend connections go — the conclusive proof |
+| `detach` | 6 | Drops the subscription and publication, verifies the slot was released |
+| `rotate-migration-secret` | 6 | Repoints the migration secret at the internal record, verified before writing |
 
 **The engineer owns** the Terraform — declaring the replacement, repointing the record, retiring the predecessor — every apply, and the migration freeze.
 
 **The cutover is NOT one indivisible verb, and that is forced rather than chosen.** The apply that repoints the record sits inside the window where clients are held, and an apply is the engineer's approval — so the window opens with `hold` and closes with `release`, with the apply between them. Every other seam would park the system between two databases; this one already exists because the approval boundary creates it.
 
-**What the script deliberately does NOT do is the login proof that closes Phase 1.** Proving the application role means connecting as it, which needs the plaintext password from `/<env>/DATABASE_URL` — and the md5 transplant is built from the pooler's userlist precisely so that value is never read. Run it separately, and run it: a role can exist, own every table and carry the correct verifier and still be unable to connect (finding 23).
+**`certify` is the verb that earns its place most.** It connects AS the application, and every cheaper check passes on a target the application cannot use: a role can exist, own every table, carry the correct verifier, and match the source on schema-ACL text, and still be unable to log in (finding 23) or run a migration (finding 29). It reads the plaintext from `/<env>/DATABASE_URL` for that one connection — the md5 transplant still works from the pooler's userlist, so the plaintext is read to *verify*, never to *set*.
 
 Three things the script resolves for itself rather than accepting as arguments, because each is a fact about the system that a caller could get wrong:
 
