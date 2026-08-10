@@ -2,9 +2,11 @@
 
 ## What this is
 
-The command-level procedure for the last surface of the KMS key-per-environment migration. It exists to be executed **manually once on a non-productive environment**, corrected against what actually happens, and only then turned into a skill plus a binary — the same shape `mongodb-reprovision` has, where the script owns the dangerous repetitive half and the engineer owns the Terraform and the gates.
+The command-level procedure for the last surface of the KMS key-per-environment migration. It has the shape `mongodb-reprovision` has: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply.
 
-Written before the first manual run, so **every step is a hypothesis until it is executed**. Steps that have already been verified against AWS or the live configuration are marked; the rest are not, and the point of the manual run is to find out where this document is wrong.
+**The script is the `rds-reprovision` skill**, invoked from its installed path — `bash ~/.claude/skills/rds-reprovision/scripts/rds-reprovision.sh <verb> ...`. The sequence below writes it as `rds-reprovision.sh` for readability; the real invocation is always the full installed path, bare, with no redirection or trailing `echo` (that is what keeps one allow-list entry covering the dozens of calls inside it).
+
+**The procedure is proven — it has carried four migrations across three environments, including one productive.** What each run corrected lives in `EXECUTION-LOG.md` as numbered findings; this document carries the procedure those findings produced. Where something is still unmeasured it says so, and the remaining environment is where it gets measured.
 
 ## Why one procedure covers all four environments
 
@@ -26,15 +28,15 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 
 ## State
 
-The non-productive single-instance environment is **done**. It runs on one database, `app-beta-001`, in `us-east-1b`, encrypted under the environment's own key, with the predecessor destroyed and its AWS Backup recovery points retained.
+**Three of the four environments run on their own key, every predecessor destroyed. `atento-001` is the only one left.**
 
-Reaching that took **two** migrations rather than one. The first moved the data onto the environment's key but had to create the replacement under a suffixed identifier, because the original still held the name. The second corrected the name. An instance's identifier is fixed at creation as far as Terraform is concerned — AWS supports an in-place rename that the provider does not expose — so a name is not editable, it is a second copy. **Name the replacement the way the environment should be named forever, before any data moves.**
+`app-beta-001` (single instance, `us-east-1b`) took **two** migrations rather than one. The first moved the data onto the environment's key but had to create the replacement under a suffixed identifier, because the original still held the name. The second corrected the name. An instance's identifier is fixed at creation as far as Terraform is concerned — AWS supports an in-place rename that the provider does not expose — so a name is not editable, it is a second copy. **Name the replacement the way the environment should be named forever, before any data moves.** That rule was paid for here and honoured everywhere since.
 
-The non-productive cluster is **mid-migration**, and it is the first Aurora run — the one that validates the cluster-shaped half of every phase. Its replacement exists as `app-demo-001` with the writer `app-demo-001-instance001` pinned to `us-east-1a`, encrypted under the environment's own key. Phase 1 is complete and proven — the application role logs in, and the 168 tables it owns match the 168 it can read — and replication is running: all 168 tables reached state `r`, the stream reports `streaming` at zero lag with both error counters at zero, and an independent verification found structure and per-table row-id boundaries identical on both sides.
+`app-demo-001` (writer `app-demo-001-instance001`, `us-east-1a`) was the first Aurora run and migrated **once**. It validated the cluster-shaped half of every phase and moved the direct-connection secret onto the internal record instead of an endpoint, so no future replacement touches it.
 
-**That environment is finished, predecessor destroyed.** Its single database is `app-demo-001` with the writer `app-demo-001-instance001`, encrypted under the environment's own key, and it migrated **once** — the identifier rule earned its place here rather than only being stated. The replication link was severed with its slot confirmed released, the direct-connection secret now names the internal record instead of an endpoint (so no future replacement touches it), and the predecessor's AWS Backup recovery points survive its deletion.
+`app-shared-001` (writer `app-shared-001-instance001`, `us-east-1b`) was the first **productive** run and the first at real volume: 318 GB across 171 tables, copied in about 45 hours. `verify` found catalog structure and per-table row-id boundaries identical, with the target 1 GB smaller than the source — the source's accumulated bloat, which a fresh copy does not reproduce, and the expected direction rather than missing rows. Its cutover advanced 125 sequences at zero lag and dropped no connection. **Its predecessor's CloudWatch log group survives the cluster deliberately** (see Phase 6).
 
-The two productive clusters follow, in that order, and they inherit everything demo surfaces.
+`app-atento-001` is next and is the largest at roughly 350 GB, so at the rate shared measured its copy runs about two days. Everything below is what those runs produced.
 
 ## Paying nothing for the copy is a REQUIREMENT, not an optimization
 
@@ -95,7 +97,9 @@ Block 2 is not a `--section` value, so it is carved out of the post-data dump ra
 
 **Nothing is ever dropped, and no window exists where an unindexed database serves traffic.** The indexes are created on a target that has never received a request, while the predecessor is still serving every client. The cutover happens after `verify` confirms the index count matches the source — so a missed index blocks the cutover instead of reaching production. That is what separates this from dropping indexes on a live database, which this procedure never does on either side.
 
-**What is NOT measured**: whether the bulk build actually beats the inline maintenance on a `db.t4g.large`. The community consensus favours it, and `pg_restore -j` can parallelise the index build in a way inline maintenance cannot, but two vCPUs and 8 GB of memory bound both halves and the sort spills to disk. The first environment to use this split is where that gets measured — `measure` reports index weight per table, so the prediction and the result can be compared.
+**The baseline to beat is known, which is what makes this measurable rather than an article of faith.** A full copy against a target carrying every index moved **318 GB in about 45 hours** on a `db.t4g.large` — roughly 7 GB/h overall. Read that as an average and not as a rate: the first hours run far faster because the small tables finish first, so an early extrapolation predicts a completion that never arrives, and the tail is where the index-heavy tables sit. `measure` reports heap, index weight and index count per table before anything moves, so the tables that will dominate are known in advance.
+
+**What is NOT measured**: whether the bulk build actually beats the inline maintenance on a `db.t4g.large`. The community consensus favours it, and `pg_restore -j` can parallelise the index build in a way inline maintenance cannot, but two vCPUs and 8 GB of memory bound both halves and the sort spills to disk. The gain is also not free at the far end — the post-copy index build is time the target spends unusable for a cutover, so a split that halves the copy and spends the saving rebuilding indexes has moved the cost rather than removed it. **Time both halves separately on the run that uses it**: the copy from `replicate` to every table reading `r`, and the block-4 restore from start to finish. Their sum against 45 hours per 318 GB is the answer; either number alone is not.
 
 ## The sequence, end to end
 
@@ -105,30 +109,41 @@ One environment, in order. `<env>` is the stack (`shared-001`), `<source>` its e
 S=app-<env>-cluster ; T=app-<env> ; E=<env>
 D=~/Projects/4Shark/terraform/app-<env>
 
+rds-reprovision.sh measure   --source $S            # size, index weight, WAL rate — before anything
+
 # PR 1 — declare the replacement (writer pinned to the source writer's zone,
 #        environment's own KMS key, `self` ingress on the database SG)
-rds-key-migration.sh preflight --source $S --target $T --environment $E
-rds-key-migration.sh prepare   --source $S --target $T --environment $E
-rds-key-migration.sh certify   --target $T --environment $E
-rds-key-migration.sh replicate --source $S --target $T
-rds-key-migration.sh status    --source $S --target $T     # until every table reads 'r'
-rds-key-migration.sh verify    --source $S --target $T
+rds-reprovision.sh preflight --source $S --target $T --environment $E
+rds-reprovision.sh prepare   --source $S --target $T --environment $E   # blocks 1 and 2 only
+rds-reprovision.sh certify   --target $T --environment $E
+rds-reprovision.sh replicate --source $S --target $T
+rds-reprovision.sh status    --source $S --target $T     # until every table reads 'r'
+#   ... load block 4 — secondary indexes, foreign keys, triggers ...
+rds-reprovision.sh verify    --source $S --target $T
 
-# PR 2 — the cutover: repoint the internal record
-rds-key-migration.sh hold      --source $S --target $T --environment $E --stack-dir $D
-#   ... engineer applies PR 2 here, inside the window ...
-rds-key-migration.sh release   --target $T --environment $E --stack-dir $D
-rds-key-migration.sh confirm   --target $T --environment $E --stack-dir $D
+# PR 2 — the cutover: repoint the internal record AND the backup selections
+rds-reprovision.sh hold      --source $S --target $T --environment $E --stack-dir $D
+#   ... engineer applies PR 2 here, inside the window, with -replace on each
+#       restore-testing selection ...
+rds-reprovision.sh release   --target $T --environment $E --stack-dir $D
+rds-reprovision.sh confirm   --target $T --environment $E --stack-dir $D
+#   ... verify the repointed selections against AWS, per region ...
 
 # Retirement — only after the environment has run on the replacement
-rds-key-migration.sh detach    --source $S --target $T
-rds-key-migration.sh rotate-migration-secret --target $T --environment $E \
-  --internal-record database-primary-<env>.4shark.internal --repo 4shark/app
+rds-reprovision.sh detach    --source $S --target $T
 # PR 3 — deletion_protection = false, skip_final_snapshot = true
-# PR 4 — remove the module block, repoint backup.tf at the replacement
+# PR 4 — remove the module block (the predecessor's log group stays)
 ```
 
-**Three things sit outside the script and each one has bitten.** The **MFA session is renewed BEFORE `hold`, never inside the window** — an apply needs a 15-minute margin, and discovering an expired session with clients held turns a window into an outage. The **schema-migration freeze** holds from `replicate` to `confirm`, because DDL is not replicated and a migration mid-window desynchronises the target silently while the subscription keeps reporting healthy. And **`backup.tf` names the predecessor**, so PR 4 repoints it in the same change — removing the module without that fails to plan, and the version that plans leaves the environment's cross-region recovery following a database that no longer exists.
+**Three things sit outside the script and each one has bitten.** The **MFA session is renewed BEFORE `hold`, never inside the window** — an apply needs a 15-minute margin, and discovering an expired session with clients held turns a window into an outage. The **schema-migration freeze** holds from `replicate` to `confirm`, because DDL is not replicated and a migration mid-window desynchronises the target silently while the subscription keeps reporting healthy. And **the backup resources name the predecessor** — the plan's backup selection and, where the stack declares them, the restore-testing selections — so PR 2 repoints all of them alongside the record, rather than deferring it to the teardown. A predecessor that stops being backed up the moment it stops serving is the wrong trade; the replacement is what needs protecting from the cutover onward.
+
+**Verify a repoint against AWS, never against terraform's own report.** A backup selection is force-new, so terraform destroys and recreates it and the new value lands at creation; a restore-testing selection updates in place, and that update has been observed to report success without persisting. `Modifications complete after 0s` against a remote API is the tell — a change that reached AWS takes measurable time. Apply the cutover with `-replace` on each restore-testing selection so it takes the recreate path, then read the live value back per region, because the cross-region selection is a separate resource and a check that covers only the local one passes while half the repoint is missing:
+
+```bash
+aws backup get-restore-testing-selection --restore-testing-plan-name <plan> --restore-testing-selection-name <selection> --region <region> --query 'RestoreTestingSelection.ProtectedResourceArns'
+```
+
+Left unrepointed, restore testing targets a cluster that is about to be destroyed: the validation that proves the backups are restorable stops being real without failing loudly. Only `app-shared-001` declares restore testing today — check whether the environment being migrated does before assuming this step is empty.
 
 **Before accepting `skip_final_snapshot`, confirm the backups exist** — `aws backup list-recovery-points-by-resource --resource-arn <cluster-arn>`. That is what makes the skipped snapshot a duplicate rather than a loss, and it is checked per environment rather than assumed from the backup plan.
 
@@ -201,26 +216,47 @@ pg_dumpall --roles-only --no-role-passwords --host <source-host> --username <mas
 
 `--no-role-passwords` is mandatory, not a preference: the RDS master is not a superuser, so reading password verifiers fails with `permission denied for table pg_authid` and the dump produces nothing at all.
 
-Review that file before loading it: `pg_dumpall` emits the RDS-internal roles too, and loading those either fails or is a no-op. Then load what is genuinely ours:
+**`pg_dumpall` records the GRANTOR of every role membership, and the target's master cannot act as it.** The dump emits `GRANT "<app-role>" TO postgres WITH INHERIT TRUE GRANTED BY rdsadmin`, and the target master is not `rdsadmin`, so that statement fails with `permission denied to grant privileges as role "rdsadmin"`. The failure is quiet in its consequence rather than in its message: the master never becomes a member of the application role, and `CREATE DATABASE ... OWNER <app-role>` in step 1.2 is then refused with `must be able to SET ROLE`. Strip the grantor, along with the privileged attribute tokens the master also cannot set:
+
+```bash
+sed -e 's/ NOSUPERUSER//g' -e 's/ NOREPLICATION//g' -e 's/ NOBYPASSRLS//g' -e 's/ GRANTED BY [^;]*//g' /tmp/roles.sql > /tmp/roles_loadable.sql
+```
+
+Review the file before loading it: `pg_dumpall` emits the RDS-internal roles too, and loading those either fails or is a no-op. Then load what is genuinely ours:
 
 ```bash
 psql --host <target-host> --username <master-user> --dbname postgres --file /tmp/roles.sql
 ```
 
-**1.1a The application role arrives with no password, and how you restore it decides whether the pooler works after cutover.**
+**1.1a Every role the pooler authenticates with arrives on the target with no password, and how you restore them decides whether the pooler works after cutover.**
 
-Setting it from the plaintext the application uses is the obvious move and it is **wrong**. `password_encryption` is `scram-sha-256`, so `ALTER ROLE ... PASSWORD '<plaintext>'` stores a **SCRAM** verifier. The pooler's userlist holds an **md5** verifier for that role (`auth_type = md5`), and md5 is all it can answer with — a server holding a SCRAM verifier demands SCRAM, and the pooler cannot compute SCRAM from an md5 hash. Everything looks correct until the repoint, and then the pooler cannot reach the target **inside the cutover window**.
+Setting one from the plaintext the application uses is the obvious move and it is **wrong**. `password_encryption` is `scram-sha-256`, so `ALTER ROLE ... PASSWORD '<plaintext>'` stores a **SCRAM** verifier. The pooler's userlist holds an **md5** verifier for that role (`auth_type = md5`), and md5 is all it can answer with — a server holding a SCRAM verifier demands SCRAM, and the pooler cannot compute SCRAM from an md5 hash. The pooler then reports `cannot do SCRAM authentication: wrong password type` on every attempt to open a server connection.
 
 Copy the verifier instead. PostgreSQL accepts a pre-hashed md5 string verbatim, and the md5 verifier is `md5(password || rolename)` — bound to the role name, which is identical on both sides, so the transplant is exact. PostgreSQL 18 accepts it with a deprecation warning; support runs through v20 ([release notes](https://www.postgresql.org/docs/18/release-18.html)).
+
+**The transplant covers EVERY role in the pooler's `[databases]` section, not the application role alone — and a productive stack has more than one.** A stack with a read follower declares two pools, a master pool and a follower pool, each with its own distinct role; the follower's role owns no tables, so the `prepare` step that resolves "the application role" from table ownership never sees it. Transplanting only what that resolution returns leaves the second role holding a SCRAM verifier, and the consequence is **partial and therefore quiet**: the master pool authenticates and the application serves, while the follower pool fails to open server connections and every read routed to it errors. Read the roles from the pooler's own configuration rather than assuming how many there are:
+
+```bash
+aws ecs describe-task-definition --task-definition <env>-connection-pooler --region us-east-1 --query 'taskDefinition.containerDefinitions[0].environment[?name==`PGBOUNCER_INI_B64`].value' --output text > /tmp/pgbouncer_ini_b64.txt
+base64 --decode -i /tmp/pgbouncer_ini_b64.txt -o /tmp/pgbouncer.ini
+sed -n 's/.*[[:space:]]user=\([^[:space:]]*\).*/\1/p' /tmp/pgbouncer.ini | sort -u > /tmp/pooler_roles.txt
+```
+
+`stats_users` and `admin_users` are deliberately excluded by that extraction — they are PgBouncer console accounts, not database roles, and an `ALTER ROLE` naming one fails. Then emit one statement per pooler role and confirm the count matches the number of pools before loading anything:
 
 ```bash
 aws secretsmanager get-secret-value --secret-id <env>-connection-pooler-userlist --region us-east-1 --query SecretString --output text > /tmp/userlist_b64.txt
 base64 --decode -i /tmp/userlist_b64.txt -o /tmp/userlist.txt
-sed -n "s/^\"<app-role>\" \"\(md5[0-9a-f]\{32\}\)\".*/ALTER ROLE \"<app-role>\" PASSWORD '\1';/p" /tmp/userlist.txt > /tmp/set_app_role_password.sql
-psql --host <target-host> --username <master-user> --dbname <dbname> --set ON_ERROR_STOP=1 --file /tmp/set_app_role_password.sql
+awk -F'"' 'NR==FNR { pooler_role[$1] = 1; next } pooler_role[$2] && $4 ~ /^md5/ { printf "ALTER ROLE \"%s\" PASSWORD '\''%s'\'';\n", $2, $4 }' /tmp/pooler_roles.txt /tmp/userlist.txt > /tmp/set_pooler_role_passwords.sql
+wc -l /tmp/pooler_roles.txt /tmp/set_pooler_role_passwords.sql
+psql --host <target-host> --username <master-user> --dbname <dbname> --set ON_ERROR_STOP=1 --file /tmp/set_pooler_role_passwords.sql
 ```
 
-The verifier never passes through a terminal or a session — it moves file to file. Delete `/tmp/userlist*.txt` and the generated `.sql` as soon as the `ALTER ROLE` returns.
+A statement count below the role count means a pooler role is missing from the userlist or is not stored as md5 — stop there, because loading the short file leaves exactly the silent half-failure described above.
+
+The verifier never passes through a terminal or a session — it moves file to file. Delete `/tmp/userlist*.txt`, `/tmp/pgbouncer*`, `/tmp/pooler_roles.txt` and the generated `.sql` as soon as the `ALTER ROLE` statements return.
+
+**`pg_authid` cannot confirm this afterwards — RDS denies it to the master, so there is no SQL check of a role's credential type.** What confirms it is the pooler's own log: `aws logs tail /ecs/<env>-connection-pooler --since 30m --filter-pattern "wrong password type"` returning nothing once the tasks have recycled their server connections (`server_lifetime = 600`, so within ten minutes). A run that skips this check discovers the gap only when a user hits a read.
 
 **Then prove it, rather than reasoning about it.** The application's plaintext password lives in `/<env>/DATABASE_URL` (SSM, `SecureString`), which is what makes a real end-to-end login test possible:
 
@@ -236,7 +272,11 @@ A successful login proves the verifier; the privilege count matching the table c
 psql --host <target-host> --username <master-user> --dbname postgres --command "CREATE DATABASE <dbname>;"
 ```
 
-**1.3 Load the schema, structure only — preserving ownership, inside a transaction.**
+**1.3 Load the schema in three blocks, preserving ownership, each block atomic.**
+
+The target is filled by a copy whose cost is index maintenance, not row movement, so it is built carrying **only the indexes replication cannot work without** and receives the rest after the copy has caught up. The reasoning and the pg_dump mechanics are in *The schema is loaded in THREE blocks* above; this is the step that performs it.
+
+**`prepare` loads the schema as one block today — the split is owed to the binary before it runs on the largest environment.** A run that uses the split before that change performs blocks 1, 2 and 4 by hand against the dump `prepare` already produces.
 
 Check who owns the application tables on the source first. The answer decides whether the dump may strip ownership, and on this application it may not:
 
@@ -244,19 +284,50 @@ Check who owns the application tables on the source first. The answer decides wh
 psql --host <source-host> --username <master-user> --dbname <dbname> --command "SELECT tableowner, count(*) FROM pg_tables WHERE schemaname='public' GROUP BY tableowner;"
 ```
 
-Every application table is owned by the application role, not by the master. A dump taken with `--no-owner` would leave them all owned by the master on the target, and the application — which connects as its own role — could not write after cutover. So the dump preserves ownership, which is `pg_dump`'s default:
+Every application table is owned by the application role, not by the master. A dump taken with `--no-owner` would leave them all owned by the master on the target, and the application — which connects as its own role — could not write after cutover. So the dump preserves ownership, which is `pg_dump`'s default.
+
+Take the schema in the **custom format**, because the three-block split is driven by the archive's table of contents rather than by editing SQL text:
 
 ```bash
-pg_dump --schema-only --host <source-host> --username <master-user> --dbname <dbname> --file /tmp/schema.sql
+pg_dump --schema-only --format=custom --host <source-host> --username <master-user> --dbname <dbname> --file /tmp/schema.dump
 ```
 
-The load is **atomic, and this is not optional**:
+**Block 1 — pre-data.** Tables, columns, defaults, sequences. No indexes, no constraints:
 
 ```bash
-psql --host <target-host> --username <master-user> --dbname <dbname> --single-transaction --set ON_ERROR_STOP=1 --file /tmp/schema.sql
+pg_restore --section=pre-data --file /tmp/block1_pre_data.sql /tmp/schema.dump
+```
+
+**Block 2 — the replica identities.** List the post-data TOC, keep only the primary-key and unique-index entries that serve as a replica identity, and restore that filtered list:
+
+```bash
+pg_restore --section=post-data --list /tmp/schema.dump > /tmp/post_data_toc.txt
+grep -E 'CONSTRAINT .*_pkey|INDEX .*_pkey' /tmp/post_data_toc.txt > /tmp/block2_keys.txt
+pg_restore --use-list /tmp/block2_keys.txt --file /tmp/block2_keys.sql /tmp/schema.dump
+```
+
+**Block 4 — everything else in post-data.** The complement of block 2, applied only after the copy has caught up:
+
+```bash
+grep -vE 'CONSTRAINT .*_pkey|INDEX .*_pkey' /tmp/post_data_toc.txt > /tmp/block4_rest.txt
+pg_restore --use-list /tmp/block4_rest.txt --file /tmp/block4_rest.sql /tmp/schema.dump
+```
+
+**Confirm the split covers the whole TOC before loading anything** — every post-data entry belongs to exactly one of the two lists. A pattern that misses an entry silently drops an index or a foreign key, and the loss surfaces at `verify` if you are lucky and in production if you are not. Compare the line counts: blocks 2 and 4 together must equal the full post-data listing.
+
+**Every block loads atomically, and this is not optional**:
+
+```bash
+psql --host <target-host> --username <master-user> --dbname <dbname> --single-transaction --set ON_ERROR_STOP=1 --file <block>.sql
 ```
 
 Without those two flags an interrupted load leaves a half-built schema that the next run silently completes around, producing a database assembled from two runs and reporting `already exists` errors that look harmless. With them, an interruption rolls back to empty and the operator simply runs it again.
+
+**The dump carries session settings that can postdate the target, and the newest client is a deliberate choice.** `pg_dump` emits `SET` statements for the server it was built against; a client newer than the target emits settings the target rejects outright, failing the load on its first line. The client must be at least as new as the newest server in the fleet, so it is newer than the older ones by construction — the settings are stripped rather than the client downgraded. `prepare` deletes the known offender before loading; a manual run does the same:
+
+```bash
+sed -e '/^SET transaction_timeout = /d' /tmp/block1_pre_data.sql > /tmp/block1_loadable.sql
+```
 
 ### Phase 2 — Start replication
 
@@ -265,15 +336,15 @@ Without those two flags an interrupted load leaves a half-built schema that the 
 **2.2 Publication on the source.** Requires `rds_superuser`.
 
 ```bash
-psql --host <source-host> --username <master-user> --dbname <dbname> --command "CREATE PUBLICATION key_migration FOR ALL TABLES;"
+psql --host <source-host> --username <master-user> --dbname <dbname> --command "CREATE PUBLICATION reprovision FOR ALL TABLES;"
 ```
 
 **2.3 Subscription on the target.** The connection string carries the master password, so this command is composed and run by the engineer with the value from their own shell — it is the one command in this procedure that cannot be copied verbatim from a document.
 
 ```
-CREATE SUBSCRIPTION key_migration
+CREATE SUBSCRIPTION reprovision
   CONNECTION 'host=<source-host> dbname=<dbname> user=<master-user> password=<from-secrets-manager>'
-  PUBLICATION key_migration;
+  PUBLICATION reprovision;
 ```
 
 `copy_data` defaults to true, which is what performs the initial load. That is the whole reason the target was created empty.
@@ -292,7 +363,9 @@ On the source, the lag in bytes:
 psql --host <source-host> --username <master-user> --dbname <dbname> --command "SELECT application_name, state, pg_wal_lsn_diff(sent_lsn, replay_lsn) AS lag_bytes FROM pg_stat_replication;"
 ```
 
-**This is where the first real number gets measured**: how long the initial copy takes. It is unknown, and it is the number that decides whether the productive cutover is scheduled for a quiet hour or can happen any time.
+**Read the progress as tables finished, not as elapsed time against a percentage.** The small tables finish first, so the early hours look far faster than the copy will average and an extrapolation taken there predicts a completion that never arrives. A full copy against a fully-indexed target moved 318 GB in about 45 hours; the index-heavy tables are the tail. `pg_subscription_rel` naming the tables still in state `d` is what tells you which ones are holding the copy — the ones `measure` flagged for index weight are the ones you expect to see there.
+
+**Nothing about a long copy needs intervening on.** The subscription streams once the initial copy finishes and holds the target current indefinitely, so a copy that runs past the window it started in has not failed — completion and cutover are independent (see *The copy wants a quiet window*).
 
 ### Phase 4 — Verify the target independently
 
@@ -378,18 +451,29 @@ The cutover itself:
 
 Only after a period of the replacement serving without incident, and it is **two applies whose order the provider forces**. The first sets `deletion_protection = false` and `skip_final_snapshot = true`; the second removes the module block. Both arguments reach AWS only at deletion, and the protection is editable only while the resource is still declared, so a single apply that lifted it and deleted the declaration fails.
 
+**The predecessor must be RUNNING for either apply — do not stop it to save money before the teardown.** AWS refuses both `ModifyDBCluster` and `DeleteDBCluster` on a stopped cluster, so a stopped predecessor has to be started and waited back to `available` before anything can proceed. Stopping it is legitimate as a *test* — it answers "does anything still reach the old database?" the way nothing else does — but it is then undone, and the test costs a start plus the wait. **The cheaper test is the connection metric**, which answers the same question without touching the cluster:
+
+```bash
+aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name DatabaseConnections --dimensions Name=DBClusterIdentifier,Value=<predecessor> --start-time <iso> --end-time <iso> --period 300 --statistics Maximum --region us-east-1
+```
+
+A predecessor that has held zero connections since the cutover is a predecessor nothing points at. Leaving it running and idle for that observation window is the shape that costs nothing but time.
+
 Skipping the final snapshot is deliberate and needs its evidence each time: AWS Backup already holds daily recovery points for these instances, so the snapshot would duplicate a backup that exists. Confirm the recovery points before accepting the skip — `aws backup list-recovery-points-by-resource --resource-arn <instance-arn>` answers it in one call.
+
+**On a productive environment the predecessor's CloudWatch log group is KEPT, and its declaration stays in the stack.** The cluster is destroyed; the group is not. Its retention window then runs out on its own, which leaves the collected records readable for as long as a problem traceable to the period that database served can still surface — the destroy would otherwise discard them at the moment they become most useful. Nothing writes there afterwards, so the group is retained rather than orphaned, and the declaration comes out in a later change once the window has passed. Say so in a comment at the declaration, because a log group whose cluster no longer exists reads as leftover to anyone who was not there.
 
 Each apply is its own PR, which keeps one commit per pull request and makes each apply match a state a reviewer can read.
 
 ## What the binary owns, and what stays with the engineer
 
-`rds-key-migration.sh`, alongside this document, follows `mongodb-reprovision`'s split: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply.
+The `rds-reprovision` skill follows `mongodb-reprovision`'s split: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply. Its `SKILL.md` carries the invocation rules, the invariants and the traps; this table is the phase mapping for this migration.
 
 | Verb | Phase | What it does |
 |---|---|---|
+| `measure` | before 0 | Logical size and table count, the largest tables with their index weight and index count, WAL rate, tables without a primary key |
 | `preflight` | 0 | Client-versus-server version, zone match, network comparison, pooler-console currency |
-| `prepare` | 1 | Roles, the md5 verifier transplant, the database with its owner asserted, the atomic schema load |
+| `prepare` | 1 | Roles, the md5 verifier transplant for **every role in the pooler's `[databases]` section**, the database with its owner asserted, the atomic schema load — **one block today; the three-block split is owed to it** |
 | `certify` | 1 | Connects AS the application: login, DDL privilege, grant completeness |
 | `replicate` | 2 | Publication on the source, subscription on the target |
 | `status` | 3 | Per-table state, stream and lag, error counters |
@@ -397,9 +481,8 @@ Each apply is its own PR, which keeps one commit per pull request and makes each
 | `hold` / `release` | 5 | Opens and closes the cutover window around the engineer's apply |
 | `confirm` | 5 | Asks the pooler where its backend connections go — the conclusive proof |
 | `detach` | 6 | Drops the subscription and publication, verifies the slot was released |
-| `rotate-migration-secret` | 6 | Repoints the migration secret at the internal record, verified before writing |
 
-**The engineer owns** the Terraform — declaring the replacement, repointing the record, retiring the predecessor — every apply, and the migration freeze.
+**The engineer owns** the Terraform — declaring the replacement, repointing the record, retiring the predecessor — every apply, and the migration freeze. **Rotating the migration secret is theirs too and sits outside this procedure**: it is a credential change with its own consumers, so it is done separately rather than folded into a step here — the procedure never leaves a rotation owed to itself.
 
 **The cutover is NOT one indivisible verb, and that is forced rather than chosen.** The apply that repoints the record sits inside the window where clients are held, and an apply is the engineer's approval — so the window opens with `hold` and closes with `release`, with the apply between them. Every other seam would park the system between two databases; this one already exists because the approval boundary creates it.
 
@@ -413,13 +496,15 @@ Three things the script resolves for itself rather than accepting as arguments, 
 
 ## Order of execution across the four environments
 
-The order runs smallest and cheapest to fail first: the non-productive single-instance environment, then the non-productive cluster, then the two productive ones. **Both non-productive environments are through their cutover**, so the shared machinery and the cluster-shaped half of every phase have each been exercised end to end. The two productive clusters remain, `shared-001` before `atento-001`.
+The order ran smallest and cheapest to fail first: the non-productive single instance, then the non-productive cluster, then the productive ones. **Three are through, `atento-001` is the last**, and it inherits a procedure that has been corrected against a real productive run rather than only a rehearsal.
 
-**Everything the remaining ladder structurally depended on is in place.** `modules/rds_aurora_cluster` takes the `availability_zone` input that lets a replacement's writer be pinned to its source's zone (ADR-012's naming and PR #913). Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again and `PAUSE` is reachable in all four environments (PR #912, applied to each stack before merging, since the module it changes is shared by all of them).
+**Everything the remaining migration structurally depends on is in place.** `modules/rds_aurora_cluster` takes the `availability_zone` input that lets a replacement's writer be pinned to its source's zone (ADR-012's naming and PR #913). Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again and `PAUSE` is reachable in all four environments (PR #912, applied to each stack before merging, since the module it changes is shared by all of them).
 
-**The four traps the non-productive cluster surfaced are fixed in the script, and each one would have cost more on a productive environment**: the privileged attribute tokens that make `pg_dumpall`'s single `ALTER ROLE` fail, leaving the application role unable to log in (23); the anchored error count that reported a clean load over a failed one (23); `--command`'s lack of variable interpolation, whose obvious workarounds put the password in argv (25); and the two PostgreSQL major versions in the fleet, which made a catalog query die on the environments it was not written against (26).
+**What the earlier runs cost, and what they bought**, is the reason the last one should be cheap: the privileged attribute tokens and the recorded grantor that each make `pg_dumpall`'s output unloadable, leaving the application role unable to log in or the database unable to be created with the right owner (23, 33); the anchored error count that reported a clean load over a failed one (23); `--command`'s lack of variable interpolation, whose obvious workarounds put the password in argv (25); the two PostgreSQL major versions in the fleet, which made a catalog query die on the environments it was not written against (26); a dump carrying a session setting the target rejects (34); two counts of "the same thing" that counted different populations (35); a privilege function evaluated on rows its `WHERE` meant to exclude (36); a repoint terraform reported as applied that never reached AWS (39); and a verifier transplant scoped to the single role table ownership resolves, which leaves a productive stack's second pooler role unable to authenticate while the first one serves normally (40). Every one is fixed in the script or in this document.
 
-**Before an environment's migration begins, three things are settled in this order.** Its replacement's zone placement and the billing question above, because both are fixed at creation. Its pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. And its replacement's identifier, which is the name the environment keeps forever — `app-<env>-001` with `app-<env>-001-instance<NNN>`, free today because what the existing databases occupy is `app-<env>-001-cluster`.
+**Before the last migration begins, five things are settled in this order.** Its replacement's zone placement and the billing question above, because both are fixed at creation. Its pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. **How many roles its pooler authenticates with**, read from the `[databases]` section of its own configuration, because that number is what step 1.1a's transplant must produce and a short transplant fails silently on the pools it missed. Its replacement's identifier, which is the name the environment keeps forever — `app-<env>-001` with `app-<env>-001-instance<NNN>`, free because what the existing databases occupy is `app-<env>-001-cluster`. And **whether the stack declares restore testing**, because that decides if the cutover PR carries the `-replace` of finding 39 or has nothing to repoint.
+
+**The three-block split is owed to `prepare` before this run, not after it.** It is the one part of the procedure this document describes and the binary does not yet perform, and the largest environment is both where the gain is worth having and where a hand-run split is most expensive to get wrong.
 
 **What changes for the productive pair is volume and timing, not procedure.** The largest holds roughly 350 GB, so its initial copy takes real time rather than finishing before it can be observed, and the window is scheduled rather than opened on the spot. Neither changes a step.
 
