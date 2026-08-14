@@ -1,0 +1,256 @@
+// NOT valid JSON as a whole file — this is three separate raw renovate.json files,
+// each fetched verbatim via curl from raw.githubusercontent.com, concatenated for reference.
+// Each block IS valid JSON on its own. Fetched: 2026-08-14.
+
+// =====================================================================
+// SOURCE 1: getlago/lago-api (Lago — open-source usage-based billing API, Ruby/Rails)
+// URL: https://raw.githubusercontent.com/getlago/lago-api/main/renovate.json
+// Note: enabledManagers is ["bundler", "dockerfile", "custom.regex"] — bundler is
+// effectively the only dependency-file manager in play, and rangeStrategy is set
+// GLOBALLY (top-level, not inside a packageRule) to "update-lockfile". No packageRule
+// distinguishes gems with a Gemfile version constraint from gems without one.
+// =====================================================================
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "enabledManagers": ["bundler", "dockerfile", "custom.regex"],
+  "rangeStrategy": "update-lockfile",
+  "minimumReleaseAge": "7 days",
+  "prConcurrentLimit": 10,
+  "prCreation": "immediate",
+  "addLabels": ["🔗 dependencies"],
+  "schedule": ["every weekend", "before 5am every weekday"],
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "👷‍♀️ Dependency Dashboard",
+  "dependencyDashboardHeader": "[👮‍♂️ Do not close]. This issue tracks Renovate updates and their statuses. [Learn more](https://docs.renovatebot.com/key-concepts/dashboard/)",
+  "dependencyDashboardLabels": ["🙅 Don't close"],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "addLabels": ["security"]
+  },
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"],
+    "commitMessagePrefix": "chore(deps)"
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Bump ARG *_VERSION lines in the Dockerfile annotated with a `# renovate:` comment (e.g. GO_VERSION, PDFCPU_VERSION)",
+      "managerFilePatterns": ["/(^|/)Dockerfile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>[a-z-.]+?) depName=(?<depName>[^\\s]+?)(?: versioning=(?<versioning>[^\\s]+?))?\\s+ARG [A-Z_]+?_VERSION=(?<currentValue>[^\\s]+)"
+      ],
+      "versioningTemplate": "{{#if versioning}}{{{versioning}}}{{else}}semver-coerced{{/if}}"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group the Rails framework gems so interdependent packages bump together",
+      "matchPackageNames": [
+        "rails", "railties", "actioncable", "actionmailbox", "actionmailer",
+        "actionpack", "actiontext", "actionview", "activejob", "activemodel",
+        "activerecord", "activestorage", "activesupport"
+      ],
+      "groupName": "Rails"
+    },
+    {
+      "description": "Sidekiq Pro/Enterprise live on the private contribsys gem source; needs a Renovate host rule + token to look up. Disabled until credentials are configured to avoid failing lookups.",
+      "matchPackageNames": ["sidekiq-pro", "sidekiq-ent"],
+      "enabled": false
+    },
+    {
+      "description": "Commit prefixes by update type (mirrors lago-front conventions)",
+      "matchUpdateTypes": ["major"],
+      "commitMessagePrefix": "chore(deps-major)"
+    },
+    {
+      "matchUpdateTypes": ["minor"],
+      "commitMessagePrefix": "chore(deps-minor)"
+    },
+    {
+      "matchUpdateTypes": ["patch", "digest", "bump"],
+      "commitMessagePrefix": "chore(deps)"
+    }
+  ]
+}
+
+// =====================================================================
+// SOURCE 2: catatsuy/private-isu (ISUCON benchmark reference app; Ruby, PHP, Node,
+// Python, Go implementations in one monorepo)
+// URL: https://raw.githubusercontent.com/catatsuy/private-isu/master/renovate.json
+// Note: rangeStrategy is set via a packageRule scoped with matchManagers: ["bundler"]
+// to "update-lockfile" — no split by whether the individual gem carries a constraint.
+// The same file shows composer getting the identical treatment, and npm/pep621 (Python)
+// getting "bump" instead — i.e. the per-manager scoping is about the ECOSYSTEM/manager,
+// not about constrained-vs-unconstrained dependencies within one manager.
+// =====================================================================
+{
+  "extends": ["config:recommended"],
+  "minimumReleaseAge": "2 days",
+  "lockFileMaintenance": { "enabled": true },
+  "customDatasources": {
+    "mysql-lts": {
+      "defaultRegistryUrlTemplate": "https://raw.githubusercontent.com/docker-library/official-images/master/library/mysql",
+      "format": "plain",
+      "transformTemplates": [
+        "( $ltsLine := releases.version[$substring($, 0, 6) = 'Tags: ' and $contains(', ' & $substringAfter($, 'Tags: ') & ', ', ', lts, ')][0]; $minor := $split($substringAfter($ltsLine, 'Tags: '), ', ')[$match($, /^\\d+\\.\\d+$/)][0]; { 'releases': $minor ? [{ 'version': $minor }] : [] } )"
+      ]
+    }
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/provisioning/image/ansible/04_xbuild.yml/"],
+      "matchStrings": [
+        "datasource=(?<datasource>.*?) depName=(?<depName>.*?)( versioning=(?<versioning>.*?))?\n.*?-install v?(?<currentValue>[0-9.]*).*\n"
+      ]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/provisioning/bench/ansible/02_golang.yml/"],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go",
+      "matchStrings": ["go(?<currentValue>[0-9]*.[0-9]*.[0-9]*)"]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/.github/workflows/codeql.yml/"],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go",
+      "matchStrings": ["go-version: \"?(?<currentValue>[0-9]*.[0-9]*.[0-9]*)\"?"]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/osv-scanner.toml/"],
+      "datasourceTemplate": "golang-version",
+      "depNameTemplate": "go",
+      "matchStrings": ["GoVersionOverride = \"?(?<currentValue>[0-9]*.[0-9]*.[0-9]*)\"?"]
+    },
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/^webapp\\/compose\\.yml$/"],
+      "matchStrings": [
+        "(?:^|\\r?\\n)[ \\t]+mysql:[ \\t]*\\r?\\n[ \\t]+image:[ \\t]*mysql:(?<currentValue>\\d+\\.\\d+)[ \\t]*(?:#.*)?(?:\\r?\\n|$)"
+      ],
+      "depNameTemplate": "mysql",
+      "datasourceTemplate": "custom.mysql-lts",
+      "versioningTemplate": "semver-coerced"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": ["Keep lock file maintenance PRs split by application."],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["webapp/ruby/Gemfile", "webapp/ruby/Gemfile.lock"],
+      "branchTopic": "ruby-lock-file-maintenance",
+      "commitMessageTopic": "Ruby lock file"
+    },
+    {
+      "description": ["Keep lock file maintenance PRs split by application."],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["webapp/php/composer.json", "webapp/php/composer.lock"],
+      "branchTopic": "php-lock-file-maintenance",
+      "commitMessageTopic": "PHP lock file"
+    },
+    {
+      "description": ["Keep lock file maintenance PRs split by application."],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["webapp/node/package.json", "webapp/node/package-lock.json"],
+      "branchTopic": "node-lock-file-maintenance",
+      "commitMessageTopic": "Node lock file"
+    },
+    {
+      "description": ["Keep lock file maintenance PRs split by application."],
+      "matchUpdateTypes": ["lockFileMaintenance"],
+      "matchFileNames": ["webapp/python/pyproject.toml", "webapp/python/uv.lock"],
+      "branchTopic": "python-lock-file-maintenance",
+      "commitMessageTopic": "Python lock file"
+    },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["nginx"],
+      "versioning": "regex:^(?<major>[0-9]+)\\.(?<minor>[0-9]*[02468])(?<patch>\\d*)$"
+    },
+    {
+      "description": ["Let the custom datasource manage the MySQL LTS version in Docker Compose."],
+      "matchManagers": ["docker-compose"],
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["mysql"],
+      "matchFileNames": ["webapp/compose.yml"],
+      "enabled": false
+    },
+    {
+      "description": ["The MySQL LTS custom datasource does not provide release timestamps, so override the global minimumReleaseAge; otherwise Renovate treats its updates as permanently pending."],
+      "matchDatasources": ["custom.mysql-lts"],
+      "matchPackageNames": ["mysql"],
+      "matchFileNames": ["webapp/compose.yml"],
+      "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": [
+        "Bundler incorrectly passes the RubyGems registry to git-refs dependencies.",
+        "See https://github.com/renovatebot/renovate/issues/37432."
+      ],
+      "matchManagers": ["bundler"],
+      "matchDatasources": ["git-refs"],
+      "matchPackageNames": ["https://github.com/defunkt/unicorn.git"],
+      "registryUrls": []
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchDepTypes": ["indirect"],
+      "enabled": true
+    },
+    { "matchManagers": ["bundler"], "rangeStrategy": "update-lockfile" },
+    { "matchManagers": ["composer"], "rangeStrategy": "update-lockfile" },
+    { "matchManagers": ["npm"], "rangeStrategy": "bump" },
+    { "matchManagers": ["pep621"], "rangeStrategy": "bump" }
+  ],
+  "postUpdateOptions": ["gomodTidy", "gomodUpdateImportPaths"]
+}
+
+// =====================================================================
+// SOURCE 3: geeksforsocialchange/PlaceCal (Ruby/Rails community-calendar app)
+// URL: https://raw.githubusercontent.com/geeksforsocialchange/PlaceCal/main/renovate.json
+// Note: the GLOBAL default is rangeStrategy: "pin" (everything else in the repo gets
+// pinned to exact versions), and there is a single packageRule that OVERRIDES this to
+// "update-lockfile" scoped to matchManagers: ["bundler"] — again, the split is by
+// MANAGER (Ruby/Bundler vs. everything else), not by whether an individual gem in the
+// Gemfile carries a version constraint.
+// =====================================================================
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests",
+    "schedule:nonOfficeHours",
+    "customManagers:dockerfileVersions"
+  ],
+  "automerge": true,
+  "automergeStrategy": "squash",
+  "labels": ["dependencies"],
+  "lockFileMaintenance": { "enabled": true },
+  "rangeStrategy": "pin",
+  "timezone": "Europe/London",
+  "vulnerabilityAlerts": { "labels": ["security"] },
+  "packageRules": [
+    { "matchManagers": ["bundler"], "rangeStrategy": "update-lockfile" },
+    {
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["postgres"],
+      "matchCurrentVersion": "13.4",
+      "allowedVersions": "13.4"
+    },
+    {
+      "matchDatasources": ["npm", "rubygems"],
+      "minimumReleaseAge": "7 days"
+    },
+    {
+      "groupName": "node version",
+      "matchDepNames": ["node"],
+      "matchManagers": ["nodenv", "npm", "custom.regex"]
+    }
+  ]
+}

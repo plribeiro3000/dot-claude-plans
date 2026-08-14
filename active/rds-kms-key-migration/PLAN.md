@@ -2,7 +2,9 @@
 
 ## What this is
 
-The command-level procedure for the last surface of the KMS key-per-environment migration. It has the shape `mongodb-reprovision` has: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply.
+The command-level procedure for moving each app environment's DATABASE onto its own KMS key. It has the shape `mongodb-reprovision` has: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply.
+
+**The databases are one surface of the key-per-environment scheme, not the whole of it.** An environment's SSM SecureString parameters — the secrets the application reads at boot — still encrypt with the shared `alias/4shark-master` in every environment, including the ones whose databases are already migrated, because the `app-*-001` stacks declare their parameters with no `key_id`. That work is scoped in `EXECUTION-LOG.md` finding 41 and starts once the last database is through; nothing in this procedure touches it, and finishing this procedure does not finish the migration.
 
 **The script is the `rds-reprovision` skill**, invoked from its installed path — `bash ~/.claude/skills/rds-reprovision/scripts/rds-reprovision.sh <verb> ...`. The sequence below writes it as `rds-reprovision.sh` for readability; the real invocation is always the full installed path, bare, with no redirection or trailing `echo` (that is what keeps one allow-list entry covering the dozens of calls inside it).
 
@@ -23,12 +25,13 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 
 - **`rds.logical_replication` is already `1` in every parameter group in the fleet** (`aurora-postgresql16`, `aurora-postgresql17`, `postgresql18`). The parameter is static, so had it been off, enabling it would have required rebooting a production writer before replication could begin. It is not off. No reboot anywhere.
 - **No application resolves a database identifier.** Applications resolve the pooler's internal record; the pooler receives its backend host as a Terraform module reference. So the replacement can keep a new permanent name and the cutover is a pooler repoint.
-- **The schema has no obstacle to logical replication in two of its four documented gaps**: 166 tables, every one with a simple primary key, and zero views or materialized views. The two remaining gaps (DDL, sequences) are steps below, not risks.
+- **The schema has no obstacle to logical replication in two of its four documented gaps**: zero views or materialized views, and every table carrying application data has a simple primary key. The two remaining gaps (DDL, sequences) are steps below, not risks.
+- **`schema_migrations` is the one table with no primary key, in every environment.** Logical replication cannot apply an UPDATE or a DELETE to a table with no replica identity, so this would be a real gap if the table ever received one — Rails only ever appends a version row, and the schema-migration freeze that runs from `replicate` to `confirm` means it receives nothing at all during the copy. `measure` reports it on every environment; it is the expected output and not a finding to chase.
 - **Connectivity for the manual run is the VPN.** Each database security group admits PostgreSQL from the Management VPC, and RDS allows no host access, so the whole procedure runs as `psql` from the engineer's machine over the VPN — there is nothing to SSH into.
 
 ## State
 
-**Three of the four environments run on their own key, every predecessor destroyed. `atento-001` is the only one left.**
+**Three of the four environments' DATABASES run on their own key, every predecessor destroyed. `atento-001` is the only database left.** No environment's SSM parameters have moved — that is the second surface, and it is fleet-wide rather than a tail on the last run (finding 41).
 
 `app-beta-001` (single instance, `us-east-1b`) took **two** migrations rather than one. The first moved the data onto the environment's key but had to create the replacement under a suffixed identifier, because the original still held the name. The second corrected the name. An instance's identifier is fixed at creation as far as Terraform is concerned — AWS supports an in-place rename that the provider does not expose — so a name is not editable, it is a second copy. **Name the replacement the way the environment should be named forever, before any data moves.** That rule was paid for here and honoured everywhere since.
 
@@ -36,7 +39,7 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 
 `app-shared-001` (writer `app-shared-001-instance001`, `us-east-1b`) was the first **productive** run and the first at real volume: 318 GB across 171 tables, copied in about 45 hours. `verify` found catalog structure and per-table row-id boundaries identical, with the target 1 GB smaller than the source — the source's accumulated bloat, which a fresh copy does not reproduce, and the expected direction rather than missing rows. Its cutover advanced 125 sequences at zero lag and dropped no connection. **Its predecessor's CloudWatch log group survives the cluster deliberately** (see Phase 6).
 
-`app-atento-001` is next and is the largest at roughly 350 GB, so at the rate shared measured its copy runs about two days. Everything below is what those runs produced.
+`app-atento-001` is next and is **small — 34 GB across 167 tables**, measured on the live cluster. It is the last environment, not the largest one: `app-shared-001` was the largest and is through. At the ~7 GB/h shared averaged its copy is a matter of hours rather than days, so its window can be opened rather than scheduled weeks out — but the rate is shared's average and not a guarantee, so the schedule is confirmed from `status` during the run instead of promised before it. Everything below is what the earlier runs produced.
 
 ## Paying nothing for the copy is a REQUIREMENT, not an optimization
 
@@ -44,7 +47,7 @@ The replication that fills a replacement is ordinary network traffic and it is b
 
 On beta this was settled by pinning the replacement to the source's zone and confirming both reported `us-east-1b` before any data moved. The same guarantee has to be **established** for each remaining environment rather than assumed, and two things make that harder than repeating the beta step:
 
-The first is size. The largest productive environment holds roughly 350 GB, so a cross-zone copy there is metered on both ends of 350 GB — and the identifier correction means the copy can happen twice. That is the whole reason the naming rule above is stated as a rule.
+The first is size, and it is why the rule was written before the largest environment ran rather than after. `app-shared-001` holds 317 GB, so a cross-zone copy of it would have been metered on both ends of 317 GB — and because a wrong identifier forces a second full copy, the exposure doubles. The remaining environment is far smaller (34 GB), which lowers the money at stake without changing the rule: the placement is still proven by describing both sides, because the cost of proving it is one API call and the cost of being wrong is not recoverable after creation.
 
 The second is that **Aurora's pricing statements do not transfer to this case, and reading them as though they do is the trap.** Aurora documents that data transferred between Availability Zones for *DB cluster replication* is free — that covers a cluster replicating to its own members, not logical replication between two separate clusters, which is what a key migration runs. Nothing verified so far establishes how the second case is billed, so the placement is arranged so the answer does not matter — same zone, proven by describing both sides, exactly as on beta.
 
@@ -78,28 +81,11 @@ What bounds that waiting is the **migration freeze**: DDL is not replicated, so 
 
 **Expect a cold cache after the cutover, and do not read it as a regression.** The replacement has never served this workload, so its buffer cache is empty against a working set far larger than the instance's memory; the first queries go to disk and latency is elevated until the cache fills. It resolves on its own. The reader instance is cold for the same reason. Reverting on this signal would trade a transient for a second full cutover.
 
-## The schema is loaded in THREE blocks, and the secondary indexes go on last
+## The copy's cost is index maintenance, and the rate that follows from it
 
-The initial copy's cost is not moving rows — it is maintaining indexes while the rows land. A table carrying more index than heap pays that on every row: `commissionings` holds 18 GB of index across ten indexes over an 11 GB heap and copies at roughly a fifth the rate of a table with half the index count over three times the data. Building those indexes once, in bulk, after the data is in place is cheaper than maintaining them row by row during the copy.
+The initial copy's cost is not moving rows — it is maintaining indexes while the rows land. A table carrying more index than heap pays that on every row, so index weight rather than table size predicts which tables dominate the copy. `measure` reports heap, index weight and index count per table before anything moves, so those tables are known in advance rather than discovered at the tail.
 
-`pg_dump --section` splits the schema natively. Post-data holds *"definitions of indexes, triggers, rules, statistics for indexes, and constraints other than validated check and not-null constraints"*; pre-data holds everything else. So a plain two-way pre-data / post-data split defers the indexes — **and takes the primary keys with them, which breaks replication.**
-
-**The primary keys must be present before replication starts.** The subscriber locates each row an `UPDATE` or `DELETE` touches through the replica identity, which is the primary key by default. Without it PostgreSQL falls back to scanning: *"the search on the subscriber side can be very inefficient, therefore replica identity FULL should only be used as a fallback if no other solution is possible."* A sequential scan per modified row against a 61 GB table costs far more than the index maintenance the split was meant to avoid — and it costs it during the streaming phase, which runs until the cutover.
-
-The load is therefore three blocks, in this order:
-
-1. **pre-data** — tables, columns, defaults, sequences. No indexes, no constraints.
-2. **primary keys** (and any unique index serving as a replica identity) — everything replication needs to find a row.
-3. `replicate`, and the copy runs against a target carrying only the indexes it cannot work without.
-4. **the rest of post-data** — secondary indexes, foreign keys, triggers, remaining constraints — applied once the copy has caught up.
-
-Block 2 is not a `--section` value, so it is carved out of the post-data dump rather than dumped separately. Take the dump in the custom format and drive the selection with `pg_restore --list` / `--use-list`, which exists for exactly this: the TOC names every index and constraint individually, so the split is a filtered restore rather than text-editing SQL.
-
-**Nothing is ever dropped, and no window exists where an unindexed database serves traffic.** The indexes are created on a target that has never received a request, while the predecessor is still serving every client. The cutover happens after `verify` confirms the index count matches the source — so a missed index blocks the cutover instead of reaching production. That is what separates this from dropping indexes on a live database, which this procedure never does on either side.
-
-**The baseline to beat is known, which is what makes this measurable rather than an article of faith.** A full copy against a target carrying every index moved **318 GB in about 45 hours** on a `db.t4g.large` — roughly 7 GB/h overall. Read that as an average and not as a rate: the first hours run far faster because the small tables finish first, so an early extrapolation predicts a completion that never arrives, and the tail is where the index-heavy tables sit. `measure` reports heap, index weight and index count per table before anything moves, so the tables that will dominate are known in advance.
-
-**What is NOT measured**: whether the bulk build actually beats the inline maintenance on a `db.t4g.large`. The community consensus favours it, and `pg_restore -j` can parallelise the index build in a way inline maintenance cannot, but two vCPUs and 8 GB of memory bound both halves and the sort spills to disk. The gain is also not free at the far end — the post-copy index build is time the target spends unusable for a cutover, so a split that halves the copy and spends the saving rebuilding indexes has moved the cost rather than removed it. **Time both halves separately on the run that uses it**: the copy from `replicate` to every table reading `r`, and the block-4 restore from start to finish. Their sum against 45 hours per 318 GB is the answer; either number alone is not.
+**The rate to plan with is 7 GB/h**, from a full copy that moved 318 GB in about 45 hours on a `db.t4g.large` with every index in place. Read it as an average and not as a rate: the first hours run far faster because the small tables finish first, so an early extrapolation predicts a completion that never arrives, and the index-heavy tables are the tail.
 
 ## The sequence, end to end
 
@@ -114,11 +100,10 @@ rds-reprovision.sh measure   --source $S            # size, index weight, WAL ra
 # PR 1 — declare the replacement (writer pinned to the source writer's zone,
 #        environment's own KMS key, `self` ingress on the database SG)
 rds-reprovision.sh preflight --source $S --target $T --environment $E
-rds-reprovision.sh prepare   --source $S --target $T --environment $E   # blocks 1 and 2 only
+rds-reprovision.sh prepare   --source $S --target $T --environment $E
 rds-reprovision.sh certify   --target $T --environment $E
 rds-reprovision.sh replicate --source $S --target $T
 rds-reprovision.sh status    --source $S --target $T     # until every table reads 'r'
-#   ... load block 4 — secondary indexes, foreign keys, triggers ...
 rds-reprovision.sh verify    --source $S --target $T
 
 # PR 2 — the cutover: repoint the internal record AND the backup selections
@@ -272,11 +257,7 @@ A successful login proves the verifier; the privilege count matching the table c
 psql --host <target-host> --username <master-user> --dbname postgres --command "CREATE DATABASE <dbname>;"
 ```
 
-**1.3 Load the schema in three blocks, preserving ownership, each block atomic.**
-
-The target is filled by a copy whose cost is index maintenance, not row movement, so it is built carrying **only the indexes replication cannot work without** and receives the rest after the copy has caught up. The reasoning and the pg_dump mechanics are in *The schema is loaded in THREE blocks* above; this is the step that performs it.
-
-**`prepare` loads the schema as one block today — the split is owed to the binary before it runs on the largest environment.** A run that uses the split before that change performs blocks 1, 2 and 4 by hand against the dump `prepare` already produces.
+**1.3 Load the schema in one atomic pass, preserving ownership.**
 
 Check who owns the application tables on the source first. The answer decides whether the dump may strip ownership, and on this application it may not:
 
@@ -286,39 +267,16 @@ psql --host <source-host> --username <master-user> --dbname <dbname> --command "
 
 Every application table is owned by the application role, not by the master. A dump taken with `--no-owner` would leave them all owned by the master on the target, and the application — which connects as its own role — could not write after cutover. So the dump preserves ownership, which is `pg_dump`'s default.
 
-Take the schema in the **custom format**, because the three-block split is driven by the archive's table of contents rather than by editing SQL text:
+Take the schema, then load it:
 
 ```bash
-pg_dump --schema-only --format=custom --host <source-host> --username <master-user> --dbname <dbname> --file /tmp/schema.dump
+pg_dump --schema-only --host <source-host> --username <master-user> --dbname <dbname> --file /tmp/schema.sql
 ```
 
-**Block 1 — pre-data.** Tables, columns, defaults, sequences. No indexes, no constraints:
+**The load is atomic, and this is not optional**:
 
 ```bash
-pg_restore --section=pre-data --file /tmp/block1_pre_data.sql /tmp/schema.dump
-```
-
-**Block 2 — the replica identities.** List the post-data TOC, keep only the primary-key and unique-index entries that serve as a replica identity, and restore that filtered list:
-
-```bash
-pg_restore --section=post-data --list /tmp/schema.dump > /tmp/post_data_toc.txt
-grep -E 'CONSTRAINT .*_pkey|INDEX .*_pkey' /tmp/post_data_toc.txt > /tmp/block2_keys.txt
-pg_restore --use-list /tmp/block2_keys.txt --file /tmp/block2_keys.sql /tmp/schema.dump
-```
-
-**Block 4 — everything else in post-data.** The complement of block 2, applied only after the copy has caught up:
-
-```bash
-grep -vE 'CONSTRAINT .*_pkey|INDEX .*_pkey' /tmp/post_data_toc.txt > /tmp/block4_rest.txt
-pg_restore --use-list /tmp/block4_rest.txt --file /tmp/block4_rest.sql /tmp/schema.dump
-```
-
-**Confirm the split covers the whole TOC before loading anything** — every post-data entry belongs to exactly one of the two lists. A pattern that misses an entry silently drops an index or a foreign key, and the loss surfaces at `verify` if you are lucky and in production if you are not. Compare the line counts: blocks 2 and 4 together must equal the full post-data listing.
-
-**Every block loads atomically, and this is not optional**:
-
-```bash
-psql --host <target-host> --username <master-user> --dbname <dbname> --single-transaction --set ON_ERROR_STOP=1 --file <block>.sql
+psql --host <target-host> --username <master-user> --dbname <dbname> --single-transaction --set ON_ERROR_STOP=1 --file /tmp/schema.sql
 ```
 
 Without those two flags an interrupted load leaves a half-built schema that the next run silently completes around, producing a database assembled from two runs and reporting `already exists` errors that look harmless. With them, an interruption rolls back to empty and the operator simply runs it again.
@@ -326,7 +284,7 @@ Without those two flags an interrupted load leaves a half-built schema that the 
 **The dump carries session settings that can postdate the target, and the newest client is a deliberate choice.** `pg_dump` emits `SET` statements for the server it was built against; a client newer than the target emits settings the target rejects outright, failing the load on its first line. The client must be at least as new as the newest server in the fleet, so it is newer than the older ones by construction — the settings are stripped rather than the client downgraded. `prepare` deletes the known offender before loading; a manual run does the same:
 
 ```bash
-sed -e '/^SET transaction_timeout = /d' /tmp/block1_pre_data.sql > /tmp/block1_loadable.sql
+sed -e '/^SET transaction_timeout = /d' /tmp/schema.sql > /tmp/schema_loadable.sql
 ```
 
 ### Phase 2 — Start replication
@@ -473,7 +431,7 @@ The `rds-reprovision` skill follows `mongodb-reprovision`'s split: the script ow
 |---|---|---|
 | `measure` | before 0 | Logical size and table count, the largest tables with their index weight and index count, WAL rate, tables without a primary key |
 | `preflight` | 0 | Client-versus-server version, zone match, network comparison, pooler-console currency |
-| `prepare` | 1 | Roles, the md5 verifier transplant for **every role in the pooler's `[databases]` section**, the database with its owner asserted, the atomic schema load — **one block today; the three-block split is owed to it** |
+| `prepare` | 1 | Roles, the md5 verifier transplant for **the single role table ownership resolves**, the database with its owner asserted, the atomic schema load — a productive stack's second pooler role is NOT covered and is transplanted by hand before the cutover (finding 43) |
 | `certify` | 1 | Connects AS the application: login, DDL privilege, grant completeness |
 | `replicate` | 2 | Publication on the source, subscription on the target |
 | `status` | 3 | Per-table state, stream and lag, error counters |
@@ -504,9 +462,9 @@ The order ran smallest and cheapest to fail first: the non-productive single ins
 
 **Before the last migration begins, five things are settled in this order.** Its replacement's zone placement and the billing question above, because both are fixed at creation. Its pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. **How many roles its pooler authenticates with**, read from the `[databases]` section of its own configuration, because that number is what step 1.1a's transplant must produce and a short transplant fails silently on the pools it missed. Its replacement's identifier, which is the name the environment keeps forever — `app-<env>-001` with `app-<env>-001-instance<NNN>`, free because what the existing databases occupy is `app-<env>-001-cluster`. And **whether the stack declares restore testing**, because that decides if the cutover PR carries the `-replace` of finding 39 or has nothing to repoint.
 
-**The three-block split is owed to `prepare` before this run, not after it.** It is the one part of the procedure this document describes and the binary does not yet perform, and the largest environment is both where the gain is worth having and where a hand-run split is most expensive to get wrong.
+**The five settled items each have an answer for the remaining environment**, read from the live infrastructure rather than carried forward: the writer sits in `us-east-1b`, so the replacement's writer is pinned there; the pooler's `[databases]` section defines **two** pools, so the verifier transplant must produce two `ALTER ROLE` statements and a count of one means it missed the follower; the replacement is `app-atento-001` with `app-atento-001-instance001` and `-instance002`, free because the source occupies `app-atento-001-cluster`; and **the stack declares no restore testing**, so the cutover PR repoints the internal records and the backup selection and has no restore-testing selection to `-replace`.
 
-**What changes for the productive pair is volume and timing, not procedure.** The largest holds roughly 350 GB, so its initial copy takes real time rather than finishing before it can be observed, and the window is scheduled rather than opened on the spot. Neither changes a step.
+**Volume changes timing and nothing else, and for this environment it barely changes that.** 34 GB against shared's 317 GB means the copy is measured in hours, so the window can be opened rather than scheduled weeks out. No step changes. The WAL rate makes retention a non-issue as well: 1232 kB/h, or 87 MB across a three-day window, so the source has nothing to strain to retain while the copy runs.
 
 **The identifier is decided, and it is what makes each remaining migration a single copy rather than two.** A database is named `app-<env>-001` and a member instance `app-<env>-001-instance<NNN>` — the application, the environment, the environment's version, and nothing about the engine (ADR-012 in the terraform repository). The names that hold that shape are free today, because what the existing databases occupy is `app-<env>-001-cluster`, so a replacement is born with its permanent name instead of taking a suffix and needing a second migration to shed it. `app-beta-001` already satisfies the rule.
 
