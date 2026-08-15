@@ -4,11 +4,23 @@
 
 The command-level procedure for moving each app environment's DATABASE onto its own KMS key. It has the shape `mongodb-reprovision` has: the script owns the dangerous repetitive half, the engineer owns the Terraform and every apply.
 
-**The databases are one surface of the key-per-environment scheme, not the whole of it.** An environment's SSM SecureString parameters — the secrets the application reads at boot — still encrypt with the shared `alias/4shark-master` in every environment, including the ones whose databases are already migrated, because the `app-*-001` stacks declare their parameters with no `key_id`. That work is scoped in `EXECUTION-LOG.md` finding 41 and starts once the last database is through; nothing in this procedure touches it, and finishing this procedure does not finish the migration.
+**The databases are one surface of the key-per-environment scheme, not the whole of it.** The other is an environment's SSM SecureString parameters — the secrets the application reads at boot. Both surfaces are through: every environment's database runs on its own key, and the 68 parameters that carried the shared key are on their environment's key instead.
+
+**The key and the parameters it encrypts are declared in the same module, which is what turns this migration's end state into a property rather than an achievement.** `modules/app/kms.tf` mints the key and `modules/app/ssm_secrets.tf:44-49` declares the parameters against `local.kms_key_arn`, so an environment created from this module is born with both and there is no per-stack step to perform or to forget. The task role's decrypt grant reads the same local (`modules/app/iam_task_roles.tf:57-58`), so the three pieces that have to agree about which key is live cannot disagree.
+
+**A third surface — the OpenSearch domains — is also migrated**: `modules/opensearch/main.tf:63-66` encrypts at rest with the `kms_key_id` its stack passes, and `app-shared-001`'s domain reads `mrk-416bffe4f94545f68345ebb6e835cb92`, which is `alias/app-shared-001`.
+
+**Every parameter Terraform DECLARES is on its environment's key, and the shared account key holds none.** That covers the application secrets the app module declares, the Mongo URLs declared in each `mongodb.tf`, and the two master credentials the OpenSearch module publishes for its own domains.
+
+**Four parameters remain outside, and what keeps them there is that Terraform READS them rather than declaring them.** Each stack's `MONGO_PASSWORD` is an `aws_ssm_parameter` DATA source (`app-shared-001/mongodb.tf:86`), seeded by hand and never rotated, so no resource exists whose `key_id` could be set — finding 53. Moving them means reading each decrypted value and writing it back with the environment's key, the same out-of-band operation that created it.
+
+**Bringing those four under Terraform puts them in the STACK, not in the app module, and the rule that decides it is the same one the module boundary already enforces.** A Mongo credential belongs to the Atlas account and reaches the stack as a value; a module that received it would be accepting a credential value through a variable, which the credential corollary forbids outright. Its sibling `MONGO_URL` stays in the stack for exactly that reason (`app-shared-001/mongodb.tf:96-108` composes it from the Atlas connection string with the credential spliced in), so the two end up declared together, which is also where a reader expects to find them.
 
 **The script is the `rds-reprovision` skill**, invoked from its installed path — `bash ~/.claude/skills/rds-reprovision/scripts/rds-reprovision.sh <verb> ...`. The sequence below writes it as `rds-reprovision.sh` for readability; the real invocation is always the full installed path, bare, with no redirection or trailing `echo` (that is what keeps one allow-list entry covering the dozens of calls inside it).
 
-**The procedure is proven — it has carried four migrations across three environments, including one productive.** What each run corrected lives in `EXECUTION-LOG.md` as numbered findings; this document carries the procedure those findings produced. Where something is still unmeasured it says so, and the remaining environment is where it gets measured.
+**The procedure is proven — it has carried five migrations across four environments, two of them productive.** What each run corrected lives in `EXECUTION-LOG.md` as numbered findings; this document carries the procedure those findings produced. Where something is still unmeasured it says so.
+
+**It is kept because it outlives this migration.** Several properties of a database are fixed at creation — the encryption key, the identifier, a writer's Availability Zone — so changing any one of them is not an edit but a new database plus a data move, and that is this procedure whatever the reason for the move.
 
 ## Why one procedure covers all four environments
 
@@ -31,7 +43,7 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 
 ## State
 
-**Three of the four environments' DATABASES run on their own key, every predecessor destroyed. `atento-001` is the only database left.** No environment's SSM parameters have moved — that is the second surface, and it is fleet-wide rather than a tail on the last run (finding 41).
+**Every environment's DATABASE runs on its own key, and every predecessor is destroyed — the RDS surface is closed.** The parameter surface is closed too for every application secret the app module declares, leaving the Mongo and OpenSearch tail described above. The procedure below has no further database to apply itself to.
 
 `app-beta-001` (single instance, `us-east-1b`) took **two** migrations rather than one. The first moved the data onto the environment's key but had to create the replacement under a suffixed identifier, because the original still held the name. The second corrected the name. An instance's identifier is fixed at creation as far as Terraform is concerned — AWS supports an in-place rename that the provider does not expose — so a name is not editable, it is a second copy. **Name the replacement the way the environment should be named forever, before any data moves.** That rule was paid for here and honoured everywhere since.
 
@@ -39,7 +51,7 @@ What was ruled out, and why it matters that it was tried rather than reasoned ab
 
 `app-shared-001` (writer `app-shared-001-instance001`, `us-east-1b`) was the first **productive** run and the first at real volume: 318 GB across 171 tables, copied in about 45 hours. `verify` found catalog structure and per-table row-id boundaries identical, with the target 1 GB smaller than the source — the source's accumulated bloat, which a fresh copy does not reproduce, and the expected direction rather than missing rows. Its cutover advanced 125 sequences at zero lag and dropped no connection. **Its predecessor's CloudWatch log group survives the cluster deliberately** (see Phase 6).
 
-`app-atento-001` is next and is **small — 34 GB across 167 tables**, measured on the live cluster. It is the last environment, not the largest one: `app-shared-001` was the largest and is through. At the ~7 GB/h shared averaged its copy is a matter of hours rather than days, so its window can be opened rather than scheduled weeks out — but the rate is shared's average and not a guarantee, so the schedule is confirmed from `status` during the run instead of promised before it. Everything below is what the earlier runs produced.
+`app-atento-001` (writer `app-atento-001-instance001`, `us-east-1b`) was the second productive run and the **small** one — 34 GB across 167 tables, against shared's 317 GB. It is where the procedure's one unguarded step was paid for: the cutover was declared complete without confirming the predecessor's connections had reached zero, so the predecessor kept accepting writes for a few minutes after the record moved, and each of those rows replicated in carrying an identifier the replacement's own sequence was about to issue. Three tables raised duplicate-key violations until the subscription was disabled, and the signature that identifies the cause is exact — the colliding identifier equals the predecessor's `max(id)` for that table (findings 48 and 49). Its data came through whole: catalog structure identical, every table's lowest identifier matching, and a per-table count bounded by the predecessor's own identifier range agreeing on all 165.
 
 ## Paying nothing for the copy is a REQUIREMENT, not an optimization
 
@@ -112,6 +124,8 @@ rds-reprovision.sh hold      --source $S --target $T --environment $E --stack-di
 #       restore-testing selection ...
 rds-reprovision.sh release   --target $T --environment $E --stack-dir $D
 rds-reprovision.sh confirm   --target $T --environment $E --stack-dir $D
+#   ... read the source's DatabaseConnections against ZERO — the check `confirm`
+#       cannot make, and the one that says the cutover is finished ...
 #   ... verify the repointed selections against AWS, per region ...
 
 # Retirement — only after the environment has run on the replacement
@@ -120,7 +134,7 @@ rds-reprovision.sh detach    --source $S --target $T
 # PR 4 — remove the module block (the predecessor's log group stays)
 ```
 
-**Three things sit outside the script and each one has bitten.** The **MFA session is renewed BEFORE `hold`, never inside the window** — an apply needs a 15-minute margin, and discovering an expired session with clients held turns a window into an outage. The **schema-migration freeze** holds from `replicate` to `confirm`, because DDL is not replicated and a migration mid-window desynchronises the target silently while the subscription keeps reporting healthy. And **the backup resources name the predecessor** — the plan's backup selection and, where the stack declares them, the restore-testing selections — so PR 2 repoints all of them alongside the record, rather than deferring it to the teardown. A predecessor that stops being backed up the moment it stops serving is the wrong trade; the replacement is what needs protecting from the cutover onward.
+**Four things sit outside the script and each one has bitten.** The **connection count on the source must read ZERO before the cutover is called finished** — `confirm` cannot establish it (finding 47) and `PAUSE` does not deliver it, so a writer outside the pooler survives every check the script makes and its rows collide with the target's sequences (finding 48). The **MFA session is renewed BEFORE `hold`, never inside the window** — an apply needs a 15-minute margin, and discovering an expired session with clients held turns a window into an outage. The **schema-migration freeze** holds from `replicate` to `confirm`, because DDL is not replicated and a migration mid-window desynchronises the target silently while the subscription keeps reporting healthy. And **the backup resources name the predecessor** — the plan's backup selection and, where the stack declares them, the restore-testing selections — so PR 2 repoints all of them alongside the record, rather than deferring it to the teardown. A predecessor that stops being backed up the moment it stops serving is the wrong trade; the replacement is what needs protecting from the cutover onward.
 
 **Verify a repoint against AWS, never against terraform's own report.** A backup selection is force-new, so terraform destroys and recreates it and the new value lands at creation; a restore-testing selection updates in place, and that update has been observed to report success without persisting. `Modifications complete after 0s` against a remote API is the tell — a change that reached AWS takes measurable time. Apply the cutover with `-replace` on each restore-testing selection so it takes the recreate path, then read the live value back per region, because the cross-region selection is a separate resource and a check that covers only the local one passes while half the repoint is missing:
 
@@ -149,11 +163,11 @@ The second leg is the more dangerous of the two even though it is usually the on
 
 **Leg 1 — target reaches source.** Each environment's database security group admits PostgreSQL from the application cluster, from the connection pooler, and from the Management VPC. It does not admit itself. That was correct for as long as an environment had exactly one database — nothing else ever needed to reach it. A migration creates a second database in the same group, and logical replication requires that second database to connect back to the first, which no existing rule allows. The failure is late and expensive: everything up to and including the schema load succeeds, and only `CREATE SUBSCRIPTION` fails, with `could not connect to the publisher ... Connection timed out`.
 
-The rule to add, in each environment's `rds.tf`, inside the database security group:
+The rule lives in `modules/app/database_network.tf:48-54`, inside the security group every database in the environment sits behind:
 
 ```hcl
   ingress {
-    description = "PostgreSQL between databases in this group (logical replication during a key migration)"
+    description = "PostgreSQL between databases in this group (logical replication)"
     from_port   = 5432
     to_port     = 5432
     protocol    = "tcp"
@@ -162,6 +176,8 @@ The rule to add, in each environment's `rds.tf`, inside the database security gr
 ```
 
 `self = true` lets any member of the group reach any other on 5432 and opens nothing to anything outside it. Source and target already share the group, so no second group is needed.
+
+**Being in the module is what makes this a check to confirm rather than a step to perform.** The group is created by the same module that creates the environment, so every environment has the rule by construction and a future one cannot be born without it. Confirm it with the ingress read below; adding it is only ever needed for a database that sits outside that group.
 
 **Leg 2 — the application reaches the target.** The application does not connect to the database directly: it resolves the connection pooler, and the pooler holds the backend host as a Terraform reference (`host = module.rds_instance.address` in each stack's pooler `databases` block). So the party whose reachability matters is the **pooler's** security group, and the repoint is a Terraform edit the application never sees.
 
@@ -364,6 +380,12 @@ psql --host <host> --username <master-user> --dbname <dbname> --tuples-only --co
 
 `pg_tables`, `pg_sequences`, `pg_indexes` and `pg_constraint` are catalog views and are safe for the same comparison.
 
+**Boundaries do not see a hole in the MIDDLE of a table, and closing that needs a BOUNDED count.** `min(id)` and `max(id)` answer two of the three questions: a target missing rows at the head reads a higher `min`, one missing the tail reads a lower `max`, and one missing rows *between* them reads identical on both. The complete check is a per-table `count(*)` bounded by the SOURCE's `max(id)`, written into generated SQL as a literal so both databases count the identical identifier range — that ceiling is also what makes the check usable AFTER a cutover, since it excludes exactly the rows the application has written to the target since. Reading the ceiling is an index backward scan and costs nothing; generate the statement on the source, run the same text against both, and `diff`. On 34 GB across 165 tables each side finished in well under a minute.
+
+A count is made acceptable against a serving database by bounding the identifier range, and what the range bounds is scan time — not contention. Under MVCC a reader blocks no writer, so a full count costs IO and duration rather than a lock.
+
+**A difference here is not automatically a hole.** A row deleted by hand on the target produces exactly this shape, since replication runs one way and the source therefore keeps it. Name the identifiers before concluding — `comm -23` over the two ordered lists — and confirm with whoever has been connected.
+
 **Unverified**: whether a row-count mismatch on a high-write table is real drift or replication lag caught mid-flight.
 
 ### Phase 5 — The cutover, with no downtime
@@ -386,7 +408,16 @@ The cutover itself:
 
 1. **`PAUSE <dbname>` on every pooler task.** Clients block and stay connected; in-flight transactions finish first. From this moment the source receives nothing from the application, which is what makes the next two steps well-defined — and it is a *hold*, not a stop.
 2. **Confirm zero lag** with the Phase 3 queries. Not "small" — zero. The source is quiescent, so this converges immediately.
-3. **Advance every sequence on the target to the source's current value.** Sequences are not replicated: *"NEXTVAL operations on sequence objects aren't synchronized"*. AWS performs this step itself during a blue/green switchover, which is precisely the work inherited here. Miss it and the first inserts after cutover collide on primary keys.
+3. **Confirm the source has no writer left — `PAUSE` does not establish this, and the next step's correctness rests entirely on it.** `PAUSE` holds the clients the POOLER serves and nothing else. A connection opened straight at the source — a desktop client over the VPN, a task that resolved the endpoint instead of the record, anything at all outside the pooler — is untouched by it, and every row such a connection writes AFTER the next step's snapshot replicates into the target carrying an identifier the target's own sequence is about to issue. That is the collision, and it breaks the application within minutes of the cutover rather than at some later time (finding 48).
+
+   ```bash
+   psql --host <source-host> --username <master-user> --dbname <dbname> --command "SELECT usename, client_addr, state FROM pg_stat_activity WHERE datname = '<dbname>' AND pid <> pg_backend_pid();"
+   ```
+
+   What may legitimately appear is the replication slot's `START_REPLICATION` connection and read-only desktop clients over the VPN (`10.255.0.0/16`). Anything else that can write is a writer, and the cutover does not proceed until it is gone.
+
+   **One snapshot of this query is weak evidence and must not be treated as the answer.** Under `pool_mode = transaction` a server connection exists only while a transaction runs, so a query landing between two transactions reports an empty set about a path that is very much alive. Read it more than once, and treat step 8's metric — which cannot miss what happened between two samples — as the check that actually settles it.
+4. **Advance every sequence on the target to the source's current value.** Sequences are not replicated: *"NEXTVAL operations on sequence objects aren't synchronized"*. AWS performs this step itself during a blue/green switchover, which is precisely the work inherited here. Miss it and the first inserts after cutover collide on primary keys.
 
    Generate the statements from the source and run them on the target:
 
@@ -395,15 +426,24 @@ The cutover itself:
    psql --host <target-host> --username <master-user> --dbname <dbname> --set ON_ERROR_STOP=1 --file /tmp/advance_sequences.sql
    ```
 
-   Two conditions make the exact value correct rather than a value plus a safety margin, and both are worth checking rather than assuming. **`last_value` must not be running ahead of what was issued** — it does when a sequence caches, so confirm `cache_size` is 1 everywhere with `SELECT cache_size, count(*) FROM pg_sequences WHERE schemaname='public' GROUP BY cache_size;`. And **generation must happen while the pooler is paused and lag is confirmed zero** — that ordering is what makes the source's `last_value` final. A margin would not buy safety here, it would only paper over a broken ordering while leaving gaps in every id column.
+   Two conditions make the exact value correct rather than a value plus a safety margin, and both are worth checking rather than assuming. **`last_value` must not be running ahead of what was issued** — it does when a sequence caches, so confirm `cache_size` is 1 everywhere with `SELECT cache_size, count(*) FROM pg_sequences WHERE schemaname='public' GROUP BY cache_size;`. And **generation must happen while the pooler is paused, lag is confirmed zero, and step 3 has established that no writer remains outside the pooler** — that ordering is what makes the source's `last_value` final, and step 3 is the part of it that `PAUSE` alone does not deliver. A margin would not buy safety here, it would only paper over a broken ordering while leaving gaps in every id column.
 
    **`last_value IS NOT NULL` is a filter, not an optimization.** A sequence that has never been used reports `NULL`, and it is already at its start value on the target because the schema load created it there. Calling `setval(..., true)` on one would make its first `nextval` return 2 and silently burn the value 1.
-4. **Point the CNAME at the target.** A DNS record change — no `terraform apply` against the app stack, no task definition, no task replacement. Phase 0's leg 2 must already be confirmed, since this is the step it protects.
-5. **`RECONNECT <dbname>`**, so resolution is fresh rather than left to the DNS cache expiring on its own. Its documented effect is to *"Close each open server connection for the given database, or all databases, after it is released"* — and the pooler holds no server connections at this point, because step 1 already released them.
-6. **`RESUME <dbname>`.** The clients held since step 1 continue, now against the target. They never saw a disconnect — only latency, bounded by how long steps 2 through 5 took.
-7. **Drop the subscription and the publication.** Leaving them keeps a replication slot open on a database that is about to be destroyed.
+5. **Point the CNAME at the target.** A DNS record change — no `terraform apply` against the app stack, no task definition, no task replacement. Phase 0's leg 2 must already be confirmed, since this is the step it protects.
+6. **`RECONNECT <dbname>`**, so resolution is fresh rather than left to the DNS cache expiring on its own. Its documented effect is to *"Close each open server connection for the given database, or all databases, after it is released"* — and the pooler holds no server connections at this point, because step 1 already released them.
+7. **`RESUME <dbname>`.** The clients held since step 1 continue, now against the target. They never saw a disconnect — only latency, bounded by how long steps 2 through 6 took.
+8. **Read the source's connection count against ZERO, and do not proceed until it is zero.** This is the conclusive check of the whole phase, and it is the one the pooler cannot answer: `confirm` compares each pooler task's backend against the writer's address, which an environment served through its FOLLOWER pool can never satisfy (finding 47), so a failing `confirm` says nothing about whether a writer remains. The metric does, and it cannot miss what happened between two samples:
 
-**What this design removes is the step that had no answer.** With the backend behind a CNAME the pooler's tasks are never replaced, so the question of whether the application's connections survive a task replacement stops being on the critical path — it is designed out rather than tested and hoped for. What the non-productive run still has to establish is the *duration* of the pause: steps 2 through 5 are the entire time clients spend blocked, and how long that is on a real dataset is the number that decides whether the productive environments need anything further.
+   ```bash
+   aws cloudwatch get-metric-statistics --namespace AWS/RDS --metric-name DatabaseConnections --dimensions Name=DBClusterIdentifier,Value=<predecessor> --start-time <iso> --end-time <iso> --period 900 --statistics Maximum --region us-east-1
+   ```
+
+   **Zero is the criterion, and any other number is an unfinished cutover** — not a small residue to accept. `WriteIOPS` is not a substitute: a trickle of application writes disappears against the engine's own background floor, so a flat reading there looks exactly like an idle cluster whether or not it is one.
+
+   Should the collisions already be running when this is read, the recovery is `ALTER SUBSCRIPTION <name> DISABLE` on the target — it severs the arriving rows at once and costs the application nothing, since it already serves from the target. The sequences need no repair afterwards: a failed insert still consumes its `nextval`, so each climbs through the collided range on its own.
+9. **Drop the subscription and the publication**, once step 8 reads zero. Leaving them keeps a replication slot open on a database that is about to be destroyed; dropping them while a writer remains strands whatever that writer has not yet replicated.
+
+**What this design removes is the step that had no answer.** With the backend behind a CNAME the pooler's tasks are never replaced, so the question of whether the application's connections survive a task replacement stops being on the critical path — it is designed out rather than tested and hoped for. Steps 2 through 6 are the entire time clients spend blocked, and across every run that duration has stayed short enough that no environment needed anything further; steps 8 and 9 fall outside it, since the clients are already running against the target by then.
 
 ### Phase 6 — Retire the source
 
@@ -454,25 +494,25 @@ Three things the script resolves for itself rather than accepting as arguments, 
 
 ## Order of execution across the four environments
 
-The order ran smallest and cheapest to fail first: the non-productive single instance, then the non-productive cluster, then the productive ones. **Three are through, `atento-001` is the last**, and it inherits a procedure that has been corrected against a real productive run rather than only a rehearsal.
+The order ran smallest and cheapest to fail first: the non-productive single instance, then the non-productive cluster, then the productive ones. **All four are through.** What follows is kept because the procedure outlives this migration — the next database that has to be replaced rather than edited (an encryption key, an identifier, a zone: everything fixed at creation) runs exactly these phases.
 
-**Everything the remaining migration structurally depends on is in place.** `modules/rds_aurora_cluster` takes the `availability_zone` input that lets a replacement's writer be pinned to its source's zone (ADR-012's naming and PR #913). Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again and `PAUSE` is reachable in all four environments (PR #912, applied to each stack before merging, since the module it changes is shared by all of them).
+**Everything a migration structurally depends on is in place.** `modules/rds_aurora_cluster` takes the `availability_zone` input that lets a replacement's writer be pinned to its source's zone (ADR-012's naming and PR #913). Every pooler's task definition names its userlist secret's version, so the console credentials cannot drift again and `PAUSE` is reachable in all four environments (PR #912, applied to each stack before merging, since the module it changes is shared by all of them).
 
 **What the earlier runs cost, and what they bought**, is the reason the last one should be cheap: the privileged attribute tokens and the recorded grantor that each make `pg_dumpall`'s output unloadable, leaving the application role unable to log in or the database unable to be created with the right owner (23, 33); the anchored error count that reported a clean load over a failed one (23); `--command`'s lack of variable interpolation, whose obvious workarounds put the password in argv (25); the two PostgreSQL major versions in the fleet, which made a catalog query die on the environments it was not written against (26); a dump carrying a session setting the target rejects (34); two counts of "the same thing" that counted different populations (35); a privilege function evaluated on rows its `WHERE` meant to exclude (36); a repoint terraform reported as applied that never reached AWS (39); and a verifier transplant scoped to the single role table ownership resolves, which leaves a productive stack's second pooler role unable to authenticate while the first one serves normally (40). Every one is fixed in the script or in this document.
 
-**Before the last migration begins, five things are settled in this order.** Its replacement's zone placement and the billing question above, because both are fixed at creation. Its pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. **How many roles its pooler authenticates with**, read from the `[databases]` section of its own configuration, because that number is what step 1.1a's transplant must produce and a short transplant fails silently on the pools it missed. Its replacement's identifier, which is the name the environment keeps forever — `app-<env>-001` with `app-<env>-001-instance<NNN>`, free because what the existing databases occupy is `app-<env>-001-cluster`. And **whether the stack declares restore testing**, because that decides if the cutover PR carries the `-replace` of finding 39 or has nothing to repoint.
+**Before any migration begins, five things are settled in this order.** The replacement's zone placement and the billing question above, because both are fixed at creation. The pooler's console access, because the check is cheap and the failure is only discoverable when the window is already open. **How many roles the pooler authenticates with**, read from the `[databases]` section of its own configuration, because that number is what step 1.1a's transplant must produce and a short transplant fails silently on the pools it missed. The replacement's identifier, which is the name the environment keeps forever. And **whether the stack declares restore testing**, because that decides if the cutover PR carries the `-replace` of finding 39 or has nothing to repoint.
 
-**The five settled items each have an answer for the remaining environment**, read from the live infrastructure rather than carried forward: the writer sits in `us-east-1b`, so the replacement's writer is pinned there; the pooler's `[databases]` section defines **two** pools, so the verifier transplant must produce two `ALTER ROLE` statements and a count of one means it missed the follower; the replacement is `app-atento-001` with `app-atento-001-instance001` and `-instance002`, free because the source occupies `app-atento-001-cluster`; and **the stack declares no restore testing**, so the cutover PR repoints the internal records and the backup selection and has no restore-testing selection to `-replace`.
+**Each is read from the live infrastructure rather than carried forward from another environment** — the productive runs differed from each other on three of the five, and the one that bit was the pool count: a stack with a read follower authenticates with two roles, and the transplant that resolves "the application role" from table ownership returns only one (finding 43).
 
-**Volume changes timing and nothing else, and for this environment it barely changes that.** 34 GB against shared's 317 GB means the copy is measured in hours, so the window can be opened rather than scheduled weeks out. No step changes. The WAL rate makes retention a non-issue as well: 1232 kB/h, or 87 MB across a three-day window, so the source has nothing to strain to retain while the copy runs.
+**Volume changes timing and nothing else.** At the ~7 GB/h these runs averaged, a copy is measured in hours or in days depending only on size, and no step changes with it. Retention on the source is likewise a non-issue at these WAL rates.
 
 **The identifier is decided, and it is what makes each remaining migration a single copy rather than two.** A database is named `app-<env>-001` and a member instance `app-<env>-001-instance<NNN>` — the application, the environment, the environment's version, and nothing about the engine (ADR-012 in the terraform repository). The names that hold that shape are free today, because what the existing databases occupy is `app-<env>-001-cluster`, so a replacement is born with its permanent name instead of taking a suffix and needing a second migration to shed it. `app-beta-001` already satisfies the rule.
 
-The concrete targets: **demo** `app-demo-001` with `app-demo-001-instance001`; **shared** `app-shared-001` with `app-shared-001-instance001` and `-instance002`; **atento** `app-atento-001` with the same pair.
+Every environment now holds that shape: `app-beta-001`, `app-demo-001` with `app-demo-001-instance001`, and `app-shared-001` and `app-atento-001` each with `-instance001` and `-instance002`.
 
-**One PR per environment, not one PR for all four.** A PR that declares every environment's replacement cannot be merged until every environment has been migrated, because 4Shark applies before merging — so the first environment's work would sit unmerged behind three that have not started, and every branch cut afterwards would have to stack on it or plan against infrastructure its own base does not describe. Scoping the PR to the environment being migrated keeps each one mergeable the moment its own apply is confirmed. The cutover, and each of the two teardown applies, are their own PRs for the same reason.
+**One PR per environment, never one PR for several.** A PR that declares more than one environment's replacement cannot be merged until every one of them has been migrated, because 4Shark applies before merging — so the first environment's work would sit unmerged behind others that have not started, and every branch cut afterwards would have to stack on it or plan against infrastructure its own base does not describe. Scoping the PR to the environment being migrated keeps each one mergeable the moment its own apply is confirmed. The cutover, and each of the two teardown applies, are their own PRs for the same reason.
 
-The three environments still waiting have **no replacement declared anywhere**. Each gets its own PR when its migration starts, shaped like the completed one's — same arguments, `rds_aurora_cluster` instead of `rds_instance`, one instance, the encryption key and the identifier and the zone all set at creation because none of them is editable afterwards, and the self-ingress rule on the security group so the replacement can be filled by replication.
+**The `self` ingress rule survives every teardown because it belongs to the module rather than to a migration.** It admits one database in the group to another, which is what logical replication needs while a replacement is being filled, and every future replacement needs it again — a group that lacks it fails at `CREATE SUBSCRIPTION` with a connection timeout, after the schema load has already succeeded, which is the late and expensive failure Phase 0 exists to prevent. Declaring it where the group is created is what makes removing it require a deliberate edit to shared code rather than an oversight in one stack's cleanup.
 
 **The pooler indirection is the exception to that split, and deliberately so.** The records and the admin user are the *mechanism* the cutover runs on rather than a per-environment resource, so they land once for all four.
 
