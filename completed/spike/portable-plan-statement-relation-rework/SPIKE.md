@@ -99,6 +99,6 @@ The old `PlanStatementPortableBatch#plan_statements_presence` gave the user an i
 
 ## References
 - Purge session: this conversation (2026-08-07), delete + verify console scripts.
-- Scale-limits research: `../portable-exportation-scale-limits/SPIKE.md`.
+- Scale-limits research: `../signature-pdf-audit-trail/PLAN.md` § Scale ceilings.
 - Delivery/scale decisions: `../signature-pdf-audit-trail/PLAN.md` § "2026-07-22 — Scale & delivery decisions".
 - Result-side reference implementation: `statement_portable_batch/producer.rb`, `portable_exportation/result_producer.rb`.

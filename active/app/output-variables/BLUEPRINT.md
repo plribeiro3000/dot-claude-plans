@@ -1,8 +1,8 @@
-# BLUEPRINT — Auxiliary (output) variables
+# BLUEPRINT — Output variables
 
 **Status**: validated against vendor documentation and gem source; ready to estimate
 **Date**: 2026-07-30
-**Feature**: an incentive rule may publish its per-user result into an auxiliary variable, which any incentive in a later calculation stage reads by name.
+**Feature**: an incentive rule may publish its per-user result into an output variable, which any incentive in a later calculation stage reads by name.
 
 ## What this document is, and what it is not
 
@@ -27,7 +27,7 @@ Five things the plan asserted turned out to be wrong or incomplete. Each was ver
 
 ### 1.1 The upsert does not close BE-6's race — this is the finding that changes what gets built
 
-`TASKS.md` said the unique index plus an upsert made the write safe, because the aggregate re-reads at the moment of write. That covers the row mutation and not the read-then-write cycle. Two consumer jobs — one per rule bound to the same auxiliary variable, a fan-out shape `IndicatorIncentive::Producer` already produces — each compute a `SUM` from a separate `SELECT`. Under Read Committed the later write overwrites the earlier with a lower number, silently, on a payroll figure.
+`TASKS.md` said the unique index plus an upsert made the write safe, because the aggregate re-reads at the moment of write. That covers the row mutation and not the read-then-write cycle. Two consumer jobs — one per rule bound to the same output variable, a fan-out shape `IndicatorIncentive::Producer` already produces — each compute a `SUM` from a separate `SELECT`. Under Read Committed the later write overwrites the earlier with a lower number, silently, on a payroll figure.
 
 **Decided: the `Reward` precedent.** `Reward#increment_budget` wraps exactly this read-modify-write in `transaction do lock! … end` (`app/models/reward.rb:65-71`), inside a method the file's own comments frame as a financial operation. BE-6 takes the same shape: `transaction { lock; recompute the sum; write }`. Source 2 on the ladder — 4Shark's own code, for the same class of problem. It stays in plain ActiveRecord, so Query Discipline Rule 1 needs no raw-SQL authorization, and unlike an upsert it fires the model's validations and cache callbacks.
 
@@ -56,9 +56,9 @@ The criteria were removed and replaced by a note recording why, so the dead meth
 
 Both were "follow the pattern at X" where nobody had checked that X was the right analogue — the failure mode that passes review because it looks idiomatic.
 
-**BE-4** pointed at `indicator_variables_options`, which emits three keys per variable: the key plus a `_goal`/`meta_` pair that exists only for variables carrying a goal. An auxiliary variable carries none — `calculation`, `frequency` and `override_calculation` are each validated `if: :indicator?` (`app/models/variable.rb:32,36,39`). **Decided: the `easy_variables_options` shape** (`app/models/rule.rb:221-225`), one key per variable. Copying the indicator builder would have bound keys that never exist at runtime, so a formula would validate and then return zero in production — the exact failure class this feature exists to remove.
+**BE-4** pointed at `indicator_variables_options`, which emits three keys per variable: the key plus a `_goal`/`meta_` pair that exists only for variables carrying a goal. An output variable carries none — `calculation`, `frequency` and `override_calculation` are each validated `if: :indicator?` (`app/models/variable.rb:32,36,39`). **Decided: the `easy_variables_options` shape** (`app/models/rule.rb:221-225`), one key per variable. Copying the indicator builder would have bound keys that never exist at runtime, so a formula would validate and then return zero in production — the exact failure class this feature exists to remove.
 
-**FE-1** assumed the generic `variable/create` screen without noting that `EasyVariable` sets the opposite precedent, with its own mutation and module. **Decided: the generic screen, following Deal.** The generic form builder already carries `require = false` on `variableCalculation`, `variableFrequency` and `variableOverrideCalculation` (`app-webclient/src/app/variable/create/variable-create-form-builder.service.ts:36,46,56`) — precisely the mechanism a type without the indicator-only attributes needs. `EasyVariable` does not transfer: its mutation hardcodes `type` because Easy is scoped to a company mode rather than chosen among peers, which Auxiliary is.
+**FE-1** assumed the generic `variable/create` screen without noting that `EasyVariable` sets the opposite precedent, with its own mutation and module. **Decided: the generic screen, following Deal.** The generic form builder already carries `require = false` on `variableCalculation`, `variableFrequency` and `variableOverrideCalculation` (`app-webclient/src/app/variable/create/variable-create-form-builder.service.ts:36,46,56`) — precisely the mechanism a type without the indicator-only attributes needs. `EasyVariable` does not transfer: its mutation hardcodes `type` because Easy is scoped to a company mode rather than chosen among peers, which Output is.
 
 ---
 
@@ -70,7 +70,7 @@ Worth recording, because each was a premise something else rested on.
 
 **The deploy ordering rests on something firmer than we had.** Apollo's documentation states a query selecting a field the schema does not define never executes, so there is no partial result for `errorPolicy: 'none'` to discard — it is total failure. Frontend-last is therefore necessary, not merely prudent. And the fourth `Variable` type stays additive for an un-updated client because `type` is exposed as a plain `String`, confirmed at `app/graphql_types/variable_graphql_type.rb:33`.
 
-**Reusing `AggregatedIndicator#calculate!` would be actively wrong**, not merely redundant: an auxiliary variable never populates `indicator_aggregations`, so it would always fall through to `variable.format_default`. This is what the Calculator re-entry guard in BE-2 exists to prevent.
+**Reusing `AggregatedIndicator#calculate!` would be actively wrong**, not merely redundant: an output variable never populates `indicator_aggregations`, so it would always fall through to `variable.format_default`. This is what the Calculator re-entry guard in BE-2 exists to prevent.
 
 **The migration shapes hold.** M1's database-level default is metadata-only on Postgres 11+ and all four stacks qualify (16.13–18.4, from the terraform `rds.tf` files); the `CONCURRENTLY` + `disable_ddl_transaction!` shape matches Postgres's documented constraints and recovery path; and M2 needs no follow-up `validate_foreign_key`, because Postgres never checks NULL foreign key values and every pre-existing row is NULL.
 
@@ -87,7 +87,7 @@ Each resolved under the ladder, with the source that resolved it. None was escal
 | 16 | BE-6 write shape | `transaction { lock; recompute; write }` | `Reward#increment_budget` (`app/models/reward.rb:65-71`) — in-repo precedent for the same financial read-modify-write |
 | 17 | BE-4 builder shape | The `easy_variables_options` form, one key per variable | The indicator-only validations at `app/models/variable.rb:32,36,39` mean the `_goal`/`meta_` pair has nothing to attach to |
 | 18 | FE-1 creation screen | The generic `variable/create` screen, following Deal | The `require = false` controls already in `variable-create-form-builder.service.ts:36,46,56` |
-| 19 | Auxiliary key reserved words | The type's key validation excludes `case`, `end`, `then`, `when`, `else` | Dentaku's `case_statement` scanner matches those words case-insensitively (`dentaku-3.5.7/lib/dentaku/token_scanner.rb:150-152`), and `Variable#key`'s format (`variable.rb:37`) permits them |
+| 19 | Output key reserved words | The type's key validation excludes `case`, `end`, `then`, `when`, `else` | Dentaku's `case_statement` scanner matches those words case-insensitively (`dentaku-3.5.7/lib/dentaku/token_scanner.rb:150-152`), and `Variable#key`'s format (`variable.rb:37`) permits them |
 | 20 | `CalendarAudit` exclusion path | Through `joins(:variable)` | `plan_variables` carries only `goal_type`, `plan_id`, `variable_id` (`db/schema.rb:1617-1624`) — no type column to filter on directly |
 | 21 | BE-6 cache-callback gap | Accepted as-is | The cost is a cache miss forcing a live query on read — performance, not correctness. Fixing it is not in the requested scope |
 
@@ -134,6 +134,6 @@ Three things could not be settled from the repository, and each is named rather 
 
 ## 6. Sources
 
-The four spikes named in the table at the top, each with its own auxiliary evidence files. Vendor and gem sources consulted during validation: Dentaku 3.5.7 source, `strong_migrations` 2.7.0 source, Rails 8.1.3.1 source (`active_model/validations.rb`, `active_record/nested_attributes.rb`), PostgreSQL documentation on `ON CONFLICT DO UPDATE`, Read Committed isolation and `CREATE INDEX CONCURRENTLY`, Apollo Client error-policy documentation, graphql-ruby schema-evolution documentation, and Netlify build documentation.
+The four spikes named in the table at the top, each with its own output evidence files. Vendor and gem sources consulted during validation: Dentaku 3.5.7 source, `strong_migrations` 2.7.0 source, Rails 8.1.3.1 source (`active_model/validations.rb`, `active_record/nested_attributes.rb`), PostgreSQL documentation on `ON CONFLICT DO UPDATE`, Read Committed isolation and `CREATE INDEX CONCURRENTLY`, Apollo Client error-policy documentation, graphql-ruby schema-evolution documentation, and Netlify build documentation.
 
 Versions were read from `Gemfile.lock`, `package.json` and the terraform `rds.tf` files rather than assumed.

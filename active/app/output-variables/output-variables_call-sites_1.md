@@ -55,7 +55,7 @@ plan can state the exclusion is verified rather than assumed.
 ```
 
 `aggregated_indicator_value` (lines 51-60) falls back to `variable.format_default` on
-`ActiveRecord::RecordNotFound`, so an auxiliary key lands in the snapshot carrying its default.
+`ActiveRecord::RecordNotFound`, so an output key lands in the snapshot carrying its default.
 
 **`app/workers/calendar_audit/producer.rb:19`**
 
@@ -65,7 +65,7 @@ plan can state the exclusion is verified rather than assumed.
         calendar_audit.computation.increment_queue(by: combinations.count)
 ```
 
-The product is `periods × users × variables`, so each auxiliary variable multiplies the audit
+The product is `periods × users × variables`, so each output variable multiplies the audit
 fan-out by `periods × users` jobs.
 
 **`app/workers/goal_dataset/migration/producer.rb:16`**
@@ -96,7 +96,7 @@ fan-out by `periods × users` jobs.
 ```
 
 Line 12 gates on `variables.indicators` (positively scoped) but line 29 builds the lookup from the
-unscoped `@commission.variables`, so an auxiliary variable would enter the workbook's index.
+unscoped `@commission.variables`, so an output variable would enter the workbook's index.
 
 **`app/work_books/plan_slice_commission_work_book/indicator_work_sheet.rb:36`** — same shape:
 
@@ -186,7 +186,7 @@ Consumers of `plan_variables` that a fourth type would reach:
 | `app/models/calendar_audit.rb:30` | `variable_quantity = PlanVariable.where(plan_id: plan_ids).count` | no |
 
 `PlanVariable#goals_presence` (`app/models/plan_variable.rb:32-39`) only fires when `goal_type` is
-present, so an auxiliary `plan_variables` row with a blank `goal_type` validates cleanly. The
+present, so an output `plan_variables` row with a blank `goal_type` validates cleanly. The
 exposure is the picker: `PlanVariableInputGraphqlType` requires `goal_type`
 (`app/graphql_types/plan_variable_input_graphql_type.rb:5-6`), and the plan-finish screen offers a
 goal type for every `plan_variable`.

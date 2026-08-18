@@ -208,10 +208,10 @@ Read by every downstream consumer:
 | `limiter_incentive/consumer.rb` | 37 | `options = deal_options.merge(modifier_options).merge(limiter_options)` |
 | `redemption_incentive/consumer.rb` | 34 | `options = deal_options.merge(modifier_options).merge(redemption_options)` |
 
-The two deal-stage sites filter the snapshot down to metric keys only, so a fresh auxiliary merge
+The two deal-stage sites filter the snapshot down to metric keys only, so a fresh output merge
 there would need its own path rather than riding the existing `select`.
 
-### The fresh-read precedent the auxiliary path would copy
+### The fresh-read precedent the output path would copy
 
 `Commission::LimiterOptionsProcessor` and `Commission::RedemptionOptionsProcessor` are invoked
 with live state at the moment of use rather than read from the snapshot.
@@ -324,7 +324,7 @@ end
 
 `Commissioning#money` (the base, `app/models/commissioning.rb:60-64`) returns `value` unchanged.
 A materialization that sums `commissionings.value` and one that sums `#money` therefore disagree in
-sign for any limiter rule bound to an auxiliary variable.
+sign for any limiter rule bound to an output variable.
 
 ---
 
@@ -343,7 +343,7 @@ sign for any limiter rule bound to an auxiliary variable.
 Both `payment_type_id` and `user_payment_type_commission_id` are mandatory, and both are resolved
 from the `Incentivation` of the plan (e.g. `app/workers/limiter_incentive/consumer.rb:18-23`). A
 commissioning row therefore cannot exist detached from a payment type — relevant to the
-publish-only question, because a rule that writes an auxiliary value without paying still has to
+publish-only question, because a rule that writes an output value without paying still has to
 decide whether a commissioning row exists at all.
 
 ---
@@ -376,9 +376,9 @@ only indicator and limiter.
         end
 ```
 
-Unscoped, so auxiliary rows stored in `aggregated_modifiers` are cleared on every reprocess — the
+Unscoped, so output rows stored in `aggregated_modifiers` are cleared on every reprocess — the
 free half of SPIKE §4.2c. Recreation is type-scoped
-(`app/workers/aggregated_indicator/producer.rb:22-26`), so auxiliary rows are not recreated there.
+(`app/workers/aggregated_indicator/producer.rb:22-26`), so output rows are not recreated there.
 
 **One consequence SPIKE §4.2c does not state.** `AggregatedIndicator::Calculator::Producer` fans
 out over *every* aggregated indicator of the commission's user commissions, with no type scope
@@ -405,6 +405,6 @@ and its consumer calls `calculate!` on each (`calculator/consumer.rb:17`):
 ```
 
 Within a single commission run the Calculator stage completes before any incentive stage begins, so
-an auxiliary row written during the indicator stage is never seen by it. The exposure is any path
-that re-enters the Calculator after auxiliary rows exist — it would overwrite them with the
+an output row written during the indicator stage is never seen by it. The exposure is any path
+that re-enters the Calculator after output rows exist — it would overwrite them with the
 variable's default.

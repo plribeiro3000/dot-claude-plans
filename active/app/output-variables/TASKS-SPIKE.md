@@ -1,8 +1,8 @@
-# TASKS-SPIKE — Auxiliary (output) variables in `app`
+# TASKS-SPIKE — Output variables in `app`
 
 > Reference: `PLAN.md` (engineer-approved) in this directory, and its evidence files
-> `auxiliary-variables_call-sites_1.md`, `auxiliary-variables_pipeline_2.md`,
-> `auxiliary-variables_rollout_3.md`.
+> `output-variables_call-sites_1.md`, `output-variables_pipeline_2.md`,
+> `output-variables_rollout_3.md`.
 > Repositories: `~/Projects/4Shark/app` (backend) and `~/Projects/4Shark/app-webclient` (frontend),
 > branch `develop` in both.
 > Language classification: internal engineering doc → English (`LANGUAGE-POLICY.md`, category 1).
@@ -32,14 +32,14 @@ chosen, and the source that decided it.
 | # | Fork | Resolved | Source |
 |---|---|---|---|
 | D1 | Phase 1 as one task, or split into type / role column / rule binding | **One task (BE-1).** | `PLAN.md:71-93` states one objective and one dependency line ("Dependencies: none. Blocks every other phase") for the whole phase. Reviewability confirms it: each third is unjudgeable alone — a reviewer seeing "add a `role` column defaulting to input" with no fourth type in the diff cannot assess it. The combined diff is ~15 files of declarations, read in one pass |
-| D2 | The Calculator re-entry guard (`aggregated_indicator/calculator/producer.rb:20-21`) in the exclusions task or the materialization task | **Materialization task (BE-6).** | `PLAN.md:212` lists it under Phase 6 components, and its failure mode ("a silently zeroed auxiliary value", `PLAN.md:380`) is a materialization failure, not an exclusion failure. Its criterion is only meaningful once auxiliary rows exist |
-| D3 | The plan-finish goal suppression — backend or frontend | **Split by repository.** Backend half (the auxiliary `plan_variable` validates with a blank `goal_type` and is distinguishable through the API) in BE-3; frontend half (the screen stops rendering the goal control) in FE-4 | `PLAN.md:69` puts phases 1-8 in the backend deploy and phase 9 in the frontend release, so the halves cannot ship together. `PLAN.md:188` sets the precedent for which half is the guarantee: "The plan picker filtered to compatible incentives (Phase 9) is the preventive form and is UX, not the guarantee" |
+| D2 | The Calculator re-entry guard (`aggregated_indicator/calculator/producer.rb:20-21`) in the exclusions task or the materialization task | **Materialization task (BE-6).** | `PLAN.md:212` lists it under Phase 6 components, and its failure mode ("a silently zeroed output value", `PLAN.md:380`) is a materialization failure, not an exclusion failure. Its criterion is only meaningful once output rows exist |
+| D3 | The plan-finish goal suppression — backend or frontend | **Split by repository.** Backend half (the output `plan_variable` validates with a blank `goal_type` and is distinguishable through the API) in BE-3; frontend half (the screen stops rendering the goal control) in FE-4 | `PLAN.md:69` puts phases 1-8 in the backend deploy and phase 9 in the frontend release, so the halves cannot ship together. `PLAN.md:188` sets the precedent for which half is the guarantee: "The plan picker filtered to compatible incentives (Phase 9) is the preventive form and is UX, not the guarantee" |
 | D4 | Phase 6 as one task, or the recompute mechanism + indicator writer first, then the other three writers | **One task (BE-6).** | `PLAN.md:224` makes the engineer's worked example a Phase 6 success criterion: "two positive contributions and one limiter contribution of the same magnitude publish 300 + 200 − 100 = 400". That criterion needs the limiter writer, so a first PR carrying only the indicator writer could not satisfy the phase's own acceptance test |
 | D5 | Phase 8 as one task, or the GraphQL surface separated from the permission | **Two tasks (BE-8, BE-9).** | `PLAN.md:378` and `PLAN.md:386` assign the two halves different failure modes and different mitigations — "A cloned incentive silently loses its output bindings" (High) versus "M4's `Action.create!` is re-applied" (Low, a re-run hazard). A PR whose entire subject is "the binding survives create/update/clone" gets the review attention the first risk warrants; the permission PR's subject is a non-idempotent data migration needing a different kind of scrutiny. They still ship in the same deploy, so nothing is lost |
-| D6 | Phase 9 as one frontend task, or split | **Four tasks (FE-1..FE-4).** | `PLAN.md:290-294` lists three independent success criteria, and the variable-creation screen has a fourth, separate dependency profile: `PLAN.md:266` records that "creating an auxiliary variable needs no mutation change", so FE-1 depends only on the type existing, while FE-2/FE-3 depend on the new GraphQL argument and FE-4 on the new `role` field. Splitting turns one 20-file diff into four coherent ones with distinct reviewers' contexts |
+| D6 | Phase 9 as one frontend task, or split | **Four tasks (FE-1..FE-4).** | `PLAN.md:290-294` lists three independent success criteria, and the variable-creation screen has a fourth, separate dependency profile: `PLAN.md:266` records that "creating an output variable needs no mutation change", so FE-1 depends only on the type existing, while FE-2/FE-3 depend on the new GraphQL argument and FE-4 on the new `role` field. Splitting turns one 20-file diff into four coherent ones with distinct reviewers' contexts |
 | D7 | The two plan screens (create picker, finish goal control) as one task or two | **One task (FE-4).** | Both depend on the same backend deploy, both live in the plan authoring flow, and each is small on its own. § No Premature DRY's converse applies — do not split what only makes sense reviewed together |
-| D8 | The name of the STI subclass, its scope, and its data-type allow-list | **`AuxiliaryVariable`, `scope :auxiliary`, `ApplicationDataType::AUXILIARY_TYPES`.** | The surrounding code (`DECISION-AUTHORITY.md` ladder, source 2). `app/models/variable.rb:4` declares `TYPES = %w[DealVariable IndicatorVariable EasyVariable]`; `:47`, `:49`, `:58` declare `scope :deals` / `:easy` / `:indicators` in one shape; `app/data_types/application_data_type.rb:4-6` declares `DEAL_TYPES` / `INDICATOR_TYPES` / `EASY_TYPES`. The fourth member follows mechanically |
-| D9 | The name of the new options processor | **`Commission::AuxiliaryOptionsProcessor`, at `app/services/commission/auxiliary_options_processor.rb`.** | The sibling files in that directory are `deal_options_processor.rb`, `deal_options_v2_processor.rb`, `indicator_options_processor.rb`, `limiter_options_processor.rb`, `ranking_options_processor.rb`, `redemption_options_processor.rb` — each named for what it supplies. (Correction recorded: `PLAN.md:235` says "alongside the four existing ones"; `ls app/services/commission/` returns six files. The naming pattern is unaffected) |
+| D8 | The name of the STI subclass, its scope, and its data-type allow-list | **`OutputVariable`, `scope :output`, `ApplicationDataType::OUTPUT_TYPES`.** | The surrounding code (`DECISION-AUTHORITY.md` ladder, source 2). `app/models/variable.rb:4` declares `TYPES = %w[DealVariable IndicatorVariable EasyVariable]`; `:47`, `:49`, `:58` declare `scope :deals` / `:easy` / `:indicators` in one shape; `app/data_types/application_data_type.rb:4-6` declares `DEAL_TYPES` / `INDICATOR_TYPES` / `EASY_TYPES`. The fourth member follows mechanically |
+| D9 | The name of the new options processor | **`Commission::OutputOptionsProcessor`, at `app/services/commission/output_options_processor.rb`.** | The sibling files in that directory are `deal_options_processor.rb`, `deal_options_v2_processor.rb`, `indicator_options_processor.rb`, `limiter_options_processor.rb`, `ranking_options_processor.rb`, `redemption_options_processor.rb` — each named for what it supplies. (Correction recorded: `PLAN.md:235` says "alongside the four existing ones"; `ls app/services/commission/` returns six files. The naming pattern is unaffected) |
 | D10 | The permission key, level and resource | **`key: 'incentive_output_variable_binding'`, `level: 'module'`, `resource: 'incentive'`.** | The `MODULE_KEYS` grammar at `app/workers/company/admin/processor.rb:15-52` is `<resource>_<action-noun>` with multi-segment resources already present (`user_identifier_action_document_creation`, `:35-36`). `level: 'module'` because the permission gates a capability rather than a per-record action — the contrast is `db/migrate/20260729113439_user_update_document_actions.rb:5-8`, where `*_listing` / `*_creation` are `level: 'module'` and `*_destruction` / `*_download` are `level: 'resource'`. `incentive_clone` (`processor.rb:31`) is the closest sibling and is module-level, gated by `IncentivePolicy#clone?` (`app/policies/incentive_policy.rb:28-33`) |
 | D11 | Where the CHANGELOG entry lands across a 9-PR backend feature | **On the first task of each repository — BE-1 for `app`, FE-1 for `app-webclient` — named once and not duplicated.** | § Changelog Policy requires every feature branch to update the changelog and requires entries to "name the subject, nothing else". The observed granularity in `app/CHANGELOG.md:15-19` is feature-level ("Bulk user update by spreadsheet"), not PR-level; nine entries for one capability would violate the succinctness rule. Landing it first means no branch ships the capability before it is recorded |
 | D12 | Where the incentive-CSV-import limitation is recorded | **In the `## Decisions` block of BE-1's PR description.** | § Decision Authority makes that block mandatory for a resolved ambiguity a reviewer would want to know about, and BE-1 is where the binding is introduced — the point a reader asks why the CSV cannot set it. `PLAN.md:32` already carries the reasoning and the citation (`app/workers/incentive_document/processor.rb:81-86`). No new document file, per § Scope Discipline |
@@ -81,7 +81,7 @@ consumers, the new options processor). `PLAN.md:218` states the lane independenc
 deploy.
 
 **What is strictly serial and why.** BE-4 after BE-3 because the validator has to know which
-auxiliary variables the company has, which is what registration establishes (`PLAN.md:173`).
+output variables the company has, which is what registration establishes (`PLAN.md:173`).
 BE-7 after BE-6 because there is nothing to read otherwise, and after BE-4 because no rule can name
 the variable otherwise (`PLAN.md:248`). BE-8 after BE-5 "so the front never offers a binding the
 backend rejects" (`PLAN.md:268`). FE-2 after both BE-8 (the argument must exist) and BE-9 (the
@@ -98,7 +98,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:71-93`): Phase 1, schema and model, inert
-- **Description**: create the auxiliary `Variable` type and its STI subclass, the `role` column on
+- **Description**: create the output `Variable` type and its STI subclass, the `role` column on
   `incentive_variables`, the output binding on `rules`, and the unique index that guarantees the
   role pair. Nothing reads or writes any of it yet. This is the only task with no dependency and it
   blocks every other task.
@@ -109,7 +109,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         `bin/rails db:migrate`; `db/schema.rb` committed in the same commit.
   - [ ] **M1 carries a database-level default equal to the input role, and this is the task's
         load-bearing constraint, not a style point.** During the deploy window the schema is new and
-        every serving container still runs the old code (`auxiliary-variables_rollout_3.md:210-220`,
+        every serving container still runs the old code (`output-variables_rollout_3.md:210-220`,
         reading `deploy-shared-001.yaml:403-458` against `:616-621`). That old code calls
         `incentive_variables.create(variable_id: variable.id)` with no role at
         `app/models/incentive.rb:156`, `:160`, `:164`, `:168`, and it runs against the OLD model
@@ -129,10 +129,10 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         fails in Postgres when split. M3 runs after M1; the index references the column M1 creates.
         Precedent: `db/migrate/20260729113429_add_unique_index_to_user_update_document_enrollments.rb:2-11`.
   - [ ] `Variable::TYPES` (`app/models/variable.rb:4`) gains the fourth member and a
-        `scope :auxiliary` joins the three at `:47`, `:49`, `:58`.
-  - [ ] `AuxiliaryVariable < Variable` mirrors `app/models/easy_variable.rb` — the two
+        `scope :output` joins the three at `:47`, `:49`, `:58`.
+  - [ ] `OutputVariable < Variable` mirrors `app/models/easy_variable.rb` — the two
         `rescue_unique_constraint` declarations plus a `data_type` inclusion drawn from a new
-        `ApplicationDataType::AUXILIARY_TYPES` alongside the three at
+        `ApplicationDataType::OUTPUT_TYPES` alongside the three at
         `app/data_types/application_data_type.rb:4-6`. The type constrains `default` to zero
         (`PLAN.md:368`); `validates :default, presence: true` (`app/models/variable.rb:35`) still
         applies, while the three indicator-only validations at `:32`, `:36` and `:39` do not,
@@ -145,12 +145,12 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
   - [ ] **Tests, in this task's own PR.** `spec/models/variable_spec.rb:35` currently reads
         `it { is_expected.to validate_inclusion_of(:type).in_array(%w[DealVariable EasyVariable IndicatorVariable]) }`
         and fails by construction against a fourth type — editing it is required, not a regression.
-        A new `spec/models/auxiliary_variable_spec.rb` mirrors
+        A new `spec/models/output_variable_spec.rb` mirrors
         `spec/models/easy_variable_spec.rb` (145 lines of shoulda-matchers plus method blocks) and
         asserts the data-type allow-list and that the three indicator-only validations do not fire.
         `spec/models/incentive_variable_spec.rb` (10 lines today) gains the role presence and
         `enumerize` assertions.
-  - [ ] Factories: `spec/factories/variables.rb` gains an `:auxiliary` trait alongside `:indicator`
+  - [ ] Factories: `spec/factories/variables.rb` gains an `:output` trait alongside `:indicator`
         and `:deal`; `spec/factories/rules.rb` gains the output binding;
         `spec/factories/incentive_variables.rb` is a bare `factory :incentive_variable` today and
         gains the role.
@@ -168,22 +168,22 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
   - `db/schema.rb:1959-1961` — a variable-bearing FK already on `rules` (`variable_track_id` and its
     partial unique index), so M2's shape has precedent in the same table.
 
-### BE-2 — Exclude auxiliary variables from the unscoped existing flows
+### BE-2 — Exclude output variables from the unscoped existing flows
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:94-116`): Phase 2, exclusions. Independently valuable — this is the task that
   contains the blast radius.
 - **Description**: fifteen call sites already read through `variables.deals` / `.indicators` /
   `.easy` and exclude a fourth type with no code change (full inventory,
-  `auxiliary-variables_call-sites_1.md:16-32`). Six unscoped sites need a scope; five are left
+  `output-variables_call-sites_1.md:16-32`). Six unscoped sites need a scope; five are left
   unscoped deliberately. This task is the regression net for every other task.
 - **Dependencies**: BE-1 merged — the type must exist before a scope can exclude it.
 - **Acceptance criteria**:
   - [ ] `app/workers/calendar_audit/producer.rb:19` is scoped. Its fan-out at `:20` is
-        `period_ids.product(user_ids, variable_ids)`, so each unscoped auxiliary variable adds
+        `period_ids.product(user_ids, variable_ids)`, so each unscoped output variable adds
         `periods × users` audit jobs per plan.
   - [ ] `app/models/calendar_audit.rb:30` (`PlanVariable.where(plan_id: plan_ids).count`, the
-        audit's expected row count) excludes auxiliaries. An auxiliary variable has no integration
+        audit's expected row count) excludes auxiliaries. An output variable has no integration
         source, so counting it as expected produces a permanent false gap.
   - [ ] `app/workers/goal_dataset/migration/producer.rb:16` is scoped.
   - [ ] `app/workers/commission/money_sanitizer_processor.rb:48` is scoped.
@@ -196,7 +196,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         `app/work_books/variable_audit_work_book/variables_work_sheet.rb:28` (a configuration catalog
         with a type column that already renders blank frequency for deal and easy variables, `:15-38`);
         `app/services/commission/indicator_options_processor.rb:41` (left unscoped deliberately —
-        BE-7 depends on auxiliary keys landing in the frozen snapshot carrying their default, so a
+        BE-7 depends on output keys landing in the frozen snapshot carrying their default, so a
         consuming formula never hits the unbound-variable path at runtime); and
         `app/workers/company/inactivator.rb:107`, `app/workers/company/activator.rb:110`,
         `app/workers/company/cleansing/variable_producer.rb:13`, whose purpose is covering every
@@ -205,7 +205,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         (`spec/work_books/`). The four worker/model changes have no spec home — `spec/` contains
         `factories`, `forms`, `models`, `requests`, `search_indexes`, `work_books` and **no
         `spec/workers/` directory** (see § Test surface). `app/models/calendar_audit.rb:30` is model
-        code and is asserted in `spec/models/` that a plan carrying an auxiliary variable does not
+        code and is asserted in `spec/models/` that a plan carrying an output variable does not
         raise the expected count. The three producer scopes are verified on `beta-001` under
         ROLLOUT-1, which is where PLAN.md already places end-to-end confirmation.
 - **Pattern reference**: `app/workers/aggregated_indicator/producer.rb:23,25` —
@@ -217,7 +217,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
 - **Repository**: `app`
 - **Phase** (`PLAN.md:118-134`): Phase 3, registration
 - **Description**: saving an incentive records its inputs and its outputs, each with the right role.
-  Auxiliary variables reach `plan_variables` — the read path requires them there — with goal binding
+  Output variables reach `plan_variables` — the read path requires them there — with goal binding
   suppressed for the type on the backend side.
 - **Dependencies**: BE-1 merged.
 - **Acceptance criteria**:
@@ -232,14 +232,14 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         whose variable is both an input of one rule and an output of another and asserts **both**
         rows exist. M3's unique index (BE-1) is where the defect would surface if the scope is
         missed.
-  - [ ] An auxiliary variable reaches `plan_variables`. `Plan#create_variables`
+  - [ ] An output variable reaches `plan_variables`. `Plan#create_variables`
         (`app/models/plan.rb:434-436`) populates it from `variable_ids` (`:438-445`), which is
         unscoped, so this is verification rather than a change — the spec pins it so a later scope
         cannot silently remove it.
-  - [ ] The auxiliary `plan_variables` row validates with a blank `goal_type`.
+  - [ ] The output `plan_variables` row validates with a blank `goal_type`.
         `PlanVariable#goals_presence` (`app/models/plan_variable.rb:32-39`) opens with
         `return if goal_type.blank?`, so this holds today; the spec pins it.
-  - [ ] The backend half of goal suppression: the plan-finish path can distinguish an auxiliary
+  - [ ] The backend half of goal suppression: the plan-finish path can distinguish an output
         `plan_variable`. `PlanVariableInputGraphqlType` declares both arguments `required: true`
         (`app/graphql_types/plan_variable_input_graphql_type.rb:4-5`) and is consumed by
         `finish_plan_graphql_mutation.rb:5` as `plan_variables_attributes`. The frontend half —
@@ -248,40 +248,40 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         gains a `describe '#update_variables'` block; the shape to copy is
         `spec/models/deal_variable_spec.rb:50-62`, and 48 of the 284 model specs already use it.
         `spec/requests/graphql_mutations/graphql_controller_finish_plan_spec.rb` covers the
-        finish path with an auxiliary variable present.
+        finish path with an output variable present.
 
-### BE-4 — Bind auxiliary keys in the `Rule` syntax validators
+### BE-4 — Bind output keys in the `Rule` syntax validators
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:136-178`): Phase 4, the blocker
 - **Description**: **this is a prerequisite for the read side, not polish.** Today a rule whose
-  formula references an auxiliary variable key cannot be saved at all, and the failure is silent
+  formula references an output variable key cannot be saved at all, and the failure is silent
   about its cause. `Rule` validates every formula by evaluating it against a synthetic options hash
   built from positively-scoped variable queries; an unbound identifier raises
   `Dentaku::UnboundVariableError`, a subclass of `Dentaku::Error`, which is the first entry of
   `Rule::PARSE_EXCEPTIONS` (`app/models/rule.rb:4-5`), so `validate_syntax`
   (`app/models/rule.rb:172-180`) swallows it into a bare `errors.add(:value, :invalid)`.
-- **Dependencies**: BE-3 merged — the validator needs to know which auxiliary variables the company
+- **Dependencies**: BE-3 merged — the validator needs to know which output variables the company
   has (`PLAN.md:173`).
 - **Acceptance criteria**:
-  - [ ] The synthetic options hash binds auxiliary keys for the three incentive types that may read
+  - [ ] The synthetic options hash binds output keys for the three incentive types that may read
         one — ranking, limiter and redemption. The four existing builders are `metrics_options`
         (`app/models/rule.rb:183`), `deal_extra_fields_options` (`:203`),
         `indicator_variables_options` (`:209`) and `easy_variables_options` (`:217`); the three
         validators that consume them are `ranking_syntax` (`:114`), `limiter_syntax` (`:140`) and
         `redemption_syntax` (`:161`). (Correction already recorded in
-        `auxiliary-variables_call-sites_1.md:34-38`: SPIKE §4.5 cites `173,193,199,207`; the current
+        `output-variables_call-sites_1.md:34-38`: SPIKE §4.5 cites `173,193,199,207`; the current
         `develop` lines are the ones above.)
-  - [ ] `indicator_syntax` (`:95`) and `formula_syntax` (`:71`) are **not** given auxiliary bindings
+  - [ ] `indicator_syntax` (`:95`) and `formula_syntax` (`:71`) are **not** given output bindings
         — the indicator stage writes but does not read (`PLAN.md:45`).
-  - [ ] A rule referencing an auxiliary key saves through the incentive mutation, on the incentive
+  - [ ] A rule referencing an output key saves through the incentive mutation, on the incentive
         types that may read one. Asserted in
         `spec/requests/graphql_mutations/graphql_controller_create_incentive_spec.rb`.
   - [ ] A rule referencing a genuinely unknown key still fails with `errors.add(:value, :invalid)` —
         the negative case, without which the change could be an unconditional bind. Asserted in
         `spec/models/rule_spec.rb` (60 lines today).
   - [ ] Runtime behaviour is confirmed unchanged: `calculate` returns `0` on a parse exception
-        (`app/models/rule.rb:53-57`), so a missing auxiliary value at calculation time yields zero
+        (`app/models/rule.rb:53-57`), so a missing output value at calculation time yields zero
         rather than an error.
 - **Pattern reference** — `app/models/rule.rb:209-215`, the builder this one is modelled on:
   ```ruby
@@ -298,10 +298,10 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:180-196`): Phase 5
-- **Description**: a plan whose incentive reads an auxiliary variable is rejected unless another
+- **Description**: a plan whose incentive reads an output variable is rejected unless another
   incentive in the same plan, in a strictly earlier stage, exports it. The calculation order has no
   representation in code today — it exists only in the enqueue graph across 41 call sites
-  (`auxiliary-variables_pipeline_2.md:69-115`), and `Incentive::TYPES`
+  (`output-variables_pipeline_2.md:69-115`), and `Incentive::TYPES`
   (`app/models/incentive.rb:15`) is declared in a different order carrying no ordering semantics.
 - **Dependencies**: BE-3 and BE-4 merged.
 - **Acceptance criteria**:
@@ -312,7 +312,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         mechanism that answers the "nothing keeps them in sync" objection and is the mitigation
         `PLAN.md:382` names for the drift risk — without it the constant is a second, silently
         divergent representation.
-  - [ ] `Plan#auxiliary_variable_requirements` joins the four custom validations at
+  - [ ] `Plan#output_variable_requirements` joins the four custom validations at
         `app/models/plan.rb:58-61`, modelled on its structural twin `redemption_incentive_requirements`
         (`:389-398`), which also reasons over the plan's incentive set and adds to `:incentivations`.
   - [ ] **Two details differ from the twin and each has a consequence.** It reads `incentive_ids`
@@ -332,7 +332,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         `spec/requests/graphql_mutations/graphql_controller_create_plan_spec.rb` /
         `..._update_plan_spec.rb`.
 
-### BE-6 — Materialize the per-`(user_commission, variable)` auxiliary value
+### BE-6 — Materialize the per-`(user_commission, variable)` output value
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:198-226`): Phase 6. The largest task and the one carrying the feature's
@@ -353,7 +353,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         A money incentive's rules sum `Commissioning#money`, a points incentive's sum
         `Commissioning#points`. `LimiterCommissioning` returns `value * -1`
         (`app/models/limiter_commissioning.rb`, whole class, quoted at
-        `auxiliary-variables_pipeline_2.md:307-323`); the base `Commissioning#money` returns `value`
+        `output-variables_pipeline_2.md:307-323`); the base `Commissioning#money` returns `value`
         unchanged (`app/models/commissioning.rb:60-70`).
   - [ ] **The engineer's worked example closes**: two positive contributions and one limiter
         contribution of the same magnitude publish 300 + 200 − 100 = 400. This test fails if the raw
@@ -382,9 +382,9 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         out over every row for the commission with no type scope, and its consumer calls `calculate!`
         (`calculator/consumer.rb:17`), which falls back to `variable.format_default` when there are
         no `indicator_aggregations` (`app/models/aggregated_indicator.rb:26-28`) — so any path
-        re-entering the Calculator after auxiliary rows exist overwrites them with the default.
+        re-entering the Calculator after output rows exist overwrites them with the default.
         Within one run the ordering makes this unreachable; the scope closes the re-entry exposure.
-  - [ ] A reprocess clears the auxiliary rows and recomputes them. The purge at
+  - [ ] A reprocess clears the output rows and recomputes them. The purge at
         `app/workers/aggregated_indicator/purge/consumer.rb:17-21` is unscoped, so the clearing half
         is free; the recompute half is what this criterion tests.
   - [ ] **Partial commissions checked specifically.** Every worker in the chain branches on `partial`
@@ -419,18 +419,18 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:228-253`): Phase 7, read path
-- **Description**: a new options processor supplies the materialized auxiliary values, merged last
+- **Description**: a new options processor supplies the materialized output values, merged last
   into the Dentaku options hash of the three reading stages.
 - **Dependencies**: BE-6 (nothing to read otherwise) and BE-4 (no rule can name the variable
   otherwise).
 - **Acceptance criteria**:
-  - [ ] `Commission::AuxiliaryOptionsProcessor` created at
-        `app/services/commission/auxiliary_options_processor.rb` (decision D9).
+  - [ ] `Commission::OutputOptionsProcessor` created at
+        `app/services/commission/output_options_processor.rb` (decision D9).
   - [ ] The merge is added in exactly three consumers, each joining the existing expression:
         `app/workers/ranking_incentive/consumer.rb:44`
         (`options = deal_options.merge(modifier_options).merge(ranking_options)`),
         `app/workers/limiter_incentive/consumer.rb:37`, and
-        `app/workers/redemption_incentive/consumer.rb:34`. The auxiliary merge comes last, after
+        `app/workers/redemption_incentive/consumer.rb:34`. The output merge comes last, after
         `modifier_options`, following both named precedents.
   - [ ] **The indicator consumer is not touched.** It is the first writer and nothing has been
         written before it; its line 29
@@ -438,13 +438,13 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
   - [ ] **The deal stage is not touched, and the PR states why that is safe.** It does not merge the
         snapshot wholesale — it filters it to metric keys
         (`app/workers/deal_incentive/consumer.rb:30-32`, and the same shape at
-        `deal_incentive/period_processor.rb:20`), so an auxiliary key is filtered out by that
+        `deal_incentive/period_processor.rb:20`), so an output key is filtered out by that
         `select` with no code change.
-  - [ ] **A plan with no auxiliary variable produces byte-identical options hashes to today.** This
+  - [ ] **A plan with no output variable produces byte-identical options hashes to today.** This
         is the regression criterion for the whole read path.
-  - [ ] A rule in a ranking, limiter or redemption incentive reading an auxiliary variable evaluates
+  - [ ] A rule in a ranking, limiter or redemption incentive reading an output variable evaluates
         against the materialized value, not the default. The frozen snapshot already carries
-        auxiliary keys at their default — it is written once before any incentive stage
+        output keys at their default — it is written once before any incentive stage
         (`app/workers/user_commission/indicator_options_consumer.rb:16-17`) and
         `IndicatorOptionsProcessor` reads `plan.variables` unscoped
         (`app/services/commission/indicator_options_processor.rb:41`) — so this criterion is
@@ -544,12 +544,12 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         unreachable; granting is ROLLOUT-1's prepared procedure, executed by the engineer.
   - [ ] The PR's `## Decisions` block records D10.
 
-### FE-1 — Offer the auxiliary type on the variable screens
+### FE-1 — Offer the output type on the variable screens
 
 - **Repository**: `app-webclient`
 - **Phase** (`PLAN.md:276-294`): Phase 9, the variable creation screen component
 - **Description**: the earliest frontend task and fully independent of the rest — until an operator
-  can create an auxiliary variable there is nothing to bind. `PLAN.md:266` records that creating one
+  can create an output variable there is nothing to bind. `PLAN.md:266` records that creating one
   needs no backend mutation change, so this depends only on the type existing.
 - **Dependencies**: BE-1 merged (the backend accepts the type).
 - **Acceptance criteria**:
@@ -563,7 +563,7 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         control with a required validator. Its `variableCalculation` (`:36`), `variableFrequency`
         (`:46`) and `variableOverrideCalculation` (`:56`) helpers are conditionally required,
         matching the backend model where those three are validated only `if: :indicator?`
-        (`app/models/variable.rb:32,36,39`) — an auxiliary variable follows the deal/easy shape and
+        (`app/models/variable.rb:32,36,39`) — an output variable follows the deal/easy shape and
         requires none of them. Verified by the diff not adding a control.
   - [ ] The conditional blocks keyed on `IndicatorVariable`
         (`variable-create.component.html:124`, `variable-update.component.html:116`,
@@ -629,13 +629,13 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         the rest unbound (`PLAN.md:360` — "ele pode salvar só uma faixa ou ele pode salvar todas").
   - [ ] Verification is manual per FE-1's criterion.
 
-### FE-4 — Plan screens: compatible-incentive picker and no goal control for auxiliary variables
+### FE-4 — Plan screens: compatible-incentive picker and no goal control for output variables
 
 - **Repository**: `app-webclient`
 - **Phase** (`PLAN.md:285` and `PLAN.md:126`): Phase 9's plan picker plus the frontend half of
   Phase 3's goal suppression (decisions D3 and D7)
-- **Description**: the plan create screen offers only incentives compatible with the auxiliary
-  variables already present, and the plan finish screen stops offering a goal type for an auxiliary
+- **Description**: the plan create screen offers only incentives compatible with the output
+  variables already present, and the plan finish screen stops offering a goal type for an output
   variable.
 - **Dependencies**: BE-8 (the `role` field on `IncentiveVariableGraphqlType`) and BE-3 (the backend
   half of the goal suppression), both merged and deployed.
@@ -643,14 +643,14 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
   - [ ] The plan picker offers only compatible incentives. The plan create form builds
         `incentivationsAttributes` via `IncentivationCreateFormBuilderService`
         (`src/app/plan/create/plan-create-form-builder.service.ts:23`); the picker needs each
-        candidate incentive's auxiliary inputs and outputs, which is why BE-8 adds `role`.
+        candidate incentive's output inputs and outputs, which is why BE-8 adds `role`.
   - [ ] **The picker is UX, not the guarantee.** `PLAN.md:188` is explicit: the plan validation from
         BE-5 is the guarantee. A plan assembled around the picker still has to be rejected by the
         backend when it lacks an exporter — confirmed by attempting it and seeing the BE-5 error.
-  - [ ] The plan finish screen does not offer a goal type for an auxiliary `plan_variable`.
+  - [ ] The plan finish screen does not offer a goal type for an output `plan_variable`.
         `PlanVariableInputGraphqlType` requires `goal_type`
         (`app/graphql_types/plan_variable_input_graphql_type.rb:5`) and the screen offers a goal type
-        for every `plan_variable` today, so an auxiliary variable would otherwise appear there.
+        for every `plan_variable` today, so an output variable would otherwise appear there.
   - [ ] Verification is manual per FE-1's criterion.
 
 ### ROLLOUT-1 — Deploy and rollout preparation
@@ -667,8 +667,8 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
   frontend half.
 - **Acceptance criteria**:
   - [ ] **A `beta-001` validation checklist**, executable step by step, covering every Phase 10
-        success criterion: a commission with no auxiliary variables completes end to end unchanged;
-        one with an auxiliary variable produces the expected value; a rule naming an auxiliary key
+        success criterion: a commission with no output variables completes end to end unchanged;
+        one with an output variable produces the expected value; a rule naming an output key
         saves; a plan missing an exporter is rejected and the document import reports it;
         `Incentive` save still produces the same `incentive_variables` rows for incentives with no
         output binding; the new GraphQL fields resolve and the permission exists, granted to nobody.
@@ -700,9 +700,9 @@ ROLLOUT-1 produces a document in this feature directory and touches neither repo
         splitting, and there is no contract half — nothing is dropped or rewritten.
   - [ ] **The rollback path per step**: a redeploy of the previous image. The columns stay — rolling
         back a migration is not part of the deploy flow — which is harmless because the old code
-        never reads them and M1's default keeps the old code writing valid rows. Auxiliary rows
+        never reads them and M1's default keeps the old code writing valid rows. Output rows
         already written become unread and are purged by the next reprocess. There is no point of no
-        return; the closest candidate is a commission already calculated with auxiliary values, which
+        return; the closest candidate is a commission already calculated with output values, which
         a reprocess under the old code reproduces — a recovery path rather than an irreversibility,
         though a reprocess on a productive stack is not free.
   - [ ] **The frontend release step and its rollback.** One merge fans out into the per-client
@@ -784,7 +784,7 @@ idempotent).
 
 | Hazard | Owner | Why there |
 |---|---|---|
-| The `Rule` syntax validator refuses to save a rule naming an auxiliary key, silently | **BE-4** | It is the task's entire subject; `PLAN.md:138` calls it "a prerequisite for the read side, not optional polish" |
+| The `Rule` syntax validator refuses to save a rule naming an output key, silently | **BE-4** | It is the task's entire subject; `PLAN.md:138` calls it "a prerequisite for the read side, not optional polish" |
 | The incentive-clone gap through `CreateIncentiveGraphqlMutation`'s rule allow-list | **BE-8** (backend allow-lists + the round-trip test) and **FE-2** (all five front clone builders) | The gap needs both halves to close; `PLAN.md:263` and `PLAN.md:378` name both |
 | `IncentivePolicy#update?` returns false when `record.plans.any?` | **ROLLOUT-1** | It is not a defect to fix — it is the boundary that bounds the permission grant's blast radius, so it belongs to the grant procedure (`PLAN.md:342`) |
 
@@ -812,12 +812,12 @@ decomposition reopens that. ROLLOUT-1 prepares the execution; the engineer runs 
 **Plan and its evidence** (this directory):
 
 - `PLAN.md` — read in full, 404 lines. Every phase citation above resolves to it.
-- `auxiliary-variables_call-sites_1.md` — the 15 positively-scoped reads and the unscoped inventory
+- `output-variables_call-sites_1.md` — the 15 positively-scoped reads and the unscoped inventory
   behind BE-2, and the `rule.rb` line-number correction behind BE-4.
-- `auxiliary-variables_pipeline_2.md` — the 41-enqueue chain behind BE-5's sync spec, the
+- `output-variables_pipeline_2.md` — the 41-enqueue chain behind BE-5's sync spec, the
   `LimiterCommissioning` sign inversion and per-stage zero guards behind BE-6, and the merge sites
   behind BE-7.
-- `auxiliary-variables_rollout_3.md` — the migration window, the `Action.create!` / `MODULE_KEYS`
+- `output-variables_rollout_3.md` — the migration window, the `Action.create!` / `MODULE_KEYS`
   coupling, the GraphQL contract constraints, and the Netlify shipping model behind BE-8, BE-9 and
   ROLLOUT-1.
 

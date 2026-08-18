@@ -35,17 +35,32 @@ Fuente de las respuestas: cuestionarios de seguridad ya respondidos por 4Shark �
 
 ## Sección 1 — Inventario y control de activos corporativos
 
-### 1.1 — Inventario preciso, detallado y actualizado de todos los activos (endpoints, red, IoT, servidores), revisado al menos semestralmente ❌
+### 1.1 — Inventario preciso, detallado y actualizado de todos los activos (endpoints, red, IoT, servidores), revisado al menos semestralmente ⚠️
 
-**Respuesta sugerida**: `NO`
+**Respuesta**: `SÍ`
 
-**Texto**: 4Shark mantiene un inventario completo y versionado de la **infraestructura productiva**: la totalidad de los servidores, contenedores, redes y servicios en la nube está declarada como código en Terraform y Ansible, con historial auditable por commit — cada activo tiene propietario, propósito y configuración rastreables. No existe, en cambio, un inventario formal de **dispositivos de usuario final** (portátiles y móviles) con dirección de hardware, propietario y aprobación de conexión, ni herramienta MDM. 4Shark es una empresa de ingeniería de tamaño reducido con acceso a producción controlado por identidad y no por dispositivo (ver ítems 6.3 a 6.5).
+**Texto**: 4Shark mantiene el inventario en dos planos, ambos actualizados de forma continua:
 
-> ❌ **Paulo decide**: mantener `NO` con la explicación compensatoria, o levantar un inventario de endpoints antes de responder. Ninguno de los formularios anteriores (Barigui/Positivo) preguntó esto.
+- **Infraestructura productiva**: la totalidad de los servidores, contenedores, redes y servicios en la nube está declarada como código en Terraform y Ansible, con historial auditable por commit. Cada activo tiene propietario, propósito y configuración rastreables, y ningún recurso existe fuera de esa declaración.
+- **Dispositivos de usuario final**: el proveedor de identidad corporativo (Google Workspace) mantiene el registro de todos los dispositivos — estaciones de trabajo y dispositivos móviles — que acceden a la cuenta corporativa, incluidos los de modalidad BYOD que no están bajo control directo de la compañía. El registro consigna el dispositivo, el sistema operativo, el propietario y la última sincronización. Sobre esa base 4Shark mantiene un inventario consolidado que añade el departamento responsable, la aprobación de uso corporativo y el nivel de acceso de cada activo (infraestructura productiva / aplicación en modo lectura / sin acceso a datos de cliente).
 
-### 1.2 — Proceso semanal de gestión de activos no autorizados ❌
+**Alcance del inventario**: comprende los activos del personal de 4Shark — las personas que integran su fuerza de trabajo y utilizan un dispositivo para ejecutar las actividades de la compañía. Cada activo registrado tiene un propietario identificado dentro de 4Shark y un departamento responsable. Los dispositivos de los usuarios finales de la plataforma — colaboradores del cliente que acceden a la aplicación como servicio contratado — no forman parte de este inventario: son activos del cliente, bajo su propia gestión y su propio inventario. La identidad corporativa de 4Shark es la cuenta del proveedor de identidad, y la totalidad de la fuerza de trabajo posee una, de modo que el registro del proveedor cubre la población completa.
 
-**Respuesta sugerida**: `NO` — misma justificación que 1.1. En la red productiva no existe la figura del activo no autorizado: nada se conecta fuera de lo declarado en Terraform, y el acceso a la infraestructura interna exige VPN más credencial individual.
+El inventario se revisa con periodicidad semestral y ante cualquier alta o baja de personal, evento que en la práctica dispara la revisión de forma inmediata por el proceso de ciclo de vida de identidad.
+
+**Evidencia (col. F)**: Inventario de Activos — `4shark_inventario_activos.csv` · Procedimiento de Ciclo de Vida de Identidad.
+
+> ⚠️ **Antes de responder `SÍ`**: exportar el listado real desde el admin console de Google Workspace (`Devices → Mobile & endpoints → Devices`) y completar el CSV. La respuesta solo es verdadera con el documento detrás.
+
+### 1.2 — Proceso semanal de gestión de activos no autorizados ✅
+
+**Respuesta**: `N/A`
+
+**Texto**: El control presupone una red corporativa a la que un activo no autorizado pueda conectarse y desde ahí alcanzar sistemas o datos. Esa red no existe en 4Shark: la compañía no opera oficina con red propia ni infraestructura on-premises — la totalidad de los sistemas son SaaS y recursos en la nube, accesibles únicamente mediante autenticación en el proveedor de identidad corporativo con MFA obligatorio, y la infraestructura productiva exige adicionalmente conexión VPN. Un dispositivo no autorizado no obtiene acceso por el hecho de estar en una red: sin identidad válida no alcanza ningún recurso.
+
+En el plano de la infraestructura productiva, la figura del activo no autorizado tampoco se materializa: nada existe fuera de lo declarado en Terraform, y cualquier recurso creado fuera de ese canal sería visible como desviación respecto del estado declarado.
+
+El control equivalente que 4Shark sí ejerce es sobre la **identidad**, no sobre el dispositivo: la revocación de una cuenta se ejecuta en el momento de la desvinculación con plazo efectivo dentro de 24 horas, y retira simultáneamente el acceso desde cualquier dispositivo, corporativo o personal.
 
 ---
 
@@ -250,11 +265,17 @@ En autenticación local (sin SSO), la plataforma no impone MFA como exigencia pr
 
 **Texto**: El acceso remoto a la infraestructura interna y a las bases de datos productivas exige VPN, y la identidad que autoriza ese acceso está anclada en el proveedor de identidad corporativo con MFA obligatorio.
 
-### 6.5 — MFA para todas las cuentas de acceso administrativo ✅
+### 6.5 — MFA para todas las cuentas de acceso administrativo ⚠️
 
-**Respuesta**: `SÍ`
+**Respuesta**: `NO`
 
-**Texto**: Sí. La elevación de privilegio para acciones de mutación en AWS exige autenticación multifactor y está limitada a una sesión de una hora. Las operaciones administrativas amplias exigen la cuenta break-glass operada exclusivamente mediante llave física YubiKey (MFA por hardware) bajo custodia de la dirección técnica. Las credenciales sensibles se almacenan y comparten exclusivamente mediante la bóveda corporativa 1Password, con MFA habilitado. Este diseño garantiza que cualquier concesión o revocación de acceso a un sistema crítico pase por aprobación rastreable y llave física custodiada.
+**Texto**: El acceso administrativo a la **infraestructura** exige autenticación multifactor en todos sus niveles: la elevación de privilegio para acciones de mutación en la nube requiere MFA y está limitada a una sesión de una hora; las operaciones administrativas amplias exigen una cuenta dedicada operada exclusivamente mediante llave física (MFA por hardware) bajo custodia de la Dirección Técnica; y las credenciales sensibles se gestionan en una bóveda corporativa con MFA habilitado.
+
+En la **aplicación**, el perfil de soporte de 4Shark no exige un segundo factor: la autenticación se realiza con credencial individual e intransferible y contraseña, sin federación con el proveedor de identidad corporativo. La sesión tiene expiración absoluta de una hora, sin mecanismo de renovación — un token vencido obliga a autenticarse nuevamente, no se prolonga.
+
+El alcance de ese perfil está acotado por diseño y es mayoritariamente de consulta. Sobre los datos de negocio — planes, comisiones, metas, calendarios, operaciones comerciales — el perfil solo lee: no crea, no modifica y no elimina ningún registro de esas categorías. Su capacidad de escritura se limita a la administración del tenant y de las identidades: alta y actualización de la organización cliente, su activación y desactivación, alta de subsidiarias, y alta y actualización de usuarios, incluida la reinicialización de contraseña que el soporte necesita para atender al usuario que perdió acceso.
+
+> ⚠️ **Decisión de Paulo, y es la de mayor peso del cuestionario.** El perfil incluye alta de usuarios y reinicialización de contraseñas sobre las organizaciones cliente. Esa capacidad es, por definición, administración de identidades: quien puede fijar la contraseña de un usuario puede autenticarse como él y alcanzar lo que ese usuario alcanza. Por eso el ítem no se responde `SÍ` apoyándose en que el perfil no toca datos de negocio directamente. Habilitar MFA en la autenticación local de las cuentas de 4Shark cierra el ítem con un `SÍ` verdadero y es, entre los controles pendientes de este formulario, el de mejor relación entre esfuerzo y riesgo mitigado.
 
 ---
 
@@ -914,6 +935,8 @@ Todos están declarados en el RoPA y en el DPA celebrado con el cliente.
 
 Nueve ítems del cuestionario (1.1, 1.2, 4.3, 4.5, 5.4, 9.1, 9.2, 10.1, 10.2) evalúan la gestión del parque de estaciones de trabajo. Comparten una misma justificación, y por eso se tratan aquí en conjunto.
 
+**El mecanismo legítimo para un control que no se implementa es la justificación basada en riesgo, no el tamaño de la compañía.** La ISO/IEC 27001 lo formaliza en el Statement of Applicability: un control puede excluirse cuando *"does not contribute to modifying a risk"*, siempre que la exclusión esté documentada, justificada y acompañada de medidas alternativas. La LGPD sigue el mismo eje: el art. 46 exige *"medidas de segurança, técnicas e administrativas **aptas a proteger** os dados pessoais"* — un criterio de resultado, no de catálogo — y su §1.º calibra la exigencia por *"a natureza das informações tratadas, as características específicas do tratamento e o estado atual da tecnologia"*. Ninguna de las dos referencias calibra por número de empleados. Toda respuesta `NO` en este bloque debe sostenerse en el riesgo que el control mitiga y en el control alternativo que cubre ese riesgo.
+
 **El argumento del tamaño de la compañía NO sirve como justificación, y no debe usarse.** Las salvaguardas que estos ítems reproducen — inventario de activos (1.1), firewall en dispositivo de usuario final (4.5), filtrado DNS (9.2), antimalware (10.1) — pertenecen todas al **Implementation Group 1** de los CIS Controls v8.1, el nivel que el propio CIS define como *"essential cyber hygiene"* y describe como dirigido a una empresa *"typically small to medium-sized with limited IT and cybersecurity expertise"*. Un revisor de seguridad que conozca el marco responderá exactamente eso a un argumento de tamaño: IG1 existe para una empresa de este porte. La justificación tiene que apoyarse en el **riesgo mitigado**, no en el número de empleados.
 
 **El argumento que sí se sostiene: el dispositivo no es la frontera de confianza en 4Shark, y la población con acceso privilegiado es nominada y acotada.** Cada una de estas salvaguardas mitiga el mismo riesgo — que una estación de trabajo comprometida o no gestionada se convierta en una vía de acceso a los datos corporativos o del cliente. En 4Shark esa vía está cerrada por controles de identidad y de red, no por controles de dispositivo, y el conjunto de personas que puede recorrerla está identificado individualmente.
@@ -921,7 +944,7 @@ Nueve ítems del cuestionario (1.1, 1.2, 4.3, 4.5, 5.4, 9.1, 9.2, 10.1, 10.2) ev
 El acceso se organiza en dos planos, y la respuesta debe declarar los dos:
 
 - **Infraestructura y bases de datos productivas — dos personas nominadas** de la Dirección Técnica, que constituyen la totalidad de la población con esa capacidad. Ese acceso exige, de forma acumulativa: identidad en el proveedor corporativo con MFA obligatorio, conexión VPN, permiso de solo lectura por defecto en la nube, elevación temporal vía MFA limitada a una sesión de una hora para cualquier acción de mutación, y llave física (YubiKey) para operaciones administrativas amplias. Cada permiso concedido está declarado como código en Terraform, con trazabilidad por commit.
-- **Aplicación — la totalidad del equipo**, con credencial individual e intransferible, en modo de solo lectura para las funciones de soporte y con la visibilidad acotada por el modelo jerárquico de permisos de la plataforma. Sin acceso a infraestructura, a la base de datos ni a credenciales productivas.
+- **Aplicación — la totalidad del equipo**, con credencial individual e intransferible y un perfil de soporte que permite consulta sin capacidad de escritura: el personal de operaciones no puede crear ni modificar registros, no puede ejecutar procesos de integración y no puede alterar configuración — toda acción de esa naturaleza se deriva a la Dirección Técnica. Sin acceso a infraestructura, a la base de datos ni a credenciales productivas.
 
 Los controles que sustentan ambos planos:
 

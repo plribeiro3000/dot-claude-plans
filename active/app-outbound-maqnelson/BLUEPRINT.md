@@ -98,6 +98,23 @@ pp body
 
 **Next phase (after the single push is validated): full load.** Send every pending `user_payment` of the payment (drop the `.limit(1)`), or run the synchronous `.new.perform(payment_id)`. The "UserCommission / Commissioning" the engineer mentioned is the source-of-value question for that full load — to be pinned down when we get there, not now.
 
+### New real test — customer confirmed the dry-run, now integrate a chosen payment (2026-08-17)
+
+**The dry-run handshake closed.** The customer confirmed the manual single-record push landed on their Nexus and settled the test value ("já confirmaram o valor e já pagaram"). So the open handshake at the end of the manual dry-run above — confirm value landed → delete test record → run the real integration — is done through step two, and the remaining step is the real integration test on a specific payment.
+
+**This test is the real path, not another zero-side-effect dry-run.** It runs `MaqnelsonIntegration::Processor.new.perform(payment_id)` synchronously in the outbound console (Phase 1–3 procedure above), which — unlike the manual dry-run — DOES persist our side: `start_integration!` flips the payment state and the `PayrollRequest` / `PayrollAuthenticationRequest` audit rows are written. That is intended now: the point is to prove the full audited flow, not to avoid a footprint. It still writes real payroll data to the customer's Nexus, so it stays engineer-driven and coordinated, not run unattended.
+
+**Infra verified live, read-only (2026-08-17):** cluster `app-outbound-maqnelson-cluster` ACTIVE; both services (`runner`, `worker-payroll`) ACTIVE at `desired=0` on the dedicated subnets `10.1.2.128/28` (`prv-a`) + `10.1.2.144/28` (`prv-b`); autoscaling schedule `Lambda-app-outbound-maqnelson-worker-payroll-schedule` ENABLED at `rate(1 minute)`. Nothing to scale up: the services rest at zero by design, the Lambda scales the worker when a job hits the `payroll_tiger_shark` queue, and the runner spins up on `bin/ecs run`.
+
+**Steps for this test:**
+1. ✅ Infra liveness — read-only AWS check above; cluster/services/subnets/Lambda all in their correct resting state.
+2. ⬜ Boot the outbound console — `bin/ecs run app-outbound-maqnelson 'bundle exec rails console'` (spins the runner task) and confirm the console boots (proves the shared-001 DB path) and the auth probe reaches Nexus with HTTP 200 (proves the customer path). Engineer-driven.
+3. ⬜ Pick the specific payment (company 97, Maqnelson) and pre-flight it read-only (Phase 1 above) — confirm `status == pending_integration` (or move it there with `queue_integration!`) and that it carries sendable `user_payments`.
+4. ⬜ Push — `MaqnelsonIntegration::Processor.new.perform(payment_id)` (Phase 2). Engineer-driven; writes real data to the customer.
+5. ⬜ Verify — payment `integrated`, the execution `PayrollRequest` `success`, `user_payments` moved to `success`/`skipped` (Phase 3), then cross-check with the customer.
+
+**Still owed (unchanged):** the Nexus password transited e-mail — flag it to Maqnelson for rotation.
+
 **Follow-up (engineer, 2026-07-24):** revisit the atento-br outbound after this — it likely peers its VPC broadly to `app-atento-001` for the database and may grant wider production-DB access than intended; apply the same scoping.
 
 ---
