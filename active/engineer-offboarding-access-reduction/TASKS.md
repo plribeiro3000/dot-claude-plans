@@ -1,56 +1,65 @@
-# Tasks — Engineer Offboarding, AWS Access Reduction
+# Tasks — Engineer Offboarding
 
-Companion to `PLAN.md`. Subject: IAM user `emerson.silva@4shark.com.br`, account `405749097490`.
-Run every AWS command with `--profile 4shark-mfa`.
+Companion to `PLAN.md`. Subject: `emerson.silva@4shark.com.br` / GitHub `eoliveiramg`, AWS
+account `405749097490`. Run AWS commands with `--profile 4shark-mfa`.
 
-## Done — interim reduction (2026-07-31)
+## Done
 
-- [x] Map the engineer's effective AWS access from the deployed policy documents
-- [x] Confirm the other platforms need no action (Atlas read-only, Cloudflare read-only, SSO
-      `ReadOnlyAccess`, GitHub `member`)
-- [x] Create and attach `DestructiveActionGuardrail` to the user
-- [x] Set permissions boundary `arn:aws:iam::aws:policy/ReadOnlyAccess` on the user
-- [x] Deactivate MFA device `arn:aws:iam::405749097490:mfa/4shark-1Password`
-- [x] Verify the end state with `simulate-principal-policy` — reads allowed, everything else denied
+- [x] Interim containment: `DestructiveActionGuardrail` attached, `ReadOnlyAccess` permissions
+      boundary set, MFA device deactivated
+- [x] PR [#893](https://github.com/4shark/terraform/pull/893) opened, applied and merged —
+      including the `github.tf` team-membership fix without which the apply fails
+- [x] Blockers to `DeleteUser` cleared: policy detached, access key deleted, boundary removed
+- [x] Second apply completed — IAM user destroyed, `get-user` returns `NoSuchEntity`
+- [x] `/merge-cleanup` — worktree removed, branch `feature/identity-offboard-engineer` deleted
+- [x] Manual revocations: Pritunl VPN, Redis Cloud, Datadog, Netlify, 1Password, Slack, Clockify
+- [x] `app` user account deactivated in all four environments
+- [x] Claude Code — personal account, cancelled by the engineer himself
 
-## Pending — at the cut
+## Pending — access
 
-- [ ] List the access keys before deleting the user, so the record shows what existed. A second
-      key could have been created up to the moment the boundary landed.
+- [ ] **Google Workspace** — the last identity system. While the account exists he keeps the
+      corporate mailbox and the federated identity, even with no authorization anywhere.
 
-      aws iam list-access-keys --user-name emerson.silva@4shark.com.br --profile 4shark-mfa
+- [ ] Confirm whether he held a person account in **`integrator`** (Rails with its own internal
+      web) and in **`setup`**. Neither was checked. Keycloak and `onboarding` are already ruled
+      out — see `PLAN.md` § Per-system record.
 
-- [ ] Delete every access key found, starting with `AKIAV46EH4QJB5QNOWER`
+## Pending — AWS residue
 
-      aws iam delete-access-key --user-name emerson.silva@4shark.com.br --access-key-id <KEY_ID> --profile 4shark-mfa
+Both are orphaned objects, confirmed unused (`AttachmentCount: 0`,
+`PermissionsBoundaryUsageCount: 0`).
 
-- [ ] Delete the orphaned virtual MFA device. The seed is still in the engineer's 1Password;
-      the boundary blocks re-enrolment, but the device should not outlive the account.
-
-      aws iam delete-virtual-mfa-device --serial-number arn:aws:iam::405749097490:mfa/4shark-1Password --profile 4shark-mfa
-
-- [ ] Remove the engineer from `engineers` in `identity/terraform.tfvars` and apply the
-      `identity/` stack from the break-glass account (`AWS_PROFILE=ivo` — `identity/guard.tf`
-      admits no other caller). This deletes the IAM user, and with it the boundary and the
-      guardrail attachment, resolving the CLI drift.
-
-- [ ] Delete the now-unattached `DestructiveActionGuardrail` policy
+- [ ] Delete the guardrail policy
 
       aws iam delete-policy --policy-arn arn:aws:iam::405749097490:policy/DestructiveActionGuardrail --profile 4shark-mfa
 
-- [ ] Revoke access on the platforms outside AWS: MongoDB Atlas, Cloudflare, Rollbar and the
-      GitHub org — all driven by the same `engineers` map, so the single `identity/` apply covers
-      them. Confirm each one afterwards rather than assuming the apply reached it.
+- [ ] Delete the orphaned virtual MFA device
 
-- [ ] Revoke VPN access (Pritunl) — outside the `identity/` stack, so it needs its own step.
+      aws iam delete-virtual-mfa-device --serial-number arn:aws:iam::405749097490:mfa/4shark-1Password --profile 4shark-mfa
 
-## Follow-up, independent of the cut
+## Pending — decision
 
-- [ ] Trace where `iam:PutUserPermissionsBoundary` and `iam:DeactivateMFADevice` against another
-      user actually come from. Neither appears in the deployed documents of any policy on the
-      `engineers` group, yet both succeeded. See `PLAN.md` § Open item. If the grant is real and
-      intentional, document it in ADR-004; if it is drift, reconcile it into the identity stack.
+- [ ] **Credential rotation.** Revoking access does not undo what was already read or copied.
+      Decide whether to rotate what he could reach in 1Password — the shared `Terraform ENV`
+      item holding the org-wide third-party credentials, database passwords, VPN and MongoDB
+      keys — and in what order of risk. `THIRD-PARTY-KEY-STANDARD.md` carries the rotation path:
+      Terraform-managed keys via `apply -replace`, the bootstrap credential by hand.
 
-- [ ] Three unrelated orphaned virtual MFA devices sit in the account inventory —
-      `1password-2`, `Ivan-4shark`, `my-auth-app`. Unrelated housekeeping, safe to delete once
-      each is confirmed to belong to nobody.
+## Pending — the deliverable this case exists to produce
+
+- [ ] Write the offboarding runbook at `~/.claude/docs/runbooks/engineer-access/OFFBOARDING.md`
+      with an entry in `runbooks/INDEX.md`. None exists: the only written guidance is one line in
+      ADR-004 covering the six systems the identity stack manages and silent on everything else.
+      Organize it **by category, not by system list** — see `PLAN.md` § What this case taught.
+      This is a PR to `dot-claude`.
+
+- [ ] Remove the departed engineer's MFA serial from the table in
+      `~/.claude/docs/runbooks/engineer-access/AWS-ENGINEER-SETUP.md`. Same repository, can ride
+      along with the runbook PR.
+
+## Pending — unrelated to the offboarding
+
+- [ ] On 2026-09-04, confirm the GitHub seat count actually dropped to 5. A scheduled task
+      (`github-seat-downgrade-check`) and a calendar event both fire that day. If it is still 9,
+      open a support ticket — see `PLAN.md` § Open.

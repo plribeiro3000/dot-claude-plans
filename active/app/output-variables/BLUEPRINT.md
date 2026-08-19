@@ -12,7 +12,7 @@
 
 | Layer | Tasks | Spike |
 |---|---|---|
-| Schema and migrations | BE-1 (M1–M3), BE-9 (M4) | `../../spike/auxvar-migrations/SPIKE.md` |
+| Schema and migrations | BE-1 (M1, M1b, M2), BE-9 (M4) | `../../spike/auxvar-migrations/SPIKE.md` |
 | Model and validation | BE-3, BE-4, BE-5 | `../../spike/auxvar-validation/SPIKE.md` |
 | Materialization and read path | BE-2, BE-6, BE-7 | `../../spike/auxvar-materialization/SPIKE.md` |
 | API and front-end | BE-8, FE-1–FE-4 | `../../spike/auxvar-graphql-frontend/SPIKE.md` |
@@ -23,7 +23,7 @@ Each spike directory also holds the fetched sources and code excerpts it rests o
 
 ## 1. What the validation round changed
 
-Five things the plan asserted turned out to be wrong or incomplete. Each was verified directly — the gem source or the file, not a summary.
+Five findings that decide how the work is built, each established by reading the gem source or the file directly rather than a summary of it.
 
 ### 1.1 The upsert does not close BE-6's race — this is the finding that changes what gets built
 
@@ -46,11 +46,13 @@ So the recompute casts on the way in — and, more consequentially, **no SQL-sid
 
 The reference is named `output_variable` for its role; its target table is `variables`. Rails pluralizes the reference name when `to_table:` is absent, so the migration as planned asked for a foreign key to a nonexistent `output_variables` table. The convention already covers this (`RAILS-MIGRATIONS.md:64` shows the same role-differs-from-table shape); the tasks simply omitted it. Corrected in `TASKS.md`.
 
-### 1.4 The `statement_timeout` convention is inert in this codebase
+### 1.4 The `statement_timeout` convention is live, and the gem that applies it is not the obvious one
 
-A correction round earlier in this planning added `def self.statement_timeout` to all four migrations, on the strength of `RAILS-MIGRATIONS.md` stating that `strong_migrations` detects the method automatically. **It does not, at the installed version.** `strong_migrations` 2.7.0 touches a timeout in one place, `lib/strong_migrations/checker.rb:193-194`, and reads the global `StrongMigrations.statement_timeout`; nothing reads a method on the migration class. `app/config/initializers/strong_migrations.rb` sets only `auto_analyze = true`, so the global is never assigned, and no `MIGRATION_<timestamp>` variable exists in the repo or the deploy workflows.
+Every migration in the feature declares `def self.statement_timeout` as `ENV.fetch('MIGRATION_<timestamp>', 250)`. The gem that reads it is **`activerecord-safer_migrations`** (`Gemfile.lock:66`, version 5.0.0): it does `class_attribute :statement_timeout` on `ActiveRecord::Migration` and reads the instance reader inside its prepended `exec_migration` (`lib/active_record/safer_migrations/migration.rb:13,24`), so a migration defining the method overrides the class reader for itself.
 
-The criteria were removed and replaced by a note recording why, so the dead method is not re-added. A separate task is open to correct the doc.
+**`strong_migrations` is a different gem and does not read it** — it touches a timeout in one place (`lib/strong_migrations/checker.rb:193-194`) and reads only its own global `StrongMigrations.statement_timeout`, which `app/config/initializers/strong_migrations.rb` never assigns. The two are easy to confuse because both wrap migrations and both write a session timeout; `RAILS-MIGRATIONS.md:143` names the confusion directly, and checking the wrong one is how the method gets mistaken for dead code.
+
+The convention is in active use: 91 migrations under `db/migrate/2026/` carry the method, including the most recent `create_table` (`20260804135838_create_portable_exportations.rb:17-19`). No `MIGRATION_<timestamp>` variable is declared in the repo or the deploy workflows, which is by design — raising a timeout is a per-deploy operational act, not a code change (`RAILS-MIGRATIONS.md:184`).
 
 ### 1.5 Two tasks named the wrong pattern to copy
 

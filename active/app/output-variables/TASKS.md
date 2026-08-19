@@ -23,18 +23,18 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
 
 | # | Fork | Resolved | Source |
 |---|---|---|---|
-| D1 | Phase 1 as one task, or split into type / role column / rule binding | **One task (BE-1).** | `PLAN.md:71-93` states one objective and one dependency line ("Dependencies: none. Blocks every other phase") for the whole phase. Reviewability confirms it: each third is unjudgeable alone — a reviewer seeing "add a `role` column defaulting to input" with no fourth type in the diff cannot assess it. The combined diff is ~15 files of declarations, read in one pass |
+| D1 | Phase 1 as one task, or split into type / registration entities / rule binding | **One task (BE-1).** | `PLAN.md:71-93` states one objective and one dependency line ("Dependencies: none. Blocks every other phase") for the whole phase. Reviewability confirms it: each third is unjudgeable alone — a reviewer seeing two new join tables with no fourth type in the diff cannot assess what they are for. The combined diff is ~15 files of declarations, read in one pass |
 | D2 | The Calculator re-entry guard (`aggregated_indicator/calculator/producer.rb:20-21`) in the exclusions task or the materialization task | **Materialization task (BE-6).** | `PLAN.md:212` lists it under Phase 6 components, and its failure mode ("a silently zeroed output value", `PLAN.md:380`) is a materialization failure, not an exclusion failure. Its criterion is only meaningful once output rows exist |
 | D3 | The plan-finish goal suppression — backend or frontend | **Split by repository.** Backend half (the output `plan_variable` validates with a blank `goal_type` and is distinguishable through the API) in BE-3; frontend half (the screen stops rendering the goal control) in FE-4 | `PLAN.md:69` puts phases 1-8 in the backend deploy and phase 9 in the frontend release, so the halves cannot ship together. `PLAN.md:188` sets the precedent for which half is the guarantee: "The plan picker filtered to compatible incentives (Phase 9) is the preventive form and is UX, not the guarantee" |
 | D4 | Phase 6 as one task, or the recompute mechanism + indicator writer first, then the other three writers | **One task (BE-6).** | `PLAN.md:224` makes the engineer's worked example a Phase 6 success criterion: "two positive contributions and one limiter contribution of the same magnitude publish 300 + 200 − 100 = 400". That criterion needs the limiter writer, so a first PR carrying only the indicator writer could not satisfy the phase's own acceptance test |
 | D5 | Phase 8 as one task, or the GraphQL surface separated from the permission | **Two tasks (BE-8, BE-9).** | `PLAN.md:378` and `PLAN.md:386` assign the two halves different failure modes and different mitigations — "A cloned incentive silently loses its output bindings" (High) versus "M4's `Action.create!` is re-applied" (Low, a re-run hazard). A PR whose entire subject is "the binding survives create/update/clone" gets the review attention the first risk warrants; the permission PR's subject is a non-idempotent data migration needing a different kind of scrutiny. They still ship in the same deploy, so nothing is lost |
-| D6 | Phase 9 as one frontend task, or split | **Four tasks (FE-1..FE-4).** | `PLAN.md:290-294` lists three independent success criteria, and the variable-creation screen has a fourth, separate dependency profile: `PLAN.md:266` records that "creating an output variable needs no mutation change", so FE-1 depends only on the type existing, while FE-2/FE-3 depend on the new GraphQL argument and FE-4 on the new `role` field. Splitting turns one 20-file diff into four coherent ones with distinct reviewers' contexts |
+| D6 | Phase 9 as one frontend task, or split | **Four tasks (FE-1..FE-4).** | `PLAN.md:290-294` lists three independent success criteria, and the variable-creation screen has a fourth, separate dependency profile: `PLAN.md:266` records that "creating an output variable needs no mutation change", so FE-1 depends only on the type existing, while FE-2/FE-3 depend on the new GraphQL argument and FE-4 on the incentive's output-variables field. Splitting turns one 20-file diff into four coherent ones with distinct reviewers' contexts |
 | D7 | The two plan screens (create picker, finish goal control) as one task or two | **One task (FE-4).** | Both depend on the same backend deploy, both live in the plan authoring flow, and each is small on its own. § No Premature DRY's converse applies — do not split what only makes sense reviewed together |
 | D8 | The name of the STI subclass, its scope, and its data-type allow-list | **`OutputVariable`, `scope :output`, `ApplicationDataType::OUTPUT_TYPES`.** | The surrounding code (`DECISION-AUTHORITY.md` ladder, source 2). `app/models/variable.rb:4` declares `TYPES = %w[DealVariable IndicatorVariable EasyVariable]`; `:47`, `:49`, `:58` declare `scope :deals` / `:easy` / `:indicators` in one shape; `app/data_types/application_data_type.rb:4-6` declares `DEAL_TYPES` / `INDICATOR_TYPES` / `EASY_TYPES`. The fourth member follows mechanically |
 | D9 | The name of the new options processor | **`Commission::OutputOptionsProcessor`, at `app/services/commission/output_options_processor.rb`.** | The sibling files in that directory are `deal_options_processor.rb`, `deal_options_v2_processor.rb`, `indicator_options_processor.rb`, `limiter_options_processor.rb`, `ranking_options_processor.rb`, `redemption_options_processor.rb` — each named for what it supplies. (Correction recorded: `PLAN.md:235` says "alongside the four existing ones"; `ls app/services/commission/` returns six files. The naming pattern is unaffected) |
 | D10 | The permission key, level and resource | **`key: 'incentive_output_variable_binding'`, `level: 'module'`, `resource: 'incentive'`.** | The `MODULE_KEYS` grammar at `app/workers/company/admin/processor.rb:15-52` is `<resource>_<action-noun>` with multi-segment resources already present (`user_identifier_action_document_creation`, `:35-36`). `level: 'module'` because the permission gates a capability rather than a per-record action — the contrast is `db/migrate/20260729113439_user_update_document_actions.rb:5-8`, where `*_listing` / `*_creation` are `level: 'module'` and `*_destruction` / `*_download` are `level: 'resource'`. `incentive_clone` (`processor.rb:31`) is the closest sibling and is module-level, gated by `IncentivePolicy#clone?` (`app/policies/incentive_policy.rb:28-33`) |
 | D11 | Where the CHANGELOG entry lands across a 9-PR backend feature | **On the first task of each repository — BE-1 for `app`, FE-1 for `app-webclient` — named once and not duplicated.** | § Changelog Policy requires every feature branch to update the changelog and requires entries to "name the subject, nothing else". The observed granularity is feature-level, not PR-level: `app/CHANGELOG.md:26` is "Bulk user update by spreadsheet", one entry naming one capability. It sits under `## [3.60.0] - 2026-07-30` — a **released, dated** section, so it is the shipped shape of an entry rather than a work-in-progress one, which is what makes it the granularity to copy. Nine entries for one capability would violate the succinctness rule. Landing it first means no branch ships the capability before it is recorded |
-| D12 | Where the incentive-CSV-import limitation is recorded | **In the `## Decisions` block of BE-1's PR description.** | § Decision Authority makes that block mandatory for a resolved ambiguity a reviewer would want to know about, and BE-1 is where the binding is introduced — the point a reader asks why the CSV cannot set it. `PLAN.md:32` already carries the reasoning and the citation (`app/workers/incentive_document/processor.rb:81-86`). No new document file, per § Scope Discipline |
+| D12 | Where the incentive-CSV-import limitation is recorded | **As a code comment in `IncentiveDocument::Processor`, at the row-building loop.** | § Decision Authority puts a resolved decision in the code, at the line where the next reader meets it, and forbids a `## Decisions` block in the PR body (`PULL-REQUEST-CONVENTIONS.md:59`) — the reviewer has the diff, a reader a year from now has only the file. The loop that builds rules from positional CSV columns (`app/workers/incentive_document/processor.rb:81-86`) is exactly where someone asks why the binding cannot be set there. `PLAN.md:32` carries the reasoning. No new document file, per § Scope Discipline |
 
 ---
 
@@ -44,26 +44,37 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:71-93`): Phase 1, schema and model, inert
-- **Description**: create the output `Variable` type and its STI subclass, the `role` column on
-  `incentive_variables`, the output binding on `rules`, and the unique index that guarantees the
-  role pair. Nothing reads or writes any of it yet. This is the only task with no dependency and it
+- **Description**: create the output `Variable` type and its STI subclass, the two registration
+  entities (`incentive_output_variables` and `plan_output_variables`), and the output binding on
+  `rules`. Nothing reads or writes any of it yet. This is the only task with no dependency and it
   blocks every other task.
 - **Dependencies**: none
 - **Acceptance criteria**:
   - [ ] Three migrations, each generated with `bin/rails generate migration` (never hand-written —
         `validate-rails-migration-creation.sh` blocks the Write), one action each, then applied with
         `bin/rails db:migrate`; `db/schema.rb` committed in the same commit.
-  - [ ] **M1 carries a database-level default equal to the input role, and this is the task's
-        load-bearing constraint, not a style point.** During the deploy window the schema is new and
-        every serving container still runs the old code (`output-variables_rollout_3.md:210-220`,
-        reading `deploy-shared-001.yaml:403-458` against `:616-621`). That old code calls
-        `incentive_variables.create(variable_id: variable.id)` with no role at
-        `app/models/incentive.rb:156`, `:160`, `:164`, `:168`, and it runs against the OLD model
-        class, which carries no `enumerize` declaration — so an `enumerize`-level default does not
-        reach it and only the column default does. Verify by confirming `db/schema.rb` shows the
-        integer default on `incentive_variables.role`, and that a bare
-        `IncentiveVariable.create(incentive_id: …, variable_id: …)` produces a row whose role is the
-        input role.
+  - [ ] **M1 creates `incentive_output_variables` and M1b creates `plan_output_variables`, and
+        being brand-new tables is what makes them the safest migrations in the feature.** During the
+        deploy window the schema is new and every serving container still runs the old code
+        (`output-variables_rollout_3.md:210-220`, reading `deploy-shared-001.yaml:403-458` against
+        `:616-621`). A table that did not exist before is invisible to that old code: nothing reads
+        it, nothing writes it, no default is load-bearing, and there is no backfill to get wrong.
+        **`incentive_variables` is not touched by this feature at all** and keeps its current shape
+        (`db/schema.rb:951-956`) — the reason the two directions are two entities is that they
+        answer different questions (`PLAN.md:44`).
+  - [ ] **Each table carries two `t.references` and one composite unique index, all inside the
+        `create_table` block.** `t.references :incentive` / `:variable` (and `:plan` / `:variable`
+        for M1b), each `null: false, foreign_key: true, index: true`, plus
+        `t.index %i[incentive_id variable_id], unique: true` (respectively
+        `%i[plan_id variable_id]`) in the same block. That is the shape `plan_variables` already
+        carries (`db/schema.rb:1600-1607`) and it is one conceptual operation, so it does not
+        violate one-action-per-migration (`RAILS-MIGRATIONS.md:275-279`). The unique index needs
+        neither `disable_ddl_transaction!` nor `algorithm: :concurrently` — those are required when
+        indexing a table that already holds rows and takes writes, which a table created in the same
+        migration does not.
+  - [ ] **`plan_output_variables` carries no `goal_type`, and the absence is the point.**
+        `plan_variables` has one (`db/schema.rb:1601`) because its whole purpose is the goal-binding
+        flow; an output variable never takes a meta (`PLAN.md:44`).
   - [ ] **M2 uses the documented safe form for adding a reference to an existing table, names its
         target table explicitly, and carries no `safety_assured`.** The shape is
         `t.references :output_variable, null: true, index: { algorithm: :concurrently }, foreign_key: { to_table: :variables, validate: false }`
@@ -88,11 +99,10 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         `rules.output_variable_id` is a new nullable column, so every pre-existing row holds `NULL`
         and no row can violate the constraint — there is nothing for a validation pass to check.
         Confirmed by the diff containing exactly three migrations.
-  - [ ] M3 adds the unique index on `incentive_variables (incentive_id, variable_id, role)` with
-        `disable_ddl_transaction!` **and** `algorithm: :concurrently` together —
-        `validate-concurrent-index-migration.sh` blocks the write otherwise, and the pair always
-        fails in Postgres when split. M3 runs after M1; the index references the column M1 creates.
-        Precedent: `db/migrate/20260729113429_add_unique_index_to_user_update_document_enrollments.rb:2-11`.
+  - [ ] **M2 is the only migration in this task that needs `disable_ddl_transaction!`**, because it
+        is the only one touching a table that already holds rows. When a concurrent index and that
+        directive are ever split apart, `validate-concurrent-index-migration.sh` blocks the write
+        and Postgres fails the migration anyway.
   - [ ] `Variable::TYPES` (`app/models/variable.rb:4`) gains the fourth member and a
         `scope :output` joins the three at `:47`, `:49`, `:58`.
   - [ ] `OutputVariable < Variable` mirrors `app/models/easy_variable.rb` — the two
@@ -105,32 +115,41 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   - [ ] `Rule` gains `belongs_to :output_variable, class_name: 'Variable', optional: true` with **no**
         manual presence validation — the binding is optional (`PLAN.md:360`), which is the one case
         where § Optional belongs_to's companion `validates … presence: true` is deliberately absent.
-  - [ ] `IncentiveVariable` gains the role `enumerize` and a presence validation joining the two at
-        `app/models/incentive_variable.rb:7-8`.
+  - [ ] `IncentiveOutputVariable` and `PlanOutputVariable` each mirror
+        `app/models/incentive_variable.rb` (9 lines) — two `belongs_to … optional: true` with
+        `inverse_of:`, and a presence validation per foreign key (§ Optional belongs_to). The
+        owning side gains `has_many :output_variables, class_name: 'IncentiveOutputVariable'` on
+        `Incentive` and its counterpart on `Plan`, named by role rather than by class
+        (§ Association Naming). **`IncentiveVariable` is not modified** — confirmed by the diff not
+        touching that file.
   - [ ] **Tests, in this task's own PR.** `spec/models/variable_spec.rb:35` currently reads
         `it { is_expected.to validate_inclusion_of(:type).in_array(%w[DealVariable EasyVariable IndicatorVariable]) }`
         and fails by construction against a fourth type — editing it is required, not a regression.
         A new `spec/models/output_variable_spec.rb` mirrors
         `spec/models/easy_variable_spec.rb` (145 lines of shoulda-matchers plus method blocks) and
         asserts the data-type allow-list and that the three indicator-only validations do not fire.
-        `spec/models/incentive_variable_spec.rb` (10 lines today) gains the role presence and
-        `enumerize` assertions.
+        A spec per new entity mirrors `spec/models/incentive_variable_spec.rb` (10 lines) with the
+        association and presence one-liners.
   - [ ] Factories: `spec/factories/variables.rb` gains an `:output` trait alongside `:indicator`
-        and `:deal`; `spec/factories/rules.rb` gains the output binding;
-        `spec/factories/incentive_variables.rb` is a bare `factory :incentive_variable` today and
-        gains the role.
+        and `:deal`; `spec/factories/rules.rb` gains the output binding; one factory per new
+        entity, mirroring the bare `spec/factories/incentive_variables.rb`.
   - [ ] `CHANGELOG.md` gains one entry under `## [Unreleased]` → `### Added`, naming the capability
         in user terms with no class, method, file or column named (§ Changelog Policy). Per D11 this
         is the only `app` entry for the feature.
-  - [ ] The PR's `## Decisions` block records D8, D12, and the deliberate absence of a presence
-        validation on `output_variable_id`.
-- **No `def self.statement_timeout` on any of these migrations, and that is deliberate**:
-  `RAILS-MIGRATIONS.md:141` prescribes a per-migration `statement_timeout` method, but it is inert at
-  the installed version — `strong_migrations` reads the **global** `StrongMigrations.statement_timeout`
-  (`lib/strong_migrations/checker.rb:193-194`) and nothing reads a method on the migration class,
-  while `app/config/initializers/strong_migrations.rb` sets only `StrongMigrations.auto_analyze = true`,
-  so the global is never assigned. Do not add the method back as dead code; a doc fix is open
-  separately.
+  - [ ] The deliberate absence of a presence validation on `rules.output_variable_id`, and the
+        incentive-CSV-import limitation (D12), are recorded as **code comments at the line** — the
+        `belongs_to` declaration and the CSV row-building loop respectively. A `## Decisions` block
+        in the PR description is forbidden (`PULL-REQUEST-CONVENTIONS.md:59`): the reviewer has the
+        diff, and a reader a year from now has only the file.
+- **Every migration in this task declares `def self.statement_timeout`**, at the bottom of the class,
+  as `ENV.fetch('MIGRATION_<timestamp>', 250)`. The gem that applies it is
+  `activerecord-safer_migrations` (`Gemfile.lock:66`, version 5.0.0), which does
+  `class_attribute :statement_timeout` on `ActiveRecord::Migration` and reads it in its prepended
+  `exec_migration` (`lib/active_record/safer_migrations/migration.rb:13,24`). `strong_migrations` is
+  a different gem that reads only its own global and never a method on the migration class — the two
+  are easy to confuse, and `RAILS-MIGRATIONS.md:143` names the confusion directly. The convention is
+  live: 91 migrations under `db/migrate/2026/` carry the method, including the most recent
+  `create_table` (`20260804135838_create_portable_exportations.rb:17-19`).
 - **Pattern references**:
   - `app/models/easy_variable.rb` (whole file, 8 lines) — the STI subclass shape this copies.
   - `RAILS-MIGRATIONS.md:64` — `t.references :owner, null: true, foreign_key: { to_table: :users }, index: true`,
@@ -140,71 +159,77 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   - `db/schema.rb:1959-1961` — a variable-bearing FK already on `rules` (`variable_track_id` and its
     partial unique index), so M2's shape has precedent in the same table.
 
-### BE-2 — Exclude output variables from the unscoped existing flows
+### BE-2 — Confirm no existing flow needs a type exclusion
 
 - **Repository**: `app`
-- **Phase** (`PLAN.md:94-116`): Phase 2, exclusions. Independently valuable — this is the task that
-  contains the blast radius.
-- **Description**: fifteen call sites already read through `variables.deals` / `.indicators` /
-  `.easy` and exclude a fourth type with no code change (full inventory,
-  `output-variables_call-sites_1.md:16-32`). Six unscoped sites need a scope; five are left
-  unscoped deliberately. This task is the regression net for every other task.
-- **Dependencies**: BE-1 merged — the type must exist before a scope can exclude it.
+- **Phase** (`PLAN.md`): Phase 2. A reading task, not a patching one — it produces no production
+  diff.
+- **Description**: an output variable's write direction lives entirely in
+  `incentive_output_variables` and `plan_output_variables`, so it never reaches `plan_variables` by
+  that path. It reaches `plan_variables` only as an **input a rule reads**, and BE-7 depends on that
+  membership. A type filter on any `plan_variables`-derived read would therefore drop a variable the
+  plan genuinely uses, silently — so no such filter is added, and the reason is recorded so a later
+  reader does not add one.
+- **Dependencies**: BE-1 merged; BE-3 for the membership it confirms.
 - **Acceptance criteria**:
-  - [ ] `app/workers/calendar_audit/producer.rb:19` is scoped. Its fan-out at `:20` is
-        `period_ids.product(user_ids, variable_ids)`, so each unscoped output variable adds
-        `periods × users` audit jobs per plan.
-  - [ ] `app/models/calendar_audit.rb:30` (`PlanVariable.where(plan_id: plan_ids).count`, the
-        audit's expected row count) excludes auxiliaries. An output variable has no integration
-        source, so counting it as expected produces a permanent false gap.
-  - [ ] `app/workers/goal_dataset/migration/producer.rb:16` is scoped.
-  - [ ] `app/workers/commission/money_sanitizer_processor.rb:48` is scoped.
-  - [ ] `app/work_books/commission_work_book/indicator_work_sheet.rb:29` and
-        `app/work_books/plan_slice_commission_work_book/indicator_work_sheet.rb:36` each get
-        `.indicators` on the lookup. Both files already gate on `variables.indicators.exists?` at
-        their line 12, so scoping the lookup restores the file's own declared subject rather than
-        changing it.
-  - [ ] **Five sites are left untouched, and the PR says so explicitly** —
-        `app/work_books/variable_audit_work_book/variables_work_sheet.rb:28` (a configuration catalog
-        with a type column that already renders blank frequency for deal and easy variables, `:15-38`);
-        `app/services/commission/indicator_options_processor.rb:41` (left unscoped deliberately —
-        BE-7 depends on output keys landing in the frozen snapshot carrying their default, so a
-        consuming formula never hits the unbound-variable path at runtime); and
+  - [ ] **No production file is changed.** The unscoped reads stay unscoped:
+        `app/workers/calendar_audit/producer.rb:19`, `app/models/calendar_audit.rb:30`,
+        `app/workers/goal_dataset/migration/producer.rb:16`,
+        `app/workers/commission/money_sanitizer_processor.rb:48`,
+        `app/work_books/commission_work_book/indicator_work_sheet.rb:29`,
+        `app/work_books/plan_slice_commission_work_book/indicator_work_sheet.rb:36`,
+        `app/work_books/variable_audit_work_book/variables_work_sheet.rb:28`,
+        `app/services/commission/indicator_options_processor.rb:41`,
         `app/workers/company/inactivator.rb:107`, `app/workers/company/activator.rb:110`,
-        `app/workers/company/cleansing/variable_producer.rb:13`, whose purpose is covering every
-        variable of a company.
-  - [ ] **Tests.** The two workbook changes are covered where the repository tests workbooks
-        (`spec/work_books/`). The four worker/model changes have no spec home — `spec/` contains
-        `factories`, `forms`, `models`, `requests`, `search_indexes`, `work_books` and **no
-        `spec/workers/` directory** (see § Test surface). `app/models/calendar_audit.rb:30` is model
-        code and is asserted in `spec/models/` that a plan carrying an output variable does not
-        raise the expected count. The three producer scopes are verified on `beta-001` under
-        ROLLOUT-1, which is where PLAN.md already places end-to-end confirmation.
-- **Pattern reference**: `app/workers/aggregated_indicator/producer.rb:23,25` —
-  `Variable.with_uncached_connection { plan.variables.easy.pluck(:id) }`, the already-scoped shape
-  each unscoped site is being brought in line with.
+        `app/workers/company/cleansing/variable_producer.rb:13`.
+  - [ ] **Four further reads take the same collection through `plan_variables` directly**
+        (`output-variables_call-sites_1.md` §3), and they already answer the question correctly:
+        `app/workers/plan/goals_processor.rb:12` filters by `with_goal` and
+        `app/workers/groupification/processor.rb:17` by `goal_type`, so an output row is excluded by
+        the goal it does not carry; `app/workers/plan_goal_audit/producer.rb:14` and
+        `app/workers/commission_goal/producer.rb:18` are unfiltered and stay that way. **Those first
+        two are the precedent for the whole task** — the codebase's own discriminator on this
+        collection is the goal, never the variable's type.
+  - [ ] **The discriminator, where one is ever needed, is the goal and not the type.** An output row
+        carries a blank `goal_type` (BE-3), and `PlanVariable.with_goal`
+        (`app/models/plan_variable.rb:14`) is the existing scope for that question — already used at
+        `app/workers/plan/goals_processor.rb:12`.
+  - [ ] **Tests.** None here. The membership spec belongs to BE-3, where the behaviour it pins is
+        introduced.
+- **Follow-up recorded, not fixed**: `app/workers/calendar_audit/producer.rb` and
+  `app/workers/goal_dataset/migration/producer.rb` fan out per variable without asking whether the
+  row carries a goal, so they already enumerate goal-less rows today — `Plan#create_variables`
+  (`app/models/plan.rb:434-436`) writes every row with a blank `goal_type`, the finish step sets it
+  (`app/graphql_mutations/finish_plan_graphql_mutation.rb:24`), and `Plan#clear` (`:461`) resets it.
+  An output variable adds volume to that shape rather than introducing it, so § Scope Discipline
+  category 3 applies: a follow-up, kept out of this feature.
 
 ### BE-3 — Register output variables on incentive save, and carry them into the plan roll-up
 
 - **Repository**: `app`
 - **Phase** (`PLAN.md:118-134`): Phase 3, registration
-- **Description**: saving an incentive records its inputs and its outputs, each with the right role.
-  Output variables reach `plan_variables` — the read path requires them there — with goal binding
-  suppressed for the type on the backend side.
+- **Description**: saving an incentive records its inputs in `incentive_variables` and its outputs
+  in `incentive_output_variables`. Output variables reach `plan_variables` — the read path requires
+  them there — with goal binding suppressed for the type on the backend side, and the plan gains the
+  `plan_output_variables` roll-up that mirrors it.
 - **Dependencies**: BE-1 merged (`PLAN.md:128`) — BE-1 is the only task with no dependency and it
   blocks every other task.
 - **Acceptance criteria**:
-  - [ ] `Incentive#update_variables` (`app/models/incentive.rb:149-175`, the `after_save` callback
-        declared at `:80`) writes output rows with the output role alongside the input rows it writes
-        today. The method opens with `incentive_variables.delete_all` at `:150`, so a spec asserts
-        the rebuild does not drop outputs.
-  - [ ] **The ranking branch is the named hazard and gets its own assertion.**
-        `app/models/incentive.rb:172` is
-        `incentive_variables.find_or_create_by(variable_id: variable.id) if …` — with no role scope,
-        that call can find an output row and skip creating the input row. A spec covers an incentive
-        whose variable is both an input of one rule and an output of another and asserts **both**
-        rows exist. M3's unique index (BE-1) is where the defect would surface if the scope is
-        missed.
+  - [ ] `Incentive#update_variables` (`app/models/incentive.rb:151-177`, the `after_save` callback
+        declared at `:75`) keeps writing input rows exactly as it does today, and gains a sibling
+        rebuild of `incentive_output_variables` from the distinct `output_variable_id` values of the
+        incentive's rules — one row per incentive-variable pair, however many faixas point at it.
+        A spec asserts each rebuild leaves the other collection untouched.
+  - [ ] **The reading branches gain the output scope.** The indicator/limiter/redemption branch
+        iterates `company.variables.indicators.enabled` (`app/models/incentive.rb:165`), so an
+        output key referenced by a formula produces no input row at all today. That branch is what
+        carries an output variable into `plan_variables` through the incentive that **reads** it.
+  - [ ] **The ranking branch needs no change, and the spec pins why.**
+        `app/models/incentive.rb:174` is
+        `incentive_variables.find_or_create_by(variable_id: variable.id) if …`; because outputs live
+        in a different table, that call can never find an output row (`PLAN.md:127`). A spec covers
+        an incentive whose variable is both an input of one rule and the output of another and
+        asserts a row exists in **each** table.
   - [ ] An output variable reaches `plan_variables`. `Plan#create_variables`
         (`app/models/plan.rb:434-436`) populates it from `variable_ids` (`:438-445`), which is
         unscoped, so this is verification rather than a change — the spec pins it so a later scope
@@ -212,6 +237,15 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   - [ ] The output `plan_variables` row validates with a blank `goal_type`.
         `PlanVariable#goals_presence` (`app/models/plan_variable.rb:32-39`) opens with
         `return if goal_type.blank?`, so this holds today; the spec pins it.
+  - [ ] **`plan_output_variables` is rolled up alongside `plan_variables`, from the plan's
+        incentives' `incentive_output_variables`.** It is derived the same way `variable_ids`
+        (`app/models/plan.rb:438-445`) derives its own set, and both roll-ups are rebuilt together
+        whenever the plan's incentive set changes, so they can never disagree about which incentives
+        are in the plan. **That symmetry is what makes BE-5's validation a set comparison rather
+        than a traversal** — "does this plan write every output variable it reads" becomes
+        `plan_variables` restricted to the output type, minus `plan_output_variables` — and the same
+        two collections back FE-7's panel, so screen and validation cannot drift apart
+        (`PLAN.md:130-131`).
   - [ ] The backend half of goal suppression: the plan-finish path can distinguish an output
         `plan_variable`. `PlanVariableInputGraphqlType` declares both arguments `required: true`
         (`app/graphql_types/plan_variable_input_graphql_type.rb:4-5`) and is consumed by
@@ -220,6 +254,17 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   - [ ] **Tests.** `spec/models/incentive_spec.rb` (108 lines, association matchers only today)
         gains a `describe '#update_variables'` block; the shape to copy is
         `spec/models/deal_variable_spec.rb:50-62`, and 48 of the 284 model specs already use it.
+        **The persisted-`Plan` graph these specs need has no precedent in `spec/` — no spec in the
+        repository builds one.** A working one is preserved beside this file as
+        `persisted-plan-factory-graph_spec.rb`; copy its `let` block rather than rediscovering it.
+        Five constraints it encodes and each cost a failing run to find: the company needs
+        `retention_jurisdiction_country` and `manager_legal_module: false` (otherwise the plan demands
+        two responsibles with seat types); the payment type needs an owner; the calendar needs a
+        `calendar_payment_type` row or every incentivation is invalid; the incentive needs at least
+        one rule, and that rule's formula is what links a variable, since `Plan#variable_ids` is
+        derived from the incentives rather than assignable; and `plan_variables` cannot be built
+        through nested attributes, because `PlanVariable` validates `plan_id` presence before the
+        parent is saved.
         `spec/requests/graphql_mutations/graphql_controller_finish_plan_spec.rb` covers the
         finish path with an output variable present.
 - **Follow-up recorded, not fixed**: `Incentive#update_variables` opens with
@@ -409,7 +454,9 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   - [ ] **Documented, not guarded against**: `#money` returns zero for a points-typed incentive and
         `#points` zero for a money-typed one, so a variable bound by both a money rule and a points
         rule sums mixed units. That is the author's modelling choice and no validation is added
-        (`PLAN.md:207`). The PR's `## Decisions` block records it.
+        (`PLAN.md:207`). Recorded as a code comment on the summing method, where a reader meets the
+        `#money` / `#points` branch (`PULL-REQUEST-CONVENTIONS.md:59` forbids a `## Decisions` block
+        in the PR body).
   - [ ] **Pre-existing constraint the PR must state, not fix**: limiter and ranking commissioning
         writes are not retry-idempotent — both construct a fresh record
         (`app/workers/limiter_incentive/consumer.rb:41`, `ranking_incentive/consumer.rb:48`), so a
@@ -498,10 +545,10 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         argument on that type is `required: false` today and the frontend declares the input type by
         name (`$rules: [RuleInputGraphql!]`), so a newly-required argument would fail validation on
         every existing client, and the type name must not change.
-  - [ ] A `role` field on `IncentiveVariableGraphqlType`
-        (`app/graphql_types/incentive_variable_graphql_type.rb:4-7`, today `id`, `incentive`,
-        `incentive_id`, `variable`, `variable_id`) so the plan-side picker in FE-4 can distinguish
-        inputs from outputs.
+  - [ ] An output-variables field on `IncentiveGraphqlType`, alongside its existing `variables`, so
+        the plan-side picker in FE-4 and the panel in FE-7 can tell a writer from a reader.
+        **`IncentiveVariableGraphqlType` is not modified** — the two directions are two collections,
+        so no field on a row has to say which one it is.
   - [ ] **Both mutation rule allow-lists carry the new argument.**
         `create_incentive_graphql_mutation.rb:43-47` is `rules: %i[ description type value ]` and
         `update_incentive_graphql_mutation.rb:39-45` is `rules: %i[ _destroy description id type value ]`.
@@ -559,11 +606,11 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         `role.permission?('incentive_creation') || user.permission?('incentive_creation')`.
   - [ ] **The permission is granted to nobody.** The deploy makes the feature present and
         unreachable; granting is ROLLOUT-1's prepared procedure, executed by the engineer.
-  - [ ] The PR's `## Decisions` block records D10.
-- **No `def self.statement_timeout` on M4, for the reason recorded under BE-1**: the convention in
-  `RAILS-MIGRATIONS.md:141` is inert at the installed version — `strong_migrations` reads the global
-  `StrongMigrations.statement_timeout` (`lib/strong_migrations/checker.rb:193-194`), which
-  `app/config/initializers/strong_migrations.rb` never assigns.
+  - [ ] The non-idempotency of `Action.create!` is recorded as a code comment in M4 itself, where a
+        re-run is attempted (`PULL-REQUEST-CONVENTIONS.md:59` forbids a `## Decisions` block in the
+        PR body).
+- **M4 declares `def self.statement_timeout`, for the reason recorded under BE-1**: the method is
+  read by `activerecord-safer_migrations` (`Gemfile.lock:66`), not by `strong_migrations`.
 
 ### FE-1 — Offer the output type on the variable screens
 
@@ -658,13 +705,13 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
 - **Description**: the plan create screen offers only incentives compatible with the output
   variables already present, and the plan finish screen stops offering a goal type for an output
   variable.
-- **Dependencies**: BE-8 (the `role` field on `IncentiveVariableGraphqlType`) and BE-3 (the backend
+- **Dependencies**: BE-8 (the output-variables field on `IncentiveGraphqlType`) and BE-3 (the backend
   half of the goal suppression), both merged and deployed.
 - **Acceptance criteria**:
   - [ ] The plan picker offers only compatible incentives. The plan create form builds
         `incentivationsAttributes` via `IncentivationCreateFormBuilderService`
         (`src/app/plan/create/plan-create-form-builder.service.ts:23`); the picker needs each
-        candidate incentive's output inputs and outputs, which is why BE-8 adds `role`.
+        candidate incentive's inputs and outputs, which is why BE-8 adds the output-variables field.
   - [ ] **The picker is UX, not the guarantee.** `PLAN.md:188` is explicit: the plan validation from
         BE-5 is the guarantee. A plan assembled around the picker still has to be rejected by the
         backend when it lacks an exporter — confirmed by attempting it and seeing the BE-5 error.
@@ -842,8 +889,8 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         saves; a plan missing an exporter is rejected and the document import reports it;
         `Incentive` save still produces the same `incentive_variables` rows for incentives with no
         output binding; the new GraphQL fields resolve and the permission exists, granted to nobody.
-        This checklist is also where BE-2's three producer scopes and BE-6's four consumer call sites
-        get their confirmation, since neither has a unit-test home (§ Test surface).
+        This checklist is also where BE-6's four consumer call sites get their confirmation, since
+        they have no unit-test home (§ Test surface).
   - [ ] **The per-environment sequence, with the productive gate written as a single motion.**
         `beta-001` builds from `develop` and is validated first; `demo-001` is the second
         non-productive gate; then the two productive stacks.
@@ -864,9 +911,9 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         `deploy-shared-001.yaml` the `prepare-and-migrate` job (`:371`) builds and pushes the image
         (`:384`, `image-tag: latest` at `:396`) and then runs `bin/rails db:migrate` (`:403`, `:458`),
         while the job activating the new code depends on it and runs later (`:616`, `:621`).
-        **Between those two points the schema is new and every serving container is old.** M1's
-        default is what makes that window safe (BE-1); M2 is nullable and unread by old code; M3 is
-        safe once M1's default is in place; M4 changes no old-code behaviour. Nothing needs
+        **Between those two points the schema is new and every serving container is old.** M1 and
+        M1b create brand-new tables, invisible to that old code (BE-1); M2 is a nullable column on
+        an existing table, equally unread; M4 changes no old-code behaviour. Nothing needs
         splitting, and there is no contract half — nothing is dropped or rewritten.
   - [ ] **The rollback path per step**: a redeploy of the previous image. The columns stay — rolling
         back a migration is not part of the deploy flow — which is harmless because the old code
@@ -906,7 +953,7 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
 
 ```mermaid
 graph TD
-  BE1[BE-1 type + columns] --> BE2[BE-2 exclusions]
+  BE1[BE-1 type + columns] --> BE2[BE-2 confirm no exclusion]
   BE1 --> BE3[BE-3 registration]
   BE1 --> BE9[BE-9 permission]
   BE1 --> FE1[FE-1 variable screens]
@@ -986,7 +1033,8 @@ which:
   exist: `graphql_controller_create_incentive_spec.rb`, `..._update_incentive_spec.rb`,
   `..._create_plan_spec.rb`, `..._update_plan_spec.rb`, `..._finish_plan_spec.rb`,
   `..._create_variable_spec.rb`.
-- `spec/work_books/` — for BE-2's two worksheet changes.
+- `spec/work_books/` — one file today, built around a small object graph. No task in this feature
+  changes a worksheet, so nothing here needs extending.
 
 **`app-webclient`** — seven `.spec.ts` files exist in total: `app.component.spec.ts`,
 `cropper-dialog/cropper-dialog.component.spec.ts`, and five under `core/http/`. There is **no test
@@ -1010,11 +1058,11 @@ assert.
 ### Migration ordering
 
 Two tasks touch migrations and each carries the constraint in its own criteria rather than relying
-on a reader remembering `PLAN.md`: BE-1 (M1's database-level default, M2's safe form with its
-explicit `to_table:`, M3 after M1) and BE-9 (M4 in the same deploy as the `MODULE_KEYS` entry, and
-not idempotent). Neither task declares a per-migration `def self.statement_timeout` — that
-convention is inert at the installed `strong_migrations` version, and both tasks record why so it is
-not added back as dead code.
+on a reader remembering `PLAN.md`: BE-1 (M1 and M1b as brand-new tables, M2's safe form with its
+explicit `to_table:`) and BE-9 (M4 in the same deploy as the `MODULE_KEYS` entry, and not
+idempotent). Every migration in both tasks declares a per-migration `def self.statement_timeout`,
+which `activerecord-safer_migrations` reads — `strong_migrations` is the other gem and reads only
+its own global (`RAILS-MIGRATIONS.md:143`).
 
 ### Stale `rule.rb` line numbers — re-verify before implementing BE-4
 
@@ -1037,8 +1085,9 @@ everything below it by the same amount. `app/CHANGELOG.md:31` records the change
 | The incentive-clone gap through `CreateIncentiveGraphqlMutation`'s rule allow-list | **BE-8** (backend allow-lists + the round-trip test) and **FE-2** (all five front clone builders) | The gap needs both halves to close; `PLAN.md:263` and `PLAN.md:378` name both |
 | `IncentivePolicy#update?` returns false when `record.plans.any?` | **ROLLOUT-1** | It is not a defect to fix — it is the boundary that bounds the permission grant's blast radius, so it belongs to the grant procedure (`PLAN.md:342`) |
 
-A fourth, the ranking `find_or_create_by` at `app/models/incentive.rb:172`, is owned by **BE-3** with
-its own assertion, and M3's unique index (BE-1) is where the defect would surface if missed.
+The ranking `find_or_create_by` at `app/models/incentive.rb:174` is **not** a fourth hazard: keeping
+the two registration directions in separate tables means that call can never find an output row.
+BE-3 carries the spec that pins it.
 
 ### Two risks are deliberately not owned by any task
 
@@ -1109,8 +1158,8 @@ calendar proportionally.
 
 | Task | Countable surface it turns on | Weight | What drives the spread |
 |---|---|---|---|
-| BE-1 | 4 migrations (2 of them new tables), 1 STI subclass, 3 model declarations, the output-type validation on the binding, 4 factories, ~6 spec files | 2 – 2.5 | File count, not logic, but the breadth is real |
-| BE-2 | 15 inventoried call sites, ~6 gain a scope, 5 deliberately untouched, 1 spec example each | 0.5 – 1 | Mechanical. The judgement is per-site and already made in `PLAN.md` |
+| BE-1 | 3 migrations (2 of them new tables), 1 STI subclass, 2 new entity models, the model declarations on `Variable` / `Rule` / `Incentive` / `Plan`, the output-type validation on the binding, 4 factories, ~6 spec files | 2 – 2.5 | File count, not logic, but the breadth is real |
+| BE-2 | 19 inventoried call sites read and confirmed unscoped, no production diff | 0.25 | Reading only. Its output is the recorded reason a type filter would be wrong |
 | BE-3 | The reading branches gain the output scope, the output rebuild from the rules' bindings, both plan roll-ups, goal-suppression backend half | 1.5 – 2 | Two rebuilds and two roll-ups instead of one, and `spec/models/incentive_spec.rb` carries association matchers only today, so the `#update_variables` block is written from nothing |
 | BE-4 | 1 query on `Rule::Options`, 1 branch split in `#identifiers`, 3 spec files | 0.5 | Smallest backend task. `spec/models/rule/options_spec.rb` already exists to copy |
 | BE-5 | `CALCULATION_ORDER`, one `Plan` validation, 5 validation branches, the enqueue-graph sync spec, bulk-import surfacing | 1 – 1.5 | The sync spec is the uncertainty — it pins a constant against a 41-call-site graph |
@@ -1121,7 +1170,7 @@ calendar proportionally.
 | FE-1 | The type list on the variable screens | 0.5 | The `type` control and its validator already exist |
 | FE-2 | 1 shared control + 5 incentive modules × 3 flows = 15 wirings | 1.5 – 2 | Breadth, and the clone flows are where the High risk lands |
 | FE-3 | A form-level action on the rules `FormArray`, across 5 modules | 0.5 – 1 | Small but repeated five times |
-| FE-4 | Plan create picker (needs the `role` field) + finish-screen goal suppression | 1 | Two screens, one deploy dependency |
+| FE-4 | Plan create picker (needs the incentive's output-variables field) + finish-screen goal suppression | 1 | Two screens, one deploy dependency |
 | BE-10 | 1 GraphQL field, 1 set intersection over an existing primitive | 0.5 | Small. `Formula#referenced_identifiers` already exists |
 | BE-11 | 1 query for the value, 1 resolver for the composition, the signed-contribution round trip | 1 – 1.5 | Exposure of what BE-6 already computes, not new computation |
 | FE-5 | 1 new block + 1 sibling query, on 2 statement screens | 1.5 – 2 | The third query copies the aggregated-indicators query in the same component |
@@ -1224,11 +1273,6 @@ retry, and a recompute that genuinely re-reads) cannot be settled by reading alo
 ---
 
 > **Authoring:** written by `@agent-task-composer` from a validated `TASKS-SPIKE.md` plus the
-> engineer's chosen decomposition. No new tasks, no new dependencies, and no new acceptance criteria
-> beyond cosmetic clarity were introduced at the composer stage — every task, criterion and citation
-> traces to the draft or to `PLAN.md`. Three correction rounds were applied after the write: the
-> migration safe forms and BE-3's `delete_all` follow-up; the citation corrections in BE-4, BE-8,
-> BE-9 and D11; and the four spike-validated corrections (M2's `to_table:`, the removal of the inert
-> `statement_timeout` criterion, BE-6's locked-transaction write shape, and BE-6's string-column
-> constraint). Every correction was re-verified against the cited file rather than applied from the
+> engineer's chosen decomposition. Every task, criterion and citation traces to the draft or to
+> `PLAN.md`, and every citation is verified against the cited file rather than carried over from a
 > review note.
