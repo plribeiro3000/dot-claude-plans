@@ -1,9 +1,183 @@
 # PLAN — One KMS key per environment, with restrictive key policies
 
-**Status: NOT COMPLETE — the INTEGRATORS are done; the app estate is what remains.** All fifteen stacks
-are on a dedicated task-execution role, and the integrators are on customer-managed keys the shared
-module owns. The account-wide `ecsTaskExecutionRole` no longer carries any per-stack SSM policy. See the
-phase notes below for the per-stack history and the two cross-region blind spots that step-3 exposed.
+**Status: DELIVERED — every surface the Terraform stacks own is encrypted under its environment's own
+key.** All fifteen stacks are on a dedicated task-execution role, every module mints its own
+correctly-named key, and the account-wide `ecsTaskExecutionRole` no longer carries any per-stack SSM
+policy. The last two surfaces outside a customer-managed key were the `sa-east-1` outbound registries,
+closed 2026-08-19: both now read `KMS` under the replica of their linked cluster's key
+(`mrk-416bffe4…`, `mrk-07429959…`), verified by reading the repository configuration back from AWS.
+See the phase notes below for the per-stack history and the two cross-region blind spots that
+step-3 exposed.
+
+**What outlives the migration is destruction, not migration.** `4shark-master` no longer encrypts
+anything; its `sa-east-1` replica is in `PendingDeletion` with AWS's own 30-day window running to
+2026-09-18, and the primary in `us-east-1` stays `Enabled` until that replica is actually gone — AWS
+refuses to delete a primary while a replica exists. Removing the primary from `shared-resources/kms.tf`
+is therefore one small PR that cannot be written earlier, scheduled for 2026-09-21.
+
+**App estate — measured live against AWS 2026-08-19, surface by surface.** RDS (four environments, each
+on its own key), SSM (73 parameters), OpenSearch (both domains), S3 (four buckets on `aws:kms` with
+Bucket Keys, and the pre-existing objects re-encrypted — the `kms-migration/` prefix is present in each),
+CloudWatch Logs (83 groups) and ECR all sit on the per-environment keys. The twelve app log groups
+without a key are AWS-service-created (`/aws/ecs/containerinsights/…`, `/aws/rds/cluster/…/postgresql`,
+`/aws/lambda/…`), not module-owned.
+
+**The ECR scope is TEN repositories, not the eight in `us-east-1`.** The `Build` workflow of each
+productive stack dual-pushes, so `shared-001-app` and `atento-001-app` also exist in `sa-east-1`, feeding
+the `app-outbound-*` Fargate stacks that run the same application image in that Region. They are
+Terraform-managed and always were — the declaration is not in any stack but in
+`modules/app_outbound_runtime/compute.tf`, which instantiates the same `modules/ecr` the migration
+rewrote. **Searching the stacks for `aws_ecr_repository` and concluding they were unmanaged is the
+mistake to avoid repeating**; a module can own a resource no stack file mentions. Both are live paths:
+`atento-001-app` has carried images since 2026-04-22 and holds 237, `shared-001-app` since 2026-07-15 and
+holds 87, and every productive build pushes to them.
+
+**The key they need is already in `sa-east-1`, and an alias search is what hides it.** AWS requires the
+key to live in the repository's Region, and `modules/app_outbound_runtime/kms.tf:33` creates exactly that
+— an `aws_kms_replica_key` of the linked cluster's key, minted for the log groups (§ Phase 11) and
+carrying the cluster's own key material. **It has no alias, so listing `sa-east-1` aliases returns only
+`alias/auth-001` and the integrator keys and reads as "no app key here"**; `list-key-policies` against the
+primary's `Replicas` is what answers the question. So no replication is owed — the two things missing are
+the ECR statements in the replica's own policy (a replica's policy is independent and AWS never
+synchronizes it from the primary) and an alias so the key is findable at all.
+
+### Owed — the `sa-east-1` outbound registries
+
+**Grant the replica ECR use, then adopt it, and RENAME in the same replace.** The repository is named
+after the stack that PRODUCES the image (`local.image_name = "${var.primary_identifier}-app"`), not the
+one that consumes it, so a registry serving `app-outbound-maqnelson` is called `shared-001-app` — which
+reads as the primary stack having a São Paulo presence it does not have. ECR offers no rename: its API
+carries `CreateRepository` and `DeleteRepository` and nothing between them. That is what makes the rename
+cheap here rather than expensive — adopting the key ALREADY destroys and recreates the repository, so
+changing the name costs nothing extra if both land in one replace. Doing them separately would pay the
+empty-repository window twice.
+
+**Step 1 — the key policy and the alias (PR #1029, `1 add, 1 change, 0 destroy` on both stacks, applied
+2026-08-19).** `get-key-policy` against each replica in `sa-east-1` returns two `ecr.sa-east-1` hits —
+the use statement and the grant — so the precondition step 2 depends on is confirmed live, not assumed
+from a successful apply. The
+ECR use + `CreateGrant` pair, scoped `kms:ViaService = ecr.sa-east-1.amazonaws.com`, plus
+`aws_kms_alias.app_cluster` named `alias/${var.environment}` → `alias/app-outbound-maqnelson` and
+`alias/app-outbound-atento-br`. The alias is named after the stack that OWNS it rather than the primary
+it replicates, because an alias is a Regional resource and the primary's says nothing here. Both changes
+are additive and must be applied and confirmed BEFORE step 2 — without the grant already live, the
+create half of the replace fails after the destroy half has run.
+
+**Step 2 — `force_delete = true`, alone (PR #1031, `0 add, 1 change, 0 destroy` on both stacks).** The
+repositories hold images, so the replace in step 4 cannot destroy them while the guard is on. It lands
+alone because Terraform issues the delete with the value already in STATE, not the one in the new
+configuration — the same reason the app estate needed PRs #1019 and #1021 separated. The change is
+Terraform-side only and alters nothing in AWS.
+
+**Step 3 — the `app` repository, BEFORE the replace (PR #5359, merged into `develop`).** The image is
+pushed by `app`'s Build, which composed one repository name and applied it to every registry in its
+list, so a rename in `sa-east-1` left the push aiming at a repository that no longer exists — and ECR
+does not create one on push. Each job now lists full repository paths, and the two deploy workflows
+carried the same path hardcoded for the second Region's worker and runner. **Six references, not two**:
+`build-image.yaml` ×2, `deploy-shared-001.yaml` ×2, `deploy-atento-001.yaml` ×2.
+
+**The productive Build runs from `master`, and GitHub uses the workflow file of the ref that triggered
+it — so step 3 sitting on `develop` does not protect step 4.** Either the replace waits for a release or
+hotfix carrying it to `master`, or the refill is dispatched with `--ref` pointing at a branch that
+already has it while `master`'s automatic push-triggered build stays broken until the release. That
+choice is the engineer's.
+
+**Step 4 — `kms_key_arn` on the outbound's `module "ecr"` plus the rename, in one replace.**
+
+The window is the one the app estate already measured: the repository comes back empty and the outbound
+stacks rest at `desired_count 0`, so nothing is trying to launch. The refill is the productive `Build`,
+which pushes to both Regions on its own.
+
+### Owed — the rule for creating a NEW outbound
+
+**An outbound's registry can only be encrypted if the primary's key is already replicated into the
+outbound's Region, so that check belongs in the creation path rather than in someone's memory.** Standing
+up an outbound today creates its ECR through `modules/app_outbound_runtime` with no key, and nothing
+notices — the repository is born `AES256` and stays that way until an audit finds it, which is exactly how
+these two came to be missed. The replication is a precondition of the outbound, not a follow-up to it.
+
+**The app ECR migration — three prerequisite applies, then one window per environment.** Encryption is
+fixed at creation, so adopting the key REPLACES a repository and it comes back empty. Nothing already
+running is affected: an image is pulled when a task launches, not while it runs, so what has to stop for
+the window is only what STARTS tasks. Both schedule families are held at `DISABLED` through the window
+(`lambda_scheduler_state`, `scheduled_task_state`) and released in the apply that follows the rebuild.
+The four windows measured 5m19s (beta), 4m42s (demo), 3m54s (shared) and 3m53s (atento).
+
+Three facts the sequence turns on, each of which costs a broken window if missed:
+
+- **The rebuild is TWO dispatches per environment.** `<env>-app` comes from the `app` repository's
+  `Build`; `<env>-connection-pooler` comes from the pooler image's own repository, with the same
+  environment input. Dispatching only the first leaves the pooler repository empty, and nothing surfaces
+  it until a pooler task next needs to launch.
+- **A productive `Build` publishes to `us-east-1` AND `sa-east-1`**, so the `:latest` confirmation covers
+  both Regions before the schedules are released.
+- **The ECR lifecycle policies die with the repository and Terraform only notices on the next refresh**,
+  so they are recreated by the release apply rather than the window apply.
+
+**Read a surface against AWS before reporting it, never against this file.** A status line records the
+intent at the moment it was written, and work that continues in a sibling plan never comes back to
+update it — so a plan can describe a surface as pending long after it finished. That gap has already
+produced a report claiming the app estate was untouched while five of its six surfaces were migrated.
+
+### Retiring `4shark-master` — the dependency is SNAPSHOTS, not usage
+
+Cryptographic use of the key ended between 10 and 15 August 2026, when the last predecessor cluster was
+destroyed; the final events on it are a `Decrypt` and two `RetireGrant` from Performance Insights. **Usage
+having stopped does not make the key removable** — a snapshot generates no event and still cannot be
+restored without the key that encrypted it.
+
+**Nothing depends on the key any more.** All seven snapshots were retired 2026-08-19, so `4shark-master`
+can be scheduled for deletion whenever the engineer chooses. Five were straightforward — the three
+`preupgrade-app-*-cluster-…` rollback points of the 30 May PostgreSQL upgrades (whose clusters no longer
+exist), `onboarding-preteardown-20260717` (that database was removed deliberately and did not return), and
+`setup-pre-dedicated-key-migration` (its re-encrypted twin lives on `alias/setup`). None covered a day
+inside any current retention window.
+
+**The other two were the atento backup window, and retiring them was a business decision rather than a
+cleanup.** A re-provisioned cluster starts its backup history at zero, so `app-atento-001` — created 14/08
+— carries five daily backups against a seven-day retention, and point-in-time recovery cannot reach past
+its creation either (`EarliestRestorableTime` is the minute the cluster was born). Those two recovery
+points of the predecessor were therefore the only route back to 13 August and to the morning of the 14th.
+**PITR is bounded by `BackupRetentionPeriod`, not by a separate longer window** — seven days on every
+database here, which is worth stating because the opposite is easy to assume.
+
+What made the deletion right is that restoring `app-atento-001` is not an operation 4Shark would perform:
+four countries work independently on that environment, each with its own team, so reverting the database
+to fix one country would revert the other three. Recovery capacity that would never be exercised is cost
+without benefit. **Read that as scoped to this environment** — it follows from the multi-country tenancy,
+not from a general position on backups.
+
+**A recovery point held by AWS Backup cannot be deleted through the RDS API.** `delete-db-cluster-snapshot`
+refuses it outright (`AWS Backup snapshots cannot be deleted`); the vault owns it, so the call is
+`backup:DeleteRecoveryPoint` against `<environment>-local`. Any snapshot whose identifier begins with
+`awsbackup:` takes that path.
+
+**Deleting a snapshot needs `rds:DeleteDBClusterSnapshot` / `rds:DeleteDBSnapshot`**, which the elevated
+layer did not carry — terraform PR #1013 adds them. Enumerating instance snapshots needs
+`rds:DescribeDBSnapshots`, added in #1012; before it the inventory reported five snapshots instead of
+seven, and reported low, which is the direction that matters.
+
+**Retirement is TWO stages separated by the deletion window, because the key is multi-Region.** AWS orders
+them: *"To delete a primary key, you must schedule the deletion all of its replica keys, and then wait for
+the replica keys to be deleted. The required waiting period for deleting a primary key begins when the last
+of its replica keys is deleted."* Removing both `aws_kms_replica_key.master` and `aws_kms_key.master` in one
+apply therefore fails — the primary would be scheduled while AWS still considers it replicated.
+
+Stage one is **DONE** — terraform PR #1015 removed the replica and its alias from `shared-resources/kms.tf`
+(`0 add, 0 change, 2 destroy`, applied 2026-08-19). The replica reports `PendingDeletion` in `sa-east-1`
+with `DeletionDate` **2026-09-18**: the provider defaults `deletion_window_in_days` to 30 for
+`aws_kms_replica_key`, so the schedule stays cancellable until that date. Stage two removes
+`aws_kms_key.master`, its alias, and the now-unused `sa-east-1` element of
+`data.aws_iam_policy_document.master_key` — **only once the replica is actually gone**, so it unblocks
+on 2026-09-18 and not before.
+
+**There is no `alias/auth002` key to retire, and the id recorded against that name belongs to something
+else.** `6f7b8e40` in sa-east-1 is **`alias/aws/rds`** — AWS-managed, created 2019, and undeletable by
+design (*"You can only schedule the deletion of a customer managed key. You cannot delete AWS managed keys
+or AWS owned keys."*). The only auth-related aliases in that region are `alias/auth-001` and
+`alias/backup-auth-001-local`. Eight manual `auth-001` snapshots did sit on the AWS-managed key — six from
+December 2024, two from the 2026-07-03 upgrade — and were retired 2026-08-19 as versions nobody would roll
+back to; the fifteen the database holds today are all on `alias/auth-001`. That cleanup freed no key.
 
 **Integrator closing audit — 2026-07-27, live against AWS, surface by surface.** Three surfaces are on
 the integrator's own key, verified rather than assumed: the twelve serving EBS volumes (each under its
@@ -2821,7 +2995,7 @@ confident — non-blocking.
 | **OpenSearch** | ~~Blocked~~ — NO LONGER out of scope (2026-07-20). Handled by the replace path in Phases 3–8 step 4: the data need not persist, so a new domain under the correct key/name replaces the old in a quiet window. Folded into the per-stack app-estate migration. |
 | **The six `backup-<stack>-local` key policies** | Right count, wrong policy (account-root `kms:*`, `modules/cross_region_backup/main.tf`). Same fix as Phase 3, different scope. |
 | **`alias/4shark-ecs-beta-key`** (`6bf5847f`, us-east-1) | Orphan. Created 2025-10-17, rotation off, console-default policy, referenced by no repo. Billed ~9 months for nothing. |
-| **`alias/auth002`** (live `6f7b8e40`, sa-east-1) | **NOT an orphan — corrected 2026-07-22.** It encrypts the `auth-001` RDS storage today (`modules/auth/rds.tf` hardcodes its key). Retire only AFTER the auth RDS is re-keyed onto `alias/auth-001` (Effort 2 in § "What is already DONE"). The `df7df919` id recorded earlier does not match live (`6f7b8e40`) — reconcile before any deletion. |
+| **`alias/auth002`** | No such alias exists in the account. The `6f7b8e40` id filed under that name is `alias/aws/rds` in sa-east-1 — AWS-managed and undeletable. The `auth-001` RDS runs on `alias/auth-001`; nothing here is retirable. |
 | **`alias/main`** (`64eb0fa9`, sa-east-1) | Legitimate — CloudTrail's key, `audit/kms.tf:116`. Leave alone. |
 | **VPN EBS encryption** | The `alias/vpn` key (PR #790) is minted ready but idle. Using it means encrypting the three VPN hosts' EBS volumes (MongoDB data host + the two Pritunl instances), which REPLACES each volume — a data migration on the MongoDB host (`disable_api_termination`, `delete_on_termination=false`, holds all Pritunl state), taken in a window. Deferred; the key's via-EC2 policy is already in place for it. |
 | **The restricted engineer tier** | `active/spike/aws-engineer-staging-tier/`. This plan makes its scoping possible; it does not build it. |
