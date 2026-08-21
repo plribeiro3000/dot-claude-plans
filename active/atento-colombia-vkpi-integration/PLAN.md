@@ -6,9 +6,11 @@ Load the VKPI apurado value per person, per indicator, per period into the 4Shar
 
 ## Where this stands
 
-One structural item is open, and it is the last one: a `llave` column on the catalogue holding the 4Shark Variable key. Everything else on the score table is either closed or already proposed by Atento and awaiting application to the live database.
+The structure 4Shark builds against is defined, written as an executable script, and delivered. `~/Downloads/estructura_final_vkpi_atento_colombia_20260820.sql` takes the score table from its 16 columns to the 22 of the 30-jul maqueta, applies the recommendations issued through July and August, and adds the `llave` column to the catalogue. Santiago sent it to Atento on 20-ago over Slack, together with the roadmap PDF.
 
-**Confirmation from Atento is what starts the build.** No code is written before it, because building against a shape they have not agreed to is work that may be thrown away.
+**Both tables are truncated before the script runs, and that decision is what makes it a single pass.** The server holds sample rows for structural work, not the operation, so nothing there is worth preserving: the score rows predate `RESULTADO` and the date columns, and the catalogue rows predate `llave`. On empty tables the script can declare `llave` NOT NULL and unique immediately, instead of creating a nullable column and waiting for someone to come back and close it. The real data enters afterwards — the score table through the load procedure, the catalogue through Atento's own process.
+
+**The estimate is calculated on the structure that script produces, not on a confirmation from Atento.** Nothing has been confirmed in writing since 04-ago, so waiting on a confirmation postpones the estimate indefinitely. The script is the statement of what the structure is; Atento has until 17-sep to say something changed, and after that the build proceeds on what the script leaves.
 
 ## The three sources, and what each one proves
 
@@ -28,15 +30,13 @@ Confusing these is the most expensive mistake available here, because each answe
 
 What 4Shark contributes is the remediation itself — the SQL that creates the unique index, and the load procedure that guarantees the date semantics. The execution on their side, and the ownership, stay with Atento.
 
-## Gate and the committed timeline
+## The committed timeline
 
-**No effort estimate is issued until Atento confirms they can work with the agreed shape.** A confirmation of intent is not an applied change, but it is enough to start: the estimate follows the confirmation, and the code is tested against the database once the changes are actually applied.
+**Development runs 17-sep to 08-oct — three weeks — and both dates are in the roadmap Atento holds.** The three weeks cover preparing the environment, configuring the new Source and its mappings, and validating the values against real data before production. The 08-oct date assumes the base is in the script's structure by 17-sep; each week of delay in applying it moves delivery by the same amount, and the roadmap states that in those terms.
 
-The timeline communicated to Atento on 05-ago, and therefore binding:
+**Two entries precede it in the roadmap and gate the start**: the output-variables delivery on 11-sep and the Simplex cesados adjustment on 14–16 sep.
 
-**On their confirmation** — the estimate of effort and the code delivery date, the same day or at the latest the next. **After the code is delivered** — testing against the real base, one to two days if nothing unexpected surfaces, then release for daily running.
-
-**Internal working figure: one to two weeks, possibly less.** Stated by Paulo in the 05-ago LatAm alignment on the basis that the integration consumes one score table plus a catalogue lookup. It is a planning number, not the estimate, and it is not communicated before the analysis that produces the real one.
+The estimate is dominated by environment work, not by the VKPI itself. The integration consumes four payload fields (`compiled_at`, `user_id`, `value`, `variable` — `modifier.rb:6-15`) that map straight onto `DT_DATA`, `NR_RE`, `RESULTADO` and `llave`, and the SQL Server adapter already exists on both `master` and `develop` (`database_source.rb:4`), so the VKPI part is Source, Stream and AttributeMapping configuration — six to nine working days. The remaining eight to twelve are the cost of carrying `develop`: getting it green, rehearsing the normalized-customer migration on a homologation base, and releasing it to the other clients.
 
 ## Requirement status
 
@@ -46,12 +46,16 @@ The timeline communicated to Atento on 05-ago, and therefore binding:
 | A single person identifier, stable over time | Score table | Closed — `NR_RE` is the Simplex code; a document-based variant exists as fallback |
 | `DT_DATA` free of day/month ambiguity | Score table | Closed — delivered as `yyyymmdd` |
 | One column carrying the indicator value | Score table | Closed — `RESULTADO` is the final value; `HC` / `HC_Total` are informational |
-| Per-record creation and update dates | Score table | Closed in the proposal — `DT_CREATED` / `DT_MODIFIED` |
+| Per-record creation and update dates | Score table | Closed in the script — `DT_CREACION` / `DT_ACTUALIZACION`, PASO 3.1 |
 | How the supervisor's value is composed | Score table | Closed — confirmed verbally in the 05-ago call |
-| **The proposed score-table shape applied to the live database** | Score table | **Open — requested 05-ago as parallel work** |
-| **A text column `llave` on the catalogue, unique and not null, holding the 4Shark Variable key** | Catalogue | **Open — the last structural item, requested 05-ago** |
-| One catalogue row per indicator per operation | Catalogue | **Open and not yet requested — see below** |
-| Every score row references an indicator that exists in the catalogue | Process | Open — load-bearing, the integrator reads the catalogue on every load |
+| **The script's structure applied to the live database** | Score table | **Open — delivered 20-ago, deadline 17-sep** |
+| **A text column `llave` on the catalogue, unique and not null, holding the 4Shark Variable key** | Catalogue | **Open — PASO 4 creates it constrained; Atento's catalogue load must carry a key per indicator from then on** |
+| **The score table repopulated after the truncate** | Atento | **Open — the integration has nothing to read until it happens** |
+| One catalogue row per indicator per operation | Catalogue | Closed — already true; the split lives inside `NR_ID` (see below) |
+| The list of exact Variable keys, for Atento to load into `llave` | 4Shark | **Open — owed by 4Shark, blocks the catalogue load** |
+| What distinguishes the 18 catalogue names that carry several `NR_ID` | Atento | **Open and not yet raised — those indicators cannot receive a key until it is answered** |
+| Network reachability from the integrator to `COLBOGSQL58`, plus a read-only database user on the two tables | Atento | **Open — not yet requested; blocks the 17-sep start** |
+| Every score row references an indicator that exists in the catalogue | Process | Open — load-bearing, the integrator reads the catalogue on every load; not verifiable at script time, since both tables are empty then |
 | Héctor Javier notifies Andrés and copies 4Shark on each Variable upload | Process | Open — requested 05-ago |
 | Metas table | — | Out of scope — a separate workstream after indicators |
 
@@ -89,19 +93,48 @@ A supervisor's indicator is a **distinct Variable per service unit**, so `calida
 
 The Variable-registration API and the `external_id` column on `variables` are dropped. Both existed only to support registering from the catalogue. Whether `external_id` should be mandatory or optional on `Variable` is moot — the column is not being added.
 
-## The gap the 05-ago request does not close
+## Why one `llave` per catalogue row is sufficient
 
-**One `llave` per catalogue row gives one key per `NR_ID`, and one `NR_ID` spans several operations.** The catalogue carries no service or programa column (`vkpi-schema-2026-08-03.txt`, query 2 — 17 columns, none of them a service), so a row is per indicator only. In the delivered sample, 166 of the 224 `NR_ID` appear in more than one service, across 2,461 distinct service+indicator pairs.
+The platform carries no service dimension in either identity: a Variable is unique on `(company_id, key)` (`schema.rb:2573`) and a Modifier on `(company_id, compiled_at, user_id, variable_id)` (`schema.rb:1133`). The VKPI score row, by contrast, is identified by four columns — period, person, programa, indicator. `NR_SERVIVIO_CODIGO` has no destination on the platform side, so two score rows differing only in programa would resolve to the same Modifier and one would overwrite the other.
 
-The consequence: a supervisor with `calidad` in four operations needs four Variables, but the join `score.NR_INDICADOR → catalogue.NR_ID` returns one key for all four. They collapse onto a single Variable and one value overwrites the others silently — the exact failure the unique index on `llave` exists to prevent, arriving through a different door.
+**That collision cannot occur, because the per-operation split already lives inside `NR_ID`.** Read from the live catalogue on 20-ago, `calidad` exists as ten separate records, each with its own `NR_ID` and the operation in the name:
 
-**Closing it needs one catalogue row per indicator per operation, each with its own `NR_ID` and its own `llave`.** That was item 3 of the 03-ago email and it was neither withdrawn nor resolved. The 05-ago request went out without restating it, so it is open on both sides: unstated to Atento, and unresolved here.
+```
+491  Calidad AR      499  Calidad AR - Variable
+492  Calidad BC      500  Calidad BC - Variable
+493  Calidad BP      501  Calidad BP - Variable
+496  Calidad CO      504  Calidad CO - Variable
+498  Calidad CL      506  Calidad CL - Variable
+495  Calidad PE      503  Calidad PE - Variable
+494  Calidad MX      502  Calidad MX - Variable
+497  Calidad ON      505  Calidad ON - Variable
+511  Calidad EC      512  Calidad EC - Variable
+609  CALIDAD MZ - Variable
+```
+
+Distinct `NR_ID` means distinct `llave` and distinct Variables, so a supervisor's four rows land on four Variables. The catalogue is already at the granularity the platform needs; the join `score.NR_ID → catalogue.NR_ID` is correct as it stands.
+
+**The measurement that looks like a contradiction is not one.** In the delivered sample, 166 of the 224 `NR_ID` appear in more than one service. Those are asesor indicators: an asesor is assigned to a single programa, so the same indicator serving many programas never puts two rows on one person in one period. The sample carries no supervisor rows at all, which is why it neither shows the split nor shows a collision.
+
+The consequence for the ask: one `llave` per catalogue row, unique and not null, is the correct and complete requirement. No programa column on the catalogue is needed.
+
+**Eighteen catalogue names carry more than one `NR_ID`, and some of them are byte-identical — this is the open obstacle to populating `llave`.** `Puntualidad - Variable` exists as 450 and 682 with the same string; `Penalizacion - Variable` and `Productividad` carry three ids each. Two rows sharing a name still need two distinct keys, and nothing in the name tells Andrés which is which. On the platform side the same wall exists in the other direction: `index_variables_on_company_id_and_name` is unique (`schema.rb:2574`), so Héctor cannot register two Variables both called `Puntualidad - Variable` for the keys to point at.
+
+Resolving it needs Atento to say what distinguishes each duplicate — most likely the operation, as with `calidad`, but unnamed. Until then those indicators have no key, and PASO 4's unique index rejects any attempt to give them a shared one.
 
 ## What 4Shark configures on its own side
 
 The meaning of the value — percentage, count, duration, currency — and its calculation mode are **platform configuration**, not a source requirement. The API accepts `value` as a string (`indicators_controller.rb:22-26`) and the `Variable` carries `data_type` and `calculation` (`variable.rb:45-89`); `Indicator` only delegates to it (`indicator.rb:87-92`).
 
 One consequence to carry into Variable registration: `PercentDataType#format` divides by 100 (`percent_data_type.rb:4-8`), so the platform expects a percentage on a 0–100 scale. The VKPI values for ratio-shaped indicators sit in 0–1. Whoever registers each Variable has to look at the indicator's real scale to choose between `PercentDataType` and `NumberDataType`, or a percentage enters a hundred times smaller.
+
+## What Atento holds
+
+**The 20-ago delivery supersedes every piecemeal ask below.** Santiago sent two files over Slack: the roadmap PDF, carrying the delivery history and the three committed dates, and the structure script, which consolidates into one executable file what had been spread across the 29-jul, 31-jul and 05-ago messages. The script names the 17-sep deadline for objecting to the structure, and it flags two things separately from what was agreed in July — an optional index on `DT_ACTUALIZACION`, and a correction to the load procedure.
+
+**The procedure correction is not optional and Atento was told so.** The version sent on 31-jul compares the incoming value with the stored one using `<>`, and in SQL Server that comparison against NULL is neither true nor false — an unknown condition never fires the update. One indicator arriving without a value, or the process resending an empty one, is enough to freeze that row on its previous number with nothing raised. PASO 3.3 uses the `EXCEPT` form instead, which treats NULL as comparable.
+
+**The constrained `llave` moves work into Atento's catalogue load, and that is the point.** Because the column is NOT NULL and unique from creation, an indicator loaded without a key, or with a key already in use, is rejected by the database. What used to depend on someone remembering to close a step is now enforced on every insert.
 
 ## The 05-ago request — what Atento was told
 
@@ -115,19 +148,17 @@ Paulo wrote the text; Santiago sends it. It carries three things.
 
 ## Acceptance — what happens when Atento says it is done
 
-Atento's report closes nothing on its own. When they state the changes are applied, connect to `COLBOGSQL58\MSSQL58_KPI` and verify each one against the live database, the same way the current structure was captured. Every check below is a query; none of them is a question.
+Atento's report closes nothing on its own. When they state the script ran, connect to `COLBOGSQL58\MSSQL58_KPI` and verify against the live database, the same way the current structure was captured. Every check is a query; none of them is a question.
 
-**On the catalogue `tb_dim_indicadores`:** the `llave` column exists and is text; a unique index covers it; no value repeats; no value is null for an indicator in use.
+**PASO 5 of the script is that verification and it is theirs to run**, so the fastest path is asking for its two outputs: the 22 columns all present, and the three indexes — the composite unique on the score table, the one on `DT_ACTUALIZACION`, and `UX_indicadores_llave` on the catalogue. Re-run them here rather than accepting the report.
 
-**On the score table `tb_dim_indicadores_score`:** `RESULTADO` present, `NR_NUMERADOR` / `NR_DENOMINADOR` gone, `DT_CREATED` and `DT_MODIFIED` present and populated; the composite key (date, person, programa, indicator) has zero duplicates.
+**PASO 5 proves the structure and says nothing about the data, because both tables are empty when it runs.** Everything about content is verified later, against what Atento reloads: that every score row's indicator exists in the catalogue, that the composite key holds no duplicates, and that `RESULTADO` carries the value the integration expects. `NR_NUMERADOR` / `NR_DENOMINADOR` are not checked at all — the script deliberately leaves those columns, since removing them is Atento's decision.
 
-**Across both:** zero score rows whose indicator does not exist in the catalogue, and zero score rows whose indicator has no `llave`.
-
-When every check passes, the estimate is confirmed and the build proceeds. A check that fails goes back to Atento naming exactly which one and what the query returned.
+A check that fails goes back to Atento naming exactly which one and what the query returned.
 
 ## Phases
 
-**Phase 0 — Atento confirms, then applies.** Confirmation of the agreed shape starts the estimate and the build. The application of the changes — the `llave` column with its unique index, plus the score-table shape already proposed — runs in parallel and gates only the testing. Duration is Atento's, not ours.
+**Phase 0 — Atento truncates, runs the script, and reloads both tables.** It does not gate the estimate, which is already issued, nor the start of the build on 17-sep. It gates the testing, which is the second half of the three weeks: until the reload happens the integration has nothing to read. Duration is Atento's, not ours — and 4Shark owes them the list of Variable keys before their catalogue load can satisfy the `llave` constraint.
 
 **Phase 1 — Indicators, agents and supervisors together.** A second non-normalized Source pointing at the VKPI server plus a Modifier stream on the existing Colombia integrator (stack `co`, root mode). Supervisors are no longer a separate phase: their rows arrive pre-calculated in `RESULTADO` like an asesor's, so the same stream carries both.
 
@@ -149,12 +180,16 @@ Cross the 3,535 distinct `NR_RE` in the sample against the Colombia normalized b
 
 ## Working rhythm
 
-The Friday sync does not happen this week — it is a public holiday in Colombia. The next one is the following Friday. Andrés asked to be contacted directly before then for anything that cannot wait, so the `llave` request does not wait for the sync.
+Andrés asked to be contacted directly rather than waiting for the Friday sync on anything that cannot wait, so nothing here queues behind it.
 
 ## Risks
 
-The dominant risk is schedule pressure converting into a premature estimate. The mitigation is the gate above, held consistently and stated constructively.
+**The access request never being made is the risk closest to the calendar.** Network reachability from the integrator to `COLBOGSQL58` and a read-only database user are not database structure, so they are absent from both the script and the roadmap; nothing Atento holds tells them to prepare either, and without both the 17-sep start does not happen.
 
-A second risk is accepting a report in place of a verification. The acceptance section exists precisely because a reported change and an applied change are different facts.
+A second risk is the reload after the truncate. The script leaves both tables empty by design, so testing cannot start until Atento repopulates them — and nothing on 4Shark's side can substitute for that or estimate how long it takes. It is the one dependency where a delay translates directly into idle days inside the three weeks.
 
-A third risk is the per-operation catalogue split surfacing after the code is written. It is the one open item Atento has not been told about, and it changes how many rows their catalogue holds — a change they would rather hear before applying the `llave` column than after.
+A third risk is accepting a report in place of a verification. The acceptance section exists precisely because a reported change and an applied change are different facts.
+
+A third risk is `develop`: the normalized-customer migration has not been rehearsed against a homologation base, and it carries the eight-to-twelve-day half of the estimate.
+
+A fourth risk is the supervisor case reaching production untested. The sample Atento delivered carries no supervisor rows at all, so nothing in it exercises the path where a person holds the same indicator concept across several operations. The catalogue's own split by `NR_ID` is what makes that path correct, and it has been reasoned about rather than observed — the first load that includes supervisors is where it gets confirmed.

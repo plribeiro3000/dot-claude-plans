@@ -1,14 +1,16 @@
-# Atento TPRM — Actions Before Sending
+# Atento TPRM — Controls the Filed Answers Rest On
 
-Every answer in `PLAN.md` describes the target state. The questionnaire is sent after the actions
-below are done, not before. This file is the list, grouped by who has to be involved.
+Every answer in `PLAN.md` describes the target state, and the questionnaire is filed. This file is
+the list of controls those answers assert, grouped by who has to be involved — so each claim the
+client now holds can be traced to the action that makes it true.
 
 All 119 items are reviewed and their approved answers are recorded in `PLAN.md` — 90 `SÍ`, 18 `NO`,
-11 `N/A`. What remains is this list, and the workbook is written after it closes.
+11 `N/A`.
 
-An item's **Blocks** line names the questionnaire items whose answer is not yet true without it.
-An item with no **Blocks** line costs nothing in the questionnaire and is listed because the review
-surfaced it.
+An item's **Blocks** line names the questionnaire items whose answer is not true without it. An item
+with no **Blocks** line costs nothing in the questionnaire and is listed because the review surfaced
+it. An entry still to be applied is picked up as its own piece of work with its own planning; this
+file is the record of what each answer depends on, not a tracker of that work.
 
 ## Documents the review produced
 
@@ -141,19 +143,25 @@ because the claim does not hold until the round runs.
 **Done when:** each document carries a real issue date and a named approver, and the publication date
 is recorded here.
 
-### Look up the date of the last training session
+### Register the training sessions
 
-Unlike every other date in this file, **this one already exists** — it is a lookup rather than work.
-The `Registro de Treinamentos LGPD` sits in the engineer's Drive, records folder, and the date of the
-last session is what fills the `[FECHA]` in the section-23 answers.
+The last sessions ran from 06/10/2025 to 10/10/2025, and that is the date the section-23 answers
+carry. The `Registro de Treinamentos` in the engineer's Drive does not record them — it starts at
+the June 2026 sessions — so the register the answers point at has to be built backwards from the
+calendar and the mail record of that week.
 
-It carries one consequence beyond the field itself: item 12.1 claims annual recurrence and points at
-that same log as its evidence. If the interval between sessions turns out longer than a year, the
-document that proves the control is also what disproves the claim, and the cadence wording has to be
-adjusted in 12.1, 23.2, 23.3 and 23.4 together rather than one at a time.
+Item 12.1 is what makes this more than bookkeeping: it claims annual recurrence and names the
+register as its evidence, so the document that proves the control is also what can disprove the
+claim. If the interval between two sessions turns out longer than a year, the cadence wording moves
+in 12.1, 23.2, 23.3 and 23.4 together rather than one at a time.
 
-**Blocks:** 23.2, 23.3, 23.4
-**Done when:** the date is recorded here and the interval between the last two sessions is known.
+The client-facing version carries no participant names. The answer claims a control, and a roster
+would disclose team size — which no answer in this questionnaire does, by the engineer's standing
+constraint.
+
+**Blocks:** 12.1 — the register it cites is the one document an answer names that did not go in the
+pack.
+**Done when:** the register covers the October 2025 sessions and reaches the client.
 
 ### Reconcile the information-security policy with what 4Shark actually operates
 
@@ -408,22 +416,37 @@ the reason dropping the paragraph is the recommended path.
 **Blocks:** the final workbook write
 **Done when:** either 3.1 no longer claims the scheme, or the policy exists and 19.1 claims it too.
 
-## The gate before the workbook is written
+## The delivery
 
-The workbook `~/Downloads/4Shark_Atento_TPRM_Questionnaire_respondido_20260818.xlsx` is written once,
-from `PLAN.md`, with the yellow working highlight dropped. Four things must be settled first, because
-each one changes text that would otherwise be written wrong and rewritten later:
+The questionnaire was filed with Atento on 20/08/2026, in the mail thread the client opened
+("Formulario de Seguridad"), addressed to the requester with the 4Shark and Atento participants in
+copy. Two attachments went with it: the answered workbook
+`~/Downloads/4Shark_Atento_TPRM_Questionnaire.xlsx`, written from `PLAN.md` with the yellow working
+highlight dropped, and `anexos.zip`, carrying the supporting documentation in two folders —
+`originales` (the Portuguese set as issued, plus the pentest report and the infrastructure
+provider's data processing addendum) and `traducidos` (a literal Spanish rendering of the 4Shark
+documents).
 
-1. **The policy publication date** — fills `[FECHA]` in 19.4, 20.1, 21.6 and 22.1, and lets six other
-   answers state formal approval instead of the weakened form.
-2. **The last training session date** — fills `[FECHA]` in 23.2, 23.3 and 23.4, and settles whether
-   the annual-cadence wording holds.
-3. **The infrastructure provider's DPA acceptance** — 16.4, 20.2 and 20.3 assert a safeguard that
-   reaches 4Shark only through it. If it was never accepted, all three answers change rather than
-   just their wording.
-4. **The 3.1 / 19.1 classification contradiction** — one of the two cells has to move.
+The Spanish rendering is a translation of the text and not a jurisdiction version: the policies are
+issued under Brazilian law, the legal references stay Brazilian, and the covering message says so —
+the original is the valid document and the translation exists so the client's security team can read
+it. The two third-party documents are not translated, being their authors'.
 
-Everything else in this file changes the world the answers describe rather than the answers
-themselves, so it gates the **sending** rather than the writing. The distinction matters for
-sequencing: the workbook can be written and reviewed with the partners while the workstation visit
-and the engineering items are still in flight.
+Four questions decided the answers' final wording and each is settled in the filed text: the policy
+publication date is 05/07/2023 (19.4, 20.1, 21.6, 22.1); the last training sessions ran 06/10/2025
+to 10/10/2025 (23.2, 23.3, 23.4); the infrastructure provider's addendum is the international-transfer
+safeguard and is attached (16.4, 20.2, 20.3); and item 3.1 no longer claims a data-classification
+scheme, so it no longer contradicts 19.1.
+
+**One document an answer cites is not in the pack.** Item 12.1 names a training register alongside
+the awareness programme, and that register is still to be assembled from the calendar and mail
+record of the October 2025 sessions. The client-facing version omits participant names — the answer
+claims a control, not a roster, and naming people would disclose team size, which no answer in this
+questionnaire does.
+
+## Sending it again
+
+Should the pack ever be reissued, the workbook and the zip are rebuilt rather than reused: the
+Spanish documents are rendered from the compliance repository, which is the source of truth, and a
+zip made by the macOS Finder carries `__MACOSX` and `.DS_Store` entries that a `zip -r -X` over the
+folder does not.

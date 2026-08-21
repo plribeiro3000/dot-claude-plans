@@ -4,10 +4,10 @@ Record of the item-by-item review. Each answer was approved by the engineer in c
 recorded here with the question, the verdict, the justification as it goes into the cell, and the
 reasoning behind the corrections made to the vendor-template text.
 
-All 119 items are reviewed — 90 `SÍ`, 18 `NO`, 11 `N/A`. The workbook
-`~/Downloads/4Shark_Atento_TPRM_Questionnaire_respondido_20260818.xlsx` is written once, from this
-file, with the yellow working highlight dropped. `TASKS.md` § "The gate before the workbook is
-written" names the four things that must be settled before that write.
+All 119 items are reviewed — 90 `SÍ`, 18 `NO`, 11 `N/A`. The workbook written from this file, with
+the yellow working highlight dropped, is `~/Downloads/4Shark_Atento_TPRM_Questionnaire.xlsx`, and it
+was filed with the client on 20/08/2026. `TASKS.md` records the delivery and the controls each filed
+answer rests on.
 
 Source of the questions: sheet `Information Security & Privacy`, 119 items.
 
@@ -16,9 +16,11 @@ accent on `SÍ` is required.
 
 ## Sequence
 
-The answers describe the target state. The engineer reviews them with the partners, the controls
-they describe get applied, and the questionnaire is sent after that — not before. The section
-"Controls to apply before sending" below is the list that follows from the answers written here.
+The answers describe the target state, and the questionnaire is filed. Every control an answer
+asserts is therefore a commitment already made to the client rather than an intention: an answer
+whose control is not yet operating is the one an assessor can disprove, and the client already holds
+the claim. `TASKS.md` lists the control behind each answer, so anything still to be applied is
+picked up as its own piece of work rather than tracked here.
 
 ## Review principle
 
@@ -45,12 +47,11 @@ Four constraints the engineer set, each from a correction made during the review
   sentence in column E announcing that the answer is negative spends a line saying what the reader
   just read. State the fact — what does not exist — and move on to what does.
 
-## Controls to apply before sending
+## Controls the answers rest on
 
 `TASKS.md` carries them, grouped by who has to be involved — the partner conversation, the
-engineering work, and the facts still to confirm. Each entry there names the questionnaire items it
-blocks, so an answer written here can be traced to the action that makes it true, and its last
-section separates what gates the workbook WRITE from what gates the SENDING.
+engineering work, and the facts to confirm. Each entry there names the questionnaire items whose
+answer depends on it, so an answer written here traces to the action that makes it true.
 
 ## Status
 

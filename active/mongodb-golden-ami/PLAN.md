@@ -128,6 +128,8 @@ for now — they still serve the current fleet until Phase 3 cuts it over.
    (`~/Projects/4Shark/dot-claude-plans/active/pritunl-ecs/PLAN.md`, its PR 2.3).
 5. ✅ **Phase 3** — integrator fleet cutover. DONE for every active client (see Phase 3
    below). The ansible-monorepo legacy cleanup is the remaining tail.
+6. **Phase 4** — the AMI snapshot moves onto a key of its own (see Phase 4 below). The
+   nodes' own volumes are already on their consumer keys; this closes the image itself.
 
 ## Execution progress (2026-07-10)
 
@@ -192,10 +194,89 @@ on it either way), so this is not drift that threatens the fleet — but the nex
 has no automatic path, and the stated decision is not what is deployed. Reconcile or retract
 the decision; do not leave the plan claiming a mechanism the code does not use.
 
+## Phase 4: the AMI snapshot gets a key of its own
+
+The image's snapshot and the running node's disk are two different objects, and only the
+second one is on a dedicated key today. Every consumer already re-encrypts at launch —
+`modules/integrator/mongodb.tf:86,131,176,221,266,311` declares `kms_key_id =
+aws_kms_key.integrator.arn` on all six node slots, and `modules/vpn/mongodb.tf:88-89`
+declares the VPN's own key — so the nodes serving production are correctly keyed. What is
+not is the snapshot each AMI is built from.
+
+**The build opines about nothing, which is why the images are inconsistent.**
+`packer/mongodb.pkr.hcl` carries no `encrypt_boot`, no `kms_key_id`, no
+`region_kms_key_ids`; its `launch_block_device_mappings` block sets size and type only.
+The three live images show the consequence: `mongodb-8.0-20260715103934` is not encrypted
+at all, while `mongodb-8.0-20260803203023` and `mongodb-8.0-20260819141804` are encrypted
+under `alias/aws/ebs`. Nothing in the repository changed between those builds, so the
+encryption arrived from outside it — account-level EBS default encryption is the only
+mechanism that encrypts a snapshot no one asked to encrypt, and it uses exactly that key.
+Confirm that setting and its effective date before writing the fix; the fix is the same
+either way, but the explanation in the commit should be true.
+
+**The key belongs to the `mongodb` stack, which already owns the build.** That stack holds
+`deploy_key.tf`, `github.tf` and `iam.tf` — the credentials the image pipeline runs under —
+and no `kms.tf`. A key minted there is owned by the thing that produces the artifact, which
+is the same reasoning that puts each environment's key inside the module that produces its
+resources. One key serves every image because the images are one artifact line, not
+per-client data: the blast radius of the AMI snapshot is the image, and the blast radius of
+the client's data is the node's own volume, which already has its own key.
+
+**Two key policies have to be right, and they are right for different callers.** At launch
+the EC2 service decrypts the AMI's snapshot under the golden-AMI key and encrypts the new
+root volume under the consumer's key, so the golden-AMI key needs the same
+`ec2.<region>.amazonaws.com` pair every consumer key already carries — cryptographic use
+plus `kms:CreateGrant`, since AWS states the principal calling the launch "must have
+kms:CreateGrant permissions to create a grant for Amazon EC2". The consumer keys need no
+change: `modules/integrator/kms.tf:178,197` and the VPN's equivalent already declare that
+pair. A missing grant on the new key fails at the next launch, not at apply — the same
+delayed failure mode the ECS capacity groups had, so the key policy lands and is proven
+before any image is built against it.
+
+**The key is named in the block device mapping, not in the source.** The builder's own
+guidance is that for a single-region build with a custom key it is *"more efficient to
+leave this and `encrypt_boot` empty and to instead set the key id in the
+launch_block_device_mappings"*, because the source-level pair *"saves potentially many
+minutes at the end of the build by preventing Packer from having to copy and re-encrypt
+the image at the end of the build"* only when it is avoided. This build is exactly that
+case — one region, one key — so `encrypted = true` + `kms_key_id = "alias/..."` go inside
+the existing `launch_block_device_mappings` block, which is also the shape the ECS capacity
+groups use. An alias is a valid value there provided the `alias/` prefix is kept; the build
+user's IAM policy names the key's ARN, which authorizes a call that identifies the key by
+alias, since only the policy's own `Resource` element may not be an alias.
+
+Steps, in order:
+
+1. ✅ **DONE** — the account's EBS-default-encryption setting confirmed on
+   (`EbsEncryptionByDefault: true`), which is what has been encrypting the snapshots
+   under `alias/aws/ebs`.
+2. ✅ **DONE (applied + merged, terraform#1052)** — `kms.tf` in the `mongodb` stack:
+   `alias/mongodb-golden-ami` with the EC2 use + `kms:CreateGrant` pair, plus a matching
+   grant on the Packer build user's IAM policy scoped to that key alone.
+3. ✅ **DONE (merged, mongodb#31)** — the key named in `launch_block_device_mappings`.
+4. ✅ **DONE** — `mongodb-8.0-20260820163516`, the first image built after the merge, has
+   its snapshot (`snap-03183eb94eb0614b0`) encrypted under key
+   `98113283-78a1-4d5e-9bd5-63fe7dfd9de2`, which is what `alias/mongodb-golden-ami`
+   resolves to. The two images preceding it are on the account's `aws/ebs` default
+   (`414c7ff5-6258-47f7-a96d-d502d12fd4e3`) and age out under the 3-image retention.
+5. ✅ **DONE** — a throwaway instance launched from `ami-06318272b35159665` outside
+   Terraform, with `alias/vpn` named on the root volume, produced a volume encrypted under
+   `0f4e9ae3-59a1-4d66-a4ae-14936a615f1c` — the VPN key, not the golden-AMI key. The launch
+   succeeding is itself half the proof, since EC2 had to decrypt the golden-AMI snapshot to
+   create that volume, and a missing grant fails at a LAUNCH rather than at an apply. The
+   instance was terminated and its volume deleted with it.
+
+Phase 4 is complete. What remains is attrition: the two images still on the account's
+`aws/ebs` default age out under the 3-image retention as new builds land.
+
+The existing images stay until the retention rule (3 most recent) retires them — deleting
+one deregisters the AMI that depends on it.
+
 ## Technical decisions (current)
 
 | Decision | Choice |
 |---|---|
+| AMI snapshot encryption | `alias/mongodb-golden-ami`, one key for the whole image line, minted in the `mongodb` stack; the running node re-encrypts onto its own consumer key at launch |
 | Role location | Split into its own repo `ansible-role-mongodb` (community-standard for versioned sharing across projects; galaxy cannot pull a monorepo subdir role) |
 | Build ↔ role coupling | The `mongodb` build pulls the role via `requirements.yml` + `ansible-galaxy` at a pinned tag; Renovate bumps the tag |
 | Naming | No major version in ANY identifier; version lives in `mongodb_version` (default 8.0) |
