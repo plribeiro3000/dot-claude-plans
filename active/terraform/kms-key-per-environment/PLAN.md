@@ -2680,6 +2680,96 @@ connection, not by name).
 and an outbound is structurally forced to borrow its linked cluster's key — the whole class of "new
 environment born on a shared key, or on a misnamed one" cannot recur.
 
+### Phase 15 — The account-wide buckets: three categories, five keys (engineer, 2026-08-21)
+
+Twelve buckets sit outside every stack — they belong to the account, not to an environment — and all
+of them are on the AWS-managed S3 key. The per-stack rule of § "Six keys" does not reach them: there
+is no task role to name, because no stack owns them. The engineer categorized them by **who may
+read** instead, which is the same reasoning one level up — the reader is the blast radius.
+
+| Bucket | Region | Category | Key |
+|---|---|---|---|
+| `4shark-legal` | sa-east-1 | DPO only | `4shark-legal` |
+| `4shark-terraform-state` | us-east-1 | infrastructure | `4shark-infrastructure` |
+| `4shark-backups` | us-east-1 | infrastructure | `4shark-infrastructure` |
+| `4shark-lambda-artifacts-us-east-1` | us-east-1 | infrastructure | `4shark-infrastructure` |
+| `4shark-cloudtrail` | sa-east-1 | infrastructure | `4shark-infrastructure` |
+| `4shark-lambda-artifacts-sa-east-1` | sa-east-1 | infrastructure | `4shark-infrastructure` |
+| `4shark-development` | us-east-1 | development | `4shark-development` |
+| `4shark-integrator-artifacts` | sa-east-1 | development | `4shark-development` |
+| `4shark-assets` | — | public | stays SSE-S3 |
+| `4shark-incentive` | — | public | stays SSE-S3 |
+| `mobile.app4shark.com` | — | public | stays SSE-S3 |
+| `4shark-danfe-poc` | — | discard | — |
+
+**The three public buckets are not a preference — SSE-KMS cannot serve an anonymous reader.**
+Downloading a KMS-encrypted object requires `kms:Decrypt` on the caller, and an anonymous principal
+has no identity to grant it to. AWS states the consequence directly: *"you can't use SSE-KMS with
+objects that need to be publicly accessible"*. So a bucket serving objects to the open internet stays
+on SSE-S3 for as long as it serves them. All three do: `4shark-incentive` holds brand logo pairs
+(`<brand>/large.png`, `<brand>/small.png`), and `mobile.app4shark.com` holds exactly two objects —
+`apple-app-site-association.json` and `assetlinks.json`, the Apple Universal Links and Android App
+Links association files that Apple and Google fetch anonymously to verify the domain-to-app claim.
+Deleting that bucket breaks the app's deep links; it is small, not empty.
+
+#### Three names, five keys — the region is what multiplies them
+
+A KMS key is regional and an S3 bucket can only be encrypted by a key in its own Region. Two of the
+three categories hold buckets in both Regions, so each of those is **one name declared twice**, once
+per Region — an alias is itself a per-Region name, so the same alias in `us-east-1` and `sa-east-1`
+is not a collision. The estate already reads this way: `alias/main` exists in both
+(`audit/kms.tf:115`, `shared-resources/kms_cloudtrail.tf:153`).
+
+| Alias | us-east-1 | sa-east-1 |
+|---|---|---|
+| `alias/4shark-infrastructure` | ✓ | ✓ |
+| `alias/4shark-development` | ✓ | ✓ |
+| `alias/4shark-legal` | — | ✓ |
+
+**Paired regional keys, never a multi-Region key** — § "Regional, not multi-region" already decided
+this for the estate, and S3 gives no reason to depart: each bucket lives in one Region and never has
+to decrypt another Region's ciphertext, which is the only thing a multi-Region key buys. The app
+module's `multi_region = true` is not a counter-precedent — it exists because an outbound sibling
+runs the *same application* in a second Region against the *same* log groups and secrets.
+
+#### The names follow the estate's own alias grammar
+
+An alias names the thing the key belongs to: `alias/app-<stack>`, `alias/integrator-<client>`,
+`alias/auth-001`, `alias/backup-<stack>-local`. A stack-scoped key carries no prefix because the
+stack name is already unique; the **one** account-wide key carries `4shark-` (`alias/4shark-master`,
+`shared-resources/kms.tf:125`). These three are account-wide by the same argument, so they take the
+same prefix — which also makes each alias read as the bucket set it covers. Lowercase throughout,
+matching every existing alias and every bucket name.
+
+Key shape is `modules/vpn/kms.tf`'s: `deletion_window_in_days = 30`, `enable_key_rotation = true`,
+an explicit policy with a key-administration statement, a tagged-operator statement
+(`aws:PrincipalTag/KeyAccess = all` + MFA) and a `kms:ViaService = s3.<region>.amazonaws.com`
+statement, and `Automation = "terraform"` in the tags.
+
+#### Home — `shared-resources`, for the reason `4shark-master` is already there
+
+The stack that hosts `4shark-master` states it: the key *"is shared by every stack and belongs to no
+single one"*. That is exactly these three, and `shared-resources` already declares both Region
+providers. The buckets themselves stay where they are; only `4shark-cloudtrail` is Terraform-managed
+today (`audit/cloudtrail.tf:7`), and its `audit` stack reads the sa-east-1 infrastructure key by
+alias rather than minting one.
+
+**CloudTrail already has a second layer, and it is not this one.** The trail encrypts its own log
+files with `aws_kms_key.cloudtrail` (`audit/cloudtrail.tf:118`) before they land; the bucket's
+default encryption is separately `AES256` (`audit/cloudtrail.tf:29`). Moving the bucket onto the
+infrastructure key changes the bucket-level default and leaves the trail's own key untouched.
+
+#### Migration mechanics — already settled, do not re-derive
+
+The in-place default-encryption change plus the S3 Batch Operations re-encryption pass is § Phase 12c
+verbatim, proven on production buckets holding millions of objects: Bucket Keys enabled **before** the
+batch, a `kms:ViaService` statement on the key policy, and a manifest filtered on
+`MatchAnyObjectEncryption`. Nothing is ever unavailable, because a bucket holds objects under
+different encryption at once and the reader never has to know which.
+
+**Open — `4shark-danfe-poc`.** Categorized as discard. Deleting a bucket is irreversible and is the
+engineer's call; it blocks nothing above.
+
 ## Execution order — the data migration, simplest first (engineer, 2026-07-20)
 
 **This section is the authoritative running order from 2026-07-20 forward. It REORDERS the phase

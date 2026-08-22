@@ -1,0 +1,114 @@
+Raw grep counts from ~/.claude/CLAUDE.md (2080 lines), collected 2026-08-21.
+Commands used are reproducible with plain grep against the file.
+
+=== "ask/surface/confirm/stop"-shaped word forms ===
+Command: grep -oiE '\b(ask|surface|confirm|stop|wait|question|blocker|escalat)[a-z]*\b' CLAUDE.md | sort | uniq -c | sort -rn
+
+  44 question
+  37 ask
+  30 stop
+  30 asks
+  23 asked
+  22 surface
+  18 Stop
+  17 stops
+  13 Blocker
+   9 waiting
+   9 surfaces
+   8 wait
+   8 questions
+   8 confirmed
+   8 Questions
+   7 surfaced
+   7 confirm
+   7 Ask
+   6 asking
+   5 confirmation
+   4 waited
+   4 confirming
+   4 Blockers
+   3 waits
+   3 stopping
+   3 confirms
+   3 blocker
+   3 Surface
+   2 escalate
+   2 confirma
+   2 Waiting
+   2 Wait
+   2 SURFACE
+   2 STOP
+   2 Question
+   2 Escalate
+   2 Asking
+   2 ASK
+   1 stopped
+   1 escalation
+   1 escalated
+   1 WAIT
+   1 STOPPED
+   1 Escalation
+   1 Confirmed
+   1 Asked
+   1 AskUserQuestion
+
+TOTAL: 372
+
+=== "decide/proceed/ship"-shaped word forms ===
+Command: grep -oiE '\b(decide|decided|deciding|decision|decisions|proceed|proceeds|proceeding|ship|shipped|shipping|execute|executing|continue|continuing)\b' CLAUDE.md | sort | uniq -c | sort -rn
+
+  82 decision
+  34 execute
+  22 Decision
+  16 decide
+  11 decisions
+   8 decided
+   7 DECISION
+   6 continue
+   5 proceed
+   3 ship
+   3 Decide
+   2 executing
+   2 deciding
+   2 Execute
+   2 DECIDE
+   1 shipped
+   1 continuing
+   1 Decisions
+   1 DECIDED
+   1 Continuing
+
+TOTAL: 210
+
+=== Confounds in the ask-shaped count (checked explicitly, not derived) ===
+Command: grep -c "engineer asked\|engineer's ask\|what the engineer" CLAUDE.md
+Result: 11
+
+  This phrase ("what the engineer asked" / "the engineer's ask") is source 1
+  of the resolution ladder in DECISION-AUTHORITY.md — it is a PRO-DECIDE
+  usage of "ask/asked", not an invitation for the agent to ask a question.
+  11 of the 60 combined "ask"+"asked"+"Ask"+"Asked" occurrences (37+23+7+1=68
+  raw forms, close to this 11) are this confound. This is why the raw
+  372-vs-210 ratio is reported as a crude lexical proxy, not a semantic
+  measurement, in SPIKE.md Finding 2.
+
+Command: grep -c "AskUserQuestion" CLAUDE.md
+Result: 1 (the tool name itself, in § Subagent Contract's forbidden-actions list)
+
+=== Stop hook wiring order in settings.json ===
+Command: grep -n "validate-decision-evidence\|validate-closing-summary\|validate-console-script" settings.json
+
+785:            "command": "$HOME/.claude/scripts/validate-console-script.sh",
+790:            "command": "$HOME/.claude/scripts/validate-decision-evidence.sh",
+795:            "command": "$HOME/.claude/scripts/validate-closing-summary.sh",
+
+(One "Stop" event block registers all three, in this order — confirmed via
+`grep -c '"Stop"' settings.json` = 1.)
+
+=== Permission mode / output style configuration ===
+Command: grep -n "outputStyle\|defaultMode\|permissions" settings.json | head -50
+Result: only one relevant line —
+
+294:    "defaultMode": "acceptEdits",
+
+No "outputStyle" key exists anywhere in settings.json. See SPIKE.md Finding 6.
