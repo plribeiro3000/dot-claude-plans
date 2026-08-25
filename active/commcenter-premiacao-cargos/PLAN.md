@@ -13,15 +13,65 @@ esses valores são agregados da equipe abaixo e o cálculo não os alcança:
   além de contagens de líderes e lojas no atingimento.
 - **Gerentes Comerciais** — precisam da soma dos executivos abaixo (Loja, PAP, Call Center, online).
 
-## Por que a plataforma não resolve sozinha
+## Estado da entrega
 
-O roll-up hierárquico existe e é o `override` do plano. `AggregatedIndicator#result`
-(`app/models/aggregated_indicator.rb:91-100`) resolve os subordinados por `UserScope` e soma os
-indicadores deles quando `user_commission.override?` é verdadeiro.
+**Tudo que é cálculo, soma e hierarquia está gravado e verificado na base do `shared-001`.** O que
+resta não é query: são valores que só a Andresa tem, uma decisão de régua que é dela, e o
+reprocessamento, que é do Patrick.
 
-**O override sobe um nível apenas.** Para o Coordenador isso alcança a líder imediata, mas não a
-equipe dela — que é onde o faturamento está. Ligar a flag no plano do Coordenador entregaria os
-indicadores próprios da líder, não o agregado. Por isso a correção não é configuração.
+| Frente | Estado |
+|---|---|
+| Espelhos do Coordenador | 324, R$ 35.378,78 |
+| Espelhos dos Gerentes | 896, R$ 91.625,52 |
+| Espelhos dos Executivos | 216 essenciais, R$ 21.037,25 |
+| Atingimento de lojas e líderes | 10 indicators, verificados 10/10 |
+| Headcount (`hc`) | 5 indicators, verificados 5/5 |
+| `atingimento_consultor_lider` | sem valor — depende da Andresa |
+| `quantidade_parceiro_acima_mil` | sem valor — depende da Andresa |
+| Régua 264347 | defeito confirmado — correção é decisão da Andresa |
+| Reprocessamento 63126 / 63127 / 63128 | pendente com o Patrick |
+
+**Coordenador (63126) e Gerentes (63128) podem ser reprocessados sem esperar nada.** Os Gerentes
+fecham em zero e isso está correto (§ Gerentes Comerciais). **Os Executivos (63127) fecham
+incompletos** enquanto as duas variáveis seguirem vazias, e o valor de receita deles depende da
+decisão sobre a régua.
+
+## A abordagem está decidida: espelhar DEALS. Não reabrir.
+
+**A correção acontece na tabela de deals, e em lugar nenhum além dela.** Isso é decisão do
+engenheiro, tomada, e não é insumo para reanálise: uma sessão que chega aqui executa o espelhamento
+descrito abaixo. Reabrir custa dias e já custou duas vezes.
+
+**`override` no plano está FORA — não propor, não investigar, não pedir query para conferir.** O
+roll-up hierárquico existe e é a flag `override` do plano, e o comportamento dela é discutível
+lendo o código: `Commission::DealOptionsProcessor` (`deal_options_processor.rb:14-20`) passeia um
+nível só, por `SeatHistory.where(parent_id: user.seat.id)`, enquanto
+`IndicatorAggregation::UserProducer` (`user_producer.rb:17-22`) resolve o `HierarchyScope` recursivo
+sobre a subárvore inteira. Os dois convivem porque alimentam artefatos diferentes. **Nada disso muda
+a decisão** — está registrado aqui só para que a próxima sessão reconheça o beco e não entre nele.
+
+**Um `Indicator` INTERNO está FORA — não criar, não atualizar, não espelhar.** Os indicadores
+internos da competência já estão gravados (`compiled_at` 2026-07-01, `external: false`, escritos por
+`Metric::Consumer`), e são base já calculada de várias comissões que não têm relação com esta
+demanda. Escrever ali reescreve resultado alheio. Numa variável COM métrica, deal é dado de entrada e
+indicator é resultado — é por isso que a correção entra pela entrada.
+
+**Um `Indicator` EXTERNO numa variável SEM métrica é o caso oposto, e é o único caminho que o modelo
+aceita.** `indicator.rb:116-122` recusa um indicator interno quando a variável não tem métrica, e
+recusa um externo quando ela tem. Numa variável sem métrica o externo não é uma opção entre outras, é
+a forma; e ali o indicator É o dado de entrada, não resultado de cálculo nenhum, então a regra acima
+não o alcança. É por essa porta que a premiação de atingimento entra (§ Atingimento de lojas e
+líderes).
+
+**`Metric::Grower` / `Metric::Sower` não valem como fonte sobre o que roda.** O módulo Sower/Grower
+está implementado e **nenhum cliente o usa hoje**, então ler `metric/grower.rb` e concluir qualquer
+coisa sobre o cálculo em produção é conclusão sobre código que não executa. O caminho vivo é
+`Metric::Producer` → `Metric::Consumer` → `AccumulatedDeal::Producer` → `AccumulatedDeal::Consumer`.
+
+**Grupo não é plano.** Estar numa `Groupification` é candidatura. `PlanParticipation` tem máquina de
+estado própria (`plan_participation.rb:34-47`) e só a participação em `final` chega ao
+`PlanStatement` (`plan_participation/consumer.rb:10,35`) — é o statement que faz alguém entrar na
+compensação. Um usuário no grupo sem `user_commission` é participação não aprovada, não anomalia.
 
 ## A correção
 
@@ -61,16 +111,84 @@ A subárvore sai de `UserScope` → `HierarchyScope` (`app/scopes/hierarchy_scop
 `WITH RECURSIVE` sobre `seats.parent_id` que alcança todos os níveis a partir do seat do usuário.
 Não reimplementar essa recursão.
 
+## O espelho é reversível e atualizável — as quatro operações da rotina
+
+A execução manual cria; a rotina diária que vem depois precisa também desativar e atualizar. Todas
+as quatro existem sem código novo, e o que cada uma exige está aqui para a rotina não redescobrir.
+
+**Criar** — `Deal.new(..., external: false, external_id: "<original>_<target>")` e `save`. O índice
+único `(external_id, installment, company_id)` (`deal.rb:71`) recusa a segunda tentativa como erro
+de validação em `external_id`, não como exceção, então re-execução é segura.
+
+**Desativar** — `deal.disable(by:)` (`application_record.rb:109-127`) grava `disabled_at` e
+`disabler_id` mantendo a linha. O cálculo para de enxergar porque `enabled` é
+`where(disabled_at: nil)` (`application_record.rb:20-26`) e `Metric::TotalAdapter` aplica `.enabled`
+nos dois braços (`total_adapter.rb:39,50`). Já desativado retorna `false` com `:already_inactive` —
+idempotente. `enable` reverte.
+
+**Atualizar estado** — `update(status_id:)`. Nada bloqueia: a validação `collaborative_deal`
+(`deal.rb:152-157`) só morde quando há `deal_collaboration`, que espelho não tem.
+
+**Atualizar valor** — `update(sold_price:, quantity:)`, **com um limite que muda a regra**:
+ambos são `numericality: { greater_than: 0 }` (`deal.rb:41-42`), então um original que passa a valer
+zero **não** pode ser refletido zerando o espelho. Valor que vai a zero é DESATIVAÇÃO, não update.
+
+**Achar o espelho de um original não exige parsing** — `Deal.find_by(company_id:,
+external_id: "#{original.external_id}_#{target_user_id}", installment: original.installment)` bate no
+índice único. Só a direção inversa remove o sufixo, e é determinística porque a rotina conhece o
+`target_user_id`.
+
+**Nenhuma das quatro move número sozinha.** O conjunto que a métrica lê vem de um índice chaveado
+por `commission_uuid` (`deal_search_index.rb:7-8`), então criar, desativar ou atualizar só aparece
+no resultado depois que a compensação da competência é reprocessada.
+
 ## Os scripts
 
-Nesta pasta, na ordem de execução: `plan_anchor.rb` (descobre plano, período e variáveis a partir
-do usuário), `preflight.rb` (projeta e valida, sem mutar), `mutation.rb` (cria os espelhos),
-`verification.rb` (lê o que a plataforma calculou).
+Ficam em `scripts/`, numerados na ordem de execução. **Todos são colados no console via
+`bin/ecs run <stack>`** — nunca executados como arquivo, porque o console roda numa task remota que
+não enxerga o disco do engenheiro.
 
-Todos escrevem CSV no bucket do próprio ambiente, em
-`integration-debug/audits/2077/<fase>/<timestamp>.csv`, via
-`Aws.connection.put_object(ApplicationConfiguration.aws_bucket, file_path, csv_string)` — o mesmo
-formato das rake tasks `integration_audit:*`.
+| Script | Fase | O que faz |
+|---|---|---|
+| `00-descoberta.rb` | leitura | Lista todo plano do período com grupo, override, variáveis e estado da compensação; localiza pessoas por fragmento de nome imprimindo os identificadores para conferência |
+| `01-checagem.rb` | leitura | Confirma os portões do ambiente e toda âncora do plano, alvo a alvo, incluindo sobreposição com cargos já espelhados |
+| `02-conjuntos.rb` | leitura | Compara as três noções de "abaixo de mim" com o total de deal de cada uma — use quando um número não fecha e o motivo não é óbvio |
+| `03-preflight.rb` | leitura | Projeta o que cada alvo passará a carregar e **conta os portões** (`too_long`, `already_exists`) |
+| `04-mutacao.rb` | escrita | Cria os espelhos; varre o portão antes e **não grava nada** se encontrar violação |
+| `05-validacao.rb` | leitura | Imprime o esperado ao lado do que a plataforma calculou — só produz resposta depois do reprocessamento |
+| `06-desativacao.rb` | escrita | Rollback por `disable`, que preserva a linha e é reversível por `enable` |
+| `07-classificacao.rb` | leitura | Separa os espelhos existentes em essenciais e dobrados, pela origem de cada um |
+| `08-limpeza-duplicados.rb` | escrita | Apaga só os dobrados; reclassifica do zero antes, e não grava nada se algum espelho não tiver origem rastreável |
+| `09-restauracao.rb` | escrita | Recria espelhos a partir de qualquer CSV de auditoria desta rotina — é o desfazer de `06` e `08` |
+
+**Um único script serve os três cargos.** A configuração no topo é `plan_id` e `competence_period_id`
+— nada mais. O conjunto de origem se ajusta sozinho: numa subárvore de plano não-override ninguém
+carrega linha de `Indicator` alcançável pela varredura, então a exclusão não retira nada e sobra a
+subárvore inteira. Os alvos saem dos participantes da própria compensação em vez de uma lista de nomes.
+
+| Cargo | `plan_id` | Compensação | Override | Conjunto de origem resultante |
+|---|---|---|---|---|
+| Coordenador de Call Center | 78941 | 63126 | não | subárvore inteira |
+| Executivos de Vendas | 78939 | 63127 | sim | subárvore menos quem carrega `Indicator` na variável |
+| Gerentes Comerciais | 78940 | 63128 | não | subárvore inteira |
+
+### A garantia: nada apagado aqui é irrecuperável
+
+**Todo script de escrita grava, ANTES de qualquer remoção, um CSV com as dezesseis colunas que
+recriam cada registro** — `type`, `user_id`, `owner_id`, `external_id`, `date`, `originated_at`,
+`installment`, `quantity`, `sold_price`, `client_id`, `product_id`, `status_id` e o resto. Quatro
+delas não são detalhe: `date`, `client_id`, `product_id` e `status_id` são o que a métrica filtra, e
+um espelho recriado sem elas existe sem ser visto pelo cálculo — pior que não recriar.
+
+O caminho é `integration-debug/audits/2077/<fase>/<timestamp>.csv` no bucket do próprio ambiente, via
+`Aws.connection.put_object(ApplicationConfiguration.aws_bucket, file_path, csv_string)`. O timestamp
+no nome garante que execução nenhuma sobrescreve outra, então a cadeia inteira de estados fica
+preservada e `09-restauracao.rb` recompõe qualquer um deles apontando `audit_key` para o CSV
+correspondente.
+
+**Todo script abre imprimindo `ApplicationConfiguration.aws_bucket` e para se não for o esperado**
+(§ O portão do ambiente). Um console apontado para outro stack responde zero a toda consulta, e zero
+se lê como "o dado sumiu" em vez de "estou no ambiente errado".
 
 ## O filtro da métrica sai do adapter, não do modelo
 
@@ -108,20 +226,35 @@ em branco varre a empresa inteira em silêncio.
 | `movel` | 36600 | sim |
 | `indicacao` | 36819 | sim |
 | `hc` | 36480 | não |
-| `quantidade_lojas_atingimento` | 36927 | não |
-| `quantidade_parceiros_acima_mil` | 36940 | não |
+| `lojas_atingimento` | 36927 | não |
+| `atingimento_lideres` | 36928 | não |
+| `atingimento_consultor_lider` | 36929 | não |
+| `quantidade_parceiro_acima_mil` | 36940 | não |
+| `desconto_retroativo` | 36336 | não |
+| `qualidade` | 25823 | não |
 
-Grupos: `TERRA_Coordenador` 40315, `TERRA_Gerente_Regional` 40314, `TERRA_Lider_PAP` 50216,
-`Terra_Gerente_Loja` 50212, `TERRA_VendedorII_PAP` 50370.
+**A lista a espelhar sai sempre de `plan.variables.with_metrics`, nunca desta tabela.** Ela varia
+por plano: o Coordenador consome duas variáveis com métrica, os Gerentes Comerciais três (com
+`indicacao`). Herdar a lista do cargo anterior é como se deixa uma variável para trás.
 
-O id 40315 aparece aqui como `TERRA_Coordenador` e, na tabela de julho abaixo, como grupo do plano
-dos Executivos de Vendas — enquanto o plano do Coordenador em julho sai do grupo 50210. Os dois
-não podem estar certos ao mesmo tempo. Para o Coordenador isso não trava nada, porque a âncora de
-julho foi resolvida pelo plano e conferida no `plan_anchor.rb`; para os outros dois cargos, resolver
-essa contradição é parte do passo de descoberta e vem antes de qualquer pré-flight.
+Grupos: 40314 (Gerentes Comerciais), 40315 (Executivos de Vendas), 48179 (Call Center), 50210
+(Coordenador de Call Center), 50213 (Líder de Call Center), 50216 (Líderes PAP), 50212
+(Atingimento por loja).
 
-Pessoas confirmadas: Alex Lima Lofeu `User.id` 1119697 (identificador 1918117), Roberta Dos Santos
-Cardoso Da Silva `User.id` 1119878.
+Pessoas confirmadas por identificador — o identificador que o cliente escreve **não** é o `User.id`,
+e essa é a armadilha que a tabela existe para evitar:
+
+| Pessoa | `User.id` | Identificadores |
+|---|---|---|
+| Alex Lima Lofeu (Coordenador) | 1119697 | `1918117` |
+| Roberta Dos Santos Cardoso Da Silva (Líder) | 1119878 | — |
+| Loandra Teixeira Costa (Executiva) | 1026105 | `4sk_236`, `1926540` |
+| Cristiano Rodolfo Dionísio De Oliveira (Executivo) | 1119699 | `4sk_482`, `1924504` |
+| Flavia Dutra Castanheira De Oliveira (Executiva) | 1119700 | `4sk_483`, `1918280` |
+| Luiz Felipe Sonego Bonini (Executivo) | 1243772 | `4sk_717`, `1927287` |
+| Beatriz Carvalho Costa (na compensação, fora da lista) | 1119698 | `4sk_481`, `1918853` |
+| Joel Geraldo Junior (Gerente) | 1026079 | `4sk_12`, `1922319` |
+| Joao Luis Carnelos (Gerente) | 1119696 | `4sk_537`, `1922316` |
 
 ## A âncora é o plano, nunca a compensação
 
@@ -135,53 +268,59 @@ Do usuário chega-se ao plano por dois caminhos, ambos reais: as `PlanStatement`
 
 ## Âncoras de julho/2026
 
-Calendário 19604, período **528210** (01/07 a 31/07).
+Calendário 19604, período **528210** (01/07 a 31/07). Todos os planos são `SalesPlan` com
+`deal_type` `Sale`, portanto a redução da métrica é `sold_price * quantity`.
 
-| Cargo | Plano | Grupo | Override | Variáveis com métrica |
-|---|---|---|---|---|
-| Coordenador de Call Center | 78941 | 50210 | não | `vendas_instaladas` 36311, `movel` 36600 |
-| Líder de Call Center | 78943 | 50213 | sim | `vendas_instaladas` 36311, `movel` 36600 |
-| Executivos de Vendas | 78939 | 40315 | sim | `vendas_instaladas` 36311, `movel` 36600 |
-
-Todos são `SalesPlan` com `deal_type` `Sale`, portanto a redução da métrica é
-`sold_price * quantity`.
-
-O plano do Coordenador **não** consome `indicacao` (36819) — a lista de variáveis a espelhar sai de
-`plan.variables.with_metrics`, nunca de uma lista fixa.
+| Cargo | Plano | Grupo | Compensação | Override | Variáveis com métrica |
+|---|---|---|---|---|---|
+| Coordenador de Call Center | 78941 | 50210 | 63126 | não | `vendas_instaladas`, `movel` |
+| Executivos de Vendas | 78939 | 40315 | 63127 | sim | `vendas_instaladas`, `movel` |
+| Gerentes Comerciais | 78940 | 40314 | 63128 | não | `vendas_instaladas`, `movel`, `indicacao` |
+| Líder de Call Center | 78943 | 50213 | 63134 | sim | `vendas_instaladas`, `movel` |
+| Call Center | 78942 | 48179 | 63120 | não | `vendas_instaladas`, `movel` |
+| Líderes PAP | 78938 | 50216 | 63125 | sim | `vendas_instaladas`, `movel`, `indicacao` |
 
 Métricas: `vendas_instaladas` → 4819; `movel` → 4907, que filtra apenas por `status_id` 3846 e
-`installment >= 1`, sem cliente nem produto.
+`installment >= 1`, sem cliente nem produto; `indicacao` → 4940.
 
-## O portão: a coluna existe no código, não no banco do shared-001
+## O portão do ambiente
 
-A coluna `external` está mergeada em `develop` (PR https://github.com/4shark/app/pull/5334) e o
-`schema.rb` já a declara. **Ela não existe no banco do `app-shared-001`**: uma migration só toca o
-banco de um ambiente quando aquele ambiente é deployado, numa task efêmera que roda antes do
-código novo entrar. Rodar `mutation.rb` antes disso falha na primeira gravação, com coluna
-inexistente.
+**Todo script desta apuração abre imprimindo `ApplicationConfiguration.aws_bucket` e para se não for
+`4shark-shared-001`.** O console é aberto por `bin/ecs run <stack>` e nada dentro dele anuncia em que
+ambiente está — um console apontado para outro stack responde a toda consulta com zero, que se lê
+como "o dado sumiu" em vez de "estou no lugar errado". O nome do bucket é a identificação mais barata
+que existe: já aparece em toda gravação de auditoria e distingue os ambientes sem consulta extra.
 
-O deploy do `shared-001` espera uma migração de RDS em curso, que impede deployar qualquer coisa
-que altere estrutura. Enquanto essa janela não fechar, nada de julho pode ser executado — nem o
-pré-flight, cujo valor é ser conferido imediatamente antes da mutação.
+A coluna `external` de `Deal` **existe no banco do `app-shared-001`**, levada pelo deploy que aplicou
+a migration do PR https://github.com/4shark/app/pull/5334. Uma sessão futura confirma isso pela
+primeira linha da checagem (`gate@external_column`) em vez de presumir: uma migration só toca o banco
+de um ambiente quando aquele ambiente é deployado, então um ambiente que não recebeu o deploy falha
+na primeira gravação com coluna inexistente.
 
-Quando a janela fechar, o deploy é ação do engenheiro: ambiente produtivo passa antes pelo
-`sidekiq-queue-check.sh`, que libera só com a fila limpa, e o gatilho é
-`gh workflow run deploy-shared-001.yaml -R 4shark/app`.
+`ApplicationConfiguration.search_index?` está **ligado** neste ambiente, e é isso que faz nenhuma
+mutação mover número sozinha: o `TotalAdapter` lê os ids do `DealSearchIndex` filtrando por
+`commission_uuid` (`total_adapter.rb:24-39`), e o índice é chaveado por comissão
+(`deal_search_index.rb:7-8`). Deal criado depois do processamento não existe para aquela comissão.
+
+Deploy de ambiente produtivo é ação do engenheiro: passa antes pelo `sidekiq-queue-check.sh`, que
+libera só com a fila limpa, e o gatilho é `gh workflow run deploy-shared-001.yaml -R 4shark/app`.
 
 ## Execução
 
-1. **Deploy do `shared-001`** — leva a coluna `external` ao banco do ambiente. Bloqueado pela
-   migração de RDS; é o portão de tudo que vem depois.
-2. **Descoberta de julho** — resolver, para o período de julho/2026, o plano de cada cargo pela
-   `Groupification` → grupos → planos, se é `override`, e o período pelo `plan.calendar`. Sem isso
-   nada mais tem âncora. Já feito para o Coordenador; falta para os outros dois cargos.
-3. **Pré-flight por cargo** — resolver a subárvore, aplicar o filtro do adapter, e projetar o total
-   que o cargo terá após o espelho. A projeção é conferida contra o agregado que a plataforma já
-   calcula para a liderança imediata; divergência significa filtro errado, não dado errado.
-4. **Mutação por cargo** — um deal espelhado por deal original, registro a registro, erro por
-   registro logado e laço seguindo.
-5. **Verificação** — reprocessar a compensação e ler o `AggregatedIndicator` do cargo.
-6. **Relatório consolidado** — planilha em `~/Downloads/` com contagens por cargo e pendências.
+Por cargo, na ordem, com os scripts de `scripts/`:
+
+1. **Descoberta** (`00`) — só quando o plano do cargo não é conhecido. Lista os planos do período e
+   localiza as pessoas, imprimindo identificadores para conferência.
+2. **Checagem** (`01`) — portões do ambiente e âncoras do plano, alvo a alvo. `reaches_other_target`
+   e `mirrors_already_in_subtree` dizem se este cargo está acima de outro já espelhado.
+3. **Pré-flight** (`03`) — projeta e conta os portões. **A mutação não roda enquanto `too_long` e
+   `already_exists` não forem ambos zero.**
+4. **Mutação** (`04`) — cria os espelhos, recusando gravar qualquer coisa se o portão falhar.
+5. **Reprocessar a compensação** — ação do engenheiro. Sem isso o número não se move.
+6. **Validação** (`05`) — compara o esperado com o que a plataforma calculou.
+
+O `02-conjuntos.rb` não está na sequência: é diagnóstico, para quando um número não fecha e o
+motivo não é óbvio. O `06-desativacao.rb` é o rollback, disponível em qualquer ponto após a mutação.
 
 Todo output de script vai para CSV no bucket do próprio ambiente, em
 `integration-debug/audits/2077/<fase>/<timestamp>.csv`, via
@@ -202,11 +341,329 @@ Esses números são a referência de conferência, não um resultado arquivado: 
 novo imediatamente antes da mutação, e divergir deles significa que os deals de julho se moveram
 entre uma execução e outra — o que precisa ser entendido antes de espelhar, nunca ignorado.
 
+**Os 324 espelhos EXISTEM na base do `shared-001`** — criados com `CREATED@324` e `FAILED@0`,
+reproduzindo a projeção. Uma sessão que chegar aqui NÃO roda a mutação de novo: o índice único
+recusaria, mas o pré-flight já acusa antes, com `already_exists` verdadeiro em todas as linhas.
+Para tirá-los do cálculo, o caminho é a desativação (§ as quatro operações), nunca `destroy`.
+
+**O valor do Coordenador continua zero até a compensação 63126 ser reprocessada**, porque ela está
+`locked` e o conjunto que a métrica lê vem de um índice chaveado por `commission_uuid`. Reprocessar
+uma compensação produtiva é ação do engenheiro — o espelhamento entrega o dado, não o número.
+
+## O conjunto de origem depende do `override` do plano
+
+**Quem decide isso é `IndicatorAggregation::UserProducer`, e a leitura é o oposto do que o nome
+sugere** (`user_producer.rb:18-22`):
+
+```ruby
+user_ids =
+  if commission.plan.override?
+    HierarchyScope.new(user, User).resolve.pluck(:id)
+  else
+    user.id
+  end
+```
+
+**Com `override: false` o espelho cobre a subárvore inteira** (o caso do Coordenador, plano 78941, e
+dos Gerentes, plano 78940): a agregação usa `user.id` sozinho, nada sobe, e sem espelho o alvo fica
+zerado. Os 324 espelhos do Coordenador e os 896 dos Gerentes estão corretos.
+
+**Com `override: true` o espelho CONTINUA NECESSÁRIO** (o caso dos Executivos, plano 78939), e o
+motivo é que a varredura recursiva não calcula nada — ela só **lê linhas de `Indicator` que já
+existam**. `AggregatedIndicator#result` (`aggregated_indicator.rb:92-97`) resolve o `HierarchyScope`
+sobre a subárvore e chama `indicator(user_id:, interval:)`, que em `aggregated_indicator.rb:109-120`
+faz um `find_by` na tabela `modifiers`. Quem não tem linha não contribui com nada.
+
+Quem cria essas linhas é o `Metric::Consumer`, e ele roda **só para os participantes do plano** —
+`Metric::Producer` usa `commission.user_ids` (`metric/producer.rb:19`), que em
+`commission.rb:237-253` é a lista de `Groupification`, sem nenhum subordinado. E o valor de cada
+linha é `for_user(user_id)` (`total_adapter.rb:44`): as deals daquela pessoa e de mais ninguém.
+
+Medido em julho/2026: a subárvore da Loandra tem 119 pessoas e 47 carregam linha; a do Luiz Felipe
+tem 211 e 65 carregam; a da Flavia tem 168 e 63 carregam. Os 72, 146 e 105 restantes são invisíveis
+para a soma, e o espelho é o único caminho que a receita deles tem para subir.
+
+A relação que fecha o agregado é `aggregated = own_indicator + carriers_sum`, e ela bate ao centavo:
+Loandra 19.968,22 + 21.618,08 = 41.586,30; Flavia 22.642,84 + 24.812,60 = 47.455,44; Luiz Felipe
+31.351,15 + 22.977,68 = 54.328,83.
+
+**O que ainda não foi medido é a interseção entre a origem dos espelhos e os `carriers`.** Um espelho
+que copia deal de alguém que já carrega linha própria conta duas vezes; um que copia de alguém mudo é
+a única forma daquela receita chegar. A mutação excluiu `Plan#subordinate_ids_by` (um nível), que não
+é o mesmo conjunto que os `carriers` — então o filtro pode estar deixando passar uma fatia dobrada.
+Isso se resolve lendo o CSV de auditoria e classificando cada espelho pela origem, não por dedução.
+
+**O `override` é uma propriedade do PLANO daquela competência, não do cargo.** Cada competência tem
+seu próprio plano, com sua própria régua, e o flag é lido daquele plano antes de qualquer decisão
+sobre espelhar — nunca herdado do que o cargo fazia antes.
+
+**"Abaixo de mim" tem três significados diferentes nesta codebase e eles NÃO são intercambiáveis:**
+
+| Origem | O que devolve |
+|---|---|
+| `Plan#subordinate_ids_by` (`plan.rb:214-225`) | `SeatHistory` cujo `parent_id` é o assento da pessoa, **dentro da janela do período** — é o que o cálculo do override lê |
+| `Commission#subordinate_ids` (`commission.rb:260-275`) | a mesma query, copiada |
+| `Commission::DealOptionsProcessor` (`deal_options_processor.rb:15-20`) | a mesma query, inline |
+| `User#subordinate_ids` (`user.rb:407-409`) | `seat.subordinates`, um `has_many` de `Seat` sobre si mesmo (`seat.rb:14`) |
+| `UserScope` → `HierarchyScope` (`hierarchy_scope.rb:5-12`) | `WITH RECURSIVE` sobre `seats.parent_id`, todos os níveis |
+
+**A subtração é por `user_id`, NUNCA por valor, porque os conjuntos não são aninhados.** O que o
+cálculo enxerga vem do **histórico** de assento na janela, não da hierarquia de hoje: quem trocou de
+gestor no meio da competência conta para os dois lados. Um Executivo com 29 pessoas na subárvore
+atual teve 31 no conjunto do cálculo — oito que já saíram, e a diferença de totais (R$ 304,98)
+não tem relação com o total real do resto (R$ 2.949,72).
+
+**O valor agregado que a compensação exibe NÃO serve como referência de conferência quando ela foi
+processada antes das últimas correções.** Ele foi compilado naquele instante e não acompanha
+correção de deal nem mudança de grupificação — um Executivo apareceu com zero tendo vendedor ativo
+abaixo. A conferência é sempre entre conjuntos tirados do mesmo instante, e o fechamento só depois
+do reprocessamento.
+
+## Executivos de Vendas — julho/2026
+
+Plano 78939, grupo 40315, `override: true`, compensação 63127. Cinco participantes, e os quatro
+nomes da lista da Andresa batem: Loandra Teixeira Costa, Cristiano Rodolfo Dionísio de Oliveira,
+Flavia Dutra Castanheira de Oliveira e Luiz Felipe Sonego Bonini. A quinta é **Beatriz Carvalho
+Costa** (`4sk_481` / `1918853`), que a lista não menciona — sem venda abaixo dela fora do que o
+plano já entrega, então o espelhamento não a tocou e a dúvida sobre ela não bloqueia nada.
+
+**Este cargo RECEBE espelho como os outros dois, apesar do `override: true`.** A varredura recursiva
+alcança a subárvore inteira mas só enxerga quem já tem linha de `Indicator`, e a maior parte da base
+não tem (§ O conjunto de origem depende do `override` do plano).
+
+**O espelho só é legítimo quando a origem NÃO carrega linha de `Indicator` própria.** Um vendedor com
+linha própria já é alcançado pela varredura recursiva, então espelhar a venda dele soma a mesma
+receita duas vezes; um vendedor sem linha é invisível para a varredura, e o espelho é o único caminho.
+A mutação filtrou por `Plan#subordinate_ids_by` — um nível de hierarquia — que é conjunto diferente
+desse, e é o que produz fatia dobrada.
+
+**216 espelhos EXISTEM na base do `shared-001`, todos classificados como essenciais**, verificados
+relendo a base e reclassificando cada um pela origem: nenhum sobrevivente tem origem que carregue
+indicator próprio.
+
+| Executivo | Espelhos | Valor |
+|---|---|---|
+| Luiz Felipe Sonego Bonini | 160 | 15.337,81 |
+| Loandra Teixeira Costa | 32 | 3.179,68 |
+| Flavia Dutra Castanheira De Oliveira | 24 | 2.519,76 |
+| Cristiano Rodolfo Dionísio De Oliveira | 0 | 0,00 |
+| Beatriz Carvalho Costa | 0 | 0,00 |
+
+Os CSVs de auditoria que reconstroem qualquer estado anterior deste conjunto, todos com as dezesseis
+colunas necessárias para recriar cada registro:
+
+| Conteúdo | Caminho em `s3://4shark-shared-001/` |
+|---|---|
+| 750 espelhos originais, apagados | `integration-debug/audits/2077/premiacao-deletion/20260824-205741.csv` |
+| 750 recriados a partir do anterior | `integration-debug/audits/2077/premiacao-restore/20260824-213118.csv` |
+| 534 de origem duplicada, apagados | `integration-debug/audits/2077/premiacao-duplicate-cleanup/20260824-214726.csv` |
+
+**A régua dos Executivos tem CINCO variáveis que pagam, distribuídas em três incentivos**, e é essa
+lista que define o que falta para o cargo fechar:
+
+| Incentivo | Regra | Fórmula | Estado |
+|---|---|---|---|
+| 93846 | 263610 | `atingimento_lideres * 400` | alimentada |
+| 93846 | 263612 | `lojas_atingimento * 200` | alimentada |
+| 93848 | 263617 | `IF(hc >= 1, 1000, 0)` | alimentada |
+| 93846 | 263611 | `atingimento_consultor_lider * 200` | SEM VALOR |
+| 93846 | 263613 | `quantidade_parceiro_acima_mil * 100` | SEM VALOR |
+| 94014 | 264347 / 264348 | receita sobre `vendas_instaladas + movel` | régua com defeito |
+
+## A subárvore que a agregação lê é a de HOJE, não a da competência
+
+**`HierarchyScope` não tem janela de período** (`hierarchy_scope.rb:5-12`): o `WITH RECURSIVE` navega
+`seats.parent_id` no estado atual da tabela. É o oposto de `Plan#subordinate_ids_by`
+(`plan.rb:214-225`), que filtra `SeatHistory` pela janela da competência. Como
+`AggregatedIndicator#result` resolve o `UserScope` (`aggregated_indicator.rb:93`), o agregado de um
+plano override é função da hierarquia no instante do processamento.
+
+Isso não é teórico: em uma única sessão, vinte pessoas migraram da subárvore do Luiz Felipe para a do
+Cristiano — os `carriers` do Luiz Felipe caíram de 66 para 46 e os do Cristiano subiram de 15 para 35
+entre duas leituras separadas por minutos. Sessenta e cinco espelhos mudaram de classificação por
+causa disso.
+
+**A consequência operacional é que qualquer classificação de espelho e qualquer projeção de agregado
+valem para o instante em que foram tiradas.** Reprocessar uma competência override entrega o número
+da árvore daquele momento, então a conferência só fecha quando classificação, reprocessamento e
+verificação acontecem próximos — e a verificação tem que reler a base, nunca comparar contra uma
+projeção guardada.
+
+## Gerentes Comerciais — julho/2026
+
+Plano 78940, grupo 40314, `override: false`, compensação 63128. Dois participantes, ambos da lista
+da Andresa: Joel Geraldo Junior (`4sk_12` / `1922319`, subárvore de 152) e Joao Luis Carnelos
+(`4sk_537` / `1922316`, subárvore de 382). Como o plano não sobe nada sozinho, o conjunto de origem
+é a subárvore inteira — a mesma forma do Coordenador, não a dos Executivos.
+
+Este plano consome **três** variáveis com métrica, uma a mais que os outros dois cargos:
+`vendas_instaladas` 36311, `movel` 36600 e `indicacao` 36819. A lista sai sempre de
+`plan.variables.with_metrics`, nunca de uma lista fixa herdada do cargo anterior.
+
+**Os 896 espelhos EXISTEM**, portão limpo e sem falha: Joel R$ 31.367,16 e Joao Luis R$ 60.258,36,
+ambos em `vendas_instaladas` mais R$ 75,00 de `movel` no segundo. `indicacao` seleciona zero.
+
+**Este é o cargo onde o filtro `external: true` deixa de ser precaução.** Os Gerentes estão acima dos
+Executivos, cujos espelhos caem dentro destas subárvores; sem o filtro, essa receita seria espelhada
+uma segunda vez e paga em dobro. O pré-flight imprime o valor excluído por gerente justamente para
+que isso seja verificado, e não presumido — e o valor muda toda vez que o conjunto de espelhos dos
+Executivos muda, então ele é lido na hora, nunca comparado contra um número guardado.
+
+**Os dois fecham julho em zero** (§ Pendências): Joel a 32,87% da meta e Joao Luis a 71,13%, ambos
+abaixo do piso de 80% da primeira faixa da régua.
+
+## O que cada pessoa deve fechar após o reprocessamento
+
+Estes são os valores a conferir na validação (`05-validacao.rb`), todos em `vendas_instaladas`.
+Divergir deles significa que algo mudou entre o espelhamento e o reprocessamento — deals corrigidos,
+grupificação alterada, ou espelho desativado — e a causa precisa ser entendida antes de aceitar o
+resultado.
+
+| Cargo | Pessoa | Espelhos | Valor esperado |
+|---|---|---|---|
+| Coordenador | Alex Lima Lofeu | 324 · R$ 35.378,78 | **R$ 35.378,78** |
+| Gerentes | Joao Luis Carnelos | 606 · R$ 60.258,36 | **R$ 60.258,36** |
+| Gerentes | Joel Geraldo Junior | 290 · R$ 31.367,16 | **R$ 31.367,16** |
+
+Nesses dois cargos o esperado é o total dos espelhos, porque o plano é `override: false`, nada sobe
+sozinho e o alvo não tem venda própria.
+
+**Os Executivos não têm valor esperado fixo, e inventar um seria o erro.** O plano é `override: true`,
+então o agregado de cada um é `soma dos indicators da subárvore + indicator próprio`, e o primeiro
+termo depende da hierarquia no instante do processamento (§ A subárvore que a agregação lê é a de
+HOJE). O segundo termo é o que os espelhos entregam e está na tabela da § Executivos de Vendas.
+
+A conferência deles é o que `05-validacao.rb` faz: recalcula o indicator próprio a partir dos deals
+(porque o reprocessamento reescreve essa linha), soma as linhas de `Indicator` dos demais membros da
+subárvore como elas estão (porque é literalmente o que a varredura vai encontrar), e imprime o total
+ao lado do que a compensação gravou. Comparar contra número guardado só produz divergência falsa
+quando alguém troca de gestor no intervalo.
+
+Os valores das duas variáveis de contagem dos Executivos são independentes disso e estão em
+§ Atingimento de lojas e líderes.
+
+## Atingimento de lojas e líderes — julho/2026
+
+Os Executivos de Vendas são pagos também por **contagem**: quantas lojas e quantos líderes de PAP
+bateram 100% da própria meta abaixo deles. O espelhamento não alcança essas duas variáveis, porque um
+espelho é um deal e só uma métrica soma deal — `lojas_atingimento` 36927 e `atingimento_lideres` 36928
+não têm métrica nenhuma. O valor delas entra como `Indicator` externo, um por Executivo.
+
+**Uma "loja" é uma VARIÁVEL nomeada pela cidade, não um grupo.** `taquaritinga`, `monte_alto`,
+`cerquilho` e as outras dezesseis são `IndicatorVariable` com métrica `quantity`, e a meta de cada uma
+é uma `UserGoal` pendurada no responsável. Não existe uma única `GroupGoal` nesta empresa — procurar
+loja em `Group` não devolve nada. O realizado sai da compensação 63124 (plano 78944).
+
+**A população de líderes é a compensação 63125** (plano 78938, Líderes PAP), e a comparação é meta
+contra realizado em `vendas_instaladas`. Dos 28 participantes, 16 têm meta em julho; os 12 sem meta
+contam como não-bateram, porque sem meta não há atingimento.
+
+**A atribuição inclui o próprio Executivo, e ignorar isso zera casos reais.** Várias lojas carregam a
+meta no Executivo em vez de num líder dedicado — `aguai` na Flavia, `cerquilho` e `rio_das_pedras` no
+Cristiano, `santa_adelia` e `pindorama` no Luiz Felipe. Uma subárvore que exclui o próprio nó perde
+todas elas.
+
+**Toda meta existe duas vezes, e a janela que termina em 30/07 é errônea.** A boa cobre o mês inteiro
+e está presa ao plano que a apura; a de 30/07 não tem plano. São 102 registros para 53 metas reais, e
+contar sem esse corte dobra toda loja e todo líder com aparência de estar certo.
+
+**O indicator é datado do dia 1.** `compiled_at_day` (`indicator.rb:124-133`) exige `day == 1` numa
+variável mensal, e as duas são mensais.
+
+| Executivo | `lojas_atingimento` | `atingimento_lideres` |
+|---|---|---|
+| Luiz Felipe Sonego Bonini | 4 | 1 |
+| Flavia Dutra Castanheira De Oliveira | 1 | 1 |
+| Loandra Teixeira Costa | 0 | 2 |
+| Cristiano Rodolfo Dionísio De Oliveira | 0 | 0 |
+| Beatriz Carvalho Costa | 0 | 0 |
+
+**Os 10 indicators EXISTEM na base do `shared-001`**, criados com `CREATED@10` e `FAILED@0`. Uma
+sessão que chegar aqui NÃO roda a mutação de novo: o índice único
+`index_modifiers_uniqueness` (`company_id`, `compiled_at`, `user_id`, `variable_id`) recusaria, e o
+portão `already_exists` acusa antes.
+
+**O rollback é `destroy`, não `disable`, e a janela dele fecha no reprocessamento.** `modifiers` não
+tem coluna `disabled_at`, então não há desativação a fazer — e `destroyable?` (`indicator.rb:97-105`)
+passa a devolver `false` assim que existirem `indicator_aggregations`, que nascem do processamento.
+Antes de reprocessar, destruir é limpo; depois, o caminho é atualizar o `value`.
+
+**A régua existe para as seis variáveis sem métrica — nenhuma delas é decorativa.** As regras vivem em
+três incentives do plano, todas `IndicatorRule`:
+
+| Incentive | Regra | Fórmula |
+|---|---|---|
+| 93846 | 263610 | `atingimento_lideres * 400` |
+| 93846 | 263611 | `atingimento_consultor_lider * 200` |
+| 93846 | 263612 | `lojas_atingimento * 200` |
+| 93846 | 263613 | `quantidade_parceiro_acima_mil * 100` |
+| 93848 | 263617 | `IF(hc >= 1, 1000, 0)` |
+| 94014 | 264347 | `IF((vendas_instaladas + movel) / vendas_instaladas_goal >= PERCENT(80) AND ... > PERCENT(100), (vendas_instaladas + movel) * PERCENT(3) - desconto_retroativo, 0)` |
+| 94014 | 264348 | `IF((vendas_instaladas + movel) / vendas_instaladas_goal >= PERCENT(100), (vendas_instaladas + movel) * PERCENT(5) - desconto_retroativo, 0)` |
+
+**Uma fórmula alcança a META pelo sufixo `_goal`.** `vendas_instaladas_goal` não é variável do plano —
+é o valor da `Goal` daquela variável, resolvido pelo identificador. A régua de receita já compara
+realizado contra meta sozinha, sem nada precisar ser gravado para isso.
+
+**O que a contagem gravada paga**, aplicando 263612 e 263610:
+
+| Executivo | lojas × 200 | líderes × 400 | Total |
+|---|---|---|---|
+| Luiz Felipe Sonego Bonini | 800,00 | 400,00 | **1.200,00** |
+| Loandra Teixeira Costa | 0,00 | 800,00 | **800,00** |
+| Flavia Dutra Castanheira De Oliveira | 200,00 | 400,00 | **600,00** |
+| Cristiano Rodolfo Dionísio De Oliveira | 0,00 | 0,00 | **0,00** |
+| Beatriz Carvalho Costa | 0,00 | 0,00 | **0,00** |
+
+**O `hc` de um Executivo é a soma dos `hc_<cidade>` na subárvore dele.** As variáveis `hc_<cidade>`
+existem justamente para carregar headcount e são alimentadas por indicator externo, uma por líder —
+16 delas gravadas em julho. Contar nós da hierarquia seria inventar uma métrica onde já há uma
+explícita, e é por isso que a soma dessas variáveis é a definição adotada.
+
+| Executivo | Lojas com hc abaixo | `hc` | `IF(hc >= 1, 1000, 0)` |
+|---|---|---|---|
+| Luiz Felipe Sonego Bonini | 6 | 28 | 1.000,00 |
+| Flavia Dutra Castanheira De Oliveira | 5 | 18 | 1.000,00 |
+| Loandra Teixeira Costa | 4 | 16 | 1.000,00 |
+| Cristiano Rodolfo Dionísio De Oliveira | 1 | 4 | 1.000,00 |
+| Beatriz Carvalho Costa | 0 | 0 | 0,00 |
+
+**Os 5 indicators de `hc` EXISTEM na base do `shared-001` e conferem** — a verificação recalculou a
+soma da subárvore de cada Executivo contra o valor gravado e devolveu `matching@5@diverging@0`, com
+`destroyable@true` nos cinco (nenhum `indicator_aggregation` ainda, porque a comissão não foi
+reprocessada). Uma sessão que chegar aqui NÃO roda a mutação de novo: o índice único
+`index_modifiers_uniqueness` recusaria, e o portão `already_exists` acusa antes.
+
+**A escolha da definição só muda o resultado da Beatriz.** Como o limiar é 1, qualquer leitura
+razoável paga os outros quatro; ela tem subárvore de 7 pessoas e nenhuma loja com headcount abaixo,
+então uma definição por contagem de pessoas a pagaria e a soma de `hc_<cidade>` não. Ela é também a
+participante cuja presença no plano está em aberto, o que torna esse o mesmo assunto e não dois.
+
+**Cinco lojas com meta de venda não têm `hc_<cidade>` gravado** — `monte_alto`, `cerquilho`,
+`laranjal_paulista`, `santa_adelia` e `santa_rita_do_passa_quatro`. Três delas carregam a meta num
+Executivo em vez de num líder dedicado, o que é consistente com não haver headcount de líder para
+registrar; o efeito é que o `hc` desses Executivos é um piso, não um total.
+
+**`desconto_retroativo` zerado é o estado CORRETO** — ele entra subtraindo nas fórmulas de receita, e
+zero significa nenhum desconto a aplicar. Não é lacuna.
+
+**`atingimento_consultor_lider` e `quantidade_parceiro_acima_mil` seguem sem população definida.** Têm
+régua (200 e 100 por unidade) e não têm nenhuma meta sobre elas na base, então nem o denominador dá
+para inferir — dependem da Andresa.
+
 ## Pendências
 
-A queda de 16 para 1 nos deals com `status_id` 3846 precisa de resposta do Patrick — ou móvel
-parou de vender em julho, ou a integração parou de classificar deal com esse status. No segundo
-caso o coordenador fecha o mês faltando valor sem nada acusar.
+**A queda de móvel é reclassificação de rótulo, não venda perdida, e é NEUTRA em dinheiro para o
+Coordenador.** O volume da empresa subiu de 1957 para 1993 deals entre junho e julho; o que encolheu
+foram os rótulos específicos — cidades de 376 para 313, Móvel de 16 para 1, Venda Individual de 7
+para 2, Indicação de 2 para 0 — enquanto "Executada" subiu de 1139 para 1265. As variações fecham
+com o crescimento total.
+
+Isso não custa nada ao Coordenador porque as seis regras dele somam as duas variáveis antes de usá-las,
+nos dois lugares: `IF((vendas_instaladas + movel) / vendas_instaladas_goal >= PERCENT(100) AND ... ,
+(vendas_instaladas + movel) * 0.02 - desconto_retroativo, 0)`. Como `vendas_instaladas` seleciona o
+status 3084 (Executada) e `movel` o 3846 (Móvel), uma venda que troca de rótulo sai de uma parcela e
+entra na outra, e a soma não se move — nem o atingimento, nem a base de pagamento.
 
 O Patrick precisa confirmar se a régua de julho é a mesma para os três cargos, e se as deals com
 condição de estado divergente — que ele levantou com a Larissa e a Laura — já foram corrigidas na
@@ -215,5 +672,122 @@ competência de julho.
 A verificação só roda depois que a compensação de julho for cortada e reprocessada: o valor
 agregado materializa numa `UserCommission`, que não existe antes disso.
 
-Executivos de Vendas (plano 78939) e Gerentes Comerciais seguem a mesma mecânica com outro alvo e
-outra subárvore.
+**As três compensações aguardam reprocessamento pelo Patrick** — 63126 (Coordenador), 63127
+(Executivos) e 63128 (Gerentes), todas `locked`. Enquanto isso não acontece, o valor que aparece na
+plataforma é anterior aos espelhos e às correções da Larissa, e não serve para conferir nada.
+Reprocessar compensação produtiva é ação do engenheiro; o espelhamento entrega o dado, nunca o
+número.
+
+**Os Executivos (63127) dependem da decisão sobre a regra 264347 antes de reprocessar.** O dado está
+pronto — 216 espelhos essenciais, nenhum dobrado — mas a condição invertida decide se a faixa de 80%
+a 100% paga 3% ou zero, e reprocessar antes disso entrega um número que muda de novo assim que a
+regra for tocada. Coordenador (63126) e Gerentes (63128) não dependem dessa decisão e podem ser
+reprocessados a qualquer momento.
+
+**Duas variáveis da régua dos Executivos seguem sem valor em julho** — `atingimento_consultor_lider`
+(36929) e `quantidade_parceiro_acima_mil` (36940). Ambas pagam por unidade (R$ 200 e R$ 100), foram
+alimentadas manualmente em junho para quatro Executivos, e não têm nenhuma meta na base sobre elas,
+então nem o denominador é derivável. Sem esses valores a premiação dos Executivos fecha incompleta
+mesmo com tudo o mais correto.
+
+**Beatriz Carvalho Costa** (`4sk_481` / `1918853`) participa da compensação dos Executivos sem
+constar da lista da Andresa. Não recebeu espelho — não há venda abaixo dela fora do que o plano já
+entrega — então nada trava por causa disso. O Patrick foi avisado e vai confirmar com a Andresa se
+ela é Executiva ou está no grupo por engano.
+
+**A régua do Cristiano fechar acima da equipe atual também já foi antecipada ao Patrick**, com a
+explicação de que o cálculo conta quem esteve na equipe durante julho. A resposta ao cliente está
+pronta caso a Andresa questione.
+
+**As três variáveis de receita se distinguem SÓ pelo status, sem cliente nem produto** —
+`vendas_instaladas` (métrica 4819) pelo 3084 Executada, `movel` (4907) pelo 3846 Móvel, `indicacao`
+(4940) pelo 3811 Indicação, todas com `installment >= 1`. É essa separação por rótulo único que faz a
+reclassificação mover valor de uma variável para outra, e é por isso que a neutralidade depende de a
+régua somar as duas — o que vale para o Coordenador e para os Executivos, mas precisa ser conferido
+em qualquer cargo cuja fórmula trate as variáveis separadamente.
+
+**12 dos 28 líderes de PAP não têm meta em julho** — Adysson, Maria Vitoria, Liliana, Matheus, Paula,
+Thayna, Diego Soares, Tanillys, Amanda, Pamela, Francisco e Desiree participam da compensação 63125
+sem nenhuma `UserGoal` em `vendas_instaladas`. Sem meta não há atingimento, então a contagem os trata
+como não-bateram: correto se eles realmente não têm meta, subestimado se a meta deveria ter sido
+carregada. É o único fator que muda os valores de `atingimento_lideres` desta competência.
+
+**As duas regras de receita dos Executivos disparam juntas acima de 100% da meta, pagando 8% onde a
+régua pretende 5%.** A condição da regra 264347 é `>= PERCENT(80) AND > PERCENT(100)`, que se reduz a
+`> 100%` — a mesma faixa da 264348. A descrição da própria regra diz "Atingimento entre 80% e
+99,99%", então o `<` virou `>`; do jeito que está, ninguém entre 80% e 100% recebe os 3%, e quem
+passa de 100% recebe 3% + 5%. O incentivo que as abriga se chama "… Errata", o que sugere correção
+já tentada uma vez.
+
+**As três regras dos Gerentes comparam PISO e TETO com expressões diferentes, e as faixas se
+sobrepõem.** O piso mede a soma das três variáveis de receita; o teto mede `vendas_instaladas`
+sozinha:
+
+```
+IF((vendas_instaladas + movel + indicacao) / vendas_instaladas_goal >= PERCENT(80)
+   AND vendas_instaladas / vendas_instaladas_goal < PERCENT(91), 1000, 0)
+IF((vendas_instaladas + movel + indicacao) / vendas_instaladas_goal >= PERCENT(91)
+   AND vendas_instaladas / vendas_instaladas_goal <= PERCENT(100), 2000, 0)
+IF((vendas_instaladas + movel + indicacao) / vendas_instaladas_goal > PERCENT(100), 3000, 0)
+```
+
+Como a soma é sempre maior ou igual à parcela, um Gerente acima de 100% na soma e abaixo de 91% em
+venda instalada dispara a primeira faixa e a terceira ao mesmo tempo: R$ 4.000 no lugar de R$ 3.000.
+Entre 91% e 100% de venda instalada, a segunda e a terceira somam R$ 5.000.
+
+**Em julho a sobreposição não é alcançada, e os dois Gerentes fecham em zero.** Joel Geraldo Junior
+atinge 32,87% da meta (R$ 31.367,16 contra R$ 95.420,33) e Joao Luis Carnelos 71,13% (R$ 60.183,36 de
+venda instalada mais R$ 75,00 de móvel contra R$ 84.711,67) — ambos abaixo do piso de 80% da primeira
+faixa, então nenhuma regra dispara. Os valores conferem com os 896 espelhos: 31.367,16 + 60.183,36 +
+75,00 = 91.625,52. A correção da sobreposição é alteração de plano que só muda dinheiro em
+competências futuras.
+
+**A reclassificação de rótulo NÃO é neutra para os Gerentes**, justamente porque o teto lê
+`vendas_instaladas` isolada. Uma venda que migra de Móvel para Executada aumenta essa parcela e pode
+empurrá-la acima do teto de uma faixa, desligando um pagamento de R$ 1.000 ou R$ 2.000 sem que a
+receita total tenha mudado.
+
+**As duas regras disparando juntas não é leitura da condição, é aritmética verificada na quarta casa
+decimal.** Num processamento em que três Executivos passaram de 100% da meta, o `money` gravado para
+cada um foi exatamente `(vendas_instaladas + movel) × 8%` — 4.352,3064 sobre 54.403,83; 3.796,4352
+sobre 47.455,44; 3.326,9040 sobre 41.586,30. Se só a regra 264348 tivesse disparado, o fator seria 5%.
+
+Esses agregados vêm de um processamento com um conjunto de espelhos diferente do atual e não servem
+como valor esperado (§ O que cada pessoa deve fechar após o reprocessamento) — o que eles provam é o
+fator, e o fator não depende do agregado.
+
+Corrigir a condição é alteração de plano, não de dado, e o valor muda para todo mundo que passar de
+100% em qualquer competência.
+
+**A mutação que gera espelho precisa excluir quem tem linha de `Indicator` na variável, não um nível
+de hierarquia** (§ Executivos de Vendas). O filtro por `Plan#subordinate_ids_by` deixa passar todo
+descendente com indicator próprio que esteja abaixo do primeiro nível, e cada um deles vira receita
+contada duas vezes.
+
+**A migração de vinte pessoas entre subárvores durante a apuração não tem causa identificada, e a
+trilha de auditoria da plataforma está descartada.** `SeatAction` registra `change_manager` com o
+executor e o documento de origem (`seat_action.rb:10-24`), e a empresa 2077 não tem **nenhum**
+registro nessa tabela nos últimos sete dias, em nenhum estado. Então o que mexeu na hierarquia
+escreveu `seats.parent_id` direto, sem passar pelo documento de ação — o que aponta para a API do
+integrador. `seats.updated_at` data essa escrita e é por onde a investigação continua, se alguém
+julgar que vale.
+
+Existe uma segunda leitura que não foi descartada: `carriers` é a interseção entre a subárvore e quem
+tem indicator, então o número também se move se o conjunto de indicators mudar. Três dos cinco
+Executivos ficaram idênticos entre as duas leituras e só dois trocaram exatamente vinte, o que aponta
+para movimento de árvore — apontar não é provar.
+
+Nada disso bloqueia a entrega: os 216 espelhos foram reclassificados contra o conjunto atual e
+nenhum é dobrado. O que a incerteza impõe é a ordem de operação — classificação, reprocessamento e
+verificação próximos no tempo (§ A subárvore que a agregação lê é a de HOJE).
+
+**O defeito é exclusivo dos Executivos.** `AggregatedIndicator#result` só percorre a subárvore quando
+`user_commission.override?`, que delega para `commission.plan.override?`
+(`user_commission.rb:102-109`); com `override: false` ele lê apenas o indicator da própria pessoa
+(`aggregated_indicator.rb:99`). Coordenador (plano 78941) e Gerentes (plano 78940) são `override:
+false`, então os 324 e os 896 espelhos deles não têm caminho para dobrar.
+
+**A régua que converte contagem em dinheiro vive no `Incentive`, não no `Plan`.** A cadeia é
+`Plan` → `incentivations` → `Incentive` → `rules`, e uma `FormulaRule` referencia variáveis pela
+`key` (`Formula#referenced_identifiers`). Um indicator gravado numa variável que nenhuma regra
+referencia não paga nada, então a existência da régua é o que fecha a entrega da contagem.
