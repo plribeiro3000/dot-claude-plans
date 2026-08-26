@@ -15,26 +15,36 @@ esses valores são agregados da equipe abaixo e o cálculo não os alcança:
 
 ## Estado da entrega
 
-**Tudo que é cálculo, soma e hierarquia está gravado e verificado na base do `shared-001`.** O que
-resta não é query: são valores que só a Andresa tem, uma decisão de régua que é dela, e o
-reprocessamento, que é do Patrick.
+**Os espelhos, as contagens e o headcount estão gravados na base do `shared-001`, e todos refletem
+os deals como estavam em 24/08.** Depois disso a Larissa subiu ajustes de vendas e modificou mais de
+duas mil transações, então o conjunto de origem mudou por baixo dos espelhos. A entrega de julho
+deixou de ser "reprocessar" e passou a ser: reconciliar os espelhos contra os deals de hoje, rodar
+os scripts de novo, e só então reprocessar.
 
 | Frente | Estado |
 |---|---|
-| Espelhos do Coordenador | 324, R$ 35.378,78 |
-| Espelhos dos Gerentes | 896, R$ 91.625,52 |
-| Espelhos dos Executivos | 216 essenciais, R$ 21.037,25 |
-| Atingimento de lojas e líderes | 10 indicators, verificados 10/10 |
+| Espelhos do Coordenador | 324 gravados, R$ 35.378,78 — conferidos contra os deals de 24/08 |
+| Espelhos dos Gerentes | 896 gravados, R$ 91.625,52 — conferidos contra os deals de 24/08 |
+| Espelhos dos Executivos | 216 essenciais, R$ 21.037,25 — conferidos contra os deals de 24/08 |
+| Atingimento de lojas e líderes | 10 indicators gravados — contagem tirada da base de 24/08 |
 | Headcount (`hc`) | 5 indicators, verificados 5/5 |
 | `atingimento_consultor_lider` | sem valor — depende da Andresa |
 | `quantidade_parceiro_acima_mil` | sem valor — depende da Andresa |
 | Régua 264347 | defeito confirmado — correção é decisão da Andresa |
-| Reprocessamento 63126 / 63127 / 63128 | pendente com o Patrick |
+| Receita dos Executivos somando loja | levantado pela Andresa, não verificado na base (§ Executivos de Vendas) |
+| Reconciliação dos espelhos | pendente — `10-reconciliacao.rb`, não rodou ainda |
+| Reprocessamento 63126 / 63127 / 63128 | pendente com o Patrick, depois da reconciliação |
 
-**Coordenador (63126) e Gerentes (63128) podem ser reprocessados sem esperar nada.** Os Gerentes
-fecham em zero e isso está correto (§ Gerentes Comerciais). **Os Executivos (63127) fecham
-incompletos** enquanto as duas variáveis seguirem vazias, e o valor de receita deles depende da
-decisão sobre a régua.
+**Nenhum dos três cargos fecha antes da reconciliação, e isso vale inclusive para o Coordenador e
+para os Gerentes**, que antes podiam ser reprocessados sem depender de nada. Um espelho criado a
+partir de um deal que a Larissa depois corrigiu carrega o valor antigo, e o cálculo não tem como
+perceber: para a métrica, um espelho é um deal como outro qualquer. Reprocessar antes de reconciliar
+entrega um número que já nasce errado — e errado de um jeito que confere consigo mesmo, porque a
+soma dos espelhos bate com os espelhos.
+
+**Os Executivos (63127) continuam fechando incompletos** enquanto `atingimento_consultor_lider` e
+`quantidade_parceiro_acima_mil` seguirem vazias, e o valor de receita deles depende de duas decisões
+da Andresa: a régua 264347 e o que entra como receita do cargo (§ Executivos de Vendas).
 
 ## A abordagem está decidida: espelhar DEALS. Não reabrir.
 
@@ -142,6 +152,67 @@ external_id: "#{original.external_id}_#{target_user_id}", installment: original.
 por `commission_uuid` (`deal_search_index.rb:7-8`), então criar, desativar ou atualizar só aparece
 no resultado depois que a compensação da competência é reprocessada.
 
+## A rodada de reconciliação — por que a segunda passada não é a primeira de novo
+
+**Um espelho é uma cópia congelada no instante em que foi criado, e nada o mantém sincronizado com o
+original.** Quando a origem muda — a Larissa corrige o valor, troca o status, desativa a venda ou
+sobe uma venda nova — o espelho continua exatamente como estava. O cálculo soma o que está lá, então
+a divergência não aparece como erro: aparece como um número plausível que ninguém consegue explicar
+depois.
+
+**Rodar `04-mutacao.rb` de novo não resolve, e o motivo é o próprio portão que protege a primeira
+rodada.** Ele conta os espelhos que já existem e recusa gravar qualquer coisa quando esse número é
+maior que zero (`04-mutacao.rb:100-101`, `[mutation] gate failed — nothing was written`). Com 1.436
+espelhos na base, a segunda passada não cria os que faltam — ela para inteira. O portão está certo
+para o que foi escrito: uma gravação parcial sobre vários alvos deixa um lote que ninguém consegue
+auditar. Ele só não é a ferramenta desta rodada.
+
+**O que a segunda passada precisa é de um DELTA, e as quatro operações que ele usa já estão
+descritas acima** (§ O espelho é reversível e atualizável). Para cada alvo, comparando o conjunto de
+origem de agora contra os espelhos que existem:
+
+| Situação | Operação |
+|---|---|
+| A origem passou a existir (venda nova, ou status que agora casa com a métrica) | **criar** |
+| A origem mudou de valor, quantidade, status ou data | **atualizar** |
+| A origem saiu do conjunto (desativada, status que não casa mais, dono fora da subárvore, virou carrier) | **desativar** o espelho |
+| A origem voltou a casar e o espelho está desativado | **reativar** |
+| Nada mudou | deixar como está |
+
+**A desativação é o caminho para o espelho órfão, nunca `destroy`.** A linha fica, `enable` reverte,
+e o CSV de auditoria da rodada registra o antes e o depois de cada alteração — que é o que permite
+desfazer uma reconciliação inteira se ela partir de uma premissa errada.
+
+**Um valor que vai a zero é desativação, não atualização** — `sold_price` e `quantity` são
+`numericality: { greater_than: 0 }` (`deal.rb:41-42`). Na prática esse caso chega pelo caminho do
+órfão: se a venda foi zerada ou desativada na origem, ela sai do conjunto de origem e o espelho é
+desativado por isso.
+
+**A reconciliação e a verificação andam juntas no tempo, pelo mesmo motivo que a classificação e o
+reprocessamento** (§ A subárvore que a agregação lê é a de HOJE). Reconciliar hoje e reprocessar
+depois de amanhã, com a Larissa mexendo no meio, entrega de novo o problema que a reconciliação
+existe para resolver.
+
+## Os ajustes de julho que dependem do cliente
+
+Estes são os pontos que a Andresa levantou no fechamento, e **nenhum deles é query nossa** — cada um
+espera um dado dela ou uma ação do Patrick. Ela mandou os detalhes por e-mail. A ordem importa: o
+que muda plano, meta ou grupo tem que estar em pé **antes** da reconciliação, senão os espelhos são
+reconciliados contra uma hierarquia que ainda vai mudar.
+
+| # | O que está errado | O que destrava | Responsável |
+|---|---|---|---|
+| 1 | Quatro vendedores do bônus de R$ 300 subiram, mas não constam na compensação | Andresa indica os grupos; Patrick recria o plano, amarra as metas e gera compensação nova, desativando a atual | Andresa → Patrick |
+| 2 | Dois gerentes de loja com hierarquia errada | A base de origem precisa ser corrigida — a integração não traz essa correção, então a Larissa faz na mão | Andresa/Larissa |
+| 3 | Meta de HC errada numa líder PAP, que por isso não recebe o bônus de R$ 1.000 | Andresa manda a meta e o realizado corretos; Patrick ajusta a meta e refaz o plano de Líder PAP | Andresa → Patrick |
+| 4 | Receita do Líder de Call Center e do Coordenador não batem entre si (≈28k contra ≈35k) sendo que as mesmas receitas entram nos dois | Patrick confere se alguma transação foi enviada direta ao Coordenador; se foi, desativa | Patrick |
+| 5 | Compensação dos Executivos muito acima do controle da Andresa | Decisão dela sobre o que é receita do cargo (§ Executivos de Vendas) e sobre a régua 264347 | Andresa |
+
+**O item 2 é o que mais atrasa a reconciliação e é o menos visível.** Hierarquia errada muda quem
+está na subárvore de quem, e a subárvore é a entrada de tudo: dos espelhos, das contagens de loja e
+líder, e do `hc`. Reconciliar antes de a Larissa corrigir produz um conjunto que vai ter de ser
+reconciliado de novo.
+
 ## Os scripts
 
 Ficam em `scripts/`, numerados na ordem de execução. **Todos são colados no console via
@@ -160,6 +231,14 @@ não enxerga o disco do engenheiro.
 | `07-classificacao.rb` | leitura | Separa os espelhos existentes em essenciais e dobrados, pela origem de cada um |
 | `08-limpeza-duplicados.rb` | escrita | Apaga só os dobrados; reclassifica do zero antes, e não grava nada se algum espelho não tiver origem rastreável |
 | `09-restauracao.rb` | escrita | Recria espelhos a partir de qualquer CSV de auditoria desta rotina — é o desfazer de `06` e `08` |
+| `10-reconciliacao.rb` | leitura **ou** escrita | Compara o conjunto de origem de agora contra os espelhos que existem e aplica o delta — cria os que faltam, atualiza os que mudaram, desativa os órfãos, reativa os que voltaram. Abre em `dry_run`, que só relata |
+
+**`10-reconciliacao.rb` é o único script que muda de fase por uma variável, e isso é deliberado.**
+Todo o resto da rotina separa pré-flight e mutação em arquivos distintos, mas aqui as duas metades
+precisam medir o **mesmo instante**: o delta depende da hierarquia e dos deals de agora, e entre duas
+colagens de console a Larissa pode ter subido mais um ajuste. Com `dry_run = true` (o padrão) ele
+percorre tudo, imprime os contadores e grava o CSV sem tocar em nada; trocar para `false` aplica
+exatamente o delta que acabou de ser relatado.
 
 **Um único script serve os três cargos.** A configuração no topo é `plan_id` e `competence_period_id`
 — nada mais. O conjunto de origem se ajusta sozinho: numa subárvore de plano não-override ninguém
@@ -185,6 +264,12 @@ O caminho é `integration-debug/audits/2077/<fase>/<timestamp>.csv` no bucket do
 no nome garante que execução nenhuma sobrescreve outra, então a cadeia inteira de estados fica
 preservada e `09-restauracao.rb` recompõe qualquer um deles apontando `audit_key` para o CSV
 correspondente.
+
+**A reconciliação cumpre essa garantia por outro caminho, e é o `dry_run` que a cumpre.** O CSV dela
+(`premiacao-reconciliation`) sai no fim da execução, não antes; o que roda antes de qualquer
+alteração é a passada em modo relatório, que grava o delta inteiro — inclusive as colunas de recriação
+de cada espelho que seria desativado — sem tocar em nada. E a desativação preserva a linha de todo
+jeito: o desfazer de uma reconciliação é `enable`, não recriação a partir do CSV.
 
 **Todo script abre imprimindo `ApplicationConfiguration.aws_bucket` e para se não for o esperado**
 (§ O portão do ambiente). Um console apontado para outro stack responde zero a toda consulta, e zero
@@ -307,6 +392,12 @@ libera só com a fila limpa, e o gatilho é `gh workflow run deploy-shared-001.y
 
 ## Execução
 
+Há duas sequências, e a diferença entre elas é uma pergunta só: **este cargo já tem espelhos gravados
+nesta competência?** O `01-checagem.rb` responde isso alvo a alvo, e o `03-preflight.rb` confirma
+pelo contador `already_exists`.
+
+### Primeira apuração de uma competência
+
 Por cargo, na ordem, com os scripts de `scripts/`:
 
 1. **Descoberta** (`00`) — só quando o plano do cargo não é conhecido. Lista os planos do período e
@@ -319,7 +410,31 @@ Por cargo, na ordem, com os scripts de `scripts/`:
 5. **Reprocessar a compensação** — ação do engenheiro. Sem isso o número não se move.
 6. **Validação** (`05`) — compara o esperado com o que a plataforma calculou.
 
-O `02-conjuntos.rb` não está na sequência: é diagnóstico, para quando um número não fecha e o
+### Re-apuração de uma competência que já tem espelhos
+
+**Esta é a sequência da rodada de julho/2026**, e ela começa fora do console: enquanto os ajustes da
+Andresa e da Larissa não estiverem em pé, reconciliar produz um conjunto que terá de ser reconciliado
+de novo (§ Os ajustes de julho que dependem do cliente).
+
+1. **Confirmar que os ajustes do cliente entraram** — os cinco itens da tabela daquela seção,
+   principalmente a hierarquia dos dois gerentes de loja e as metas que o Patrick refez. O sinal de
+   partida é o Patrick avisar que pode rodar.
+2. **Checagem** (`01`) — portões do ambiente e âncoras do plano. Confirma que o plano, o período e a
+   compensação do cargo continuam os mesmos depois dos ajustes.
+3. **Reconciliação em modo relatório** (`10`, com `dry_run = true`) — imprime `TO_CREATE`,
+   `TO_UPDATE`, `TO_DISABLE`, `TO_ENABLE` e `UNCHANGED`, e grava o CSV do delta. **Ler o delta antes
+   de aplicar é o passo que não se pula**: um `TO_DISABLE` alto significa que muita origem saiu do
+   conjunto, e isso pode ser tanto a correção da Larissa quanto uma hierarquia que mudou de novo.
+4. **Reconciliação aplicando** (`10`, com `dry_run = false`) — aplica exatamente o delta que acabou
+   de ser relatado, logo em seguida, sem intervalo.
+5. **Refazer as contagens dos Executivos** (`07` para reclassificar os espelhos; as contagens de
+   `lojas_atingimento`, `atingimento_lideres` e `hc` saem da base e mudam junto com ela) — a
+   subárvore e os atingimentos de julho foram medidos antes dos ajustes.
+6. **Reprocessar a compensação** — ação do engenheiro, e só depois que os três cargos estiverem
+   reconciliados.
+7. **Validação** (`05`) — compara o esperado com o que a plataforma calculou, relendo a base.
+
+O `02-conjuntos.rb` não está em nenhuma das duas: é diagnóstico, para quando um número não fecha e o
 motivo não é óbvio. O `06-desativacao.rb` é o rollback, disponível em qualquer ponto após a mutação.
 
 Todo output de script vai para CSV no bucket do próprio ambiente, em
@@ -458,6 +573,44 @@ colunas necessárias para recriar cada registro:
 | 750 recriados a partir do anterior | `integration-debug/audits/2077/premiacao-restore/20260824-213118.csv` |
 | 534 de origem duplicada, apagados | `integration-debug/audits/2077/premiacao-duplicate-cleanup/20260824-214726.csv` |
 
+### A receita que entra no atingimento dos Executivos está em aberto
+
+**A Andresa sustenta que só receita de PAP compõe o atingimento do Executivo, e que hoje receita de
+loja está entrando junto.** É a maior divergência do fechamento: a compensação do cargo soma
+R$ 11.060 na plataforma contra R$ 3.715 no controle dela. No caso do Luiz Felipe, a meta é
+R$ 27.295,00 e a receita exibida está acima disso, enquanto o controle dela registra R$ 15.768,00 de
+receita PAP — e o Patrick, filtrando a planilha só por PAP, chegou a R$ 15.608,39.
+
+**A consequência não é um ajuste fino, é a faixa inteira.** A régua de receita (264347 / 264348) só
+paga a partir de 80% da meta. Com R$ 15,6 mil contra uma meta de R$ 27.295,00 o atingimento fica
+perto de 57%, abaixo do piso, e nenhuma das duas regras dispara — o que sobra para o Executivo são
+as contagens de loja e de líder, que são pagas por outra via.
+
+**A leitura dela é coerente com o desenho da régua, e essa é a razão para levá-la a sério mesmo sem
+verificação na base.** O cargo já é pago por loja através de uma CONTAGEM (`lojas_atingimento * 200`)
+e por líder PAP através de outra (`atingimento_lideres * 400`). Se a receita de loja também entrasse
+em `vendas_instaladas`, a loja seria paga duas vezes pelo mesmo desempenho — uma vez como contagem e
+outra como receita. **Isso é inferência a partir da régua, não medição**: nada foi conferido contra
+a base ainda.
+
+**O espelhamento não distingue PAP de loja hoje, e não teria como distinguir sem uma regra.** O
+conjunto de origem é a subárvore inteira menos os carriers (§ O conjunto de origem depende do
+`override` do plano), filtrada apenas pela métrica — e as três métricas de receita se separam só por
+status (`vendas_instaladas` 3084, `movel` 3846, `indicacao` 3811), sem nada que diga se a venda veio
+de loja ou de PAP. Se a regra for confirmada, ela entra como um filtro a mais no conjunto de origem,
+e todos os espelhos dos Executivos precisam ser reconciliados contra o conjunto novo.
+
+**O discriminador que o cliente usa é a "condição de estado" com o nome da loja no deal, e é
+exatamente o campo que a Larissa está corrigindo.** Isso tem duas consequências práticas: qualquer
+classificação PAP-versus-loja feita antes da correção dela separa por um campo sabidamente errado, e
+o mapeamento desse termo do cliente para uma coluna do `Deal` ainda não foi feito — precisa ser
+levantado antes de virar filtro em qualquer script.
+
+**A decisão é da Andresa e não é nossa**, porque é regra de negócio sobre o que remunera o cargo, e
+não um defeito de cálculo. A verificação que a torna decidível é estreita: pegar a subárvore do Luiz
+Felipe, separar a receita por origem PAP e loja depois da correção da Larissa, e comparar com os
+R$ 15.608,39 que o Patrick já apurou pelo lado da planilha.
+
 **A régua dos Executivos tem CINCO variáveis que pagam, distribuídas em três incentivos**, e é essa
 lista que define o que falta para o cargo fechar:
 
@@ -518,6 +671,13 @@ Estes são os valores a conferir na validação (`05-validacao.rb`), todos em `v
 Divergir deles significa que algo mudou entre o espelhamento e o reprocessamento — deals corrigidos,
 grupificação alterada, ou espelho desativado — e a causa precisa ser entendida antes de aceitar o
 resultado.
+
+**Para a rodada de julho eles são a referência do conjunto de 24/08 e vão divergir por construção**,
+porque as correções da Larissa moveram a origem depois disso. O número que fecha julho é o que sair
+da reconciliação: o `10-reconciliacao.rb` imprime o total por alvo depois de aplicar o delta, e é
+esse total — não o da tabela abaixo — que a validação tem de reproduzir. A tabela continua valendo
+como ponto de partida para entender uma diferença: uma variação de centavos é arredondamento, uma
+variação de milhares é venda que entrou ou saiu.
 
 | Cargo | Pessoa | Espelhos | Valor esperado |
 |---|---|---|---|
@@ -665,24 +825,22 @@ nos dois lugares: `IF((vendas_instaladas + movel) / vendas_instaladas_goal >= PE
 status 3084 (Executada) e `movel` o 3846 (Móvel), uma venda que troca de rótulo sai de uma parcela e
 entra na outra, e a soma não se move — nem o atingimento, nem a base de pagamento.
 
-O Patrick precisa confirmar se a régua de julho é a mesma para os três cargos, e se as deals com
-condição de estado divergente — que ele levantou com a Larissa e a Laura — já foram corrigidas na
-competência de julho.
+**As deals com condição de estado divergente estão sendo corrigidas pela Larissa, e é essa correção
+que move mais de duas mil transações de julho.** O Patrick ainda precisa confirmar se a régua de
+julho é a mesma para os três cargos.
 
 A verificação só roda depois que a compensação de julho for cortada e reprocessada: o valor
 agregado materializa numa `UserCommission`, que não existe antes disso.
 
-**As três compensações aguardam reprocessamento pelo Patrick** — 63126 (Coordenador), 63127
-(Executivos) e 63128 (Gerentes), todas `locked`. Enquanto isso não acontece, o valor que aparece na
-plataforma é anterior aos espelhos e às correções da Larissa, e não serve para conferir nada.
-Reprocessar compensação produtiva é ação do engenheiro; o espelhamento entrega o dado, nunca o
-número.
+**As três compensações aguardam a reconciliação e, depois dela, o reprocessamento pelo Patrick** —
+63126 (Coordenador), 63127 (Executivos) e 63128 (Gerentes), todas `locked`. O valor que aparece hoje
+na plataforma é anterior às correções da Larissa e não serve para conferir nada. Reprocessar
+compensação produtiva é ação do engenheiro; o espelhamento entrega o dado, nunca o número.
 
-**Os Executivos (63127) dependem da decisão sobre a regra 264347 antes de reprocessar.** O dado está
-pronto — 216 espelhos essenciais, nenhum dobrado — mas a condição invertida decide se a faixa de 80%
-a 100% paga 3% ou zero, e reprocessar antes disso entrega um número que muda de novo assim que a
-regra for tocada. Coordenador (63126) e Gerentes (63128) não dependem dessa decisão e podem ser
-reprocessados a qualquer momento.
+**Os Executivos (63127) dependem de duas decisões da Andresa antes de reprocessar** — a regra 264347,
+cuja condição invertida decide se a faixa de 80% a 100% paga 3% ou zero, e o que conta como receita
+do cargo (§ A receita que entra no atingimento dos Executivos está em aberto). A segunda é a que pode
+mudar o conjunto de espelhos, não só o valor calculado sobre ele.
 
 **Duas variáveis da régua dos Executivos seguem sem valor em julho** — `atingimento_consultor_lider`
 (36929) e `quantidade_parceiro_acima_mil` (36940). Ambas pagam por unidade (R$ 200 e R$ 100), foram
