@@ -34,7 +34,7 @@ else
   plan = Plan.find(plan_id)
   deal_class = plan.deal_type
 
-  audit_body = Aws.connection.get_object(aws_bucket, audit_key).body
+  audit_body = Aws.with_connection { |connection| connection.get_object(aws_bucket, audit_key).body }
   audit_rows = CSV.parse(audit_body, headers: true)
 
   missing_columns = required_columns - audit_rows.headers.compact
@@ -98,7 +98,7 @@ else
           rows.each { |row| csv << row }
         end
 
-      Aws.connection.put_object(aws_bucket, file_path, csv_string)
+      Aws.with_connection { |connection| connection.put_object(aws_bucket, file_path, csv_string) }
 
       puts "s3://#{aws_bucket}/#{file_path}"
       puts "RESTORED@#{created_count}"

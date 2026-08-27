@@ -15,36 +15,65 @@ esses valores são agregados da equipe abaixo e o cálculo não os alcança:
 
 ## Estado da entrega
 
-**Os espelhos, as contagens e o headcount estão gravados na base do `shared-001`, e todos refletem
-os deals como estavam em 24/08.** Depois disso a Larissa subiu ajustes de vendas e modificou mais de
-duas mil transações, então o conjunto de origem mudou por baixo dos espelhos. A entrega de julho
-deixou de ser "reprocessar" e passou a ser: reconciliar os espelhos contra os deals de hoje, rodar
-os scripts de novo, e só então reprocessar.
+**Espelhos e contagens dos três cargos estão reconciliados contra a mesma base — os deals e a
+hierarquia de 26/08.** O que uma competência seguinte reencontra é isto: uma apuração só é coerente
+enquanto a base por baixo dela não se mexe, e ela se mexe por dois caminhos independentes — correção
+de venda e remanejamento de hierarquia. O segundo é o que engana, porque não deixa rastro no volume:
+quatro linhas de `seats` reescritas movem 54 pessoas e milhares de reais entre alvos sem que nenhuma
+venda mude.
 
 | Frente | Estado |
 |---|---|
-| Espelhos do Coordenador | 324 gravados, R$ 35.378,78 — conferidos contra os deals de 24/08 |
-| Espelhos dos Gerentes | 896 gravados, R$ 91.625,52 — conferidos contra os deals de 24/08 |
-| Espelhos dos Executivos | 216 essenciais, R$ 21.037,25 — conferidos contra os deals de 24/08 |
-| Atingimento de lojas e líderes | 10 indicators gravados — contagem tirada da base de 24/08 |
-| Headcount (`hc`) | 5 indicators, verificados 5/5 |
+| Espelhos do Coordenador | 304 ativos, R$ 33.038,00 — reconciliados contra os deals de 26/08 |
+| Espelhos dos Gerentes | 880 ativos, R$ 89.720,73 — reconciliados contra os deals de 26/08 |
+| Espelhos dos Executivos | 192 ativos, R$ 18.573,51 — reconciliados contra os deals de 26/08 |
+| Atingimento de lojas e líderes | 10 indicators — recalculados contra a base de 26/08, 1 corrigido |
+| Headcount (`hc`) | 5 indicators — recalculados contra a base de 26/08, 2 corrigidos |
 | `atingimento_consultor_lider` | sem valor — depende da Andresa |
 | `quantidade_parceiro_acima_mil` | sem valor — depende da Andresa |
 | Régua 264347 | defeito confirmado — correção é decisão da Andresa |
 | Receita dos Executivos somando loja | levantado pela Andresa, não verificado na base (§ Executivos de Vendas) |
-| Reconciliação dos espelhos | pendente — `10-reconciliacao.rb`, não rodou ainda |
-| Reprocessamento 63126 / 63127 / 63128 | pendente com o Patrick, depois da reconciliação |
+| Migração de 54 pessoas para o Cristiano | aplicada na reconciliação — é entrada do cliente, comunicada e não questionada (§ A divisão de trabalho) |
+| Reprocessamento 63126 / 63127 / 63128 | os três liberados — depende só do Patrick |
 
-**Nenhum dos três cargos fecha antes da reconciliação, e isso vale inclusive para o Coordenador e
-para os Gerentes**, que antes podiam ser reprocessados sem depender de nada. Um espelho criado a
-partir de um deal que a Larissa depois corrigiu carrega o valor antigo, e o cálculo não tem como
-perceber: para a métrica, um espelho é um deal como outro qualquer. Reprocessar antes de reconciliar
-entrega um número que já nasce errado — e errado de um jeito que confere consigo mesmo, porque a
-soma dos espelhos bate com os espelhos.
+**O Coordenador (63126) e os Gerentes (63128) estão prontos para reprocessar.** Uma reconciliação
+envelhece: um espelho é cópia congelada e nada o mantém sincronizado, então se a Larissa mexer nas
+vendas de novo entre agora e o reprocessamento, ele volta a divergir. Rodar `10-reconciliacao.rb` em
+`dry_run` imediatamente antes do reprocessamento custa uma colagem e responde isso.
 
-**Os Executivos (63127) continuam fechando incompletos** enquanto `atingimento_consultor_lider` e
-`quantidade_parceiro_acima_mil` seguirem vazias, e o valor de receita deles depende de duas decisões
-da Andresa: a régua 264347 e o que entra como receita do cargo (§ Executivos de Vendas).
+**Os Executivos (63127) também estão liberados, e fecham incompletos por dado que o cliente não
+mandou.** `atingimento_consultor_lider` e `quantidade_parceiro_acima_mil` seguem vazias porque só a
+Andresa tem esses números, e a régua 264347 paga 3% + 5% acima de 100% por um defeito de condição
+(§ Executivos de Vendas). Nada disso é motivo para segurar o processamento: o resultado sai com o que
+existe, o que falta é apontado, e a régua é corrigida na competência que o cliente decidir
+(§ A divisão de trabalho).
+
+## A divisão de trabalho: o cliente manda o dado, a gente calcula
+
+**A 4Shark não valida o dado do cliente e não segura processamento esperando ele confirmar o próprio
+dado.** Hierarquia, meta, grupificação e venda são ENTRADA. O cálculo reflete a entrada como ela está
+e o resultado é comunicado; se a entrada estava errada, o erro é do lado que a subiu, e a correção é
+subir de novo e reprocessar.
+
+**Isso não é aspereza, é o contrato.** A 4Shark não tem como saber qual hierarquia é a certa — nada
+na base distingue um remanejamento intencional de um engano de digitação. Uma sessão que trava o
+reprocessamento até o cliente "confirmar" está fazendo o trabalho de conferência que é dele, atrasando
+o fechamento e assumindo uma responsabilidade que a 4Shark não pode cumprir.
+
+**O que a 4Shark deve é EXPLICAR o número, nunca julgá-lo.** Quando um valor muda muito entre duas
+apurações, o recado diz o que mudou, de quanto para quanto e qual foi a causa mecânica — "quatro
+pessoas mudaram de equipe nos dias 24 e 25 e levaram 54 junto" —, e segue. Não diz "segura", não diz
+"confirma antes", não abre pergunta cuja resposta a 4Shark precisaria para agir.
+
+**Um defeito de régua é o mesmo caso.** A 4Shark aponta o defeito com o efeito em dinheiro e segue
+processando com a régua como ela está; alterar régua é decisão do cliente e acontece na competência
+que ele decidir.
+
+**O recado no Slack interno é RELATÓRIO, não pauta e não instrução.** O Patrick é da 4Shark e a
+Andresa é da Concentra; ele conduz a relação com ela e a sessão não sabe o que ele já combinou. Então
+o recado diz três coisas e para: **o que foi feito, o que não foi feito, e por que não foi feito.**
+Nada de "pode reprocessar", "avisa a Andresa", "vocês decidem quando" — dizer a ele o que fazer com o
+que ele controla é o mesmo erro de assumir o trabalho do outro lado, uma casa antes.
 
 ## A abordagem está decidida: espelhar DEALS. Não reabrir.
 
@@ -196,9 +225,10 @@ existe para resolver.
 ## Os ajustes de julho que dependem do cliente
 
 Estes são os pontos que a Andresa levantou no fechamento, e **nenhum deles é query nossa** — cada um
-espera um dado dela ou uma ação do Patrick. Ela mandou os detalhes por e-mail. A ordem importa: o
-que muda plano, meta ou grupo tem que estar em pé **antes** da reconciliação, senão os espelhos são
-reconciliados contra uma hierarquia que ainda vai mudar.
+espera um dado dela ou uma ação do Patrick. Ela mandou os detalhes por e-mail. **A lista existe para
+ser REPORTADA, não para ser esperada**: a apuração roda contra a base como ela está a qualquer
+momento, e o que o cliente mudar depois entra na reconciliação seguinte, que é barata justamente por
+isso (§ A divisão de trabalho).
 
 | # | O que está errado | O que destrava | Responsável |
 |---|---|---|---|
@@ -208,10 +238,10 @@ reconciliados contra uma hierarquia que ainda vai mudar.
 | 4 | Receita do Líder de Call Center e do Coordenador não batem entre si (≈28k contra ≈35k) sendo que as mesmas receitas entram nos dois | Patrick confere se alguma transação foi enviada direta ao Coordenador; se foi, desativa | Patrick |
 | 5 | Compensação dos Executivos muito acima do controle da Andresa | Decisão dela sobre o que é receita do cargo (§ Executivos de Vendas) e sobre a régua 264347 | Andresa |
 
-**O item 2 é o que mais atrasa a reconciliação e é o menos visível.** Hierarquia errada muda quem
-está na subárvore de quem, e a subárvore é a entrada de tudo: dos espelhos, das contagens de loja e
-líder, e do `hc`. Reconciliar antes de a Larissa corrigir produz um conjunto que vai ter de ser
-reconciliado de novo.
+**O item 2 é o de efeito mais amplo e o menos visível.** Hierarquia muda quem está na subárvore de
+quem, e a subárvore é a entrada de tudo: dos espelhos, das contagens de loja e líder, e do `hc`. Uma
+correção de hierarquia que chegue depois de uma apuração desloca todos esses números de uma vez — o
+que a rodada seguinte absorve, e o relatório nomeia.
 
 ## Os scripts
 
@@ -231,7 +261,8 @@ não enxerga o disco do engenheiro.
 | `07-classificacao.rb` | leitura | Separa os espelhos existentes em essenciais e dobrados, pela origem de cada um |
 | `08-limpeza-duplicados.rb` | escrita | Apaga só os dobrados; reclassifica do zero antes, e não grava nada se algum espelho não tiver origem rastreável |
 | `09-restauracao.rb` | escrita | Recria espelhos a partir de qualquer CSV de auditoria desta rotina — é o desfazer de `06` e `08` |
-| `10-reconciliacao.rb` | leitura **ou** escrita | Compara o conjunto de origem de agora contra os espelhos que existem e aplica o delta — cria os que faltam, atualiza os que mudaram, desativa os órfãos, reativa os que voltaram. Abre em `dry_run`, que só relata |
+| `10-reconciliacao.rb` | leitura **ou** escrita | Compara o conjunto de origem de agora contra os espelhos que existem e aplica o delta — cria os que faltam, atualiza os que mudaram, desativa os órfãos, reativa os que voltaram. Percorre os três planos numa execução; abre em `dry_run`, que só relata |
+| `11-contagens.rb` | leitura **ou** escrita | Recalcula `lojas_atingimento`, `atingimento_lideres` e `hc` contra a base de agora, imprime cada uma ao lado do `Indicator` gravado e corrige as divergentes por `update` do `value`. Abre em `dry_run`, que só relata |
 
 **`10-reconciliacao.rb` é o único script que muda de fase por uma variável, e isso é deliberado.**
 Todo o resto da rotina separa pré-flight e mutação em arquivos distintos, mas aqui as duas metades
@@ -294,9 +325,27 @@ O identificador que o cliente usa **não** é `User.id`. O documento de origem e
 Lofeu ID 1918117", e 1918117 é `UserIdentifier.value`; o `User.id` dele é 1119697. Resolver sempre
 por `UserIdentifier.where(company_id:, value:).pluck(:user_id)`.
 
-`modifiers.value` e `aggregated_modifiers.value` são `string` (`db/schema.rb:1120`, `:84`). Somar
-com `SUM()` no Postgres levanta `PG::UndefinedFunction`. A conversão é `variable.format(value)` e a
-redução acontece em Ruby, como em `AggregatedIndicator#calculate!`.
+`modifiers.value`, `aggregated_modifiers.value` e `goals.value` são `string` (`db/schema.rb:1120`,
+`:84`, `:859`). Somar com `SUM()` no Postgres levanta `PG::UndefinedFunction`. A conversão é
+`variable.data_type.format(value)` — a mesma chamada que `Indicator#format` faz
+(`indicator.rb:85-87`) — e a redução acontece em Ruby, como em `AggregatedIndicator#calculate!`. Ao
+gravar de volta, o formato é inteiro simples (`"13"`), que é como a empresa 2077 tem os valores.
+
+**`Aws.connection` NÃO EXISTE.** A classe expõe `connection_pool` e `with_connection` e nada mais
+(`app/models/aws.rb:3-11`); o acesso é
+`Aws.with_connection { |connection| connection.put_object(bucket, path, body) }`, a forma que as 18
+rake tasks de `lib/tasks/integration_audit/` usam. O erro estoura no fim do script, depois de a
+mutação já ter acontecido — por isso os contadores são impressos ANTES do upload.
+
+**`DATE(coluna_timestamp)` em SQL opera no valor ARMAZENADO, que é UTC.** `application.rb:64-65` põe
+`config.time_zone = 'Brasilia'` com `active_record.default_timezone = :utc`, então agrupar por
+`DATE(updated_at)` joga toda escrita após as 21h no dia seguinte. A forma certa é
+`DATE(updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')`. Um `Time.zone.now`,
+`Time.current` ou `10.days.ago` no lado Ruby já vem em -03 e não tem esse problema.
+
+**Um `Indicator` deixa de ser destruível assim que a competência é processada** — `destroyable?`
+devolve `false` na presença de `indicator_aggregations` (`indicator.rb:97-105`), e eles nascem do
+processamento. Depois disso a correção é `update(value:)`; `destroy` é recusado.
 
 `Deal.for_user(nil)` não filtra — o escopo é condicional a `user_id.present?`. Um usuário de origem
 em branco varre a empresa inteira em silêncio.
@@ -412,30 +461,33 @@ Por cargo, na ordem, com os scripts de `scripts/`:
 
 ### Re-apuração de uma competência que já tem espelhos
 
-**Esta é a sequência da rodada de julho/2026**, e ela começa fora do console: enquanto os ajustes da
-Andresa e da Larissa não estiverem em pé, reconciliar produz um conjunto que terá de ser reconciliado
-de novo (§ Os ajustes de julho que dependem do cliente).
+São seis colagens e nenhuma espera pelo cliente (§ A divisão de trabalho). O `10` cobre os três
+cargos num laço e o `11` cobre as três contagens dos Executivos, então a sequência inteira roda de
+ponta a ponta numa sessão:
 
-1. **Confirmar que os ajustes do cliente entraram** — os cinco itens da tabela daquela seção,
-   principalmente a hierarquia dos dois gerentes de loja e as metas que o Patrick refez. O sinal de
-   partida é o Patrick avisar que pode rodar.
-2. **Checagem** (`01`) — portões do ambiente e âncoras do plano. Confirma que o plano, o período e a
-   compensação do cargo continuam os mesmos depois dos ajustes.
-3. **Reconciliação em modo relatório** (`10`, com `dry_run = true`) — imprime `TO_CREATE`,
-   `TO_UPDATE`, `TO_DISABLE`, `TO_ENABLE` e `UNCHANGED`, e grava o CSV do delta. **Ler o delta antes
-   de aplicar é o passo que não se pula**: um `TO_DISABLE` alto significa que muita origem saiu do
-   conjunto, e isso pode ser tanto a correção da Larissa quanto uma hierarquia que mudou de novo.
-4. **Reconciliação aplicando** (`10`, com `dry_run = false`) — aplica exatamente o delta que acabou
-   de ser relatado, logo em seguida, sem intervalo.
-5. **Refazer as contagens dos Executivos** (`07` para reclassificar os espelhos; as contagens de
-   `lojas_atingimento`, `atingimento_lideres` e `hc` saem da base e mudam junto com ela) — a
-   subárvore e os atingimentos de julho foram medidos antes dos ajustes.
-6. **Reprocessar a compensação** — ação do engenheiro, e só depois que os três cargos estiverem
-   reconciliados.
-7. **Validação** (`05`) — compara o esperado com o que a plataforma calculou, relendo a base.
+1. **Checagem** (`01`) — portões do ambiente e âncoras do plano. Confirma que o plano, o período e a
+   compensação continuam os mesmos, e imprime o `money` atual de cada alvo.
+2. **Reconciliação em modo relatório** (`10`, `dry_run = true`) — imprime `CREATE`, `UPDATE`,
+   `DISABLE`, `ENABLE`, `UNCHANGED` e `FAILED` por plano, e grava um CSV por plano. **Ler o delta
+   antes de aplicar é o passo que não se pula**, e as contas têm de fechar dos dois lados:
+   `esperados = UNCHANGED + UPDATE + CREATE` e `existentes = UNCHANGED + UPDATE + DISABLE`. Se não
+   fecharem, alguma identidade não pareou e o motivo vem antes da escrita.
+3. **Reconciliação aplicando** (`10`, `dry_run = false`) — logo em seguida, sem intervalo.
+4. **Contagens em modo relatório** (`11`, `dry_run = true`) — recalcula loja, líder e headcount e
+   imprime cada uma ao lado do gravado, com o `raw` e o `destroyable?`.
+5. **Contagens aplicando** (`11`, `dry_run = false`) — corrige por `update` só as divergentes.
+6. **Validação** (`05`) — depois de o reprocessamento acontecer, compara o esperado com o que a
+   plataforma calculou, relendo a base.
 
-O `02-conjuntos.rb` não está em nenhuma das duas: é diagnóstico, para quando um número não fecha e o
-motivo não é óbvio. O `06-desativacao.rb` é o rollback, disponível em qualquer ponto após a mutação.
+**Um delta grande não é motivo para parar, é motivo para EXPLICAR.** Quando `DISABLE` e `CREATE` vêm
+altos e simétricos entre dois alvos, a causa costuma ser hierarquia: comparar o tamanho das subárvores
+com o registrado aqui e datar as escritas por `seats.updated_at` identifica o movimento em duas
+consultas (§ A subárvore que a agregação lê é a de HOJE). O resultado vira frase no relatório, não
+pergunta ao cliente.
+
+O `02-conjuntos.rb` não está na sequência: é diagnóstico, para quando um número não fecha e o motivo
+não é óbvio. O `06-desativacao.rb` é o rollback dos espelhos, e o CSV de cada rodada carrega o valor
+anterior de tudo que foi alterado.
 
 Todo output de script vai para CSV no bucket do próprio ambiente, em
 `integration-debug/audits/2077/<fase>/<timestamp>.csv`, via
@@ -456,10 +508,10 @@ Esses números são a referência de conferência, não um resultado arquivado: 
 novo imediatamente antes da mutação, e divergir deles significa que os deals de julho se moveram
 entre uma execução e outra — o que precisa ser entendido antes de espelhar, nunca ignorado.
 
-**Os 324 espelhos EXISTEM na base do `shared-001`** — criados com `CREATED@324` e `FAILED@0`,
-reproduzindo a projeção. Uma sessão que chegar aqui NÃO roda a mutação de novo: o índice único
-recusaria, mas o pré-flight já acusa antes, com `already_exists` verdadeiro em todas as linhas.
-Para tirá-los do cálculo, o caminho é a desativação (§ as quatro operações), nunca `destroy`.
+**O Coordenador tem 304 espelhos ativos somando R$ 33.038,00**, reconciliados contra os deals de
+26/08. Uma sessão que chegar aqui NÃO roda `04-mutacao.rb`: o índice único recusaria, o pré-flight
+acusa antes com `already_exists`, e a ferramenta desta fase é `10-reconciliacao.rb`. Para tirar um
+espelho do cálculo, o caminho é a desativação (§ as quatro operações), nunca `destroy`.
 
 **O valor do Coordenador continua zero até a compensação 63126 ser reprocessada**, porque ela está
 `locked` e o conjunto que a métrica lê vem de um índice chaveado por `commission_uuid`. Reprocessar
@@ -481,7 +533,7 @@ user_ids =
 
 **Com `override: false` o espelho cobre a subárvore inteira** (o caso do Coordenador, plano 78941, e
 dos Gerentes, plano 78940): a agregação usa `user.id` sozinho, nada sobe, e sem espelho o alvo fica
-zerado. Os 324 espelhos do Coordenador e os 896 dos Gerentes estão corretos.
+zerado. É por isso que a subárvore inteira é o conjunto de origem nesses dois cargos.
 
 **Com `override: true` o espelho CONTINUA NECESSÁRIO** (o caso dos Executivos, plano 78939), e o
 motivo é que a varredura recursiva não calcula nada — ela só **lê linhas de `Indicator` que já
@@ -552,17 +604,17 @@ receita duas vezes; um vendedor sem linha é invisível para a varredura, e o es
 A mutação filtrou por `Plan#subordinate_ids_by` — um nível de hierarquia — que é conjunto diferente
 desse, e é o que produz fatia dobrada.
 
-**216 espelhos EXISTEM na base do `shared-001`, todos classificados como essenciais**, verificados
-relendo a base e reclassificando cada um pela origem: nenhum sobrevivente tem origem que carregue
-indicator próprio.
+**Os Executivos têm 192 espelhos ativos somando R$ 18.573,51**, reconciliados contra os deals e a
+hierarquia de 26/08. Nenhum tem origem que carregue indicator próprio: a exclusão de carriers roda
+aqui por construção, porque este é o único dos três planos com `override: true`.
 
-| Executivo | Espelhos | Valor |
-|---|---|---|
-| Luiz Felipe Sonego Bonini | 160 | 15.337,81 |
-| Loandra Teixeira Costa | 32 | 3.179,68 |
-| Flavia Dutra Castanheira De Oliveira | 24 | 2.519,76 |
-| Cristiano Rodolfo Dionísio De Oliveira | 0 | 0,00 |
-| Beatriz Carvalho Costa | 0 | 0,00 |
+| Executivo | Espelhos | Valor | Subárvore | Carriers |
+|---|---|---|---|---|
+| Cristiano Rodolfo Dionísio De Oliveira | 92 | 8.813,42 | 83 | 35 |
+| Loandra Teixeira Costa | 38 | 3.719,64 | 119 | 49 |
+| Luiz Felipe Sonego Bonini | 35 | 3.280,72 | 157 | 45 |
+| Flavia Dutra Castanheira De Oliveira | 27 | 2.759,73 | 168 | 64 |
+| Beatriz Carvalho Costa | 0 | 0,00 | 6 | 1 |
 
 Os CSVs de auditoria que reconstroem qualquer estado anterior deste conjunto, todos com as dezesseis
 colunas necessárias para recriar cada registro:
@@ -631,10 +683,31 @@ lista que define o que falta para o cargo fechar:
 `AggregatedIndicator#result` resolve o `UserScope` (`aggregated_indicator.rb:93`), o agregado de um
 plano override é função da hierarquia no instante do processamento.
 
-Isso não é teórico: em uma única sessão, vinte pessoas migraram da subárvore do Luiz Felipe para a do
-Cristiano — os `carriers` do Luiz Felipe caíram de 66 para 46 e os do Cristiano subiram de 15 para 35
-entre duas leituras separadas por minutos. Sessenta e cinco espelhos mudaram de classificação por
-causa disso.
+Isso não é teórico, e o caso concreto desta competência é grande o bastante para mudar pagamento.
+**Quatro seats foram repontados para debaixo do Cristiano — dois em 24/08 (18h36 e 18h37) e dois em
+25/08 (17h14 e 17h15) — e cada um arrastou o galho inteiro abaixo de si: 20, 14, 9 e 7 descendentes,
+que com os próprios quatro somam 54 pessoas.** A subárvore do Luiz Felipe caiu de 211 para 157 e a do
+Cristiano subiu para 83; como o Cristiano fica abaixo do Joel e o Luiz Felipe abaixo do Joao Luis, o
+mesmo evento aparece nos Gerentes como receita trocando de lado.
+
+**Nenhuma dessas quatro escritas passou por `SeatAction`** — a tabela está vazia para a empresa 2077
+na janela, assim como `SeatActionDocument`, então alguém escreveu `seats.parent_id` direto. É o
+caminho que a Larissa usa para corrigir à mão o que a integração não traz, e é também por isso que
+não há autor registrado.
+
+**A consequência é retroativa e é EXPLICADA ao cliente, nunca questionada**: a hierarquia foi
+remontada em agosto, `HierarchyScope` não tem janela de período, e o resultado é que a receita de
+JULHO dessas 54 pessoas conta para o Cristiano e deixa de contar para o Luiz Felipe. Nos Gerentes isso
+não paga nada (ambos seguem abaixo do piso de 80%); nos Executivos o Luiz Felipe estava acima de 100%
+da meta, então ele muda de faixa. Hierarquia é entrada do cliente e nada na base distingue
+remanejamento de engano, então o cálculo reflete o que está lá e o recado diz o que mudou e por quê
+(§ A divisão de trabalho).
+
+**Uma escrita direta em `seats.parent_id` não deixa rastro de autoria, então a única forma de datá-la
+é `seats.updated_at`.** Ao agrupar por dia, converter o fuso explicitamente —
+`DATE(updated_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')`. O banco guarda UTC
+(`application.rb:65`) enquanto a aplicação apresenta em Brasília (`application.rb:64`), então um
+`DATE(updated_at)` cru joga toda escrita após as 21h no dia seguinte.
 
 **A consequência operacional é que qualquer classificação de espelho e qualquer projeção de agregado
 valem para o instante em que foram tiradas.** Reprocessar uma competência override entrega o número
@@ -653,8 +726,9 @@ Este plano consome **três** variáveis com métrica, uma a mais que os outros d
 `vendas_instaladas` 36311, `movel` 36600 e `indicacao` 36819. A lista sai sempre de
 `plan.variables.with_metrics`, nunca de uma lista fixa herdada do cargo anterior.
 
-**Os 896 espelhos EXISTEM**, portão limpo e sem falha: Joel R$ 31.367,16 e Joao Luis R$ 60.258,36,
-ambos em `vendas_instaladas` mais R$ 75,00 de `movel` no segundo. `indicacao` seleciona zero.
+**Os Gerentes têm 880 espelhos ativos somando R$ 89.720,73** — Joel R$ 43.259,29 em 416 espelhos e
+Joao Luis R$ 46.461,44 em 464 —, reconciliados contra os deals e a hierarquia de 26/08. `indicacao`
+seleciona zero.
 
 **Este é o cargo onde o filtro `external: true` deixa de ser precaução.** Os Gerentes estão acima dos
 Executivos, cujos espelhos caem dentro destas subárvores; sem o filtro, essa receita seria espelhada
@@ -662,7 +736,7 @@ uma segunda vez e paga em dobro. O pré-flight imprime o valor excluído por ger
 que isso seja verificado, e não presumido — e o valor muda toda vez que o conjunto de espelhos dos
 Executivos muda, então ele é lido na hora, nunca comparado contra um número guardado.
 
-**Os dois fecham julho em zero** (§ Pendências): Joel a 32,87% da meta e Joao Luis a 71,13%, ambos
+**Os dois fecham julho em zero** (§ Pendências): Joel a 45,34% da meta e Joao Luis a 54,85%, ambos
 abaixo do piso de 80% da primeira faixa da régua.
 
 ## O que cada pessoa deve fechar após o reprocessamento
@@ -672,18 +746,17 @@ Divergir deles significa que algo mudou entre o espelhamento e o reprocessamento
 grupificação alterada, ou espelho desativado — e a causa precisa ser entendida antes de aceitar o
 resultado.
 
-**Para a rodada de julho eles são a referência do conjunto de 24/08 e vão divergir por construção**,
-porque as correções da Larissa moveram a origem depois disso. O número que fecha julho é o que sair
-da reconciliação: o `10-reconciliacao.rb` imprime o total por alvo depois de aplicar o delta, e é
-esse total — não o da tabela abaixo — que a validação tem de reproduzir. A tabela continua valendo
-como ponto de partida para entender uma diferença: uma variação de centavos é arredondamento, uma
-variação de milhares é venda que entrou ou saiu.
+**A referência é sempre o `total_after` da última reconciliação, nunca um número guardado neste
+documento.** O `10-reconciliacao.rb` imprime o total por alvo depois de aplicar o delta, e é esse
+total que a validação tem de reproduzir; a tabela abaixo é o valor da última rodada e serve para
+dimensionar uma diferença, não para conferi-la. Variação de centavos é arredondamento; variação de
+milhares é venda que entrou ou saiu, ou pessoa que trocou de equipe.
 
 | Cargo | Pessoa | Espelhos | Valor esperado |
 |---|---|---|---|
-| Coordenador | Alex Lima Lofeu | 324 · R$ 35.378,78 | **R$ 35.378,78** |
-| Gerentes | Joao Luis Carnelos | 606 · R$ 60.258,36 | **R$ 60.258,36** |
-| Gerentes | Joel Geraldo Junior | 290 · R$ 31.367,16 | **R$ 31.367,16** |
+| Coordenador | Alex Lima Lofeu | 304 · R$ 33.038,00 | **R$ 33.038,00** |
+| Gerentes | Joao Luis Carnelos | 464 · R$ 46.461,44 | **R$ 46.461,44** |
+| Gerentes | Joel Geraldo Junior | 416 · R$ 43.259,29 | **R$ 43.259,29** |
 
 Nesses dois cargos o esperado é o total dos espelhos, porque o plano é `override: false`, nada sobe
 sozinho e o alvo não tem venda própria.
@@ -832,15 +905,13 @@ julho é a mesma para os três cargos.
 A verificação só roda depois que a compensação de julho for cortada e reprocessada: o valor
 agregado materializa numa `UserCommission`, que não existe antes disso.
 
-**As três compensações aguardam a reconciliação e, depois dela, o reprocessamento pelo Patrick** —
-63126 (Coordenador), 63127 (Executivos) e 63128 (Gerentes), todas `locked`. O valor que aparece hoje
-na plataforma é anterior às correções da Larissa e não serve para conferir nada. Reprocessar
-compensação produtiva é ação do engenheiro; o espelhamento entrega o dado, nunca o número.
+**As três compensações — 63126, 63127, 63128 — dependem só do reprocessamento pelo Patrick**, que é
+ação do engenheiro. O valor exibido enquanto isso é o do processamento anterior e não serve para
+conferir nada: o espelhamento entrega o dado, nunca o número.
 
-**Os Executivos (63127) dependem de duas decisões da Andresa antes de reprocessar** — a regra 264347,
-cuja condição invertida decide se a faixa de 80% a 100% paga 3% ou zero, e o que conta como receita
-do cargo (§ A receita que entra no atingimento dos Executivos está em aberto). A segunda é a que pode
-mudar o conjunto de espelhos, não só o valor calculado sobre ele.
+**A régua 264347 e o que conta como receita do cargo são decisões da Andresa e não travam nada**
+(§ A receita que entra no atingimento dos Executivos está em aberto). A segunda muda o conjunto de
+espelhos, não só o valor calculado sobre ele — se ela decidir, a reconciliação seguinte absorve.
 
 **Duas variáveis da régua dos Executivos seguem sem valor em julho** — `atingimento_consultor_lider`
 (36929) e `quantidade_parceiro_acima_mil` (36940). Ambas pagam por unidade (R$ 200 e R$ 100), foram
@@ -894,11 +965,14 @@ venda instalada dispara a primeira faixa e a terceira ao mesmo tempo: R$ 4.000 n
 Entre 91% e 100% de venda instalada, a segunda e a terceira somam R$ 5.000.
 
 **Em julho a sobreposição não é alcançada, e os dois Gerentes fecham em zero.** Joel Geraldo Junior
-atinge 32,87% da meta (R$ 31.367,16 contra R$ 95.420,33) e Joao Luis Carnelos 71,13% (R$ 60.183,36 de
-venda instalada mais R$ 75,00 de móvel contra R$ 84.711,67) — ambos abaixo do piso de 80% da primeira
-faixa, então nenhuma regra dispara. Os valores conferem com os 896 espelhos: 31.367,16 + 60.183,36 +
-75,00 = 91.625,52. A correção da sobreposição é alteração de plano que só muda dinheiro em
-competências futuras.
+atinge 45,34% da meta (R$ 43.259,29 contra R$ 95.420,33) e Joao Luis Carnelos 54,85% (R$ 46.461,44
+contra R$ 84.711,67) — ambos abaixo do piso de 80% da primeira faixa, então nenhuma regra dispara. Os
+valores conferem com os 880 espelhos: 43.259,29 + 46.461,44 = 89.720,73. A correção da sobreposição é
+alteração de plano que só muda dinheiro em competências futuras.
+
+**A migração das 54 pessoas aproximou os dois sem chegar perto do piso**, e é por isso que ela não
+custou nada aqui: o Joel subiu de 32,87% e o Joao Luis caiu de 71,13%, e nenhum dos dois cruzou os
+80%. Num fechamento em que um deles estivesse na faixa, o mesmo movimento teria mudado pagamento.
 
 **A reclassificação de rótulo NÃO é neutra para os Gerentes**, justamente porque o teto lê
 `vendas_instaladas` isolada. Uma venda que migra de Móvel para Executada aumenta essa parcela e pode
@@ -935,15 +1009,18 @@ tem indicator, então o número também se move se o conjunto de indicators muda
 Executivos ficaram idênticos entre as duas leituras e só dois trocaram exatamente vinte, o que aponta
 para movimento de árvore — apontar não é provar.
 
-Nada disso bloqueia a entrega: os 216 espelhos foram reclassificados contra o conjunto atual e
-nenhum é dobrado. O que a incerteza impõe é a ordem de operação — classificação, reprocessamento e
-verificação próximos no tempo (§ A subárvore que a agregação lê é a de HOJE).
+Nada disso bloqueia a entrega: o `10-reconciliacao.rb` reconstrói o conjunto contra a árvore de agora
+a cada execução, então nenhum espelho é dobrado por construção. O que a instabilidade impõe é a ordem
+de operação — reconciliação, reprocessamento e verificação próximos no tempo (§ A subárvore que a
+agregação lê é a de HOJE).
 
 **O defeito é exclusivo dos Executivos.** `AggregatedIndicator#result` só percorre a subárvore quando
 `user_commission.override?`, que delega para `commission.plan.override?`
 (`user_commission.rb:102-109`); com `override: false` ele lê apenas o indicator da própria pessoa
 (`aggregated_indicator.rb:99`). Coordenador (plano 78941) e Gerentes (plano 78940) são `override:
-false`, então os 324 e os 896 espelhos deles não têm caminho para dobrar.
+false`, então os espelhos deles não têm caminho para dobrar — e é exatamente por isso que a exclusão
+de carriers é gateada pelo `override` no `10-reconciliacao.rb`: aplicá-la aqui apagaria receita que
+não tem outro caminho para subir.
 
 **A régua que converte contagem em dinheiro vive no `Incentive`, não no `Plan`.** A cadeia é
 `Plan` → `incentivations` → `Incentive` → `rules`, e uma `FormulaRule` referencia variáveis pela

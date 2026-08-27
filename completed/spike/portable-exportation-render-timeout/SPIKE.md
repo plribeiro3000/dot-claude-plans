@@ -356,13 +356,7 @@ None of its notes claims the `loadingFinished`-without-`responseReceived` gap is
 is zero days old against the seven-day quarantine in `DEPENDENCY_MINIMUM_RELEASE_AGE_DAYS`, so it is
 not adoptable yet regardless.
 
-## What remains open
-
-To exhaust the budget, at least one exchange must stay sent-but-unfinished for that whole window.
-Which exchange, on a failing render, is still uncaptured — the logs record that `wait_until_settled`
-raised, never which of the three calls raised nor what was outstanding when it did. The mechanism
-above predicts what the instrumented run should show: an exchange carrying a request, no response,
-no error, `unknown == false`.
+## Failure distribution across the fleet
 
 **Failures are spread evenly across all five tasks.** Per task, successes against failures: 95/24,
 88/12, 75/19, 73/18, 69/22. No task is healthy while another is broken, and none stops producing,
@@ -376,26 +370,83 @@ times at roughly 50 requests per second, above the per-task production rate. A t
 would produce a band of failures in one interval rather than a steady fraction across nineteen
 minutes.
 
-## The discriminating experiment
-
-Run the instrumented full sequence in a loop over statements drawn from the failing queue, on the
-quieted production container, and print what is pending whenever one times out.
-
-At a 12% failure rate, twenty renders should catch two or three failures. Each success costs about
-six seconds and each failure sixty, so the loop finishes in minutes. It releases no jobs, persists
-nothing, and runs where the failures actually happened.
-
-The output names the failing step and the outstanding URLs, which is the fact every prior
-experiment was structurally unable to produce: isolated reproduction cannot distinguish a healthy
-render from an unhealthy one when seven of eight renders are healthy.
-
-## Consequence for the queue
-
-Whatever the cause, the 5,040 queued jobs cannot be released until it is fixed. Releasing the quiet
-restores 10 concurrent renders against the front, each retrying on failure.
-
 Raising `BROWSER_TIMEOUT` is not a fix: it lengthens the time each job holds a vCPU without removing
 a single request, and it does nothing about a request that never completes.
+
+## The second defect — the attachment that was never persisted
+
+Fixing the render tail exposed a defect the tail had been masking, because jobs had been dying
+earlier in the loop and never reaching it. Every `PartConsumer` and the `Finalizer` then failed with
+`NoMethodError: undefined method 'file' for nil`.
+
+`PortableExportationAttachment` inherits `validates :file, presence: { unless: :file_optional? }`
+from `Attachment`, and `file_optional?` did not list that type. The type is designed to carry no
+upload at creation — the consumers assemble the archive directly into S3 — so the validation could
+never pass. `PartProducer` used the non-bang `create_attachment`, which returned an unsaved record
+and did not raise; the in-memory object still answered `.file.path`, so `initiate_multipart_upload`
+succeeded and the `multipart_upload_identifier` was saved while `attachments` stayed empty.
+
+The failure is therefore a validation the type can never satisfy, made reachable by a fix elsewhere,
+and made silent by a non-bang persistence call whose result nothing checked.
+
+The fix is two lines in two files: adding the type to `file_optional?`
+(`app/app/models/attachment.rb`), and persisting with `save!` in `PartProducer`
+(`app/app/workers/portable_exportation/part_producer.rb`) so nothing fans out on an unsaved record.
+The bang is deliberate here and is the documented exception in `BANG-METHOD-WEB-FLOW.md`: nothing is
+enqueued yet at that point, so halting is what is wanted.
+
+## Outcome
+
+The run completed. The archive is **197,865,728,799 bytes carrying 219,842 documents**, assembled in
+2,912 multipart parts, and both the exportation and its attachment reached `final`.
+
+Recovery of the in-flight run did not require regenerating anything. The attachment row was created
+by hand against the S3 key that already existed, persisted with `save(validate: false)`, and the
+quieted workers were released: 2,911 parts drained at roughly 41 per minute, 132 stragglers followed,
+and the `Finalizer` ran for 3,923 seconds.
+
+## Delivering the archive — the region is the whole problem
+
+Downloading 184 GiB from `us-east-1` to a workstation in Brazil sustains **3,7 MB/s (~30 Mbps)**,
+which is roughly 15 hours. That figure is not a client, a disk or a parallelism problem, and each was
+ruled out by its own measurement: a ranged download to `/dev/null` was equally slow with no disk in
+the path; `netstat` showed 39 concurrent HTTPS connections; the CRT transfer client with
+`target_bandwidth 300Mb/s` produced the same 3,7 MB/s as the classic client at 32 connections; and 20
+pings to each region reported **0% loss** on both.
+
+What separates them is distance: **160 ms RTT to us-east-1 against 24 ms to sa-east-1**. Taking 10%
+of a 300 Mbps link with no packet loss and dozens of connections is the signature of a constrained
+international transit path, which is the ordinary Brazilian residential shape.
+
+**A server-side copy to `sa-east-1` runs at 143 MB/s** and never touches the workstation's link — the
+184 GiB moved in about 20 minutes over the AWS backbone. Downloading the same object from São Paulo
+then sustains **~20 MB/s average**, finishing in 2h45 instead of 15 hours.
+
+Three constraints govern that copy and each one fails the run if missed:
+
+- **Multipart caps an upload at 10,000 parts.** At the 16 MB chunk size that suits the download, 184
+  GiB needs 11,793 parts and the copy dies partway. 64 MB gives 2,948.
+- **The KMS key is multi-Region**, so the destination bucket encrypts under the replica of the same
+  key rather than needing a new one.
+- **A browser download has no resume.** A single stream over a 160 ms path also has no parallelism,
+  so the console's Download button reports two days for this object.
+
+## Local extraction
+
+Extracting on exFAT produces **453,427 files for 219,843 archive entries** — the extra 233,584 are
+AppleDouble `._` sidecars macOS writes beside every file and directory. At a 131,072-byte allocation
+block each sidecar costs a full cluster, so they account for ~28,5 GiB of the ~44 GiB the extraction
+consumes beyond the content itself; the remainder is ordinary cluster slack across 219,842 files.
+
+`unzip -t` is not worth running first: extraction validates every entry's CRC as it writes, so
+testing beforehand pays for the same 184 GiB read twice.
+
+## Retention
+
+The object in `us-east-1` is expired by a daily worker reading a TTL in the application code, not by
+an S3 lifecycle rule — `4shark-shared-001` carries lifecycle rules only for the
+`integration-debug/` prefixes. Looking for the expiry at the bucket level finds nothing and proves
+nothing.
 
 ## Sources
 

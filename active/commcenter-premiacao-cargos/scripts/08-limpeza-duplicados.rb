@@ -136,7 +136,7 @@ else
         rows.each { |row| csv << row }
       end
 
-    Aws.connection.put_object(aws_bucket, file_path, csv_string)
+    Aws.with_connection { |connection| connection.put_object(aws_bucket, file_path, csv_string) }
 
     puts "s3://#{aws_bucket}/#{file_path}"
     puts "DESTROYED@#{destroyed_count}"
