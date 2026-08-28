@@ -1,0 +1,21 @@
+Mensaje enviado a Santiago (Slack) — 2026-08-27. Puntos de la verificación de la base + recomendación de base normalizada, para relevar a Atento Colombia (Estefani y equipo).
+
+---
+
+Hola Santi.
+
+Nos comentaste que el equipo de Atento Colombia dijo que terminó la estructura en la base. La analizamos directamente en la base viva y no está terminada. Te dejo acá los puntos que todavía hay que corregir y, al final, una recomendación: puedes pasarles los puntos y cerrar con la recomendación.
+
+Venimos levantando esto desde fines de julio —analizamos la base el 27/jul—, así que ya llevamos cerca de un mes. Y no está pronto: nada de lo que pedimos está resuelto. Hay otros cambios en la tabla que no pedimos, pero lo que sí pedimos no está. Los puntos:
+
+1. La unicidad tiene que quedar sobre la clave de negocio —período + persona + servicio + indicador—, para que un mismo indicador de una persona en un período no pueda entrar duplicado. Hoy el índice único está sobre NR_CHAVE_EMPRESA_MES_RE, que es un id secuencial, no la combinación de negocio, así que esa garantía todavía no la tenemos. Se resuelve con un índice único sobre esas cuatro columnas.
+
+2. Falta la columna llave en el catálogo (tb_dim_indicadores), en texto y única, con la clave de la Variable de 4Shark por cada indicador. Es la que nos deja resolver cada indicador a su Variable en la plataforma; hoy no está.
+
+3. Las columnas de creación y actualización tienen que ser datetime —con fecha y hora—, no date. Esto no es un pedido nuevo: desde el arranque, en la reunión del 03/jul, planteamos que estas columnas debían registrar el momento exacto en que cada registro se crea o se modifica, porque nuestra lectura incremental —leer solo lo que cambió desde la última carga— necesita justamente la hora; con date, dos cambios el mismo día no se distinguen. El script que venimos entregando desde entonces, y el consolidado del 20/ago, las define como datetime. Hoy quedaron como date, así que es solo alinearlas al tipo que ya habíamos definido.
+
+4. Junto con el requisito, ya les habíamos entregado también un script y un procedimiento de carga que dejan estas garantías —unicidad e histórico de cambios— resueltas automáticamente. No es obligatorio que usen los nuestros; si prefieren resolverlo de otra forma, perfecto. Lo importante es que esas garantías queden presentes, y hoy no están. Con gusto los acompañamos.
+
+Recomendación: en lugar de seguir construyendo y ajustando esta base, sugerimos dar un paso atrás e integrar desde la base normalizada. Ya está lista y ya está integrada con 4Shark: el trabajo de su lado se reduce a cargar los datos ahí, y de nuestro lado ya entregamos. Y no tiene costo adicional: esta tabla implica operar una base de datos más, corriendo solo para esta integración —un costo que hoy tendrían que asumir—; la normalizada no agrega ese costo. Es más rápido, más barato y ya está probado, en lugar de seguir esperando a terminar una base que lleva un mes en construcción y todavía no está cerca de tener lo que necesitamos.
+
+Quedamos a disposición para acompañarlos y agendar una sesión técnica cuando gusten.

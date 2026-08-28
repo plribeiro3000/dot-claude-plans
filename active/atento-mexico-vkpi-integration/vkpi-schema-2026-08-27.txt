@@ -1,0 +1,60 @@
+VKPI Mexico — source structure capture
+Captured 2026-08-27, read live via the catalog queries in
+../atento-colombia-vkpi-integration/vkpi-schema-queries.sql
+
+SERVER / DATABASE
+  server_name       MXDCQSIMBVP003
+  database_name     dbIndicadoresAt
+  sql_server        Microsoft SQL Server 2016 (SP2) (KB4052908) — 13.x
+
+TABLES
+  dbo.tbl_agentkpis_incentivos   BASE TABLE   636 rows    (legacy, not used)
+  dbo.tbl_VKPI_incentivos        BASE TABLE   1616 rows   (integration target)
+
+Atento built a NEW table (tbl_VKPI_incentivos) rather than modifying the old
+tbl_agentkpis_incentivos. Both tables remain on the server. The integration
+consumes tbl_VKPI_incentivos only.
+
+COLUMNS — dbo.tbl_VKPI_incentivos
+  #   column                    type            null   default
+  1   id_VKP                    bigint          NO
+  2   AñoMes                    varchar(7)      YES            e.g. "2026-08"
+  3   DT_DATA                   int             YES            e.g. 20260801 (period date, yyyymmdd)
+  4   NM_CLIENTE                nvarchar(255)   YES
+  5   NR_SERVICIO_CODIGO        int             YES
+  6   NM_PROGRAMA               varchar(255)    YES
+  7   NR_RE                     bigint          YES            person (candidate carnet)
+  8   RFC                       varchar(50)     YES            fiscal id
+  9   NM_FUNCIONARIO            varchar(512)    YES
+  10  NM_SUPERVISOR             varchar(512)    YES
+  11  NM_GERENTE                varchar(255)    YES
+  12  NM_GESTOR                 varchar(1)      YES
+  13  Resultados                float           YES            final value
+  14  NR_ID                     int             YES            indicator id
+  15  NM_INDICADOR_EN_EL_PAIS   varchar(40)     YES            indicator name
+  16  NM_CARGO_DESCRIPCION      varchar(255)    YES            role
+  17  NM_EMPLEADO_ACTIVO        nvarchar(20)    YES
+  18  DT_MODIFIED               datetime        YES            update timestamp — NO default, no visible mechanism
+  19  DT__INSERT                datetime        YES  (getdate())  creation timestamp
+
+INDEXES
+  PK_tbl_VKPI_incentivos   CLUSTERED   is_primary_key=1   column id_VKP (surrogate identity)
+  No unique composite index over date + person + key.
+
+FOREIGN KEYS
+  None.
+
+DATA FINDINGS (2026-08-27)
+  - Duplicate grain WITH conflicting values: the same (NR_RE, DT_DATA, NR_ID,
+    NR_SERVICIO_CODIGO, NM_PROGRAMA) appears twice with DIFFERENT Resultados.
+    Example: NR_RE 53433, indicator 44 (% Ausentismo), TELEVIA IN, DT_DATA
+    20260801 → one row 0, one row 0.565. Reads as two calculation moments
+    (pre-cierre / reproceso) stacked on the same grain with no discriminator.
+  - Person identifier: NR_RE is stable per person; NR_ID varies per row (it is
+    the indicator); RFC is the fiscal id. NR_RE is the carnet candidate.
+  - Roles present as their own rows (NM_CARGO_DESCRIPCION): OPERADOR B/C,
+    TELEOPERADOR, TELEVENDEDOR, SUPERVISOR BASICO, COORDINADOR DE SERVICIO DE CC,
+    ANALISTA DE WFM, AGENTE / BACK OFFICE DE CALIDAD. Supervisors and
+    coordinators appear as ordinary rows, one per person·indicator·period.
+  - DT_DATA for the monthly sample (% Ausentismo, August) is 20260801 — the
+    first day of the period.

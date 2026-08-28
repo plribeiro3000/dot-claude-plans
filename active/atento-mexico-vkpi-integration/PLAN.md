@@ -2,84 +2,75 @@
 
 ## Objective
 
-Load the VKPI apurado value per person, per indicator, per period into the 4Shark platform as `Indicator` records, through the Mexico integrator's Modifier stream. The integration consumes **one table** — `dbo.tbl_agentkpis_incentivos` on `MXDCQSIMBVP003` / `dbIndicadoresAt`. There is no second table, and none needs to be created.
+Load the VKPI apurado value per person, per indicator, per period into the 4Shark platform as `Indicator` records, through the Mexico integrator's Modifier stream. The integration consumes **one table** — `dbo.tbl_VKPI_incentivos` on `MXDCQSIMBVP003` / `dbIndicadoresAt`.
 
 ## Where this stands
 
-The first round of structural requests has been written and is going to Atento México. Nothing has been agreed yet, no code exists, and no estimate has been given.
+Atento México delivered a first populated version of the table on **25-ago** (Aryadna Espinosa / Christian Rojas / Joel Acevedo) and asked 4Shark to validate it. The structure and the loaded data were validated on **27-ago** against the same checklist used with Colombia. Six points remain open before the integration can be built and estimated; they are the subject of the message below.
 
-This is one round behind Colombia, and it is not a coincidence: Atento's Mexico and Colombia teams do not coordinate with each other. Santiago proposed to Estefani that Mexico adopt the structure Colombia already converged on, and that was declined. So the same requirement set is being negotiated from the start with a different team, using what Colombia's iterations taught rather than the table Colombia built.
+A message with the validation result and the six pending points was handed to Santiago to present at the **27-ago noon meeting** with Atento México. After that meeting, pull the Granola summary of what was discussed and update this plan with any Atento commitments or changes to the six points.
+
+Atento built a **new table** rather than modifying the structure 4Shark originally reviewed. The older `dbo.tbl_agentkpis_incentivos` (636 rows) still exists on the server and is not used; the integration reads `dbo.tbl_VKPI_incentivos` (1616 rows) only. The new table follows the shape of the VKPI extract (client, program, supervisor/manager names, indicator, `Resultados`) rather than the six surgical edits proposed for the old table.
 
 ## The source structure
 
-`vkpi-schema-2026-08-03.txt` in this folder is the full capture, read directly from the live server: the one table, its eleven columns with type and nullability, its single index, the absence of foreign keys, and the row count. Read that file instead of reconnecting. Its 617 rows are sample data and prove nothing about production.
+`vkpi-schema-2026-08-27.txt` in this folder is the full capture read live from the server on 27-ago: the target table, its 19 columns with type and nullability, its single index, the absence of foreign keys, and the data findings. Read that file instead of reconnecting. `vkpi-schema-2026-08-03.txt` describes the older `tbl_agentkpis_incentivos` and is kept only as the prior reference.
 
-**One table is enough, and the missing catalogue is not a problem to solve.** Variables are registered in the 4Shark platform by Atento's own team, and each score row resolves to a Variable through the key that registration produced. Colombia carries that key in its indicator catalogue because a catalogue already exists there; Mexico has none, so the key goes straight onto the score row.
-
-Carrying the key on the row also settles the service dimension for free. A supervisor's `calidad` in one operation and in another are two different keys on two different rows, so no catalogue split is required — which is the one item still open on the Colombia side.
-
-**Two facts about the current table decide most of the requests.** `idAgent` is a surrogate identity column (`COLUMNPROPERTY(..., 'IsIdentity')` returns 1), so the primary key counts rows and constrains nothing about the business key — Colombia's original defect, arriving here through the same door. And `idAgent` is not the agent's code despite its name, so it is not a candidate for the person identifier; the person is one of `SAP`, `PBX` or `UserID`.
+Two facts settle most of the reading. The person is `NR_RE` (stable per person); `NR_ID` varies per row and is the **indicator** id; `RFC` is the fiscal id. And the primary key `id_VKP` is a surrogate identity column, so it counts rows and constrains nothing about the business key.
 
 ## The person identifier is the carnet, and that is not a question
 
-The Mexico integration already identifies each person by the **carnet** — Simplex's `Empleado_Carnet`. This is configured, not inferred: `terraform/integrator-atento/main.tf:71` sets `ExternalIdSource = "carnet"` for the `mx` harvester, resolved to `j.CarnetEmpleado` in `SimplexHarvesterService.cs:118-124`, which the Simplex procedure exposes as `v1.Empleado_Carnet AS carnet_empleado` (`sql/sp_reporte_jeraquia_4shark.sql:140`). Colombia's `mx` counterpart is `ExternalIdSource = "codigo"` — a different column, which is why the answer does not transfer between countries.
+The Mexico integration already identifies each person by the **carnet** — Simplex's `Empleado_Carnet`. This is configured, not inferred: `terraform/integrator-atento/main.tf:71` sets `ExternalIdSource = "carnet"` for the `mx` harvester, resolved to `j.CarnetEmpleado` in `SimplexHarvesterService.cs:118-124`, which the Simplex procedure exposes as `v1.Empleado_Carnet AS carnet_empleado` (`sql/sp_reporte_jeraquia_4shark.sql:140`).
 
-**Both systems must use the same identifier or the rows find nobody.** So the request is that the table carry the carnet, in whichever of `SAP` / `PBX` / `UserID` already holds it, or in a new column if none does.
+**Both systems must use the same identifier or the rows find nobody.** In the delivered table the person is `NR_RE`; it is the carnet candidate. The one thing still to confirm — with Santiago, cross-referencing the Mexico normalized base — is that `NR_RE` equals the Simplex `Empleado_Carnet`.
 
-### If they cannot send the carnet
+## Validation result — requirement status
 
-The platform admits more than one identifier per person, so a second one can be registered: each user would carry the carnet plus that second value, and indicators would resolve by the second. This is exactly what the Simplex integration already does when it registers the carnet — one more of the same.
+| Requirement | Status | Evidence in `tbl_VKPI_incentivos` |
+|---|---|---|
+| A `llave` column, text, not null, carrying the 4Shark Variable key | **Missing** | Not present. `NR_ID` / `NM_INDICADOR_EN_EL_PAIS` is Atento's internal indicator id/name, not the 4Shark key |
+| A single result column, replacing `Numerador` / `Denominador` | **OK** | `Resultados` (float) |
+| A single consolidated value per person·indicator·period | **Broken** | The same person·date·indicator·service·program appears twice with different `Resultados` (see below) |
+| A unique index over date + person + `llave` | **Missing / blocked** | Only the surrogate PK on `id_VKP`. Cannot be created today because the grain repeats |
+| `Fecha` as a real `date` column | **Missing** | `DT_DATA` is `int` (yyyymmdd). It must be a `date` |
+| A creation date alongside the update date | **OK (structure)** | `DT__INSERT` (creation, `default getdate()`) and `DT_MODIFIED` (update) exist |
+| Creation set only on insert, update refreshed on every change | **Not guaranteed** | `DT_MODIFIED` has no default and no visible mechanism — needs a procedure/trigger |
+| Compilation date follows the 4Shark period rule | **To confirm** | `DT_DATA` is the period date; the monthly sample (`% Ausentismo`) is `20260801` (first day) — confirm across all frequencies |
+| Carnet as the person identifier | **To confirm** | `NR_RE` is the candidate; confirm it equals the Simplex `Empleado_Carnet` |
 
-The API resolves the user through `UserIdentifier.get(company_id:, value:)` (`indicators_controller.rb:212`), by value alone, and the schema imposes no per-user limit beyond one `primary` (`schema.rb:2350-2356`). So the mechanism works.
+### The duplicate carries conflicting values
 
-**Two conditions have to hold before committing to that path.** The value must be populated for every person — whoever lacks it cannot be identified. And it must not collide with the carnet: `value` carries a unique index per company (`schema.rb:2350`), so a value that already exists as another person's carnet is **rejected by the database**, not silently mismapped. Two independent numeric sequences collide by construction.
-
-Taking this path also requires Atento to say **where in Simplex that value lives**, because the harvester has to read it from there in order to register it. Without that source there is nothing to load, and the column in their table has nothing to correspond to.
-
-## Requirement status
-
-| Requirement | Status |
-|---|---|
-| A `llave` column, text, not null, carrying the 4Shark Variable key | Requested 05-ago |
-| A unique index over date + person + `llave` | Requested 05-ago |
-| The carnet as the person identifier | Requested 05-ago |
-| One column with the final performance value, replacing `Numerador` / `Denominador` | Requested 05-ago |
-| `Fecha` as a real date column, or its format stated | Requested 05-ago |
-| A creation date, alongside the existing `Fecha_Actualizacion` | Requested 05-ago |
-| Whether the table carries supervisors, and whether their value arrives resolved | Asked 05-ago |
-| Metas | Not in scope, not raised |
+The same `(NR_RE, DT_DATA, NR_ID, NR_SERVICIO_CODIGO, NM_PROGRAMA)` appears twice with **different** `Resultados` — e.g. `NR_RE 53433`, `% Ausentismo`, `TELEVIA IN`, `20260801` → one row `0`, one row `0.565`. This reads as two calculation moments (pre-cierre / reproceso) stacked on the same grain with no discriminator column. For commissioning 4Shark needs a **single consolidated value** per person·indicator·period; this is also what unblocks the unique index.
 
 ### Why the unique index spans date + person + `llave`
 
-That trio mirrors the platform's own identity — `index_modifiers_uniqueness` on company, period, user and variable (`schema.rb:1122`) — so it is the same constraint expressed at the source rather than a convention invented for this integration.
+That trio mirrors the platform's own identity — `index_modifiers_uniqueness` on company, period, user and variable (`schema.rb:1122`) — so it is the same constraint expressed at the source. The `llave` column must NOT be unique on its own: it repeats across people and periods by design.
 
-**The `llave` column must NOT be unique on its own.** It repeats across people and periods by design; a unique index on it alone would reject the second person to receive the same indicator. This is the opposite of Colombia, where `llave` sits on the catalogue and one indicator is one Variable, so uniqueness there is required. The same column name carries opposite constraints in the two countries because it sits on a different table.
+### The created/updated behaviour is load-bearing
 
-## The supervisor question
+4Shark's incremental load processes only the records whose update timestamp moved. `DT__INSERT` carries a creation default, but `DT_MODIFIED` has no mechanism, so nothing guarantees it advances on every change. Without a procedure or trigger that sets the creation timestamp only on insert and refreshes the update timestamp on every update, the incremental load does not work.
 
-The table shows nothing that distinguishes a supervisor from an asesor — no headcount column, no aggregation field. In Colombia those columns exist (`HC` / `HC_Total`) and are what made the supervisor's value a month-long discussion.
+### The compilation date must follow the 4Shark period rule
 
-Their absence here has two readings and the difference matters: either the table carries only asesores, or supervisors arrive exactly like everyone else. Both are workable; what is not workable is loading without knowing which.
+The compilation/period date (`DT_DATA`) must land on the platform's calendar: a monthly indicator referenced to the first day of the period, a weekly one indexed from the first day, a daily one on the day. The monthly sample is compliant (`20260801`); confirm it holds for weekly and daily indicators.
 
-A supervisor is loaded in the platform exactly as an asesor — one value per person, per period, per variable. If their number required any operation on 4Shark's side, that operation would be a guessed business rule, and a wrong guess does not raise an error: it produces a wrong number in variable pay.
+## The supervisor question is resolved
+
+The table carries supervisors and coordinators as **ordinary rows** — `NM_CARGO_DESCRIPCION` shows `SUPERVISOR BASICO`, `COORDINADOR DE SERVICIO DE CC`, `ANALISTA DE WFM`, alongside the operator roles, one row per person·indicator·period. There is no headcount or aggregation column, so a supervisor loads exactly like an asesor — the workable case. This is the item Colombia spent a month on (`HC` / `HC_Total`); here it needs no rule on 4Shark's side.
 
 ## What 4Shark configures on its own side
 
-The meaning of the value — percentage, count, duration, currency — and its calculation mode are **platform configuration**, not a source requirement. Whoever registers each Variable has to look at the indicator's real scale to choose between `PercentDataType` and `NumberDataType`: `PercentDataType#format` divides by 100 (`percent_data_type.rb:4-8`), so a ratio-shaped value on a 0–1 scale registered as a percentage enters a hundred times smaller.
+The meaning of the value — percentage, count, duration, currency — and its calculation mode are platform configuration, not a source requirement. Whoever registers each Variable chooses between `PercentDataType` and `NumberDataType` by the indicator's real scale: `PercentDataType#format` divides by 100 (`percent_data_type.rb:4-8`), so a 0–1 ratio registered as a percentage enters a hundred times smaller.
 
 ## How the keys get agreed between the two sides
 
-Variables are registered in the 4Shark platform, as already happens, and the key that registration produces is what goes in the `llave` column. The only thing to agree is the order: the Variable is registered first, its key loaded into the table afterwards.
-
-The notification loop matches Colombia's: on registering new Variables, Atento's team tells whoever maintains the table and copies 4Shark on the same message, so a pending request stays visible rather than sitting invisibly on their side.
+Variables are registered in the 4Shark platform, and the key that registration produces is what goes in the `llave` column. The Variable is registered first, its key loaded into the table afterwards. On registering new Variables, Atento's team tells whoever maintains the table and copies 4Shark on the same message.
 
 ## Acceptance — what happens when Atento says it is done
 
-Their report closes nothing on its own. When they state the changes are applied, connect to `MXDCQSIMBVP003` / `dbIndicadoresAt` and verify each one against the live database, using the queries in `../atento-colombia-vkpi-integration/vkpi-schema-queries.sql` so the result is comparable with the capture already on file.
+Their report closes nothing on its own. When Atento states the changes are applied, connect to `MXDCQSIMBVP003` / `dbIndicadoresAt` and verify each one against the live database, using the queries in `../atento-colombia-vkpi-integration/vkpi-schema-queries.sql` so the result is comparable with the capture on file.
 
-**On `tbl_agentkpis_incentivos`:** the `llave` column exists, is text, and is never null; a unique index covers date + person + `llave`; the single result column is present and `Numerador` / `Denominador` are gone; `Fecha` is a date type or its format is confirmed in writing; a creation date exists alongside `Fecha_Actualizacion`; the carnet is present in a named column.
-
-**Plus the supervisor answer in writing** — correspondence rather than a query.
+On `tbl_VKPI_incentivos`: the `llave` column exists, is text, and is never null; a single consolidated value exists per grain (no conflicting duplicates); a unique index covers date + person + `llave`; `DT_DATA` is a `date` type; a procedure/trigger guarantees the creation/update timestamp behaviour; the compilation date follows the period rule across frequencies; `NR_RE` is confirmed as the carnet.
 
 When every check passes, the estimate follows.
 
@@ -91,10 +82,10 @@ When every check passes, the estimate follows.
 
 ## Validation 4Shark owes itself before estimating Phase 1
 
-Cross the person identifiers in whatever file or table Atento delivers against the Mexico normalized base. The integrator runs in root mode, so an identifier that does not resolve is a rejected row. This is a query, not a question — but it cannot run until the carnet question is answered, because until then it is not known which column to cross.
+Cross `NR_RE` against the Mexico normalized base. The integrator runs in root mode, so an identifier that does not resolve is a rejected row. This is a query, not a question — and it confirms the carnet at the same time.
 
 ## Risks
 
-The dominant risk is the identifier. Every other request is a column or a constraint on a table Atento controls; the carnet is the one item where a "no" pushes work onto 4Shark's side, and the fallback carries a condition (no collision with the carnet) that only their data can settle.
+The dominant risk is the identifier: `NR_RE` must equal the Simplex carnet, and only Atento's data plus the normalized-base cross-check settle it.
 
-A second risk is the coordination gap between Atento's country teams. Colombia's structure was offered to Mexico and declined, so every lesson has to be re-taught rather than transferred — which is why this plan states the reasoning behind each request rather than only the request.
+The second risk is the source's own consistency: the table already loads the same grain twice with conflicting values, and it has no mechanism guaranteeing the update timestamp advances. Both are Atento's to fix, and both are silent — a wrong value in variable pay does not raise an error.

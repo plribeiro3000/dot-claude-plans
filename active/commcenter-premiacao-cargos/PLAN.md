@@ -22,6 +22,16 @@ de venda e remanejamento de hierarquia. O segundo é o que engana, porque não d
 quatro linhas de `seats` reescritas movem 54 pessoas e milhares de reais entre alvos sem que nenhuma
 venda mude.
 
+**Onde a apuração está em 2026-08-27:** a reconciliação (`10`) rodou contra a base de 27/08 e está
+verificada — aplicou 10 `CREATE`, 1 `UPDATE` e 6 `DISABLE`, zero `FAILED`, e o `12` releu os 17
+registros tocados contra a origem devolvendo `PASS@17@FAIL@0`; as contagens (`11`) vieram
+`DIVERGING@0`, nada a corrigir. Os CSVs que revertem ou re-verificam essa rodada, em
+`s3://4shark-shared-001/integration-debug/audits/2077/premiacao-reconciliation/`, são
+`20260827-132227-78941.csv` (Coordenador), `20260827-132233-78940.csv` (Gerentes) e
+`20260827-132234-78939.csv` (Executivos). O Patrick já foi avisado e falta só ele reprocessar
+63126 / 63127 / 63128; assim que reprocessar, `05-validacao.rb` confere o agregado de cada alvo e o
+relatório consolidado fecha a sessão.
+
 | Frente | Estado |
 |---|---|
 | Espelhos do Coordenador | 304 ativos, R$ 33.038,00 — reconciliados contra os deals de 26/08 |
@@ -34,7 +44,7 @@ venda mude.
 | Régua 264347 | defeito confirmado — correção é decisão da Andresa |
 | Receita dos Executivos somando loja | levantado pela Andresa, não verificado na base (§ Executivos de Vendas) |
 | Migração de 54 pessoas para o Cristiano | aplicada na reconciliação — é entrada do cliente, comunicada e não questionada (§ A divisão de trabalho) |
-| Reprocessamento 63126 / 63127 / 63128 | os três liberados — depende só do Patrick |
+| Reprocessamento 63126 / 63127 / 63128 | reconciliados e verificados em 27/08; Patrick avisado, aguardando ele reprocessar |
 
 **O Coordenador (63126) e os Gerentes (63128) estão prontos para reprocessar.** Uma reconciliação
 envelhece: um espelho é cópia congelada e nada o mantém sincronizado, então se a Larissa mexer nas
@@ -249,6 +259,22 @@ Ficam em `scripts/`, numerados na ordem de execução. **Todos são colados no c
 `bin/ecs run <stack>`** — nunca executados como arquivo, porque o console roda numa task remota que
 não enxerga o disco do engenheiro.
 
+**Toda mutação executa TRÊS queries, nesta ordem, sem exceção — pular qualquer uma esconde uma
+mutação parcial:**
+
+1. **Dry-run / checagem** — relata o delta e não escreve NADA. É lido ANTES de aplicar, e as contas
+   têm de fechar (`esperados = UNCHANGED + UPDATE + CREATE + ENABLE`;
+   `existentes = UNCHANGED + UPDATE + DISABLE`, lembrando que `UNCHANGED` inclui os órfãos já
+   desativados). Se não fecharem, uma identidade não pareou e o motivo vem antes da escrita.
+2. **Execução** — aplica.
+3. **Verificação** — relê da base viva CADA registro que a execução tocou e confere contra a origem,
+   logo depois de aplicar e antes do reprocessamento. **A execução reportar o que fez NÃO é
+   verificação** — é o auto-relato dela, não uma releitura independente: `CREATE@9` prova que o
+   script tentou nove, nunca que nove existem e ficaram certos.
+
+A validação do agregado (`05`) é uma QUARTA checagem, à parte: só vale DEPOIS do reprocessamento e
+confere o número da compensação, não os registros que a mutação tocou.
+
 | Script | Fase | O que faz |
 |---|---|---|
 | `00-descoberta.rb` | leitura | Lista todo plano do período com grupo, override, variáveis e estado da compensação; localiza pessoas por fragmento de nome imprimindo os identificadores para conferência |
@@ -263,6 +289,7 @@ não enxerga o disco do engenheiro.
 | `09-restauracao.rb` | escrita | Recria espelhos a partir de qualquer CSV de auditoria desta rotina — é o desfazer de `06` e `08` |
 | `10-reconciliacao.rb` | leitura **ou** escrita | Compara o conjunto de origem de agora contra os espelhos que existem e aplica o delta — cria os que faltam, atualiza os que mudaram, desativa os órfãos, reativa os que voltaram. Percorre os três planos numa execução; abre em `dry_run`, que só relata |
 | `11-contagens.rb` | leitura **ou** escrita | Recalcula `lojas_atingimento`, `atingimento_lideres` e `hc` contra a base de agora, imprime cada uma ao lado do `Indicator` gravado e corrige as divergentes por `update` do `value`. Abre em `dry_run`, que só relata |
+| `12-verificacao.rb` | leitura | A terceira query de toda mutação de deal: relê, a partir do CSV de auditoria que `04` ou `10` gravou, cada registro que a mutação tocou e confere que o espelho ficou idêntico à venda de origem nos oito campos que o cálculo lê. Devolve `PASS@N@FAIL@0`; qualquer `FAIL` é mutação parcial, e o bucket não está pronto |
 
 **`10-reconciliacao.rb` é o único script que muda de fase por uma variável, e isso é deliberado.**
 Todo o resto da rotina separa pré-flight e mutação em arquivos distintos, mas aqui as duas metades
@@ -453,31 +480,46 @@ Por cargo, na ordem, com os scripts de `scripts/`:
    localiza as pessoas, imprimindo identificadores para conferência.
 2. **Checagem** (`01`) — portões do ambiente e âncoras do plano, alvo a alvo. `reaches_other_target`
    e `mirrors_already_in_subtree` dizem se este cargo está acima de outro já espelhado.
-3. **Pré-flight** (`03`) — projeta e conta os portões. **A mutação não roda enquanto `too_long` e
-   `already_exists` não forem ambos zero.**
-4. **Mutação** (`04`) — cria os espelhos, recusando gravar qualquer coisa se o portão falhar.
-5. **Reprocessar a compensação** — ação do engenheiro. Sem isso o número não se move.
-6. **Validação** (`05`) — compara o esperado com o que a plataforma calculou.
+3. **Pré-flight** (`03`) — a query de checagem: projeta e conta os portões. **A mutação não roda
+   enquanto `too_long` e `already_exists` não forem ambos zero.**
+4. **Mutação** (`04`) — a query de execução: cria os espelhos, recusando gravar qualquer coisa se o
+   portão falhar.
+5. **Verificação** (`12`) — a query de validação: relê cada espelho criado e confere contra a venda
+   de origem. `PASS@N@FAIL@0` antes de seguir.
+6. **Reprocessar a compensação** — ação do engenheiro. Sem isso o número não se move.
+7. **Validação do agregado** (`05`) — depois do reprocessamento, compara o esperado com o que a
+   plataforma calculou.
 
 ### Re-apuração de uma competência que já tem espelhos
 
-São seis colagens e nenhuma espera pelo cliente (§ A divisão de trabalho). O `10` cobre os três
+São oito colagens e nenhuma espera pelo cliente (§ A divisão de trabalho). O `10` cobre os três
 cargos num laço e o `11` cobre as três contagens dos Executivos, então a sequência inteira roda de
-ponta a ponta numa sessão:
+ponta a ponta numa sessão. Cada uma das duas mutações — a reconciliação de deals (`10`) e a correção
+de contagens (`11`) — carrega as suas três queries: dry-run, execução, verificação.
 
 1. **Checagem** (`01`) — portões do ambiente e âncoras do plano. Confirma que o plano, o período e a
    compensação continuam os mesmos, e imprime o `money` atual de cada alvo.
-2. **Reconciliação em modo relatório** (`10`, `dry_run = true`) — imprime `CREATE`, `UPDATE`,
-   `DISABLE`, `ENABLE`, `UNCHANGED` e `FAILED` por plano, e grava um CSV por plano. **Ler o delta
-   antes de aplicar é o passo que não se pula**, e as contas têm de fechar dos dois lados:
-   `esperados = UNCHANGED + UPDATE + CREATE` e `existentes = UNCHANGED + UPDATE + DISABLE`. Se não
-   fecharem, alguma identidade não pareou e o motivo vem antes da escrita.
-3. **Reconciliação aplicando** (`10`, `dry_run = false`) — logo em seguida, sem intervalo.
-4. **Contagens em modo relatório** (`11`, `dry_run = true`) — recalcula loja, líder e headcount e
-   imprime cada uma ao lado do gravado, com o `raw` e o `destroyable?`.
-5. **Contagens aplicando** (`11`, `dry_run = false`) — corrige por `update` só as divergentes.
-6. **Validação** (`05`) — depois de o reprocessamento acontecer, compara o esperado com o que a
-   plataforma calculou, relendo a base.
+2. **Reconciliação em modo relatório** (`10`, `dry_run = true`) — a query de checagem da reconciliação:
+   imprime `CREATE`, `UPDATE`, `DISABLE`, `ENABLE`, `UNCHANGED` e `FAILED` por plano, e grava um CSV
+   por plano. **Ler o delta antes de aplicar é o passo que não se pula**, e as contas têm de fechar
+   dos dois lados: `esperados = UNCHANGED + UPDATE + CREATE + ENABLE` e
+   `existentes = UNCHANGED + UPDATE + DISABLE`. Se não fecharem, alguma identidade não pareou e o
+   motivo vem antes da escrita.
+3. **Reconciliação aplicando** (`10`, `dry_run = false`) — a query de execução, logo em seguida, sem
+   intervalo.
+4. **Verificação da reconciliação** (`12`) — a query de validação: relê cada registro que o `10`
+   criou, atualizou ou desativou, a partir dos CSVs do apply, e confere contra a origem.
+   `PASS@N@FAIL@0` antes de seguir.
+5. **Contagens em modo relatório** (`11`, `dry_run = true`) — a query de checagem das contagens:
+   recalcula loja, líder e headcount e imprime cada uma ao lado do gravado, com o `raw` e o
+   `destroyable?`.
+6. **Contagens aplicando** (`11`, `dry_run = false`) — a query de execução: corrige por `update` só
+   as divergentes.
+7. **Verificação das contagens** (`11`, `dry_run = true` de novo) — a query de validação das
+   contagens: depois do apply, um novo relatório tem de vir `DIVERGING@0`. É a releitura independente,
+   porque `11` não gera CSV de espelho para o `12` reler.
+8. **Validação do agregado** (`05`) — depois de o reprocessamento acontecer, compara o esperado com o
+   que a plataforma calculou, relendo a base.
 
 **Um delta grande não é motivo para parar, é motivo para EXPLICAR.** Quando `DISABLE` e `CREATE` vêm
 altos e simétricos entre dois alvos, a causa costuma ser hierarquia: comparar o tamanho das subárvores
