@@ -19,7 +19,7 @@ require 'csv'
 expected_bucket = '4shark-shared-001'
 company_id = 2077
 
-plan_id = 78939
+plan_id = 79175
 competence_period_id = 528210
 revenue_variable_id = 36311
 
@@ -41,14 +41,21 @@ else
     target_user = User.find(user_commission.user_id)
     subtree_user_ids = HierarchyScope.new(target_user, User).resolve.pluck(:id)
 
+    # Only an override plan walks the subtree, so only there does a source seller's own Indicator row
+    # already reach the target. Without this gate an override-off plan calls every carrier-sourced
+    # mirror duplicated and this script destroys the revenue the cargo depends on.
     carrier_user_ids =
-      Indicator
-      .for_company(company_id)
-      .for_variable(revenue_variable_id)
-      .where(user_id: subtree_user_ids)
-      .where(compiled_at: period.starts_at..period.ends_at)
-      .pluck(:user_id)
-      .uniq
+      if plan.override?
+        Indicator
+          .for_company(company_id)
+          .for_variable(revenue_variable_id)
+          .where(user_id: subtree_user_ids)
+          .where(compiled_at: period.starts_at..period.ends_at)
+          .pluck(:user_id)
+          .uniq
+      else
+        []
+      end
 
     mirrors =
       Deal

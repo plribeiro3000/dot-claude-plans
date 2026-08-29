@@ -21,7 +21,7 @@ require 'csv'
 expected_bucket = '4shark-shared-001'
 company_id = 2077
 
-plan_id = 78939
+plan_id = 79175
 audit_key = 'integration-debug/audits/2077/premiacao-duplicate-cleanup/20260824-214726.csv'
 required_columns = %w[user_id external_id installment sold_price quantity date client_id product_id status_id]
 

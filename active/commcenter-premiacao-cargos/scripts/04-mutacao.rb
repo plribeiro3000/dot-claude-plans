@@ -104,6 +104,9 @@ else
     created_count = 0
     failed_count = 0
 
+    original_deal_ids = candidates.map(&:last)
+    seller_names = User.where(id: Deal.where(id: original_deal_ids).pluck(:user_id).uniq).pluck(:id, :name).to_h
+
     candidates.each do |target_user_id, variable_id, variable_key, original_deal_id|
       original_deal = Deal.find(original_deal_id)
       mirrored_external_id = "#{original_deal.external_id}_#{target_user_id}"
@@ -122,7 +125,9 @@ else
         client_id: original_deal.client_id,
         product_id: original_deal.product_id,
         status_id: original_deal.status_id,
-        description: "mirror of deal #{original_deal.id} from user #{original_deal.user_id}"
+        # The client reads this on the transaction, so it is Portuguese and carries the identifiers
+        # the client owns — never the internal ids, which mean nothing outside this database.
+        description: "espelho da venda #{original_deal.external_id} de #{seller_names[original_deal.user_id]}"
       )
 
       if mirrored_deal.save

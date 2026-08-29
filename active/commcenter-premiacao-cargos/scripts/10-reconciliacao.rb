@@ -1,5 +1,5 @@
 # Phase 10 — RECONCILIATION. Bring the mirrors already in the base back in line with the deals as
-# they stand now. Covers the three cargos in one pass.
+# they stand now. Covers every plan in plan_ids in one pass.
 # Target: app-shared-001. Paste into: bin/ecs run <stack>
 #
 # ############################################################################
@@ -50,8 +50,15 @@ dry_run = true
 expected_bucket = '4shark-shared-001'
 company_id = 2077
 
-plan_ids = [78941, 78940, 78939]
+plan_ids = [78940, 79175]
 competence_period_id = 528210
+
+# The Executivo carries only PAP revenue in vendas_instaladas, and the metric cannot express that:
+# the revenue variables separate by status alone. The cut is on the source USERS — the PAP population
+# is the union of the subtrees of the leaders in the Líderes PAP commission — and it is keyed per
+# variable because the rule names vendas_instaladas alone.
+lideres_pap_plan_id = 78938
+pap_restricted_variable_ids_by_plan_id = { 79175 => [36311] }
 
 comparable_fields = %w[sold_price quantity status_id date client_id product_id originated_at owner_id]
 
@@ -69,8 +76,16 @@ else
     period = plan.periods.find(competence_period_id)
     commission = Commission.for_company(company_id).for_plan(plan_id).for_period(competence_period_id).first
     metric_variables = plan.variables.with_metrics
+    pap_restricted_variable_ids = pap_restricted_variable_ids_by_plan_id.fetch(plan.id, [])
+    lideres_pap_user_ids = []
+
+    if pap_restricted_variable_ids.any?
+      lideres_pap_commission = Commission.for_company(company_id).for_plan(lideres_pap_plan_id).for_period(competence_period_id).first
+      lideres_pap_user_ids = UserCommission.where(commission_id: lideres_pap_commission.id).pluck(:user_id)
+    end
 
     puts "plan@#{plan.id}@#{plan.name}@deal_type@#{plan.deal_type}@override@#{plan.override?}"
+    puts "pap_restricted@#{pap_restricted_variable_ids.inspect}@lideres_pap@#{lideres_pap_user_ids.size}"
     puts "period@#{period.id}@#{period.starts_at}@#{period.ends_at}"
     puts "commission@#{commission.id}@status@#{commission.status}"
     puts "metric_variables@#{metric_variables.pluck(:id, :key).inspect}"
@@ -87,11 +102,31 @@ else
       target_user = User.find(user_commission.user_id)
       recursive_user_ids = UserScope.new(target_user, User).resolve.pluck(:id) - [target_user.id]
 
+      pap_population_ids = []
+
+      (lideres_pap_user_ids & recursive_user_ids).each do |lider_id|
+        lider = User.find(lider_id)
+        pap_population_ids += UserScope.new(lider, User).resolve.pluck(:id)
+      end
+
+      pap_population_ids = pap_population_ids.uniq
+      seller_names = User.where(id: recursive_user_ids).pluck(:id, :name).to_h
+
       expected_originals = {}
       carrier_report = []
+      source_report = []
 
       metric_variables.each do |variable|
         metric = variable.metric
+
+        variable_user_ids =
+          if pap_restricted_variable_ids.include?(variable.id)
+            recursive_user_ids & pap_population_ids
+          else
+            recursive_user_ids
+          end
+
+        source_report << "#{variable.key}:#{variable_user_ids.size}"
 
         # Only an override plan walks the subtree, so only there does a subordinate's own Indicator
         # row already reach the target. Excluding carriers under a non-override plan drops revenue
@@ -101,7 +136,7 @@ else
             Indicator
               .for_company(company_id)
               .for_variable(variable.id)
-              .where(user_id: recursive_user_ids)
+              .where(user_id: variable_user_ids)
               .where(compiled_at: period.starts_at..period.ends_at)
               .pluck(:user_id)
               .uniq
@@ -110,7 +145,7 @@ else
           end
 
         carrier_report << "#{variable.key}:#{carrier_user_ids.size}"
-        source_user_ids = recursive_user_ids - carrier_user_ids
+        source_user_ids = variable_user_ids - carrier_user_ids
 
         original_deals = Deal.for_company(company_id).where(user_id: source_user_ids).enabled.where(external: true)
         original_deals = original_deals.for_type(plan.deal_type)
@@ -154,6 +189,7 @@ else
         .sum('sold_price * quantity')
 
       puts "target@#{target_user.id}@#{target_user.name}@recursive@#{recursive_user_ids.size}" \
+           "@pap@#{pap_population_ids.size}@sources@#{source_report.join(',')}" \
            "@carriers@#{carrier_report.join(',')}" \
            "@expected@#{expected_originals.size}@existing@#{existing_mirrors.size}@total_before@#{total_before}"
 
@@ -195,7 +231,9 @@ else
               client_id: original_deal.client_id,
               product_id: original_deal.product_id,
               status_id: original_deal.status_id,
-              description: "mirror of deal #{original_deal.id} from user #{original_deal.user_id}"
+              # The client reads this on the transaction, so it is Portuguese and carries the
+              # external identifier — the internal id means nothing outside this database.
+              description: "espelho da venda #{original_deal.external_id} de #{seller_names[original_deal.user_id]}"
             )
 
             if mirrored_deal.save

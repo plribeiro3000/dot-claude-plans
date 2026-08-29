@@ -29,9 +29,8 @@ company_id = 2077
 # The reconciliation CSVs the apply wrote — one per plan, replaced each run from 10-reconciliacao.rb's
 # RECONCILIATION_DONE output.
 audit_keys = [
-  'integration-debug/audits/2077/premiacao-reconciliation/<timestamp>-78941.csv',
   'integration-debug/audits/2077/premiacao-reconciliation/<timestamp>-78940.csv',
-  'integration-debug/audits/2077/premiacao-reconciliation/<timestamp>-78939.csv'
+  'integration-debug/audits/2077/premiacao-reconciliation/<timestamp>-79175.csv'
 ]
 
 comparable_fields = %w[sold_price quantity status_id date client_id product_id originated_at owner_id]

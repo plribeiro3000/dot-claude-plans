@@ -1,13 +1,13 @@
-# Phase 11 — COUNTS. Recompute lojas_atingimento, atingimento_lideres and hc against the base as it
+# Phase 11 — COUNTS. Recompute lojas_atingimento and atingimento_lideres against the base as it
 # stands now, print each beside the Indicator stored on the Executivo, correct the divergent ones.
 # Target: app-shared-001. Paste into: bin/ecs run <stack>
 # dry_run = true reports and writes NOTHING. dry_run = false UPDATES INDICATORS IN PRODUCTION.
 #
-# These three variables carry no metric, so no mirror reaches them: their value enters as an EXTERNAL
+# Both variables carry no metric, so no mirror reaches them: their value enters as an EXTERNAL
 # Indicator, one per Executivo. That makes them the one part of the delivery that a deal-level
 # reconciliation cannot touch, and the reason they need their own pass.
 #
-# ALL THREE ARE FUNCTIONS OF THE SUBTREE, so any hierarchy move invalidates them silently — the
+# BOTH ARE FUNCTIONS OF THE SUBTREE, so any hierarchy move invalidates them silently — the
 # stored Indicator keeps the count taken against the tree of the day it was written.
 #
 # THE ATTRIBUTION INCLUDES THE EXECUTIVO. Several stores hang their goal on the Executivo instead of
@@ -31,14 +31,13 @@ dry_run = true
 
 company_id = 2077
 
-executivos_plan_id = 78939
+executivos_plan_id = 79175
 lojas_plan_id = 78944
 lideres_plan_id = 78938
 competence_period_id = 528210
 
 lojas_atingimento_variable_id = 36927
 atingimento_lideres_variable_id = 36928
-headcount_variable_id = 36480
 vendas_instaladas_variable_id = 36311
 
 expected_bucket = '4shark-shared-001'
@@ -165,7 +164,6 @@ else
         end
       end
 
-    headcount_total = 0
     headcount_detail = []
 
     headcount_variable_ids.each do |headcount_variable_id, headcount_variable_key|
@@ -178,15 +176,15 @@ else
         .pluck(:id)
         .each do |headcount_indicator_id|
           headcount_indicator = Indicator.find(headcount_indicator_id)
-          headcount_total += headcount_indicator.format
           headcount_detail << "#{headcount_variable_key}:#{headcount_indicator.format}"
         end
     end
 
+    # hc is absent on purpose: rule 263617 reads "Meta PAP batida em todas as cidades com menos HC do
+    # que o orçado", a conjunction over the cities — not a sum, which is what writing it here produced.
     computed_by_variable_id = {
       lojas_atingimento_variable_id => reached_loja_keys.size,
-      atingimento_lideres_variable_id => reached_lider_ids.size,
-      headcount_variable_id => headcount_total
+      atingimento_lideres_variable_id => reached_lider_ids.size
     }
 
     puts "executivo@#{executivo.id}@#{executivo.name}@subtree@#{subtree_user_ids.size}"

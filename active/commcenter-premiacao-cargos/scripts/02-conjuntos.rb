@@ -24,7 +24,7 @@
 # not follow deal or hierarchy changes since.
 
 company_id = 2077
-plan_id = 78939
+plan_id = 79175
 competence_period_id = 528210
 metric_variable_id = 36311
 
