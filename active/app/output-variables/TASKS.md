@@ -283,27 +283,28 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
   set into `Rule::Options` (`app/models/rule/options.rb`) and replaced formula evaluation against a
   synthetic hash of random values with a name comparison — `unknown_identifier(rule_options.identifiers)`
   (`app/models/rule.rb:80-81,101-103`), which reports `:unknown_variable` carrying the offending name.
-  So the whole task is: teach `Rule::Options` about output variables, for the rule types that may
-  read one.
-- **The branch structure is the one design point.** `Options#identifiers`
-  (`app/models/rule/options.rb:37-45`) has three branches — formula rules, easy-company indicator
-  rules, and an `else` that covers indicator, ranking, limiter and redemption together. Output
-  keys belong to ranking, limiter and redemption but **not** indicator (the indicator stage writes
-  and does not read, `PLAN.md:45`), so the `else` branch cannot simply gain a fourth term. The
-  per-type table `BUILT_IN_VARIABLES_BY_TYPE` (`:14-24`) is already keyed by rule class name and is
-  the natural place to express which types may read one.
+  The merged registration change (BE-3) already taught `Rule::Options` this: `identifiers` carries
+  `output_variables` for every reading type. So the whole task is confirmation and tests.
+- **The branch structure already expresses the rule and needs no change.** `Options#identifiers`
+  (`app/models/rule/options.rb:40-48`) has three branches — the `formula?` branch (the deal stage),
+  the easy-company indicator branch, and an `else` that covers `IndicatorRule`, `RankingRule`,
+  `LimiterRule` and `RedemptionRule` together. Output keys belong to every stage except the deal
+  stage (`PLAN.md:47`), so the `else` arm correctly carries `output_variables` for all four reading
+  types and the `formula?` branch correctly withholds them from the one stage that may not read.
+  No split, no fourth term — the merged code is already the target shape; this task pins it with
+  tests.
 - **Dependencies**: BE-3 merged — the validator needs to know which output variables the company
   has (`PLAN.md:173`).
 - **Acceptance criteria**:
-  - [ ] `Rule::Options` answers with the company's output variable keys for the three rule types
-        that may read one — `RankingRule`, `LimiterRule`, `RedemptionRule` — following the shape of
-        its sibling queries, which every one of them plucks keys rather than loading records
-        (`app/models/rule/options.rb:52-78`).
-  - [ ] `IndicatorRule` and `FormulaRule` are **not** given output keys — the indicator stage
-        writes but does not read (`PLAN.md:45`). This is the assertion that the `else` branch at
-        `app/models/rule/options.rb:43` was split rather than extended.
-  - [ ] A rule referencing an output key saves through the incentive mutation, on the incentive
-        types that may read one. Asserted in
+  - [ ] `Rule::Options` answers with the company's output variable keys for every rule type that
+        may read one — `IndicatorRule`, `RankingRule`, `LimiterRule`, `RedemptionRule` — through
+        `output_variables` (`app/models/rule/options.rb:83-85`), which plucks keys rather than
+        loading records like every sibling query.
+  - [ ] `FormulaRule` is **not** given output keys — the deal (transactional) stage may not read
+        (`PLAN.md:47`), so the `formula?` branch of `identifiers`
+        (`app/models/rule/options.rb:41-42`) carries no output term.
+  - [ ] A rule referencing an output key saves through the incentive mutation on every reading
+        type — indicator, ranking, limiter, redemption. Asserted in
         `spec/requests/graphql_mutations/graphql_controller_create_incentive_spec.rb`.
   - [ ] A rule referencing a genuinely unknown key still fails with
         `errors.add(:value, :unknown_variable, variable: <name>)` (`app/models/rule.rb:103`) — the
@@ -414,10 +415,17 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
         `value` column is summed, which is exactly what it exists to catch (`PLAN.md:385`).
   - [ ] Several rules into one variable, and two incentives into one variable, produce the expected
         sum.
+  - [ ] **Every stage's consumer materializes, deal included.** Any stage may export an output
+        variable, so the writer set is all five: deal, indicator, ranking, limiter, redemption. The
+        deal (transactional) stage is the exporter an indicator reader depends on, so its
+        materialization is what makes the indicator's read non-empty — a deal rule sums
+        `Commissioning#money` like any money stage.
   - [ ] A rule that evaluated to zero — and therefore wrote no commissioning row — contributes
-        nothing. The guard is present in all four incentive stages:
+        nothing. The guard is present in every incentive stage:
         `indicator_incentive/consumer.rb:41`, `limiter_incentive/consumer.rb:40`,
-        `ranking_incentive/consumer.rb:47`, `redemption_incentive/consumer.rb:37`.
+        `ranking_incentive/consumer.rb:47`, `redemption_incentive/consumer.rb:37`, and the deal
+        consumer's own non-zero guard (`app/workers/deal_incentive/consumer.rb`, exact site
+        confirmed at execution).
   - [ ] **Idempotency under retry: running the materialization twice leaves the value unchanged.**
         This is the property `PLAN.md:225` singles out as invisible in a single-run test.
   - [ ] Storage is `aggregated_modifiers`. Note for the implementer: `AggregatedIndicator` is the
@@ -481,31 +489,36 @@ so each passes the reversibility gate in `DECISION-AUTHORITY.md`.
 - **Repository**: `app`
 - **Phase** (`PLAN.md:228-253`): Phase 7, read path
 - **Description**: a new options processor supplies the materialized output values, merged last
-  into the Dentaku options hash of the three reading stages.
+  into the Dentaku options hash of the four reading stages — indicator, ranking, limiter, redemption.
 - **Dependencies**: BE-6 (nothing to read otherwise) and BE-4 (no rule can name the variable
   otherwise) — `PLAN.md:248`.
 - **Acceptance criteria**:
   - [ ] `Commission::OutputOptionsProcessor` created at
         `app/services/commission/output_options_processor.rb` (decision D9).
-  - [ ] The merge is added in exactly three consumers, each joining the existing expression:
+  - [ ] The merge is added in exactly four consumers — every reading stage — each joining the
+        existing expression: `app/workers/indicator_incentive/consumer.rb:29`
+        (`options = deal_options.merge(user_commission.modifier_options)`),
         `app/workers/ranking_incentive/consumer.rb:44`
         (`options = deal_options.merge(modifier_options).merge(ranking_options)`),
         `app/workers/limiter_incentive/consumer.rb:37`, and
         `app/workers/redemption_incentive/consumer.rb:34`. The output merge comes last, after
         `modifier_options`, following both named precedents.
-  - [ ] **The indicator consumer is not touched.** It is the first writer and nothing has been
-        written before it; its line 29
-        (`options = deal_options.merge(user_commission.modifier_options)`) is unchanged.
-  - [ ] **The deal stage is not touched, and the PR states why that is safe.** It does not merge the
-        snapshot wholesale — it filters it to metric keys
-        (`app/workers/deal_incentive/consumer.rb:30-32`, and the same shape at
+  - [ ] **The indicator consumer merges output — it is a reading stage.** It reads output variables
+        the deal stage exported, so its line 29
+        (`options = deal_options.merge(user_commission.modifier_options)`) gains the output merge
+        after `modifier_options`, like the other three. It stays a writer as well (BE-6): the
+        indicator stage reads what deal wrote and writes what ranking/limiter/redemption may read.
+  - [ ] **The deal stage's read path is not touched, and the PR states why that is safe.** The deal
+        stage may not read, so it does not merge the snapshot wholesale — it filters it to metric
+        keys (`app/workers/deal_incentive/consumer.rb:30-32`, and the same shape at
         `deal_incentive/period_processor.rb:20`), so an output key is filtered out by that
-        `select` with no code change.
+        `select` with no code change. Its write side (its exporting rules materialize output) is
+        BE-6, not this task.
   - [ ] **A plan with no output variable produces byte-identical options hashes to today.** This
         is the regression criterion for the whole read path.
-  - [ ] A rule in a ranking, limiter or redemption incentive reading an output variable evaluates
-        against the materialized value, not the default. The frozen snapshot already carries
-        output keys at their default — it is written once before any incentive stage
+  - [ ] A rule in an indicator, ranking, limiter or redemption incentive reading an output variable
+        evaluates against the materialized value, not the default. The frozen snapshot already
+        carries output keys at their default — it is written once before any incentive stage
         (`app/workers/user_commission/indicator_options_consumer.rb:16-17`) and
         `IndicatorOptionsProcessor` reads `plan.variables` unscoped
         (`app/services/commission/indicator_options_processor.rb:41`) — so this criterion is
