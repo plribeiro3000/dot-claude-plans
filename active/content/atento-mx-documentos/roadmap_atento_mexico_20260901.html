@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Roadmap 4Shark — Atento México</title>
+<style>
+  :root{
+    --text:#1c1917; --muted:#6b7280; --faint:#9ca3af; --border:#e5e7eb;
+    --green:#16a34a; --green-bg:#dcfce7;
+    --gray-badge:#57534e; --gray-badge-bg:#f3f4f6;
+    --blue:#2563eb;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--text); line-height:1.55; font-size:14px;
+    -webkit-print-color-adjust:exact; print-color-adjust:exact;}
+  .page{max-width:820px;margin:0 auto;padding:36px 40px 60px}
+  h1{font-size:26px;font-weight:700;margin:0 0 6px;letter-spacing:-.01em}
+  .lead{color:var(--muted);font-size:15px;margin:0 0 4px}
+  .meta{color:var(--faint);font-size:12px;margin:0 0 22px}
+  .cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px}
+  .card{flex:1 1 150px;border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .card .num{font-size:24px;font-weight:700;color:var(--green);line-height:1.1}
+  .card .num.blue{color:var(--blue)}
+  .card .cap{color:var(--muted);font-size:12px;margin-top:3px}
+  .callout{border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:10px;
+    padding:14px 18px;margin-bottom:30px;background:#fbfcfe}
+  .callout p{margin:0 0 10px} .callout p:last-child{margin-bottom:0} .callout b{font-weight:700}
+  h2{font-size:18px;font-weight:700;margin:34px 0 4px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  .section-intro{color:var(--muted);font-size:12.5px;margin:0 0 20px}
+  .timeline{position:relative;padding-left:26px;margin-top:6px}
+  .timeline::before{content:'';position:absolute;left:6px;top:6px;bottom:6px;width:2px;background:var(--border)}
+  .month{font-size:11px;font-weight:700;letter-spacing:.09em;color:var(--faint);text-transform:uppercase;margin:22px 0 12px}
+  .month:first-child{margin-top:0}
+  .event{position:relative;margin-bottom:18px;break-inside:avoid}
+  .event .node{position:absolute;left:-26px;top:2px;width:13px;height:13px;border-radius:50%;background:#fff;border:3px solid var(--green)}
+  .event .date{font-size:11px;letter-spacing:.06em;color:var(--faint);text-transform:uppercase;margin-bottom:2px}
+  .event .title{font-weight:700;font-size:14.5px;margin-bottom:3px}
+  .badge{display:inline-block;vertical-align:middle;margin-left:8px;padding:2px 7px;border-radius:4px;
+    font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase}
+  .badge.nuevo{background:var(--green-bg);color:var(--green)}
+  .badge.mejora{background:var(--gray-badge-bg);color:var(--gray-badge)}
+  .event .desc{color:var(--muted);font-size:13px}
+  .pcard{border:1px solid var(--border);border-radius:10px;padding:18px 20px;margin-bottom:18px}
+  .pcard h3{font-size:16px;font-weight:700;margin:0 0 4px}
+  .pcard .when{color:var(--blue);font-weight:600;font-size:13px;margin:0 0 12px}
+  .pcard p{margin:0 0 10px;font-size:13.5px} .pcard p b{font-weight:700}
+  .pcard ul{margin:0 0 10px;padding-left:20px} .pcard li{font-size:13.5px;margin-bottom:6px}
+  table{width:100%;border-collapse:collapse;margin-top:8px;font-size:13px}
+  thead td{background:#f9fafb;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;
+    font-weight:700;padding:9px 12px;border-bottom:1px solid var(--border)}
+  tbody td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  tbody td:first-child{font-weight:700;width:22%}
+  tbody td:nth-child(2){width:24%;color:var(--muted)}
+  tbody td:nth-child(3){color:var(--muted)}
+  .footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--border);color:var(--faint);font-size:11.5px}
+  .footer p{margin:0 0 8px}
+  @page{margin:14mm 12mm}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Roadmap 4Shark &mdash; Atento M&eacute;xico</h1>
+  <p class="lead">Funcionalidades desarrolladas y entregadas en la plataforma, y pr&oacute;ximos pasos de la integraci&oacute;n.</p>
+  <p class="meta">Documento generado el 1 de septiembre de 2026 &middot; Per&iacute;odo cubierto: mayo &ndash; agosto de 2026</p>
+
+  <div class="cards">
+    <div class="card"><div class="num">12</div><div class="cap">Funcionalidades nuevas</div></div>
+    <div class="card"><div class="num">2</div><div class="cap">Mejoras de flujo</div></div>
+    <div class="card"><div class="num blue">VKPI</div><div class="cap">Pr&oacute;xima integraci&oacute;n</div></div>
+  </div>
+
+  <div class="callout">
+    <p><b>C&oacute;mo leer este documento.</b> La primera secci&oacute;n es la l&iacute;nea de tiempo de las funcionalidades que 4Shark desarroll&oacute; y puso en producci&oacute;n para la operaci&oacute;n de Atento M&eacute;xico, con su fecha. La segunda es la pr&oacute;xima integraci&oacute;n &mdash;la de indicadores VKPI&mdash; con lo que se necesita del lado de Atento. La tercera lista los temas cuyo avance depende de definiciones o insumos de Atento M&eacute;xico.</p>
+    <p>La plataforma 4Shark evoluciona de forma continua: cada funcionalidad publicada queda disponible para la operaci&oacute;n de M&eacute;xico en el momento en que entra en producci&oacute;n, sin necesidad de instalaci&oacute;n ni de actualizaci&oacute;n por parte de ustedes.</p>
+  </div>
+
+  <h2>1. Funcionalidades entregadas</h2>
+  <p class="section-intro">En orden. <b>Nuevo</b> indica una capacidad que la plataforma no ten&iacute;a; <b>Mejora</b>, un cambio en el flujo de una funcionalidad existente. Todas ya en producci&oacute;n y disponibles para la operaci&oacute;n de M&eacute;xico.</p>
+
+  <div class="timeline">
+    <div class="month">Mayo 2026</div>
+    <div class="event"><div class="node"></div>
+      <div class="date">6 de mayo de 2026</div>
+      <div class="title">Creación masiva de planes por planilla<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Creación de todos los planes de una sola vez a partir de un archivo de carga, definiendo por fila el tipo de plan, el calendario, el grupo, el presupuesto y los responsables, en lugar de registrarlos uno por uno. Fue el desarrollo prioritario que Atento México solicitó, entregado sin costo.</div>
+    </div>
+    <div class="month">Junio 2026</div>
+    <div class="event"><div class="node"></div>
+      <div class="date">Junio de 2026</div>
+      <div class="title">Integración de usuarios vía Simplex en producción<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Carga automática de colaboradores, jerarquía y cargos desde el Simplex de producción de Atento México, documentada y aprobada en el CAB de Atento. La plataforma pasa a reflejar la estructura vigente de la operación sin carga manual.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">2 de junio de 2026</div>
+      <div class="title">Registro de eventos de seguridad<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Listado y detalle de los eventos de seguridad de la plataforma: accesos, creación de usuarios, cambios de contraseña y renovación de sesión, con su reporte de auditoría.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">23 de junio de 2026</div>
+      <div class="title">Selección de mes en la auditoría de declaración de reglas<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">La generación de la auditoría permite acotar el período consultado por mes y por ventana de tiempo, en lugar de procesar todo el histórico.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">25 de junio de 2026</div>
+      <div class="title">Activación y desactivación masiva de usuarios por planilla<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Activación y desactivación de múltiples colaboradores a partir de un archivo, sin entrar en cada registro. Disponible en el menú de usuarios, botón «Acciones en Lote».</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">30 de junio de 2026</div>
+      <div class="title">Creación masiva de grupos por planilla<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Creación de varios grupos de una sola vez a partir de un archivo de carga, sin registrarlos uno por uno.</div>
+    </div>
+    <div class="month">Julio 2026</div>
+    <div class="event"><div class="node"></div>
+      <div class="date">6 de julio de 2026</div>
+      <div class="title">Cambio masivo de jerarquía<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Actualización del coordinador y el supervisor de varios colaboradores al mismo tiempo, a partir de un archivo, reflejando reorganizaciones del equipo sin ajustar registro por registro.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">7 de julio de 2026</div>
+      <div class="title">Exportación a Excel del historial del colaborador<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Exportación del historial completo de un colaborador —pagos, indicadores, grupos, jerarquía, metas y declaraciones— consolidado en un solo archivo, con regeneración bajo demanda.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">10 de julio de 2026</div>
+      <div class="title">Información de grupo y colaboradores en Parciales y Compensaciones<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Los listados de comisión parcial y de compensación muestran el grupo y la cantidad de colaboradores de cada registro, permitiendo validar los valores directamente desde la lista sin abrir cada ítem.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">28 de julio de 2026</div>
+      <div class="title">Descarga en planilla de los errores de carga<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Cuando una carga presenta errores, se descarga el listado completo en una planilla, con la línea y el motivo de cada uno, para corregir el archivo original sin revisar los errores uno por uno en pantalla.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">28 de julio de 2026</div>
+      <div class="title">Revisión completa obligatoria antes de firmar una declaración<span class="badge mejora">Mejora</span></div>
+      <div class="desc">El colaborador debe desplegar el contenido completo de la declaración —de reglas y de resultados— antes de poder firmarla. Cambia el flujo de firma y refuerza la trazabilidad de la aceptación.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">30 de julio de 2026</div>
+      <div class="title">Actualización masiva de datos de usuarios por planilla<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Actualización de ciudad, departamento, correo electrónico, nombre, apellido, documento y estado de varios colaboradores a partir de un archivo. Las celdas en blanco no alteran el dato actual, de modo que se corrige un solo campo sin repetir el resto de la información.</div>
+    </div>
+    <div class="month">Agosto 2026</div>
+    <div class="event"><div class="node"></div>
+      <div class="date">14 de agosto de 2026</div>
+      <div class="title">Exportación de Declaraciones<span class="badge nuevo">Nuevo</span></div>
+      <div class="desc">Generación en segundo plano y descarga de un archivo ZIP con un índice en Excel y las declaraciones en PDF, separadas en carpetas de declaraciones de reglas por calendario y de resultados por plan. Disponible en Configuraciones → Exportaciones de Declaraciones.</div>
+    </div>
+    <div class="event"><div class="node"></div>
+      <div class="date">19 de agosto de 2026</div>
+      <div class="title">Restablecimiento de contraseña con permiso propio<span class="badge mejora">Mejora</span></div>
+      <div class="desc">El restablecimiento de contraseña pasa a ser una pantalla independiente con su propio permiso, separada de la edición del usuario: quien administra contraseñas ya no necesita permiso para editar los demás datos del colaborador.</div>
+    </div>
+  </div>
+
+  <h2>2. Pr&oacute;xima integraci&oacute;n</h2>
+  <p class="section-intro">La integraci&oacute;n de indicadores VKPI es el siguiente paso del proyecto de M&eacute;xico. Su inicio depende de dos insumos del lado de Atento.</p>
+  <div class="pcard">
+    <h3>Integraci&oacute;n de indicadores VKPI &mdash; M&eacute;xico</h3>
+    <p class="when">Inicia una vez recibidos los insumos de Atento &middot; sin fecha comprometida hasta entonces</p>
+    <p><b>Qu&eacute; comprende.</b> La incorporaci&oacute;n de los indicadores del VKPI como fuente adicional de la integraci&oacute;n de M&eacute;xico, de modo que el valor por persona, indicador y per&iacute;odo alimente directamente la plataforma.</p>
+    <p><b>Qu&eacute; se necesita del lado de Atento.</b> Dos insumos, ambos de decisi&oacute;n y ejecuci&oacute;n de Atento:</p>
+    <ul>
+      <li>La base VKPIs con la estructura requerida: <b>&iacute;ndice &uacute;nico, columna de identificador y sin registros duplicados</b>. 4Shark entreg&oacute; la especificaci&oacute;n de esta estructura hace m&aacute;s de un mes y medio.</li>
+      <li>La <b>poblaci&oacute;n continua</b> de esa base desde el Data Lake de Atento. Por decisi&oacute;n de arquitectura de Atento, 4Shark no accede al Data Lake; el espejado Data Lake &rarr; base VKPIs corre por cuenta de Atento.</li>
+    </ul>
+    <p><b>Estado.</b> El desarrollo de 4Shark inicia en cuanto la estructura est&eacute; aplicada y la base poblada. La fecha de entrega se compromete una vez recibidos ambos insumos.</p>
+  </div>
+
+  <h2>3. Temas en seguimiento</h2>
+  <p class="section-intro">Avanzan una vez recibidos los insumos o definiciones del lado de Atento M&eacute;xico.</p>
+  <table>
+    <thead><tr><td>Tema</td><td>Estado</td><td>Qu&eacute; est&aacute; pendiente</td></tr></thead>
+    <tbody>
+      <tr><td>Integraci&oacute;n de indicadores VKPI</td><td>Especificaci&oacute;n entregada; a la espera de insumos de Atento</td><td>Aplicaci&oacute;n en la base VKPIs de la estructura documentada por 4Shark (&iacute;ndice &uacute;nico, columna de ID, sin duplicados) y poblaci&oacute;n continua desde el Data Lake de Atento. La fecha de entrega se emite una vez recibidos ambos insumos.</td></tr>
+      <tr><td>Integraci&oacute;n de metas</td><td>Diferida por acuerdo</td><td>Se retoma &mdash;y solo entonces se estima&mdash; una vez que la integraci&oacute;n de indicadores VKPI est&eacute; en producci&oacute;n.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <p>Las funcionalidades listadas corresponden al desarrollo continuo de la plataforma 4Shark para la operaci&oacute;n de M&eacute;xico y quedan disponibles en su fecha de publicaci&oacute;n en producci&oacute;n.</p>
+    <p>Cualquier duda o precisi&oacute;n sobre este roadmap, quedamos a su disposici&oacute;n.</p>
+  </div>
+
+</div>
+</body>
+</html>

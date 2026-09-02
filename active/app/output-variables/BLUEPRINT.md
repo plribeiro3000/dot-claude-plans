@@ -2,7 +2,41 @@
 
 **Status**: validated against vendor documentation and gem source; ready to estimate
 **Date**: 2026-07-30
-**Feature**: an incentive rule may publish its per-user result into an output variable, which any incentive in a later calculation stage reads by name.
+**Feature**: an incentive rule may publish its per-user result into a variable, which any incentive in a later calculation stage reads by name.
+
+## Applicability under the commissioning-metric model
+
+This blueprint validated the earlier "fourth `OutputVariable` type" architecture. The feature is built as
+a `Metric` specialization instead (see `DOMAIN.md`; `TASKS.md` § Status maps the delivered PRs), so read
+the findings below through this filter:
+
+**Transfers (still usable):**
+
+- §1.4 — the migration `statement_timeout` convention (read by `activerecord-safer_migrations`, NOT
+  `strong_migrations`). Applies to the permission migration (`TASKS.md` TASK-7).
+- §1.1's precedent — `Reward#increment_budget` wrapping a financial read-modify-write in
+  `transaction { lock! … }` (`app/models/reward.rb:65-71`) — is a candidate shape for the materialization
+  stale-read race (`TASKS.md` TASK-M), though the store it writes has changed (see below).
+- Decision 19 — a metric-fed variable is an `IndicatorVariable` with a `key`, so the Dentaku reserved-word
+  key consideration still applies if such keys are author-chosen.
+- §2's Rails validation semantics (a custom `validate` neither halts nor is halted; nested attributes are
+  assigned before `valid?`) — validation 1 relies on these and is delivered.
+- §2's Postgres / Apollo / graphql-ruby facts — frontend-last necessity, and `type` exposed as a plain
+  `String` — survive unchanged.
+
+**Obsolete (dead architecture — re-validate in the new model when the task is picked up):**
+
+- §1.1/§1.2 materialization into `aggregated_modifiers` and its string-`value` column — the metric writes
+  the variable's internal `Indicator` instead; the store, the race, and the aggregate all need re-validating
+  at `TASKS.md` TASK-M / TASK-R.
+- §1.3 the `output_variable` M2 reference — the rule link shipped as `rules.commissioning_metric_id` (#5433).
+- §1.5 the BE-4 `easy_variables_options` builder and the FE-1 fourth-type creation screen — there is no
+  fourth variable type; re-validate at TASK-4 / TASK-FE.
+- The BE-1…FE-4 task IDs, the §4 size picture, and the four `auxvar-*` spike references — superseded by the
+  `TASK-*` set in `TASKS.md`.
+
+The sections below are the original validation record for the earlier architecture, preserved for the
+findings that transfer above.
 
 ## What this document is, and what it is not
 
