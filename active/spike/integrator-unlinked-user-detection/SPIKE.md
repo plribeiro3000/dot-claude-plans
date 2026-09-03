@@ -162,3 +162,288 @@ descoped here, not proven impossible.
 - `/tmp/final_diagnosis.txt` — per-user integrator status.
 - `/tmp/timing.txt`, `/tmp/hypothesis.txt` — creation/termination timing vs. June 2026 activation.
 - `~/Downloads/integration_debug_atento-mx_reingresos_gap_*.xlsx` — consolidated report.
+
+## Reconciliation procedure — console (manual, per batch)
+
+The reconciliation is a production mutation and stays manual: the operator reviews each batch and
+runs the phases through `bin/ecs run`, per the three-script discipline (pre-flight → mutation →
+verification). It is NOT a headless rake — a cron must never mutate 45+ users without review.
+
+The only per-batch input is the `reconciliation` map (`app_user_id => fsk_id`), produced by the
+detector. Put ONLY confirmed reingresos in it — the app mutation reactivates any disabled user in
+the map. `company_id` is the app company (Atento MX = 1318). Each phase is self-contained
+(redefines its input at the top) to avoid cross-run contamination in a shared console.
+
+The two environments are coupled by one value: the app mutation (App phase 2) prints
+`linked_fsk_ids`; that array is the `fsk_ids` input for all three integrator phases. App and
+integrator are separate consoles, so the operator copies that array across by hand — which also
+guarantees the integrator only touches users the app actually linked.
+
+Run order per batch: App phase 1 → 2 → 3 in one `bin/ecs run` on the backend, then copy
+`linked_fsk_ids`, then Integrator phase 1 → 2 → 3 in one `bin/ecs run` on `integrator-<slug>`,
+before the client's nightly run (Atento MX: 03:30 America/Mexico_City) so the next pass uses PUT.
+
+Reference cadence (to be scheduled): the 15th of each month, or the nearest business day.
+
+### App phase 1 — pre-flight (read-only)
+
+```ruby
+company_id = 1318
+reconciliation = {
+  # app_user_id => fsk_id   (fill from the detector output)
+}
+company = Company.find(company_id)
+
+puts "subsidiaries_module@#{company.subsidiaries_module?}"
+puts "app_user_id@name@active@needs_reactivation@fsk_value@value_free@ready"
+
+ready = []
+blocked = []
+to_reactivate = []
+
+reconciliation.each do |app_user_id, fsk_id|
+  user = company.users.find_by(id: app_user_id)
+
+  if user.nil?
+    blocked << app_user_id
+    puts "#{app_user_id}@NOT_FOUND@@@@@NO"
+    next
+  end
+
+  fsk_value = "4sk_#{fsk_id}"
+  already_linked = user.identifiers.exists?(value: fsk_value)
+  taken_by_other = company.user_identifiers.where(value: fsk_value).where.not(user_id: user.id).exists?
+  value_free = already_linked == false && taken_by_other == false
+
+  needs_reactivation = user.disabled?
+  if needs_reactivation
+    to_reactivate << app_user_id
+  end
+
+  ready_label = "NO"
+  if value_free
+    ready << app_user_id
+    ready_label = "yes"
+  else
+    blocked << app_user_id
+  end
+
+  puts "#{app_user_id}@#{user.name}@#{user.enabled?}@#{needs_reactivation}@#{fsk_value}@#{value_free}@#{ready_label}"
+end
+
+puts "----"
+puts "total@#{reconciliation.size}"
+puts "ready@#{ready.size}"
+puts "blocked@#{blocked.size}"
+puts "to_reactivate@#{to_reactivate.size}"
+```
+
+### App phase 2 — mutation (reactivate + create the key), prints `linked_fsk_ids`
+
+```ruby
+company_id = 1318
+reconciliation = {
+  # app_user_id => fsk_id
+}
+company = Company.find(company_id)
+
+linked = []
+reactivated = []
+skipped = []
+failed = {}
+
+reconciliation.each do |app_user_id, fsk_id|
+  user = company.users.find_by(id: app_user_id)
+
+  if user.nil?
+    skipped << app_user_id
+    puts "#{app_user_id}@NOT_FOUND@skip"
+    next
+  end
+
+  fsk_value = "4sk_#{fsk_id}"
+
+  if company.user_identifiers.where(value: fsk_value).exists?
+    skipped << app_user_id
+    puts "#{app_user_id}@#{fsk_value}@ALREADY_EXISTS@skip"
+    next
+  end
+
+  if user.disabled?
+    enable_result = user.enable
+    if enable_result
+      reactivated << app_user_id
+    else
+      failed[app_user_id] = user.errors.full_messages.join('; ')
+      puts "#{app_user_id}@ENABLE_FAILED@#{user.errors.full_messages.join('; ')}"
+      next
+    end
+  end
+
+  identifier = user.identifiers.create(company_id: company.id, value: fsk_value, primary: false)
+
+  if identifier.persisted?
+    linked << app_user_id
+    puts "#{app_user_id}@#{fsk_value}@LINKED@ok"
+  else
+    failed[app_user_id] = identifier.errors.full_messages.join('; ')
+    puts "#{app_user_id}@#{fsk_value}@LINK_FAILED@#{identifier.errors.full_messages.join('; ')}"
+  end
+end
+
+puts "----"
+puts "linked@#{linked.size}"
+puts "reactivated@#{reactivated.size}"
+puts "skipped@#{skipped.size}"
+puts "failed@#{failed.size}"
+puts "linked_fsk_ids@#{linked.map { |uid| reconciliation[uid] }.inspect}"
+```
+
+### App phase 3 — verification (read-only)
+
+```ruby
+company_id = 1318
+reconciliation = {
+  # app_user_id => fsk_id
+}
+company = Company.find(company_id)
+
+ok = []
+problem = []
+
+reconciliation.each do |app_user_id, fsk_id|
+  user = company.users.find_by(id: app_user_id)
+  fsk_value = "4sk_#{fsk_id}"
+  has_key = user.identifiers.exists?(value: fsk_value)
+  active = user.enabled?
+
+  if has_key && active
+    ok << app_user_id
+    puts "#{app_user_id}@#{fsk_value}@active=#{active}@OK"
+  else
+    problem << app_user_id
+    puts "#{app_user_id}@#{fsk_value}@active=#{active}@has_key=#{has_key}@PROBLEM"
+  end
+end
+
+puts "----"
+puts "ok@#{ok.size}"
+puts "problem@#{problem.size}"
+```
+
+### Integrator phase 1 — pre-flight (read-only)
+
+`fsk_ids` = the `linked_fsk_ids` printed by App phase 2.
+
+```ruby
+fsk_ids = [
+  # paste linked_fsk_ids from App phase 2
+]
+
+pending = []
+other = []
+missing = []
+
+fsk_ids.each do |fsk_id|
+  resource = User.where(external_id: fsk_id.to_s).first
+
+  if resource.nil?
+    missing << fsk_id
+    puts "#{fsk_id}@NO_RESOURCE"
+    next
+  end
+
+  status = resource.integration_status
+  if status == 'pending'
+    pending << fsk_id
+  else
+    other << fsk_id
+  end
+
+  puts "#{fsk_id}@#{status}"
+end
+
+puts "----"
+puts "pending@#{pending.size}"
+puts "other@#{other.size}"
+puts "missing@#{missing.size}"
+```
+
+### Integrator phase 2 — mutation (`integrate!`, guarded on `pending`)
+
+```ruby
+fsk_ids = [
+  # linked_fsk_ids from the app
+]
+
+integrated = []
+skipped = []
+failed = {}
+
+fsk_ids.each do |fsk_id|
+  resource = User.where(external_id: fsk_id.to_s).first
+
+  if resource.nil?
+    skipped << fsk_id
+    puts "#{fsk_id}@NO_RESOURCE@skip"
+    next
+  end
+
+  status = resource.integration_status
+  if status != 'pending'
+    skipped << fsk_id
+    puts "#{fsk_id}@#{status}@skip"
+    next
+  end
+
+  begin
+    resource.integrate!
+    integrated << fsk_id
+    puts "#{fsk_id}@INTEGRATED@ok"
+  rescue => error
+    failed[fsk_id] = error.message
+    puts "#{fsk_id}@FAILED@#{error.message}"
+  end
+end
+
+puts "----"
+puts "integrated@#{integrated.size}"
+puts "skipped@#{skipped.size}"
+puts "failed@#{failed.size}"
+```
+
+### Integrator phase 3 — verification (read-only)
+
+```ruby
+fsk_ids = [
+  # linked_fsk_ids from the app
+]
+
+integrated = []
+not_integrated = []
+missing = []
+
+fsk_ids.each do |fsk_id|
+  resource = User.where(external_id: fsk_id.to_s).first
+
+  if resource.nil?
+    missing << fsk_id
+    puts "#{fsk_id}@NO_RESOURCE"
+    next
+  end
+
+  status = resource.integration_status
+  if status == 'integrated'
+    integrated << fsk_id
+  else
+    not_integrated << fsk_id
+  end
+
+  puts "#{fsk_id}@#{status}"
+end
+
+puts "----"
+puts "integrated@#{integrated.size}"
+puts "not_integrated@#{not_integrated.size}"
+puts "missing@#{missing.size}"
+```

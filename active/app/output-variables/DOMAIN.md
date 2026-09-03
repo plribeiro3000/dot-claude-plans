@@ -102,14 +102,24 @@ variable-availability filter exists in the models today (the only related scope 
 
 ## Plan-level validations (one family)
 
-These are the validations the plan-save enforces over commissioning-metric variables. Validation 1 is
-enforced; validations 2 and 3 are not yet implemented.
+These are the validations the plan-save enforces over commissioning-metric variables. Validations 1 and 3
+are implemented; validation 2 is not yet implemented. Each incentivation validates its own incentive
+(`Incentivation#commissioning_metric`), so the error lands on that incentivation's `:incentive_id` and
+reaches the plan through nested-attribute autosave exactly like every other incentivation error — no
+plan-level marker. The domain object `Plan::CommissioningMetrics` holds the reads and feeds of the
+plan's commissioning-metric variables and answers `violations_for(incentivation)`, returning the list of
+error keys for that incentivation; `Plan#commissioning_metrics` builds a fresh instance around the plan on
+each call. Its ordered `INCENTIVE_PROCESSING_ORDER` constant lists the incentive types in stage order, and
+the feeds that satisfy validation 1 for a reader are the types strictly before it
+(`INCENTIVE_PROCESSING_ORDER.take(index_of_reader_type)`).
 
 1. **Producer must precede consumer.** An incentive that reads a commissioning-metric variable as
-   input requires an earlier-stage incentive whose rule feeds that variable's metric. Stage order:
-   deal → indicator → ranking → limiter → redemption. `Incentivation#commissioning_metric`
-   dispatches per incentive type to `Incentivation::<Type>IncentivationMetricValidator`, which adds the
-   `metric_not_populated` error on the `Incentivation`'s `:incentive_id`.
+   input requires that the variable's metric be fed by a rule on an incentive of an allowed producer
+   type. The allowed producers per reader type: `IndicatorIncentive` ← deal; `RankingIncentive` ← deal,
+   indicator; `LimiterIncentive` ← deal, indicator, ranking; `RedemptionIncentive` ← deal, indicator,
+   ranking, limiter. The incentivation validator adds the `missing_metric_rule` error on its own
+   `:incentive_id` when the variable it reads has no feeder of an allowed producer type. A deal reads no
+   commissioning-metric variable — it has no producer before it and is exempt.
 
 2. **Single writer type per variable (the sibling rule).** All incentives that **write** a
    commissioning-metric variable — i.e. whose rules feed that variable's metric — must be of one
@@ -117,23 +127,24 @@ enforced; validations 2 and 3 are not yet implemented.
    aggregate through the metric, sum/average); an incentive of any second type may not. **Reading**
    the variable downstream is subject to validations 1 and 3. This keeps the variable written
    at a single calculation stage, so it holds one value per plan; writers of two different types would
-   write it at two different stages and give it two values, impossible to present coherently. The
-   error is added on the `Incentivation` at plan save.
+   write it at two different stages and give it two values, impossible to present coherently. Its error
+   lands on each offending incentivation's `:incentive_id`, the same as the other two.
 
-3. **Single reading level per variable (proposed 2026-09-01).** A commissioning-metric variable may be
-   read at a single calculation stage only — an incentive that reads one forbids any incentive at a
-   different stage from reading the same variable. This is a comprehensibility and legal-clarity
-   constraint, not a correctness one: validation 2 already fixes a single writer stage, so the variable
-   holds one stable sum and every downstream read sees the same number regardless of how many stages read
-   it — the value a third stage reads is exactly the value the second stage read. What multi-stage reading
-   costs is legibility: a variable consumed across several stages turns the rule graph into a web the end
-   user cannot follow, which is what forfeits the signed declaration's legal validity. Restricting a
-   metric variable to one reading stage keeps the graph a line — fed at one stage, summed, read at one
-   stage. The error is added on the `Incentivation` at plan save.
+3. **Single reader type per variable.** A commissioning-metric variable may be read by incentives of a
+   single type only — an incentive that reads one forbids any incentive of a different type from reading
+   the same variable (many incentives of that one type may all read it). This is a comprehensibility and
+   legal-clarity constraint, not a correctness one: validation 2 already fixes a single writer type, so the
+   variable holds one stable sum and every downstream read sees the same number regardless of how many
+   incentives read it — the value one reader gets is exactly the value the next gets. What reading across
+   incentive types costs is legibility: a variable consumed by several types turns the rule graph into a web
+   the end user cannot follow, which is what forfeits the signed declaration's legal validity. Confining a
+   metric variable to one reader type keeps the graph a line — written by one type, summed, read by one type.
+   The incentivation validator adds the `conflicting_incentive_types` error on its own
+   `:incentive_id` when the variable it reads is read by more than one incentive type.
 
-Validations 1, 2 and 3 compose: 2 fixes a single writer stage (one stable value), 1 requires that writer
-stage to precede every reader, and 3 confines reading to a single stage so the dependency graph stays a
-legible line rather than a web.
+Validations 1, 2 and 3 compose: 2 fixes a single writer type (one stable value), 1 requires that writer to
+precede every reader, and 3 confines reading to a single type so the dependency graph stays a legible line
+rather than a web.
 
 ## Migrations
 
@@ -149,15 +160,14 @@ legible line rather than a web.
 
 `<Concept>Metric` mirrors the existing `<Concept>Variable` STI convention (`DealVariable`,
 `IndicatorVariable`). "Commissioning" matches the existing `commissioning/` namespace and the
-`Commissioning` model. The i18n error key is `metric_not_populated` on the incentivation's
-`:incentive_id`, describing the variable that no earlier incentive populates rather than a missing
-"output" concept.
+`Commissioning` model. Validation 1's i18n error key is `missing_metric_rule` on the offending
+incentivation's `:incentive_id`, naming the rule that no earlier incentive supplies to feed the variable's
+metric. Validation 3's key is `conflicting_incentive_types` on the same attribute, naming the incentive
+types that read the variable.
 
 ## Remaining work
 
 - **Validation 2 — single writer type per variable** (the sibling rule in Plan-level validations
   above). Not yet implemented.
-- **Validation 3 — single reading level per variable** (comprehensibility / legal-clarity constraint,
-  Plan-level validations above). Not yet implemented.
 - **Variable availability by incentive type** — the transactional-exclusion filter (see the section
   above). Where it lives (a new availability filter vs the API/GraphQL layer) is still open.

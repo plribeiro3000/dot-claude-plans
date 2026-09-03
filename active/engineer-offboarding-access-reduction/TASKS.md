@@ -12,7 +12,8 @@ account `405749097490`. Run AWS commands with `--profile 4shark-mfa`.
 - [x] Blockers to `DeleteUser` cleared: policy detached, access key deleted, boundary removed
 - [x] Second apply completed — IAM user destroyed, `get-user` returns `NoSuchEntity`
 - [x] `/merge-cleanup` — worktree removed, branch `feature/identity-offboard-engineer` deleted
-- [x] Manual revocations: Pritunl VPN, Redis Cloud, Datadog, Netlify, 1Password, Slack, Clockify
+- [x] Manual revocations: Pritunl VPN, Redis Cloud, Datadog, Netlify, 1Password, Slack, Clockify,
+      Figma
 - [x] `app` user account deactivated in all four environments
 - [x] Claude Code — personal account, cancelled by the engineer himself
 

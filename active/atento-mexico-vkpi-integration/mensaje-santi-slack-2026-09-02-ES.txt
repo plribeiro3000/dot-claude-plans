@@ -1,0 +1,11 @@
+Hola Santi, adjunto la revisión técnica de la tabla que el equipo de México (Joel) entregó el 2-sep para la integración de indicadores. La revisamos directamente sobre la base y el resumen es directo: los puntos principales no quedaron atendidos, y la tabla tal como está todavía no la podemos integrar.
+
+Dos cosas de fondo: no garantiza unicidad (siguen existiendo registros duplicados del mismo grano con valores en conflicto) y no trae las columnas que necesitamos (falta la columna llave con la clave de la variable de 4Shark). Son, además, los mismos puntos que ya habíamos levantado el 27-ago; esta entrega no los resolvió.
+
+En concreto:
+- Falta la columna llave: no existe ninguna columna con la clave de 4Shark, que es el puente con la plataforma. La NK_KEY que crearon es un hash único por fila (un intento de bloquear duplicados) que además no lo logra.
+- Sin índice único real: no hay un índice único sobre fecha + carnet + llave, así que la base tiene el mismo grano repetido con valores distintos. Hay que crear ese índice y, como la base ya está sucia, limpiarla y volver a poblarla después de corregir la estructura.
+- Persona: usaron RFC en vez del carnet (Empleado_Carnet), que es el identificador que ya habíamos acordado.
+- Fecha del periodo: que nos indiquen cuál columna debemos usar, y que sea de tipo date (no la del mes, en texto).
+
+Adjunto un documento con cada punto explicado (qué se pidió, qué se hizo, por qué no cumple y el SQL de la corrección). Lo puedes reenviar tal cual al equipo de México (Joel / Aryadna).

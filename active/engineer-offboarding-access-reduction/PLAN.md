@@ -69,9 +69,11 @@ stack can finish.
 
 **The inventory's blind spot is the finding with the longest shelf life.** The system list was
 built from the providers declared in the terraform repository, so everything that is not
-infrastructure was invisible. Three systems surfaced only because the engineer named them
+infrastructure was invisible. Four systems surfaced only because the engineer named them
 after the inventory was published: a personal Claude Code account, the engineer's user account
-inside 4Shark's own `app` product across four environments, and Clockify.
+inside 4Shark's own `app` product across four environments, Clockify, and Figma. Clockify and
+Figma both sit in category 3 below (time tracking and design), which the category-based runbook
+catches by construction where the provider-derived list did not.
 
 **So the runbook must be organized by CATEGORY, not by a list of systems.** A named list is
 always incomplete, and the three misses prove it. The categories this case revealed:
@@ -103,7 +105,7 @@ organization and team membership, Cloudflare account member, MongoDB Atlas organ
 assignment, Rollbar user.
 
 Revoked by hand, outside Terraform: Pritunl VPN, Redis Cloud, Datadog, Netlify, 1Password, Slack,
-Clockify, the `app` user account in all four environments (beta-001, demo-001, shared-001,
+Clockify, Figma, the `app` user account in all four environments (beta-001, demo-001, shared-001,
 atento-001), and the engineer's own Claude Code account, which he cancelled himself.
 
 Two adjacent questions were settled from `PROJECTS-CATALOG.md` rather than assumed. Keycloak is

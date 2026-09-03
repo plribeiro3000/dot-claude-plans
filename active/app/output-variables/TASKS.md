@@ -6,7 +6,7 @@
 > branch `develop` in both.
 > Language classification: internal engineering doc → English (`LANGUAGE-POLICY.md`, category 1).
 
-## Status — 2026-09-01
+## Status — 2026-09-02
 
 **The feature is built as a `Metric` specialization, not a fourth variable type.** A variable whose value
 the system produces is an ordinary `IndicatorVariable` carrying a `CommissioningMetric` — a subtype of an
@@ -19,7 +19,8 @@ STI `Metric`, alongside `DealMetric`. `DOMAIN.md` is the authoritative model.
 | #5348 | Register the produced variable on incentive save and roll it into the plan — superseded by the pivot below |
 | #5431 | Specialize `Metric` into `DealMetric` / `CommissioningMetric` — the `metrics.type` STI discriminator |
 | #5433 | Remove the output-variable type in favor of the commissioning metric; move the rule target `rules.output_variable_id` → `rules.commissioning_metric_id` |
-| #5434 | Validation 1 — an incentive reading a commissioning-metric variable requires an earlier-stage incentive whose rule feeds that metric (the four `Incentivation::<Type>IncentivationMetricValidator`; error `metric_not_populated` on `:incentive_id`) |
+| #5434 | Validation 1 — an incentive reading a commissioning-metric variable requires an earlier-stage incentive whose rule feeds that metric (four `Incentivation::<Type>IncentivationMetricValidator`; error `metric_not_populated` on `:incentive_id`) |
+| #5436 | Consolidate validation 1's four per-type validators into the plan-level `Plan::CommissioningMetrics` domain object (error renamed `missing_metric_rule`); deliver validation 3 — a commissioning-metric variable is read by incentives of a single type (`conflicting_incentive_types` on `:incentive_id`) |
 
 Test-infra fixes #5429 and #5432 landed alongside (spec isolation; STI factory construction) — not
 feature tasks.
@@ -49,15 +50,24 @@ fourth `Variable` type; `Variable::TYPES` unchanged.
 `rules.output_variable_id` → `rules.commissioning_metric_id`; `CommissioningMetric has_many :rules,
 dependent: :nullify`. The output-variable type and its per-rule `output_variable_type` validation removed.
 
-### TASK-3 — Plan validation 1 (feeder precedes reader) — DELIVERED (#5434)
+### TASK-3 — Plan validation 1 (feeder precedes reader) — DELIVERED (#5434, consolidated #5436)
 
-`Incentivation#commissioning_metric` dispatches per incentive type to
-`Incentivation::<Type>IncentivationMetricValidator` (`app/services/incentivation/`). Each reads the
-incentive's read variables (`IncentiveVariable.where(incentive_id:)`), the metrics behind them
+`Incentivation#commissioning_metric` delegates to `Plan::CommissioningMetrics#violations_for(self)`
+(`app/models/plan/commissioning_metrics.rb`). The object reads the incentive's read variables
+(`IncentiveVariable.where(incentive_id:)`), the metrics behind them
 (`CommissioningMetric.where(variable_id:)`), and whether an earlier-stage incentive feeds each metric
 (`Rule.where(incentive_id:, commissioning_metric_id:)`), filtering `marked_for_destruction?` in memory. A
-metric with no earlier feeder adds `metric_not_populated` on `:incentive_id`. The per-validator
-`INCENTIVE_TYPES` allow-lists encode the strictly-earlier stage order.
+metric with no earlier feeder adds `missing_metric_rule` on `:incentive_id`. The ordered
+`INCENTIVE_PROCESSING_ORDER` constant encodes the stage order; the allowed feeders for a reader are the
+types strictly before it (`INCENTIVE_PROCESSING_ORDER.take(index)`).
+
+### TASK-3B — Plan validation 3 (single reader type) — DELIVERED (#5436)
+
+`Plan::CommissioningMetrics#violations_for` also enforces that a commissioning-metric variable is read by
+incentives of a single type: it counts the distinct types among the plan's non-destroyed incentives that
+read each metric variable (`IncentiveVariable` grouped by `variable_id`) and adds `conflicting_incentive_types`
+on `:incentive_id` when a variable is read by more than one type. Several incentives of the same type may
+read it. This is DOMAIN.md's validation 3; the writer-side rule (validation 2) is TASK-5, still open.
 
 ### TASK-4 — Rule syntax validation for a metric-fed key — OPEN (confirm)
 
@@ -85,11 +95,13 @@ metric with no earlier feeder adds `metric_not_populated` on `:incentive_id`. Th
   - [ ] A plan whose one metric is fed by two incentive types is rejected with an error on the
         `Incentivation`.
   - [ ] A plan whose metric is fed by several incentives of the same type is accepted.
-  - [ ] Reading the variable downstream stays unrestricted, subject to validation 1.
+  - [ ] Reading the variable downstream stays subject to validations 1 and 3.
 - **Open questions**:
-  - Dispatch shape: mirror validation 1's per-type validator family, or a single plan-level validation?
-  - Whether a shared `Incentive::CALCULATION_ORDER` constant already exists (introduced with validation 1)
-    or must be added here; a spec keeps it aligned to the enqueue graph.
+  - The check lands in `Plan::CommissioningMetrics#violations_for`, alongside validations 1 and 3; it counts
+    the distinct types among the incentives that FEED each metric (`Rule.commissioning_metric_id`), the
+    writer-side mirror of validation 3's reader-side count.
+  - `INCENTIVE_PROCESSING_ORDER` already exists in that object; validation 2 needs only the distinct
+    feeder-type count per metric, not the order.
 
 ### TASK-M — Materialization — OPEN (design + build; the critical unknown)
 
@@ -212,6 +224,7 @@ delivered migrations are already in `develop`; the only migration still owed is 
 graph TD
   T1[TASK-1 metric STI ✓] --> T2[TASK-2 rule link ✓]
   T2 --> T3[TASK-3 validation 1 ✓]
+  T3 --> T3B[TASK-3B validation 3 ✓]
   T3 --> T5[TASK-5 validation 2]
   T2 --> T4[TASK-4 syntax confirm]
   T2 --> TM[TASK-M materialization]
@@ -228,7 +241,7 @@ graph TD
   TFE --> TROLL
 ```
 
-**Delivered:** TASK-1, TASK-2, TASK-3. **Critical unknown:** TASK-M (materialization) — TASK-R, TASK-STMT
+**Delivered:** TASK-1, TASK-2, TASK-3, TASK-3B. **Critical unknown:** TASK-M (materialization) — TASK-R, TASK-STMT
 and the productive rollout all wait on its design. **Independent lanes** once the model is in place:
 validation 2 (TASK-5), the GraphQL/permission/FE lane (TASK-6 → TASK-7/TASK-FE), the availability filter
 (TASK-8), and the materialization/read lane (TASK-M → TASK-R). The lanes converge at the deploy.
