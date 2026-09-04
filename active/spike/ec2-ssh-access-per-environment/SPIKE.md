@@ -365,3 +365,113 @@ AWS service to adopt.
   Whether to run them as one combined initiative or two sequenced ones is a scheduling/scope
   decision for the engineer, not something resolved by the mechanism findings above — either
   sequencing is compatible with Option B.
+
+## Addendum (2026-09-03) — the ECS container-instance fleet shares one key too, and the community's answer is per-user + Session Manager, not per-environment
+
+The investigation above scoped "4Shark's only EC2 instances" as the Mongo hosts. That is wrong: the
+`app` and `setup` ECS clusters run on EC2 capacity (not Fargate), and those instances are a second
+population sharing a single key pair. The question the engineer asked on 2026-09-03 — *should there
+be one SSH key per environment, mirroring the KMS key per environment, or is that over-engineering?* —
+applies to this population as much as to the Mongo hosts.
+
+### Finding 11: the 19 ECS container instances in us-east-1 all launch with one key pair, `4Shark-key`, and nothing reads that key
+
+**Evidence:** `aws ec2 describe-instances --region us-east-1` (2026-09-03, default profile) returns 19
+running instances — every `shared-001-*`, `atento-001-*`, `demo-001-web`, `beta-001-web` and `setup-web`
+— all with `KeyName = "4Shark-key"`. The key pair is imported (16-byte MD5 fingerprint, created
+2026-01-12, tags `Name=001-cluster-key-pair` / `Environment=beta`). Every app stack pins it by name:
+
+```
+app-shared-001/terraform.tfvars:5:   key_name = "4Shark-key"
+app-atento-001/terraform.tfvars:5:   key_name = "4Shark-key"
+app-demo-001/terraform.tfvars:5:     key_name = "4Shark-key"
+app-beta-001/terraform.tfvars:5:     key_name = "4Shark-key"
+setup/terraform.tfvars:5:            key_name = "4Shark-key"
+```
+
+The module that could generate a key pair has that path switched off in both callers
+(`modules/app/main.tf:50` and `modules/setup/main.tf:157`: `create_key_pair = false`), so the private
+key is not in Terraform state; `terraform/.gitignore:53` ignores `*.pem`; the 1Password vault holds no
+item with its fingerprint (`SHA256:b+SvoK…`). The only known private copy is `~/.ssh/4Shark-key.pem`
+on one engineer's laptop. No runbook, skill or script references it — ECS access is `bin/ecs run`
+(ECS Exec), which never touches the host.
+
+**Significance:** the same shape as Finding 1, on a fleet ten times more sensitive (it carries the
+productive app), with the extra defect that the key is outside every managed store.
+
+### Finding 12: the ECS instance role lacks `AmazonSSMManagedInstanceCore`, but the AMI already ships SSM Agent and the VPCs already have the egress path
+
+**Evidence:** `modules/ecs_cluster/main.tf:65` attaches only
+`arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role` to `ecs_instance_role`;
+`grep -rn SSMManagedInstanceCore modules/{ecs_cluster,ecs_capacity,app,setup}` returns nothing. The
+AMI is pinned by `modules/ami_versions/main.tf:4` to
+`al2023-ami-ecs-hvm-2023.0.20260518-kernel-6.1-x86_64`, and AWS lists *"Amazon Linux 2023 (AL2023)"*
+and *"Amazon Linux 2 ECS-Optimized Base AMIs"* among the images where *"you'll likely find that the
+SSM Agent is already installed"*. The `app-*`/`setup` VPCs each publish a NAT gateway (this spike's
+Uncertain section, first bullet), so the outbound path to the SSM endpoints exists.
+
+**Source:** https://docs.aws.amazon.com/systems-manager/latest/userguide/ami-preinstalled-agent.html
+(fetched 2026-09-03; both quoted list items verified verbatim);
+`~/Projects/4Shark/terraform/modules/ecs_cluster/main.tf:65`;
+`~/Projects/4Shark/terraform/modules/ami_versions/main.tf:4`
+
+**Significance:** for the ECS fleet, Option B is one managed-policy attachment away — a far smaller
+prerequisite than the Mongo hosts' (Finding 4 plus the unresolved sa-east-1 egress question).
+
+### Finding 13: the community's blast-radius unit is the PERSON and the INSTANCE, not the environment; AWS's own guidance skips key pairs entirely
+
+**Evidence:**
+- cloudonaut, *Avoid Sharing Key Pairs for EC2*: *"Every user uses its own SSH key. Don't share keys
+  between users."* and *"Access to EC2 instances via SSH is restricted to the minimum number of users."*
+  The article's alternatives are CodeDeploy, `AuthorizedKeysCommand`, directory-service integration,
+  or removing SSH access altogether — a per-environment key is not among them.
+- OneUptime (2026-02-12), the one source found that recommends the per-environment split, states it
+  as a floor: *"Use different keys for different environments (dev, staging, production) at minimum."*
+  In the same article: *"Each team member creates their own key pair."*, *"Keys should be rotated
+  periodically, especially when team members leave or when you suspect a key may have been
+  compromised."*, and *"Session Manager lets users connect to instances through the AWS console or
+  CLI without managing SSH keys at all."*
+- AWS, *Best practices for Amazon EC2*, Security section: the first item is *"Manage access to AWS
+  resources and APIs using identity federation with an identity provider and IAM roles whenever
+  possible."* — the section never mentions key pairs at all.
+- AWS, *Create a key pair for your Amazon EC2 instance*: no best-practice statement about how many
+  key pairs to hold or how to partition them. The page does document that a CloudFormation-created key
+  pair has *"the private key ... saved to AWS Systems Manager Parameter Store"* under
+  `/ec2/keypair/{{key_pair_id}}` — AWS's own product already stores the private key as an SSM parameter,
+  which is the shape of Option D (Finding 10).
+
+**Sources:** https://cloudonaut.io/avoid-sharing-key-pairs-for-ec2/ ;
+https://oneuptime.com/blog/post/2026-02-12-create-and-use-ec2-key-pairs-for-ssh-access/view ;
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-best-practices.html ;
+https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/create-key-pairs.html
+(all fetched 2026-09-03; every quote verified verbatim on the page)
+
+**Significance:** "one key per environment" is not what the community converges on. Where a source
+partitions keys at all, it partitions by **person** (accountability, revocation on offboarding) and
+treats the environment split as the bare minimum on the way to no keys. The stronger consensus, AWS
+included, is to stop authenticating hosts with a shared secret and gate the shell with IAM — which is
+per-person, per-environment (by tag) and audited, all at once. That is Option B. A per-environment
+key pair distributed as a file (Option A) buys blast-radius reduction only; it still cannot say WHO
+opened the shell, and it still has to be rotated by hand when someone leaves.
+
+### What this changes in the options table
+
+- **Option A (bare key pair per environment)** for the ECS fleet: not over-engineering, but the
+  wrong axis. It mirrors the KMS-key-per-environment naming without delivering what the KMS key
+  delivers (IAM-gated, per-principal, auditable access). It also multiplies the file-on-a-laptop
+  problem Finding 11 describes by the number of environments.
+- **Option D (key per environment as an SSM SecureString under the env's KMS key)** remains the
+  design that reuses the KMS work verbatim and expresses the two tiers, and it is the one AWS's own
+  CloudFormation key pair resource already implements. Its cost is unchanged: the fetch is audited,
+  the session is not, and rotation is a procedure someone has to run.
+- **Option B (Session Manager, tag-scoped `StartSession`)** is cheaper for the ECS fleet than for
+  the Mongo hosts: the AMI carries the agent and the VPCs have egress (Finding 12), so the whole
+  prerequisite is attaching `AmazonSSMManagedInstanceCore` in `modules/ecs_cluster/main.tf`. Once it
+  is on, `key_name` can be removed from the launch template and the `4Shark-key` problem (Finding 11)
+  disappears instead of being partitioned. The instances already carry the `Environment` tag the
+  IAM condition needs.
+- **Sequencing that follows from Findings 11–13**: the ECS fleet is the better first rung for Option
+  B (one policy attachment, no network question), and the Mongo hosts follow once the sa-east-1
+  egress question is settled. Whether Option D is still wanted as the break-glass path for the
+  SSM-Agent-failure case (Option C's concern) is the engineer's call; if it is, the key it stores is
+  per-environment by construction, which is the part of the engineer's instinct that survives.

@@ -48,6 +48,46 @@ Keycloak realm/flow config is managed **only via the web admin console** — the
 
 The `Trust Email` guidance in `ADD-SSO-CLIENT.md` came from the merged `feature/enable-trust-email-sso-runbook` branch — **PR #600 in `dot-claude`**. Trust Email was documented there as if it auto-linked on its own; in KC 26 it is only the prerequisite, and the `Handle Existing Account` flow customization plus verified account state are what actually re-link. The runbook PR below completes that correction.
 
+## Event retention follow-up (PRs #603 / #604)
+
+Diagnosing the login dead-end depended on CloudWatch server logs plus Keycloak's own event log, but event retention was short, so a login problem reported weeks after the fact could have had no queryable trail. A preventive follow-up raised it. `ADD-SSO-CLIENT.md` gained step 11 in Step 2 — enable login and admin event logging and give both a 180-day retention (**PR #603**). A correction followed: admin events carry their own `adminEventsExpiration` and expire lazily (purged when the next admin event is written, not on a cron), so the runbook sets admin-event retention to 180 days as well rather than treating admin events as unbounded (**PR #604**).
+
+Production `auth-001` was brought in line across all five realms (`master`, `atento-br`, `maqnelson`, `four-shark`, `barigui`), applied through the Admin REST API since the config is console/API-managed with no Terraform:
+
+- `eventsEnabled: true`, `eventsExpiration: 15552000` (180 days) — login events.
+- `adminEventsEnabled: true`, `adminEventsDetailsEnabled: true`, `adminEventsExpiration: 15552000` (180 days) — admin events.
+
+`barigui` was `eventsEnabled: false` beforehand — it kept no login events at all until this, so its own future incidents would have had no trail.
+
+## Client communication — affected-users list (2026-09-03 11:02)
+
+A consolidated email went to Gustavo (cc Paulo Cezar Cardoso Junior), framed as "analysed and identified exactly which users are affected" — deliberately not "resolved". Its point: the SSO works for the base as a whole, and the failures are **18 users out of more than 9,600 logging in per week** — a tiny fraction, not a general integration fault. The 18 affected identities handed to Atento:
+
+- cintia.conceicao@atento.com
+- lidiane.lima@atento.com
+- andrei.santos@atento.com
+- lariane.dias@atento.com
+- ana.pereira@atento.com
+- leiliane.gama@atento.com
+- larissa.silva@atento.com
+- gabriel.araujo@atento.com
+- daiane.silva@atento.com
+- josue.neto@atento.com
+- fernanda.jesus@atento.com
+- gleyce.rodrigues@atento.com
+- vinicius.costa@atento.com
+- marcelo.vieira@atento.com
+- maria.moreira@atento.com
+- marcia.silva@atento.com
+- ab1549936@br.atento.com
+- ab1555337@atento.com
+
+The email states the cause in client terms (the user's identity changed or went inconsistent at the source, Azure/Entra, so that user's login conflicts), that 4Shark already treated the consequences and adjusted the flow, and that for these already-affected users Atento's team has to check what happened to their registration at the source — 4Shark cannot fix it from its side. It asks Gustavo to pass the list to his team.
+
+Paulo Cezar Nunes Cardoso Junior (Atento, Field Service / I&O — Infraestrutura e Operações de TI, `paulo.cardoso@atento.com.br`) replied 2026-09-03 11:35, looping in two more people from the Atento infra/field side (`+@Jededias`, `+@Field Feira`). The ball is now on Atento's directory team to inspect the 18 accounts' source records.
+
+Two threads carry Atento communication: "Ajuda Atento Prime" (the login dead-end, now this affected-users list) and "Correção Matricula Prime" (a distinct case — Lucas Fernandes de Souza, `BRATE1486445`, whose SSO login lands on Lucas Amorim Fernandes `BRATE1427237` because the source `employeeId`/email on the Azure/Entra account is swapped; the fix is entirely on Atento's directory, 4Shark's record is correct).
+
 ## Pending
 
 - [ ] **Client login confirmation.** The `emailVerified=true` fix is the identified blocker for the no-stale-link accounts, but no successful login has been observed yet — Josué (or any of the 41) logging in confirms the diagnosis. If a login still fails, the new log event (against the now-corrected account) shows what remains.
