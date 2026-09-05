@@ -51,7 +51,9 @@ Independentemente da forma de login, todo acesso é **governado** em um de três
 - **Camada B — Gerido como código (IaC / Pull Request).** A autorização é um objeto versionado — por exemplo, identidade e permissões IAM na AWS, *membership* de organização e equipes no GitHub, *membership* de projeto no MongoDB Atlas. **Revogação:** Pull Request aplicado pela *break glass account*. **Lista viva:** o próprio código. **Auditoria:** histórico de Pull Requests. *Um mesmo sistema pode estar em A e B: na AWS, o login federa no Google (Camada A), mas a autorização IAM é um grant em código que a suspensão do Google não apaga e exige remoção própria (Camada B).*
 - **Camada C — Gerido no 1Password (sem SSO).** Soluções sem SSO viável, conforme o princípio de seleção. A credencial vive no cofre e o acesso equivale à participação nele. **Revogação:** remover a pessoa do cofre, **rotacionar a credencial compartilhada** e transferir a titularidade (*ownership*) de billing e administração. **Lista viva:** estrutura de cofres do 1Password. **Auditoria:** histórico de participação nos cofres.
 
-Inventário (`[CONFIRMAR]` onde o locus de governança depende de confirmação):
+**Fonte da verdade do catálogo de sistemas.** A lista autoritativa e sempre atualizada dos sistemas de que a 4SHARK depende é o **Inventário de Fornecedores** (`records/inventario-de-fornecedores.md`, no repositório de compliance). Em cada evento do ciclo de vida — entrada, movimentação e desligamento —, o executor consulta esse inventário diretamente e percorre todos os sistemas nele listados, sem depender de uma enumeração paralela mantida neste Procedimento — que ficaria desatualizada a cada sistema adicionado ou removido. O quadro abaixo não é essa enumeração: mapeia, a título ilustrativo, como cada tipo de sistema se enquadra nas três camadas de governança e como é revogado.
+
+Mapeamento por camada (ilustrativo; `[CONFIRMAR]` onde o locus de governança depende de confirmação):
 
 | Sistema | Camada | Revogação no desligamento |
 |---|---|---|

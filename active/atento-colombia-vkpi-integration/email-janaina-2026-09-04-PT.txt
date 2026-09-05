@@ -1,0 +1,22 @@
+Para: Janaína Soares (Atento) | Cópia: Estefani Pérez (Atento) | Enviado: 2026-09-04
+
+Assunto: Atento Prime | Ajuda para acelerarmos a integração de indicadores (México, Colômbia e Chile)
+
+Oi Janaína, tudo bem?
+
+Te escrevo porque preciso de uma ajuda sua. Hoje, os quatro países que já usam a plataforma têm a integração nativa de usuários e hierarquia funcionando; o que estamos concluindo agora é a integração dos indicadores (VKPIs).
+
+Essa integração vem andando bem, dentro dos fluxos da própria Atento — segurança, acessos, ajustes internos —, e a Estefani tem feito um trabalho espetacular, nos apoiando e cobrando os times todos os dias. No entanto, a gente gostaria de ganhar um pouco mais de celeridade do que o ritmo atual: falta muito pouco para fechar, e o que a gente precisa é do seu apoio para priorizar os times nesses últimos pontos e a gente destravar de vez. Do nosso lado é tudo rápido; o que falta em cada país é um passo da Atento.
+
+No México e na Colômbia, oferecemos desde o início as formas mais rápidas de destravar:
+- usar a base normalizada que já está integrada à 4Shark;
+- a 4Shark se conectar ao Data Lake e consumi-lo para a integração;
+- a 4Shark entregar um script pronto com a tabela já no formato de que precisamos.
+
+Nos dois países o time preferiu desenvolver a própria tabela de indicadores — sem problema para nós. Já passamos a eles, mais de uma vez, exatamente o que ainda falta, inclusive o script pronto com as correções. Falta só concluírem esse ajuste. Assim que a tabela ficar pronta, entregamos a integração dos VKPIs em poucos dias úteis — no México, com o script já em mãos, em até 5 dias úteis.
+
+No Chile é diferente: eles já têm a estrutura montada e a segurança já foi aprovada (a validação vale para os três países). Falta liberarem o nosso acesso a essa tabela — hoje no trâmite interno de servidores/acessos. Como ainda não conseguimos ver como ficou a base que eles montaram, é esse acesso que destrava o Chile: com ele, a gente valida a estrutura e ou já segue com a integração, ou aponta rapidinho o que precisa ser ajustado — o mesmo caminho que já estamos rodando no México e na Colômbia. Para garantir performance e não arriscar refazer trabalho, estamos montando as duas conexões em paralelo (linked server e VPN).
+
+Com esses pontos, fechamos a integração dos indicadores nos três países — e, pela nossa experiência, sem retrabalho depois. Qualquer coisa, marcamos uma call rapidinha.
+
+Um abraço,

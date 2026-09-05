@@ -12,6 +12,8 @@ On 2026-08-27 Atento reported the structure changes were applied. 4Shark verifie
 
 **The 20-ago delivery** (`estructura_final_vkpi_atento_colombia_20260820.sql` + roadmap PDF, 17-sep deadline to object) remains the record of what 4Shark asked for on the source-table path, should that path be revived.
 
+On **2026-09-04**, 4Shark sent Janaína Soares (CC Estefani Pérez) a priority-request email covering the VKPI integration in México, Colômbia and Chile: it states the integration is progressing within Atento's own flows, asks Atento to prioritize the teams on the remaining points so it closes faster, and commits 4Shark to deliver within a few business days of each unblock. Full text: `email-janaina-2026-09-04-PT.txt`.
+
 ## The three sources, and what each one proves
 
 Confusing these is the most expensive mistake available here, because each answers a different question and none of them substitutes for another.

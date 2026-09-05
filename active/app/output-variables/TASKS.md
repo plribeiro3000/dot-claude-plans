@@ -6,11 +6,17 @@
 > branch `develop` in both.
 > Language classification: internal engineering doc → English (`LANGUAGE-POLICY.md`, category 1).
 
-## Status — 2026-09-02
+## Status — 2026-09-04
 
 **The feature is built as a `Metric` specialization, not a fourth variable type.** A variable whose value
 the system produces is an ordinary `IndicatorVariable` carrying a `CommissioningMetric` — a subtype of an
 STI `Metric`, alongside `DealMetric`. `DOMAIN.md` is the authoritative model.
+
+**The structural/domain phase and the GraphQL authoring surface are complete.** The model, the rule link,
+the plan-level reader validations, the stage-boundary rules, and the GraphQL binding that authors a
+commissioning metric on a rule are merged. The work now moves to the `app-webclient` half (TASK-FE) and,
+in the backend, validation 2 (TASK-5) and the materialization/read runtime lane (TASK-M, TASK-R). The
+tasks that stay open are listed under "Open work" below.
 
 **Merged to `develop`:**
 
@@ -21,13 +27,17 @@ STI `Metric`, alongside `DealMetric`. `DOMAIN.md` is the authoritative model.
 | #5433 | Remove the output-variable type in favor of the commissioning metric; move the rule target `rules.output_variable_id` → `rules.commissioning_metric_id` |
 | #5434 | Validation 1 — an incentive reading a commissioning-metric variable requires an earlier-stage incentive whose rule feeds that metric (four `Incentivation::<Type>IncentivationMetricValidator`; error `metric_not_populated` on `:incentive_id`) |
 | #5436 | Consolidate validation 1's four per-type validators into the plan-level `Plan::CommissioningMetrics` domain object (error renamed `missing_metric_rule`); deliver validation 3 — a commissioning-metric variable is read by incentives of a single type (`conflicting_incentive_types` on `:incentive_id`) |
+| #5441 | Stage-boundary rules — a redemption rule cannot feed a commissioning metric (`Rule#commissioning_metric_absence`, guarded `if: :redemption?`, `errors.add(:commissioning_metric_id, :invalid)`); a transactional (deal) incentive excludes commissioning-metric variables from consumption (the deal workers' `plan.metrics.where.not(type: 'CommissioningMetric')`) — the consumption half of TASK-8 |
+| #5442 | GraphQL authoring surface (TASK-6) — the `commissioning_metric` / `commissioning_metric_id` binding on `RuleGraphqlType`, the `commissioning_metric_id` argument on `RuleInputGraphqlType`, that argument in the `rules:` permit of both incentive mutations, and the clone round-trip through `CreateIncentiveGraphqlMutation`; plus `MetricGraphqlType.type` exposing the STI discriminator so the front distinguishes `CommissioningMetric` from `DealMetric` |
 
 Test-infra fixes #5429 and #5432 landed alongside (spec isolation; STI factory construction) — not
 feature tasks.
 
-**Remaining, in order:** validation 2 (single feeding type), materialization, read path, GraphQL surface +
-permission, variable availability filter, the `app-webclient` half. The materialization/read design is the
-critical unknown — see the open questions on TASK-M below.
+**Open work:** the `app-webclient` authoring surface (TASK-FE), rule syntax confirm (TASK-4), validation 2 —
+single feeding type (TASK-5), the authoring-availability filter half of TASK-8 (its picker-support GraphQL
+folded into TASK-FE), the binding permission (TASK-7), materialization (TASK-M), read path (TASK-R),
+statement display (TASK-STMT). The materialization/read design is the critical unknown — see the open
+questions on TASK-M below.
 
 ---
 
@@ -141,25 +151,32 @@ read it. This is DOMAIN.md's validation 3; the writer-side rule (validation 2) i
     already deliver it — confirm whether any new `Commission::<name>OptionsProcessor` / merge step is
     required, and in which reading consumers. Depends on TASK-M's store answer.
 
-### TASK-6 — GraphQL authoring surface + clone round-trip — OPEN (build)
+### TASK-6 — GraphQL authoring surface + clone round-trip — DELIVERED (#5442)
 
 - **Repository**: `app`
-- **Description**: expose the `commissioning_metric` binding on the rule create/update mutations and types,
-  and close the clone gap.
-- **Acceptance criteria**:
-  - [ ] A `commissioning_metric` field on `RuleGraphqlType` and a matching `required: false` argument on
-        `RuleInputGraphqlType` (the type name unchanged; every argument there is optional today).
-  - [ ] Both mutation rule allow-lists carry the new argument — `create_incentive_graphql_mutation.rb`
-        (`rules: %i[ description type value ]`) and `update_incentive_graphql_mutation.rb`
-        (`rules: %i[ _destroy description id type value ]`).
-  - [ ] A field on `IncentiveGraphqlType` distinguishing fed vs read metric variables, for the plan picker.
-  - [ ] A clone carrying a binding round-trips through `CreateIncentiveGraphqlMutation` with the binding
-        intact (clone is a UI action through the create mutation — no backend clone mutation).
-  - [ ] No new mutation; creating the variable is unchanged.
-- **Open questions**:
-  - The exact field/argument names.
-  - Whether the `CommissioningMetric` itself is created through its own mutation/screen or as part of the
-    incentive/rule save.
+- **Delivered (#5442)**:
+  - `commissioning_metric` (`MetricGraphqlType`) and `commissioning_metric_id` (`ID`) read fields on
+    `RuleGraphqlType`, mirroring its own `incentive` / `incentive_id` pair.
+  - A `commissioning_metric_id` argument (`required: false`) on `RuleInputGraphqlType`.
+  - That argument in the `rules:` permit of both incentive mutations — `create_incentive_graphql_mutation.rb`
+    (`rules: %i[ commissioning_metric_id description reference type value ]`) and
+    `update_incentive_graphql_mutation.rb` (`rules: %i[ _destroy commissioning_metric_id description id
+    reference type value ]`). The permit carries `reference`.
+  - The clone round-trips the binding through `CreateIncentiveGraphqlMutation` — clone is a UI action
+    through the create mutation, so no backend clone mutation exists; a request spec asserts the binding
+    persists.
+  - `MetricGraphqlType.type` — the STI discriminator, so the front can tell a `CommissioningMetric` from a
+    `DealMetric`. Covered in the metric resolver spec.
+- **Deferred to TASK-FE (picker support)**:
+  - A field on `IncentiveGraphqlType` distinguishing the metric variables an incentive feeds vs reads: the
+    shape is a frontend-contract decision the picker query has not yet fixed, a per-incentive resolver N+1s
+    a list query, and the fed/read relation is a plan-level concept (`Plan::IncentiveCommissioningMetricMapping`
+    is plan-scoped and batched). It enters at the level the frontend query defines.
+  - A `type` filter (`option(:type)` + a `Metric.for_type` scope) on `MetricGraphqlResolver`, mirroring
+    `IncentiveGraphqlResolver` — the resolver lists deal + commissioning mixed. With `type` exposed the front
+    filters client-side; a server-side filter enters with TASK-FE.
+- **Note**: creating a `CommissioningMetric` needs no new GraphQL — `CreateMetricGraphqlMutation` already
+  permits `type` + `calculation`, so it is created via the STI type.
 
 ### TASK-7 — The binding permission — OPEN (build)
 
@@ -176,13 +193,20 @@ read it. This is DOMAIN.md's validation 3; the writer-side rule (validation 2) i
         comment in the migration.
 - **Open questions**: the permission key name.
 
-### TASK-8 — Variable availability by incentive type — OPEN (design + build)
+### TASK-8 — Variable availability by incentive type — PARTIAL (consumption exclusion delivered #5441)
 
 - **Repository**: `app`
 - **Description**: a commissioning-metric variable is excluded from the deal (transactional) incentive and
   selectable as a rule's feeding target elsewhere.
-- **Open questions**: no per-incentive-type variable-availability filter exists in the models today; where
-  it lives (a new model scope vs the GraphQL/API layer) is undecided (DOMAIN.md § Remaining work).
+- **Delivered (#5441)**: the consumption exclusion — the deal workers drop commissioning-metric variables
+  from the keys a transactional incentive may read (`plan.metrics.where.not(type: 'CommissioningMetric')`
+  in `deal_incentive/consumer.rb` and `deal_incentive/period_processor.rb`).
+- **Open**: the authoring-availability filter — a commissioning-metric variable offered as a rule's feeding
+  target only where valid, and absent from the deal incentive's picker. No per-incentive-type variable-
+  availability filter exists in the models today; where it lives (a new model scope vs the GraphQL/API
+  layer) is undecided (DOMAIN.md § Remaining work). It folds into the frontend authoring surface (TASK-FE),
+  alongside the picker-support GraphQL deferred there (the `IncentiveGraphqlType` fed/read field and the
+  `MetricGraphqlResolver` `type` filter).
 
 ### TASK-FE — `app-webclient` authoring surface — OPEN (build)
 
@@ -230,7 +254,7 @@ graph TD
   T2 --> TM[TASK-M materialization]
   TM --> TR[TASK-R read path]
   T4 --> TR
-  T2 --> T6[TASK-6 GraphQL + clone]
+  T2 --> T6[TASK-6 GraphQL + clone ✓]
   T6 --> T7[TASK-7 permission]
   T6 --> TFE[TASK-FE webclient]
   T3 --> T8[TASK-8 availability]
@@ -241,10 +265,13 @@ graph TD
   TFE --> TROLL
 ```
 
-**Delivered:** TASK-1, TASK-2, TASK-3, TASK-3B. **Critical unknown:** TASK-M (materialization) — TASK-R, TASK-STMT
-and the productive rollout all wait on its design. **Independent lanes** once the model is in place:
-validation 2 (TASK-5), the GraphQL/permission/FE lane (TASK-6 → TASK-7/TASK-FE), the availability filter
-(TASK-8), and the materialization/read lane (TASK-M → TASK-R). The lanes converge at the deploy.
+**Delivered:** TASK-1, TASK-2, TASK-3, TASK-3B, #5441's stage-boundary rules and the consumption half of
+TASK-8, and TASK-6's GraphQL authoring binding (#5442). **Active:** the `app-webclient` authoring surface
+(TASK-FE), into which the picker-support GraphQL (the fed/read field and the resolver `type` filter) and
+the availability-filter half of TASK-8 fold; validation 2 (TASK-5); the binding permission (TASK-7); the
+rule-syntax confirm (TASK-4); and the materialization/read lane (TASK-M → TASK-R). TASK-M is the critical
+unknown — TASK-R, TASK-STMT and the productive rollout all wait on its design. The lanes converge at the
+deploy.
 
 ## Cross-cutting concerns
 

@@ -18,6 +18,8 @@ The four points carried to Atento on **2-sep**, each with the SQL to fix it: (1)
 
 Atento built a **new table** rather than modifying the structure 4Shark originally reviewed. The older `dbo.tbl_agentkpis_incentivos` (636 rows) still exists on the server and is not used; the integration reads `dbo.tbl_VKPI_incentivos` (1616 rows) only. The new table follows the shape of the VKPI extract (client, program, supervisor/manager names, indicator, `Resultados`) rather than the six surgical edits proposed for the old table.
 
+On **2026-09-04**, 4Shark sent Janaína Soares (CC Estefani Pérez) a priority-request email covering the VKPI integration in México, Colômbia and Chile: it states the integration is progressing within Atento's own flows, asks Atento to prioritize the teams on the remaining points so it closes faster, and commits 4Shark to deliver within a few business days of each unblock — México, with the correction script already in hand, in up to 5 business days. Full text: `email-janaina-2026-09-04-PT.txt`.
+
 ## The source structure
 
 `vkpi-schema-2026-08-27.txt` in this folder is the full capture read live from the server on 27-ago: the target table, its 19 columns with type and nullability, its single index, the absence of foreign keys, and the data findings. Read that file instead of reconnecting. `vkpi-schema-2026-08-03.txt` describes the older `tbl_agentkpis_incentivos` and is kept only as the prior reference.
