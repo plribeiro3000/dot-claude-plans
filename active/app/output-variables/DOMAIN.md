@@ -102,48 +102,40 @@ variable-availability filter exists in the models today (the only related scope 
 
 ## Plan-level validations (one family)
 
-These are the validations the plan-save enforces over commissioning-metric variables. Validations 1 and 3
-are implemented; validation 2 is not yet implemented. Each incentivation validates its own incentive
-(`Incentivation#commissioning_metric`), so the error lands on that incentivation's `:incentive_id` and
-reaches the plan through nested-attribute autosave exactly like every other incentivation error — no
-plan-level marker. The domain object `Plan::CommissioningMetrics` holds the reads and feeds of the
-plan's commissioning-metric variables and answers `violations_for(incentivation)`, returning the list of
-error keys for that incentivation; `Plan#commissioning_metrics` builds a fresh instance around the plan on
-each call. Its ordered `INCENTIVE_PROCESSING_ORDER` constant lists the incentive types in stage order, and
-the feeds that satisfy validation 1 for a reader are the types strictly before it
-(`INCENTIVE_PROCESSING_ORDER.take(index_of_reader_type)`).
+These are the validations the plan-save enforces over commissioning-metric variables, both implemented.
+Each incentivation validates its own incentive, so the error lands on that incentivation's `:incentive_id`
+and reaches the plan through nested-attribute autosave exactly like every other incentivation error — no
+plan-level marker. The domain object `Plan::IncentiveCommissioningMetricMapping`
+(`plan/incentive_commissioning_metric_mapping.rb`) holds the reads and feeds of the plan's
+commissioning-metric variables; `Plan#incentive_commissioning_metric_mapping` builds a fresh instance in a
+`before_validation` (`plan.rb:146,148`). It exposes `rows`, keyed by `incentive_id`, each row carrying
+`{ type, consumed_metric_ids, produced_metric_ids }`. The `Incentivation::PROCESSING_ORDER` constant lists
+the incentive types in stage order, and the producers that satisfy validation 1 for a consumer are the types
+strictly before it (`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`).
 
-1. **Producer must precede consumer.** An incentive that reads a commissioning-metric variable as
-   input requires that the variable's metric be fed by a rule on an incentive of an allowed producer
-   type. The allowed producers per reader type: `IndicatorIncentive` ← deal; `RankingIncentive` ← deal,
-   indicator; `LimiterIncentive` ← deal, indicator, ranking; `RedemptionIncentive` ← deal, indicator,
-   ranking, limiter. The incentivation validator adds the `missing_metric_rule` error on its own
-   `:incentive_id` when the variable it reads has no feeder of an allowed producer type. A deal reads no
-   commissioning-metric variable — it has no producer before it and is exempt.
+1. **Producer must precede consumer.** An incentive that consumes a commissioning-metric variable requires
+   that the variable's metric was fed by a rule on an incentive of an earlier stage. The allowed producers
+   per consumer type: `IndicatorIncentive` ← deal; `RankingIncentive` ← deal, indicator; `LimiterIncentive`
+   ← deal, indicator, ranking; `RedemptionIncentive` ← deal, indicator, ranking, limiter. Any number of
+   incentive types may produce the same metric — the metric aggregates them all — so precedence only requires
+   that each consumed metric has at least one earlier-stage producer. `commissioning_metric_precedence` adds
+   `:missing_producing_incentive` on the consumer's own `:incentive_id` when a consumed metric has no
+   earlier-stage producer. A deal consumes no commissioning-metric variable — it is the first stage — and is
+   exempt.
 
-2. **Single writer type per variable (the sibling rule).** All incentives that **write** a
-   commissioning-metric variable — i.e. whose rules feed that variable's metric — must be of one
-   incentive type. Many incentives of that one type may all write to it (their commissionings
-   aggregate through the metric, sum/average); an incentive of any second type may not. **Reading**
-   the variable downstream is subject to validations 1 and 3. This keeps the variable written
-   at a single calculation stage, so it holds one value per plan; writers of two different types would
-   write it at two different stages and give it two values, impossible to present coherently. Its error
-   lands on each offending incentivation's `:incentive_id`, the same as the other two.
+2. **Single consumer type per variable.** A commissioning-metric variable may be consumed by incentives of a
+   single type only — an incentive that consumes one forbids any incentive of a different type from consuming
+   the same variable (many incentives of that one type may all consume it). Production is deliberately
+   unconstrained: any number of incentive types may feed a metric, and the metric aggregates (sum/average)
+   them into a single value, so every consumer reads the same number regardless of how many types produced it.
+   The constraint is on the read side and is a comprehensibility and legal-clarity one: a variable consumed by
+   several types turns the rule graph into a web the end user cannot follow, which forfeits the signed
+   declaration's legal validity. Confining a metric variable to one consumer type keeps the graph a legible
+   line. `commissioning_metric_consumption` adds `:multiple_consuming_incentive_types` on the consumer's own
+   `:incentive_id` when the variable it consumes is consumed by more than one incentive type.
 
-3. **Single reader type per variable.** A commissioning-metric variable may be read by incentives of a
-   single type only — an incentive that reads one forbids any incentive of a different type from reading
-   the same variable (many incentives of that one type may all read it). This is a comprehensibility and
-   legal-clarity constraint, not a correctness one: validation 2 already fixes a single writer type, so the
-   variable holds one stable sum and every downstream read sees the same number regardless of how many
-   incentives read it — the value one reader gets is exactly the value the next gets. What reading across
-   incentive types costs is legibility: a variable consumed by several types turns the rule graph into a web
-   the end user cannot follow, which is what forfeits the signed declaration's legal validity. Confining a
-   metric variable to one reader type keeps the graph a line — written by one type, summed, read by one type.
-   The incentivation validator adds the `conflicting_incentive_types` error on its own
-   `:incentive_id` when the variable it reads is read by more than one incentive type.
-
-Validations 1, 2 and 3 compose: 2 fixes a single writer type (one stable value), 1 requires that writer to
-precede every reader, and 3 confines reading to a single type so the dependency graph stays a legible line
+The two compose: precedence guarantees every consumed value was written by an earlier stage before it is
+read, and single-consumer-type confines reading to one type so the dependency graph stays a legible line
 rather than a web.
 
 ## Migrations
@@ -160,14 +152,12 @@ rather than a web.
 
 `<Concept>Metric` mirrors the existing `<Concept>Variable` STI convention (`DealVariable`,
 `IndicatorVariable`). "Commissioning" matches the existing `commissioning/` namespace and the
-`Commissioning` model. Validation 1's i18n error key is `missing_metric_rule` on the offending
-incentivation's `:incentive_id`, naming the rule that no earlier incentive supplies to feed the variable's
-metric. Validation 3's key is `conflicting_incentive_types` on the same attribute, naming the incentive
-types that read the variable.
+`Commissioning` model. Validation 1's i18n error key is `missing_producing_incentive` on the offending
+incentivation's `:incentive_id`, naming that no earlier incentive produces the metric it consumes.
+Validation 2's key is `multiple_consuming_incentive_types` on the same attribute, naming that more than one
+incentive type consumes the variable.
 
 ## Remaining work
 
-- **Validation 2 — single writer type per variable** (the sibling rule in Plan-level validations
-  above). Not yet implemented.
 - **Variable availability by incentive type** — the transactional-exclusion filter (see the section
   above). Where it lives (a new availability filter vs the API/GraphQL layer) is still open.

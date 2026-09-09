@@ -1,0 +1,21 @@
+Hola Santiago, ¿cómo estás?
+
+Después del mensaje de Nicolás del 8 de septiembre —donde nos indican que ya se realizaron los ajustes solicitados sobre los campos y fechas y que el reproceso quedó pedido— hicimos una validación técnica directa sobre la base productiva (COLBOGSQL58\MSSQL58_KPI) para confirmar la estructura antes de arrancar las pruebas. El resultado no coincide con lo que entendimos del correo, y por eso quería alinearlo contigo antes de seguir.
+
+Lo que verificamos hoy, punto por punto:
+
+1) Índice único por la llave de negocio (período + persona + servicio + indicador): no está. De hecho, tanto la tabla de score (tb_dim_indicadores_score) como el catálogo (tb_dim_indicadores) quedaron sin ningún índice —son heap—, por lo que ni siquiera existe el índice que había antes. Sin ese índice único nada impide que entren dos filas con el mismo período, persona, servicio e indicador con resultados distintos.
+
+2) Columna llave en el catálogo tb_dim_indicadores (texto, única y obligatoria), que solicitamos el 5 de agosto: no existe. Vemos una columna llamada Homologo_4shark, pero es de tipo fecha (datetime) y acepta nulos, así que no cumple la función de la llave que necesitamos para resolver cada indicador contra la Variable de 4Shark.
+
+3) Integridad entre score y catálogo: no existe la llave foránea (FK) de score hacia el catálogo, y encontramos 160 filas de score cuyo NR_ID no existe en el catálogo. Además, el NR_ID es float en la tabla de score e int en el catálogo, lo que puede estar generando parte de esas filas huérfanas.
+
+4) Lo que sí quedó correcto: las columnas de creación y actualización (DT_CREATED / DT_MODIFIED) ahora son datetime, con fecha y hora, en las dos tablas. Ese punto sí lo corrigieron.
+
+Como el correo dice que se ejecutó exactamente lo solicitado y nuestra validación muestra otra cosa, preferimos no asumir nada y pedir una confirmación al equipo de Colombia, solo para entender bien a qué se refieren. Puede ser que el reproceso todavía no se haya ejecutado, que estemos mirando una base o un entorno distinto al que ellos ajustaron, o que haya una diferencia de interpretación sobre el alcance de los cambios.
+
+¿Podrías escribirles algo en esta línea?
+
+"Hola, gracias por la actualización. Validamos la base COLBOGSQL58\MSSQL58_KPI para preparar las pruebas y queríamos confirmar un par de cosas con ustedes, porque entendimos que la estructura ya estaba lista. Al revisarla vemos que las dos tablas quedaron sin índices (no está el índice único por período + persona + servicio + indicador que pedimos), que no existe la columna llave en el catálogo, y que aún no hay la llave foránea entre score y catálogo. ¿Nos ayudan a entender si el reproceso ya se ejecutó, si estamos mirando la base correcta, o si quedó algún ajuste pendiente de aplicar? Solo queremos asegurarnos de partir de la misma base antes de arrancar las pruebas."
+
+Con eso confirmamos si es un tema de reproceso pendiente o si hay que cerrar los tres puntos que siguen abiertos. Quedo atento.

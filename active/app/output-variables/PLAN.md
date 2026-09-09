@@ -25,11 +25,11 @@ base with `DealMetric` (aggregates deals over an interval — the pre-existing b
 `CommissioningMetric` (aggregates commissionings per plan/user — this feature). Both write the variable's
 internal `Indicator`; they differ only in the source of the value.
 
-At plan save, three validations hold over commissioning-metric variables: an incentive that **reads** one
-requires an earlier-stage incentive whose rule **feeds** its metric (validation 1, enforced); a variable
-is read by incentives of a single type only (validation 3, enforced); and every incentive that **feeds**
-one metric must be of a single incentive type (validation 2, not yet implemented). Stage order: deal →
-indicator → ranking → limiter → redemption.
+At plan save, two validations hold over commissioning-metric variables: an incentive that **consumes** one
+requires an earlier-stage incentive whose rule **feeds** its metric (validation 1); and a variable is
+consumed by incentives of a single type only (validation 2). Any number of incentive types may feed one
+metric — it aggregates them into a single value, so there is no single-writer-type constraint. Stage order:
+deal → indicator → ranking → limiter → redemption.
 
 ## Scope
 
@@ -37,9 +37,8 @@ indicator → ranking → limiter → redemption.
 
 - The `Metric` STI base and its `DealMetric` / `CommissioningMetric` subtypes. **(delivered — #5431)**
 - The rule link `Rule belongs_to :commissioning_metric`, replacing the earlier `output_variable` link. **(delivered — #5433)**
-- Plan-level validation 1 — a reader requires an earlier-stage feeder. **(delivered — #5434, consolidated into `Plan::CommissioningMetrics` #5436)**
-- Plan-level validation 3 — a single reader incentive type per commissioning-metric variable. **(delivered — #5436)**
-- Plan-level validation 2 — a single writer (feeding) incentive type per commissioning-metric variable. **(open — build)**
+- Plan-level validation 1 — a consumer requires an earlier-stage feeder. **(delivered — #5434, consolidated into `Plan::IncentiveCommissioningMetricMapping` #5436)**
+- Plan-level validation 2 — a single consumer incentive type per commissioning-metric variable. **(delivered — #5436)**
 - Materialization: the `CommissioningMetric` computes its per-user value from the commissionings of its
   linked rules and writes the variable's internal `Indicator`. **(open — mechanism not yet built)**
 - The read path that delivers the materialized value to a consuming rule. **(open — likely the existing indicator read path; to confirm)**
@@ -101,11 +100,12 @@ Concretely:
 - **Any stage's rule may feed a metric; reading is constrained to every stage except the deal stage.**
   The deal stage feeds but never reads; it is the exporter an indicator reader depends on, since the
   indicator stage is the first stage that may read and the deal stage is the only stage strictly before it.
-- **A single plan-level object, `Plan::CommissioningMetrics`, backed by the ordered
-  `INCENTIVE_PROCESSING_ORDER` constant, holds both enforced validations.** Validation 1 rejects a plan
-  whose reader has no feeder in a strictly earlier stage (reader ← eligible feeder stages: indicator ←
-  deal; ranking ← deal, indicator; limiter ← deal, indicator, ranking; redemption ← deal, indicator,
-  ranking, limiter). Validation 3 rejects a variable read by incentives of more than one type.
+- **A single plan-level object, `Plan::IncentiveCommissioningMetricMapping`, builds the per-incentive
+  `rows` (`{ type, consumed_metric_ids, produced_metric_ids }`) both validations reason over, and the
+  `Incentivation::PROCESSING_ORDER` constant carries the stage order.** Validation 1 rejects a plan whose
+  consumer has no feeder in a strictly earlier stage (consumer ← eligible feeder stages: indicator ← deal;
+  ranking ← deal, indicator; limiter ← deal, indicator, ranking; redemption ← deal, indicator, ranking,
+  limiter). Validation 2 rejects a variable consumed by incentives of more than one type.
 - Rollout is one backend deploy per environment, then one frontend release, then the permission grant per
   account.
 
@@ -125,7 +125,7 @@ where it writes in the commissioning-metric model is an open design point** (see
 | STI subtype slicing a base's constant + its own `enumerize` | `commissioning_metric.rb`, `deal_metric.rb` over `metric.rb:4` |
 | A metric writing a variable's internal indicators | `DealMetric` (the existing deal-based metric path) |
 | Plan-level validation reasoning over the incentive set | `Plan#redemption_incentive_requirements` (`app/models/plan.rb`), the structural twin of validation 1 |
-| A plan-level domain object answering per incentivation | `Incentivation#commissioning_metric` → `Plan::CommissioningMetrics#violations_for` (delivered) |
+| A plan-level domain object the incentivation validators read | `Plan::IncentiveCommissioningMetricMapping#rows`, consumed by `Incentivation#commissioning_metric_precedence` / `#commissioning_metric_consumption` (delivered) |
 | Options processor merged last, after `modifier_options` | `Commission::RedemptionOptionsProcessor` / `Commission::LimiterOptionsProcessor` |
 | Worker/data access | `~/.claude/docs/DATA-ACCESS.md` — `with_uncached_connection`, IDs not loaded objects, associations navigated per record |
 
@@ -161,10 +161,10 @@ feeding relationship is carried directly by `CommissioningMetric has_many :rules
 :commissioning_metric` — there is no separate registration entity.
 
 **OPEN — the plan-set comparison.** Validation 1 (delivered) reasons per incentivation over the plan's
-incentive set. Any future need to answer "which commissioning-metric variables does this plan write vs
-read" as a set (for the authoring picker, or validation 2) must be derived from the incentives' rules and
-their metrics, not from the removed `plan_output_variables` roll-up. How that set is computed and where it
-is cached (if at all) is undecided.
+incentive set. Any future need to answer "which commissioning-metric variables does this plan feed vs
+consume" as a set (for the authoring picker) must be derived from the incentives' rules and their metrics,
+not from the removed `plan_output_variables` roll-up. How that set is computed and where it is cached (if at
+all) is undecided.
 
 ### Phase 4: Rule syntax validation for a metric-fed key — DELIVERED / to confirm
 
@@ -179,29 +179,23 @@ reading stages and withheld from the deal stage exactly as the design requires, 
 change is needed. If the metric-fed variable must be distinguished from an ordinary indicator variable at
 syntax time, that distinction is net-new. Cover with tests.
 
-### Phase 5: Plan validation and the stage order — validations 1 & 3 DELIVERED, validation 2 OPEN
+### Phase 5: Plan validation and the stage order — DELIVERED
 
-Validations 1 and 3 are enforced through one plan-level object: `Incentivation#commissioning_metric`
-delegates to `Plan::CommissioningMetrics#violations_for(self)`
-(`app/models/plan/commissioning_metrics.rb`), which reads the variables the incentive consumes
-(`IncentiveVariable.where(incentive_id:)`), the metrics behind them
-(`CommissioningMetric.where(variable_id:)`), and the plan's non-destroyed incentives — filtering
-`marked_for_destruction?` in-memory so a removal in the same save counts. It returns the error keys for
-that incentivation, surfaced on `:incentive_id` (the frontend lists per-`incentive_id` errors after
-submit). Validation 1 (delivered #5434, consolidated #5436) adds `missing_metric_rule` when a read metric
-has no feeder rule on an incentive of a strictly-earlier stage; the ordered `INCENTIVE_PROCESSING_ORDER`
-constant encodes the stage order and the allowed feeders for a reader are
-`INCENTIVE_PROCESSING_ORDER.take(index)` (Indicator ← Deal; Ranking ← Deal, Indicator; Limiter ← Deal,
-Indicator, Ranking; Redemption ← Deal, Indicator, Ranking, Limiter). Validation 3 (delivered #5436) adds
-`conflicting_incentive_types` when a metric variable is read by incentives of more than one type.
-
-**OPEN — validation 2 (single writer type per metric).** Every incentive that **feeds** one
-commissioning-metric variable — i.e. whose rules target that metric — must be of a single incentive type,
-so the variable is written at a single calculation stage and holds one value per plan; feeders of two
-types would write it at two stages and give it two values. It belongs in the same
-`Plan::CommissioningMetrics#violations_for` pass as validations 1 and 3, counting the distinct types among
-the incentives whose rules feed each metric — the writer-side mirror of validation 3's reader-side count.
-The error is added on the offending `Incentivation`'s `:incentive_id` at plan save.
+Both validations live on `Incentivation` as two methods — `commissioning_metric_precedence` and
+`commissioning_metric_consumption` — each reading `plan.incentive_commissioning_metric_mapping.rows`. The
+mapping object `Plan::IncentiveCommissioningMetricMapping` builds those rows in a `before_validation`
+(`plan.rb:146,148`): one row per non-destroyed incentive, keyed by `incentive_id`, carrying
+`{ type, consumed_metric_ids, produced_metric_ids }` — `consumed_metric_ids` are the metrics behind the
+variables the incentive reads (`IncentiveVariable` → `CommissioningMetric`), `produced_metric_ids` the
+metrics its rules feed (`Rule.commissioning_metric_id`). The error lands on `:incentive_id` (the frontend
+lists per-`incentive_id` errors after submit). Validation 1 adds `missing_producing_incentive` when a
+consumed metric has no producer among the incentives of a strictly-earlier stage; the
+`Incentivation::PROCESSING_ORDER` constant encodes the stage order and the allowed producers for a consumer
+are `PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))` (Indicator ← Deal; Ranking ← Deal,
+Indicator; Limiter ← Deal, Indicator, Ranking; Redemption ← Deal, Indicator, Ranking, Limiter). Validation
+2 adds `multiple_consuming_incentive_types` when a metric variable is consumed by incentives of more than
+one type. Production is unconstrained — any number of incentive types may feed a metric, which aggregates
+them into one value.
 
 ### Phase 6: Materialization — OPEN (mechanism not yet built)
 
@@ -369,12 +363,12 @@ afterwards.
 | The rule link | `Rule belongs_to :commissioning_metric, optional: true` | Delivered (#5433). The metric guarantees the variable is correct (indicator, numeric, no external indicator), so the earlier per-rule `output_variable_type` validation was removed |
 | The metric's calculation | `sum \| average`, sliced from `Metric::CALCULATIONS` on the subtype | Delivered. `DealMetric` uses `total \| quantity`; each subtype declares its own `enumerize` over the shared integer `calculation` column |
 | Which stages feed and which read | Any stage's rule may feed; every stage except the deal stage may read | Engineer's definition (`DECISION-AUTHORITY.md` ladder, source 1): the deal stage is the only stage that may not read, and any reader needs a feeder in a strictly earlier stage |
-| Validation 1 error surface | `missing_metric_rule` on the incentivation's `:incentive_id` | Delivered (#5434, consolidated into `Plan::CommissioningMetrics` #5436). The frontend already lists per-`incentive_id` errors after submit, so the error surfaces on the incentive rather than as a generic base error |
-| Validation 3 | Single reader incentive type per commissioning-metric variable (`conflicting_incentive_types`) | Delivered (#5436). A comprehensibility/legal constraint — a variable read across incentive types turns the rule graph into a web the signed declaration cannot legibly present |
-| Validation 2 | Single feeding incentive type per commissioning-metric variable | **Open.** Keeps the variable written at a single stage so it holds one value per plan; feeders of two types would give it two values |
+| Validation 1 error surface | `missing_producing_incentive` on the incentivation's `:incentive_id` | Delivered (#5434, consolidated into `Plan::IncentiveCommissioningMetricMapping` #5436). The frontend already lists per-`incentive_id` errors after submit, so the error surfaces on the incentive rather than as a generic base error |
+| Validation 2 | Single consumer incentive type per commissioning-metric variable (`multiple_consuming_incentive_types`) | Delivered (#5436). A comprehensibility/legal constraint — a variable consumed across incentive types turns the rule graph into a web the signed declaration cannot legibly present |
+| Production is unconstrained | Any number of incentive types may feed one metric | Decided (engineer, `DECISION-AUTHORITY.md` ladder, source 1). The metric aggregates (sum/average) every feeding commissioning into one value, so multiple feeder types produce a single coherent number — no single-writer-type validation |
 | Materialization trigger + store | Recompute the aggregate (never `+=`); write the variable's internal `Indicator` | **Open.** DOMAIN.md settles that the metric writes the internal indicator; the trigger (commissioning save vs stage boundary), the writing worker, and the exact indicator store are undecided. Recompute (not increment) is forced by Sidekiq at-least-once |
 | What the aggregate sums | The signed, commission-type-aware expression (`#money` / `#points`; limiter `value * -1`), not the raw `value` column | Engineer's requirement (source 1): the 300 + 200 − 100 = 400 example closes only if the sign travels with the value; an unsigned publication would force a downstream author to know the feeder's stage |
-| Where the stage order lives | The ordered `INCENTIVE_PROCESSING_ORDER` constant on `Plan::CommissioningMetrics` | Delivered (#5436). The allowed feeders for a reader are the types strictly before it (`take(index)`); no separate `Incentive::CALCULATION_ORDER` constant was added |
+| Where the stage order lives | The ordered `PROCESSING_ORDER` constant on `Incentivation` | Delivered (#5436). The allowed producers for a consumer are the types strictly before it (`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`); no separate `Incentive::CALCULATION_ORDER` constant was added |
 | Variable availability by incentive type | A commissioning-metric variable is excluded from the deal incentive | **Open** — no per-incentive-type variable-availability filter exists in the models today; placement (a new filter vs the GraphQL layer) undecided (DOMAIN.md § Remaining work) |
 | Does the incentive CSV import support the binding | No — documented limitation | § Scope Discipline. Changes a customer-facing template |
 | Deploy shape | One backend deploy, then one frontend release | No phasing trigger fires: the `Computation` key derivation is unchanged, job argument shapes are unchanged, and recompute makes the materialization idempotent. The act of deploying remains the engineer's |
@@ -388,9 +382,8 @@ afterwards.
 | A cloned incentive silently loses its metric binding | High — a plan validates and computes a different number than the operator authored | Extend both mutation allow-lists and all five front clone builders in the same change (Phases 8-9); cover with a clone-and-assert test |
 | The metric's recompute reads a stale aggregate | High — a silently low number, the failure class payroll cannot tolerate | The aggregate must re-read inside its own transaction at the moment of write (Phase 6) — **open until the writer is designed** |
 | Limiter and ranking commissioning writes are not retry-idempotent | Medium — a retried job raises on the unique index, and a commissionings-based aggregate inherits whatever those rows hold | Pre-existing, not introduced here; redemption compensates in its producer, limiter and ranking do not. Bounds how much the aggregate can rely on those rows being rewritable |
-| Validation 2 is absent | Medium — a metric variable fed by two incentive types holds two values and cannot be presented coherently | Build validation 2 (Phase 5) before the feature is granted to any account |
 | The materialization mechanism is undesigned | Medium — Phase 6/7 cannot be estimated or built until the trigger, writer and store are decided | Resolve the § Materialization open questions first; the model and validation 1 do not depend on them |
-| The stage order becomes a second representation of the enqueue graph | Medium — drift between validation and execution | A spec asserting `INCENTIVE_PROCESSING_ORDER` matches the observed chain is the sync mechanism (Phase 5) |
+| The stage order becomes a second representation of the enqueue graph | Medium — drift between validation and execution | A spec asserting `Incentivation::PROCESSING_ORDER` matches the observed chain is the sync mechanism (Phase 5) |
 | M-perm's `Action.create!` is re-applied | Low — the migration raises | Not idempotent by construction; a re-run hazard, not a rollback hazard |
 
 ---

@@ -15,8 +15,8 @@ STI `Metric`, alongside `DealMetric`. `DOMAIN.md` is the authoritative model.
 **The structural/domain phase and the GraphQL authoring surface are complete.** The model, the rule link,
 the plan-level reader validations, the stage-boundary rules, and the GraphQL binding that authors a
 commissioning metric on a rule are merged. The work now moves to the `app-webclient` half (TASK-FE) and,
-in the backend, validation 2 (TASK-5) and the materialization/read runtime lane (TASK-M, TASK-R). The
-tasks that stay open are listed under "Open work" below.
+in the backend, the materialization/read runtime lane (TASK-M, TASK-R). The tasks that stay open are listed
+under "Open work" below.
 
 **Merged to `develop`:**
 
@@ -26,16 +26,16 @@ tasks that stay open are listed under "Open work" below.
 | #5431 | Specialize `Metric` into `DealMetric` / `CommissioningMetric` — the `metrics.type` STI discriminator |
 | #5433 | Remove the output-variable type in favor of the commissioning metric; move the rule target `rules.output_variable_id` → `rules.commissioning_metric_id` |
 | #5434 | Validation 1 — an incentive reading a commissioning-metric variable requires an earlier-stage incentive whose rule feeds that metric (four `Incentivation::<Type>IncentivationMetricValidator`; error `metric_not_populated` on `:incentive_id`) |
-| #5436 | Consolidate validation 1's four per-type validators into the plan-level `Plan::CommissioningMetrics` domain object (error renamed `missing_metric_rule`); deliver validation 3 — a commissioning-metric variable is read by incentives of a single type (`conflicting_incentive_types` on `:incentive_id`) |
+| #5436 | Consolidate validation 1's four per-type validators against the plan-level `Plan::IncentiveCommissioningMetricMapping` read by `Incentivation` (error `missing_producing_incentive`); deliver validation 2 — a commissioning-metric variable is consumed by incentives of a single type (`multiple_consuming_incentive_types` on `:incentive_id`) |
 | #5441 | Stage-boundary rules — a redemption rule cannot feed a commissioning metric (`Rule#commissioning_metric_absence`, guarded `if: :redemption?`, `errors.add(:commissioning_metric_id, :invalid)`); a transactional (deal) incentive excludes commissioning-metric variables from consumption (the deal workers' `plan.metrics.where.not(type: 'CommissioningMetric')`) — the consumption half of TASK-8 |
 | #5442 | GraphQL authoring surface (TASK-6) — the `commissioning_metric` / `commissioning_metric_id` binding on `RuleGraphqlType`, the `commissioning_metric_id` argument on `RuleInputGraphqlType`, that argument in the `rules:` permit of both incentive mutations, and the clone round-trip through `CreateIncentiveGraphqlMutation`; plus `MetricGraphqlType.type` exposing the STI discriminator so the front distinguishes `CommissioningMetric` from `DealMetric` |
 
 Test-infra fixes #5429 and #5432 landed alongside (spec isolation; STI factory construction) — not
 feature tasks.
 
-**Open work:** the `app-webclient` authoring surface (TASK-FE), rule syntax confirm (TASK-4), validation 2 —
-single feeding type (TASK-5), the authoring-availability filter half of TASK-8 (its picker-support GraphQL
-folded into TASK-FE), the binding permission (TASK-7), materialization (TASK-M), read path (TASK-R),
+**Open work:** the `app-webclient` authoring surface (TASK-FE), rule syntax confirm (TASK-4), the
+authoring-availability filter half of TASK-8 (its picker-support GraphQL folded into TASK-FE), the binding
+permission (TASK-7), materialization (TASK-M), read path (TASK-R),
 statement display (TASK-STMT). The materialization/read design is the critical unknown — see the open
 questions on TASK-M below.
 
@@ -60,24 +60,26 @@ fourth `Variable` type; `Variable::TYPES` unchanged.
 `rules.output_variable_id` → `rules.commissioning_metric_id`; `CommissioningMetric has_many :rules,
 dependent: :nullify`. The output-variable type and its per-rule `output_variable_type` validation removed.
 
-### TASK-3 — Plan validation 1 (feeder precedes reader) — DELIVERED (#5434, consolidated #5436)
+### TASK-3 — Plan validation 1 (producer precedes consumer) — DELIVERED (#5434, consolidated #5436)
 
-`Incentivation#commissioning_metric` delegates to `Plan::CommissioningMetrics#violations_for(self)`
-(`app/models/plan/commissioning_metrics.rb`). The object reads the incentive's read variables
-(`IncentiveVariable.where(incentive_id:)`), the metrics behind them
-(`CommissioningMetric.where(variable_id:)`), and whether an earlier-stage incentive feeds each metric
-(`Rule.where(incentive_id:, commissioning_metric_id:)`), filtering `marked_for_destruction?` in memory. A
-metric with no earlier feeder adds `missing_metric_rule` on `:incentive_id`. The ordered
-`INCENTIVE_PROCESSING_ORDER` constant encodes the stage order; the allowed feeders for a reader are the
-types strictly before it (`INCENTIVE_PROCESSING_ORDER.take(index)`).
+`Incentivation#commissioning_metric_precedence` reads `plan.incentive_commissioning_metric_mapping.rows`.
+The mapping object `Plan::IncentiveCommissioningMetricMapping`
+(`app/models/plan/incentive_commissioning_metric_mapping.rb`) builds one row per non-destroyed incentive —
+`{ type, consumed_metric_ids, produced_metric_ids }` — from the incentive's read variables
+(`IncentiveVariable` → `CommissioningMetric`) and the metrics its rules feed (`Rule.commissioning_metric_id`).
+A consumed metric with no producer among the strictly-earlier stages adds `missing_producing_incentive` on
+`:incentive_id`. The `Incentivation::PROCESSING_ORDER` constant encodes the stage order; the allowed
+producers for a consumer are the types strictly before it
+(`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`).
 
-### TASK-3B — Plan validation 3 (single reader type) — DELIVERED (#5436)
+### TASK-3B — Plan validation 2 (single consumer type) — DELIVERED (#5436)
 
-`Plan::CommissioningMetrics#violations_for` also enforces that a commissioning-metric variable is read by
-incentives of a single type: it counts the distinct types among the plan's non-destroyed incentives that
-read each metric variable (`IncentiveVariable` grouped by `variable_id`) and adds `conflicting_incentive_types`
-on `:incentive_id` when a variable is read by more than one type. Several incentives of the same type may
-read it. This is DOMAIN.md's validation 3; the writer-side rule (validation 2) is TASK-5, still open.
+`Incentivation#commissioning_metric_consumption` enforces that a commissioning-metric variable is consumed
+by incentives of a single type: for each metric the incentive consumes, it counts the distinct types among
+the plan's incentives that also consume it (over the mapping `rows`' `consumed_metric_ids`) and adds
+`multiple_consuming_incentive_types` on `:incentive_id` when a variable is consumed by more than one type.
+Several incentives of the same type may consume it, and production is unconstrained — any number of types
+may feed a metric.
 
 ### TASK-4 — Rule syntax validation for a metric-fed key — OPEN (confirm)
 
@@ -96,31 +98,14 @@ read it. This is DOMAIN.md's validation 3; the writer-side rule (validation 2) i
   - If a metric-fed variable must be distinguished from a plain indicator variable at syntax time, that
     distinction is net-new.
 
-### TASK-5 — Plan validation 2 (single feeding incentive type per metric) — OPEN (build)
-
-- **Repository**: `app`
-- **Description**: every incentive that feeds one commissioning-metric variable must be of a single
-  incentive type, so the variable is written at one stage and holds one value per plan.
-- **Acceptance criteria**:
-  - [ ] A plan whose one metric is fed by two incentive types is rejected with an error on the
-        `Incentivation`.
-  - [ ] A plan whose metric is fed by several incentives of the same type is accepted.
-  - [ ] Reading the variable downstream stays subject to validations 1 and 3.
-- **Open questions**:
-  - The check lands in `Plan::CommissioningMetrics#violations_for`, alongside validations 1 and 3; it counts
-    the distinct types among the incentives that FEED each metric (`Rule.commissioning_metric_id`), the
-    writer-side mirror of validation 3's reader-side count.
-  - `INCENTIVE_PROCESSING_ORDER` already exists in that object; validation 2 needs only the distinct
-    feeder-type count per metric, not the order.
-
 ### TASK-M — Materialization — OPEN (design + build; the critical unknown)
 
 - **Repository**: `app`
 - **Description**: a `CommissioningMetric`, per plan per user, aggregates the commissionings of its rules
   (sum or average) and writes the user's internal `Indicator` for the variable, signed.
 - **Acceptance criteria**:
-  - [ ] Several rules feeding one metric, and — subject to validation 2 — several same-type incentives,
-        produce the expected aggregate per user.
+  - [ ] Several rules feeding one metric, across incentives of any types, produce the expected aggregate per
+        user.
   - [ ] A rule that evaluated to zero (wrote no commissioning) contributes nothing.
   - [ ] The engineer's worked example closes: 300 + 200 − 100 = 400, pinning the signed expression
         (`#money`/`#points`; limiter `value * -1`) against the raw `value` column.
@@ -248,8 +233,7 @@ delivered migrations are already in `develop`; the only migration still owed is 
 graph TD
   T1[TASK-1 metric STI ✓] --> T2[TASK-2 rule link ✓]
   T2 --> T3[TASK-3 validation 1 ✓]
-  T3 --> T3B[TASK-3B validation 3 ✓]
-  T3 --> T5[TASK-5 validation 2]
+  T3 --> T3B[TASK-3B validation 2 ✓]
   T2 --> T4[TASK-4 syntax confirm]
   T2 --> TM[TASK-M materialization]
   TM --> TR[TASK-R read path]
@@ -268,7 +252,7 @@ graph TD
 **Delivered:** TASK-1, TASK-2, TASK-3, TASK-3B, #5441's stage-boundary rules and the consumption half of
 TASK-8, and TASK-6's GraphQL authoring binding (#5442). **Active:** the `app-webclient` authoring surface
 (TASK-FE), into which the picker-support GraphQL (the fed/read field and the resolver `type` filter) and
-the availability-filter half of TASK-8 fold; validation 2 (TASK-5); the binding permission (TASK-7); the
+the availability-filter half of TASK-8 fold; the binding permission (TASK-7); the
 rule-syntax confirm (TASK-4); and the materialization/read lane (TASK-M → TASK-R). TASK-M is the critical
 unknown — TASK-R, TASK-STMT and the productive rollout all wait on its design. The lanes converge at the
 deploy.

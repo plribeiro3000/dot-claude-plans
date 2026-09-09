@@ -6,6 +6,8 @@ Load the VKPI apurado value per person, per indicator, per period into the 4Shar
 
 ## Where this stands
 
+On 2026-09-08 Atento (Nicolás Baracaldo, standing in for Andrés during his leave) reported the field and date adjustments were done and the reprocess was requested but not yet run. 4Shark ran a structural validation against the live base (`COLBOGSQL58\MSSQL58_KPI`) and the result contradicts that report: only the datetime columns were corrected, the three structural requirements are still unmet, and the base regressed. Both `tb_dim_indicadores_score` and `tb_dim_indicadores` are now heaps with **no index at all** — not even the surrogate PK that existed on 27-ago — so nothing enforces uniqueness anywhere. The `llave` column does not exist on the catalogue; a `Homologo_4shark` column exists but is `datetime` and nullable, so it cannot serve as the text key. There is no FK from score to catalogue, 160 score rows carry an `NR_ID` absent from the catalogue, and `NR_ID` is `float` in the score table against `int` in the catalogue — a type mismatch that plausibly produces part of those orphans. What did land: `DT_CREATED` / `DT_MODIFIED` are `datetime` on both tables. The message asking Atento to confirm whether this is a pending reprocess, a wrong base/environment, or an unapplied change is `mensaje-santi-2026-09-08-ES.txt`; the metadata validation queries are `vkpi-validation-queries-colombia-20260908.sql`.
+
 On 2026-08-27 Atento reported the structure changes were applied. 4Shark verified against the live base (`COLBOGSQL58\MSSQL58_KPI`, score table now 3.995 rows) and the two central requirements are not present: the unique constraint sits on a sequential surrogate id instead of the business grain, and the catalogue has no `llave` column. Atento restructured the score table on its own terms (26 columns, dates as `date`), not the 22-column shape the 20-ago script delivered. Full audit and the filtered list of what 4Shark can legitimately raise: `ANALYSIS-v2.md`.
 
 **The direction changed to the normalized base.** About a month after the base became usable (2026-07-27, when 4Shark completed its technical analysis — June and most of July were access/infra provisioning by a separate team, excluded from the count) and several rounds, the source table still does not carry what the integration consumes. The recommendation is to stop reshaping the VKPI source table and integrate from the normalized base instead — its structure is defined, 4Shark already integrates against it, and Atento's remaining work collapses to loading the data. That removes every open source-table point at once. The message carrying this to Santiago/Atento is the 2026-08-27 deliverable.
@@ -48,16 +50,16 @@ The estimate is dominated by environment work, not by the VKPI itself. The integ
 | A single person identifier, stable over time | Score table | Closed — `NR_RE` is the Simplex code; a document-based variant exists as fallback |
 | `DT_DATA` free of day/month ambiguity | Score table | Closed — delivered as `yyyymmdd` |
 | One column carrying the indicator value | Score table | Closed — `RESULTADO` is the final value; `HC` / `HC_Total` are informational |
-| Per-record creation and update dates | Score table | Closed in the script — `DT_CREACION` / `DT_ACTUALIZACION`, PASO 3.1 |
+| Per-record creation and update dates | Score table | Closed — `DT_CREATED` / `DT_MODIFIED` are `datetime` on both tables, confirmed on the live base 2026-09-08 |
 | How the supervisor's value is composed | Score table | Closed — confirmed verbally in the 05-ago call |
-| **The script's structure applied to the live database** | Score table | **Open — delivered 20-ago, deadline 17-sep** |
-| **A text column `llave` on the catalogue, unique and not null, holding the 4Shark Variable key** | Catalogue | **Open — PASO 4 creates it constrained; Atento's catalogue load must carry a key per indicator from then on** |
+| **The script's structure applied to the live database** | Score table | **Open — 2026-09-08 the live base carries no unique index and both tables are heaps (all indexes dropped); regressed vs 27-ago** |
+| **A text column `llave` on the catalogue, unique and not null, holding the 4Shark Variable key** | Catalogue | **Open — confirmed absent 2026-09-08; a `Homologo_4shark` `datetime` nullable column exists but is not the key** |
 | **The score table repopulated after the truncate** | Atento | **Open — the integration has nothing to read until it happens** |
 | One catalogue row per indicator per operation | Catalogue | Closed — already true; the split lives inside `NR_ID` (see below) |
 | The list of exact Variable keys, for Atento to load into `llave` | 4Shark | **Open — owed by 4Shark, blocks the catalogue load** |
 | What distinguishes the 18 catalogue names that carry several `NR_ID` | Atento | **Open and not yet raised — those indicators cannot receive a key until it is answered** |
 | Network reachability from the integrator to `COLBOGSQL58`, plus a read-only database user on the two tables | Atento | **Open — not yet requested; blocks the 17-sep start** |
-| Every score row references an indicator that exists in the catalogue | Process | Open — load-bearing, the integrator reads the catalogue on every load; not verifiable at script time, since both tables are empty then |
+| Every score row references an indicator that exists in the catalogue | Process | Open — 2026-09-08 found 160 score rows whose `NR_ID` is absent from the catalogue; `NR_ID` is `float` in score against `int` in the catalogue |
 | Héctor Javier notifies Andrés and copies 4Shark on each Variable upload | Process | Open — requested 05-ago |
 | Metas table | — | Out of scope — a separate workstream after indicators |
 
