@@ -1,268 +1,198 @@
-# TASKS — Commissioning-metric variables in `app`
+# TASKS — Commissioning metric (output variable)
 
-> Reference: `PLAN.md` and `DOMAIN.md` in this directory. `DOMAIN.md` is the authoritative current-state
-> model.
-> Repositories: `~/Projects/4Shark/app` (backend) and `~/Projects/4Shark/app-webclient` (frontend),
-> branch `develop` in both.
-> Language classification: internal engineering doc → English (`LANGUAGE-POLICY.md`, category 1).
+> Reference: PLAN.md (§ Phase 6 — Materialization, § Phase 7 — Read path). Only the open lane is decomposed
+> here: Phases 1–5, 8 and 9 are delivered, so they carry no task. Phases 10–12 (rollout) follow the build
+> and are listed last.
 
-## Status — 2026-09-04
+## Decomposition
 
-**The feature is built as a `Metric` specialization, not a fourth variable type.** A variable whose value
-the system produces is an ordinary `IndicatorVariable` carrying a `CommissioningMetric` — a subtype of an
-STI `Metric`, alongside `DealMetric`. `DOMAIN.md` is the authoritative model.
+**Chosen option:** the plan's Phase 6/7 execution order — the new `metric_options` column, the aggregation,
+the materialization stage (writes the `Indicator` and injects into `metric_options`), the four boundary
+insertions, the read injection in the four consuming consumers, and scoping the deal-metrification flow off
+commissioning metrics. One PR.
 
-**The structural/domain phase and the GraphQL authoring surface are complete.** The model, the rule link,
-the plan-level reader validations, the stage-boundary rules, and the GraphQL binding that authors a
-commissioning metric on a rule are merged. The work now moves to the `app-webclient` half (TASK-FE) and,
-in the backend, the materialization/read runtime lane (TASK-M, TASK-R). The tasks that stay open are listed
-under "Open work" below.
-
-**Merged to `develop`:**
-
-| PR | Delivered |
-|----|-----------|
-| #5348 | Register the produced variable on incentive save and roll it into the plan — superseded by the pivot below |
-| #5431 | Specialize `Metric` into `DealMetric` / `CommissioningMetric` — the `metrics.type` STI discriminator |
-| #5433 | Remove the output-variable type in favor of the commissioning metric; move the rule target `rules.output_variable_id` → `rules.commissioning_metric_id` |
-| #5434 | Validation 1 — an incentive reading a commissioning-metric variable requires an earlier-stage incentive whose rule feeds that metric (four `Incentivation::<Type>IncentivationMetricValidator`; error `metric_not_populated` on `:incentive_id`) |
-| #5436 | Consolidate validation 1's four per-type validators against the plan-level `Plan::IncentiveCommissioningMetricMapping` read by `Incentivation` (error `missing_producing_incentive`); deliver validation 2 — a commissioning-metric variable is consumed by incentives of a single type (`multiple_consuming_incentive_types` on `:incentive_id`) |
-| #5441 | Stage-boundary rules — a redemption rule cannot feed a commissioning metric (`Rule#commissioning_metric_absence`, guarded `if: :redemption?`, `errors.add(:commissioning_metric_id, :invalid)`); a transactional (deal) incentive excludes commissioning-metric variables from consumption (the deal workers' `plan.metrics.where.not(type: 'CommissioningMetric')`) — the consumption half of TASK-8 |
-| #5442 | GraphQL authoring surface (TASK-6) — the `commissioning_metric` / `commissioning_metric_id` binding on `RuleGraphqlType`, the `commissioning_metric_id` argument on `RuleInputGraphqlType`, that argument in the `rules:` permit of both incentive mutations, and the clone round-trip through `CreateIncentiveGraphqlMutation`; plus `MetricGraphqlType.type` exposing the STI discriminator so the front distinguishes `CommissioningMetric` from `DealMetric` |
-
-Test-infra fixes #5429 and #5432 landed alongside (spec isolation; STI factory construction) — not
-feature tasks.
-
-**Open work:** the `app-webclient` authoring surface (TASK-FE), rule syntax confirm (TASK-4), the
-authoring-availability filter half of TASK-8 (its picker-support GraphQL folded into TASK-FE), the binding
-permission (TASK-7), materialization (TASK-M), read path (TASK-R),
-statement display (TASK-STMT). The materialization/read design is the critical unknown — see the open
-questions on TASK-M below.
-
----
+**Rationale:** the consuming rule reads variable values from `modifier_options`, a per-user-commission cache
+built once before the deal stage and never rebuilt, so a fed-back commissioning metric cannot ride it. A
+dedicated `metric_options` column carries the value from the boundary to the consuming rule. The
+materialization stage mirrors the existing `Metric::` (deal-metrification) flow; the four insertion
+boundaries are the four finalizers. `app` is Ruby, so the work rides the Ruby policy corpus (worker
+topologies, `with_uncached_connection`, IDs-only, migrations-by-generator).
 
 ## Tasks
 
-Delivered tasks are recorded for traceability. Open tasks carry acceptance criteria plus the design
-questions that must be answered when the task is picked up — the commissioning-metric mechanism for
-materialization and the read path is not yet grounded in code.
+### Task 1: the `metric_options` column
 
-### TASK-1 — `Metric` STI base + `DealMetric` / `CommissioningMetric` — DELIVERED (#5431)
+- **Phase** (PLAN.md): 6, step 1.
+- **Description:** add `metric_options` (jsonb, `null: false, default: {}`) to `user_commissions`, separate
+  from `modifier_options` so a log distinguishes modifier variables from metric variables. Generate the
+  migration (`bin/rails generate migration`), never hand-write it; run `db:migrate` and commit the refreshed
+  `schema.rb` with the migration.
+- **Dependencies:** none.
+- **Acceptance criteria:**
+  - [ ] `user_commissions.metric_options` exists, `null: false`, default `{}`, jsonb.
+  - [ ] `schema.rb` regenerated and committed with the migration.
+- **Pattern reference:** the existing `modifier_options` column on the same table (`db/schema.rb`).
 
-`metrics.type` STI discriminator; existing rows backfilled to `DealMetric`. `Metric::TYPES`,
-`Metric::CALCULATIONS = { total, quantity, sum, average }`, base validations `variable_type` +
-`indicators_existence`. `CommissioningMetric` slices `sum | average`, `has_many :rules`, `validates
-:calculation`. `DealMetric` slices `total | quantity`, keeps the interval columns and `#calculate`. No
-fourth `Variable` type; `Variable::TYPES` unchanged.
+### Task 2: `CommissioningMetric#calculate` — the aggregation
 
-### TASK-2 — Rule link `Rule belongs_to :commissioning_metric` — DELIVERED (#5433)
+- **Phase** (PLAN.md): 6, step 2.
+- **Description:** `CommissioningMetric#calculate(user_commission:)` returns the signed, type-agnostic
+  `money + points` sum/average over the commissionings of the metric's `has_many :rules` for that user
+  commission — `Commissioning.where(rule_id: rules, user_commission_id: user_commission.id)` — reduced by
+  `calculation` (`sum`, or `average` dividing by the count of feeding commissionings), and the variable/metric
+  default when there are none. The data source is commissionings, not deals, so the adapter *structure* is
+  the sibling and the query is new.
+- **Dependencies:** none (independent of Task 1).
+- **Acceptance criteria:**
+  - [ ] `money + points` gives the signed value: `+value` for every stage, `-value` for limiter.
+  - [ ] The signed example closes: `300 + 200 − 100 = 400`.
+  - [ ] `sum` and `average` each verified; `average` divides by the count of feeding commissionings.
+  - [ ] No feeding commissioning → the variable/metric default, not zero-by-accident.
+- **Pattern reference:** `app/models/deal_metric.rb:30` (structure); `app/models/commissioning.rb:60-70` and `app/models/limiter_commissioning.rb` (the signed `money`/`points`)
+  ```ruby
+  def money
+    return 0 if rule.incentive.points?
+    value
+  end
+  # LimiterCommissioning overrides money/points to `value * -1`
+  ```
 
-`rules.output_variable_id` → `rules.commissioning_metric_id`; `CommissioningMetric has_many :rules,
-dependent: :nullify`. The output-variable type and its per-rule `output_variable_type` validation removed.
+### Task 3: the materialization stage — `CommissioningMetric::Producer` / `::Consumer` / `::Finalizer`
 
-### TASK-3 — Plan validation 1 (producer precedes consumer) — DELIVERED (#5434, consolidated #5436)
+- **Phase** (PLAN.md): 6, step 3.
+- **Description:** a Producer/Consumer stage in the `Computation` chain — the Producer fans out one Consumer
+  per user commission (× consumed metric) over the plan's scope and registers `queue`/`executions`; the
+  Consumer computes Task 2, writes the durable `Indicator` (near-copy of `Metric::Consumer:39-63`,
+  `compiled_at` the period start since the metric is per-plan, not per-interval), and **merges** the
+  `{ variable.key => value }` pair into that user commission's `metric_options` (never a whole-hash
+  overwrite); the Finalizer fires the next stage's Producer once the stage closes.
+- **Dependencies:** Tasks 1, 2.
+- **Acceptance criteria:**
+  - [ ] Producer enumerates every user commission in the plan's scope (default-on-empty), not only those with commissionings.
+  - [ ] The Consumer writes both the `Indicator` and the `metric_options` key; the merge preserves existing keys.
+  - [ ] The stage's counters close before the consuming stage's Producer fires.
+  - [ ] Class names are the topology (`Producer` / `Consumer` / `Finalizer`), never `Executor` / `Runner`.
+- **Pattern reference:** `app/workers/metric/producer.rb`, `app/workers/metric/consumer.rb:39-72`
+  ```ruby
+  indicator.external = false
+  indicator.value = value
+  Indicator.with_uncached_connection { indicator.save! }
+  # then: user_commission.update(metric_options: user_commission.metric_options.merge(key => value))
+  commission.computation.increment_executions
+  ```
 
-`Incentivation#commissioning_metric_precedence` reads `plan.incentive_commissioning_metric_mapping.rows`.
-The mapping object `Plan::IncentiveCommissioningMetricMapping`
-(`app/models/plan/incentive_commissioning_metric_mapping.rb`) builds one row per non-destroyed incentive —
-`{ type, consumed_metric_ids, produced_metric_ids }` — from the incentive's read variables
-(`IncentiveVariable` → `CommissioningMetric`) and the metrics its rules feed (`Rule.commissioning_metric_id`).
-A consumed metric with no producer among the strictly-earlier stages adds `missing_producing_incentive` on
-`:incentive_id`. The `Incentivation::PROCESSING_ORDER` constant encodes the stage order; the allowed
-producers for a consumer are the types strictly before it
-(`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`).
+### Task 4: chain insertion at the four consuming boundaries
 
-### TASK-3B — Plan validation 2 (single consumer type) — DELIVERED (#5436)
+- **Phase** (PLAN.md): 6, step 4.
+- **Description:** at each consuming stage's boundary, read from `Plan::IncentiveCommissioningMetricMapping`
+  which commissioning-metric variables the next stage consumes (filter `rows` by the next stage's `type`,
+  flat-map `consumed_metric_ids`); when none, fire the next Producer directly (unchanged); when one or more,
+  run the materialization stage first and let its Finalizer fire the original next Producer. Identical at all
+  four; the only variance is which next Producer.
+- **Dependencies:** Task 3.
+- **Acceptance criteria:**
+  - [ ] before indicator — `app/workers/deal_incentive/finalizer.rb:22` (`IndicatorIncentive::Producer`).
+  - [ ] before ranking — `app/workers/indicator_incentive/finalizer.rb:22` (`Ranking::Producer`).
+  - [ ] before limiter — `app/workers/ranking_incentive/finalizer.rb:22` (`UserCommission::LimiterOptionsProducer`).
+  - [ ] before redemption — `app/workers/limiter_incentive/finalizer.rb:22` (`RedemptionIncentive::Producer`).
+  - [ ] skip-when-none: a plan with no consumed commissioning metric produces a byte-identical chain.
+- **Pattern reference:** `app/models/plan/incentive_commissioning_metric_mapping.rb:23` (the `rows` shape), `app/workers/limiter_incentive/finalizer.rb:22`
+  ```ruby
+  { type: incentive_types[incentive_id], consumed_metric_ids: consumed_metric_ids, produced_metric_ids: produced_metric_ids }
+  ```
 
-`Incentivation#commissioning_metric_consumption` enforces that a commissioning-metric variable is consumed
-by incentives of a single type: for each metric the incentive consumes, it counts the distinct types among
-the plan's incentives that also consume it (over the mapping `rows`' `consumed_metric_ids`) and adds
-`multiple_consuming_incentive_types` on `:incentive_id` when a variable is consumed by more than one type.
-Several incentives of the same type may consume it, and production is unconstrained — any number of types
-may feed a metric.
+### Task 5: the read injection — sliced to the incentive's own metric keys
 
-### TASK-4 — Rule syntax validation for a metric-fed key — OPEN (confirm)
+- **Phase** (PLAN.md): 6, step 5 / § Phase 7.
+- **Description:** each of the four consuming consumers injects a **slice** of `metric_options` — only the
+  variable keys the executing incentive consumes, never the whole hash — so a stage never receives another
+  stage's metric variable. `consumed_keys` come from the incentive's consumed metrics
+  (`rows[incentive_id][:consumed_metric_ids]` → `CommissioningMetric.joins(:variable).pluck(:key)`). This is
+  the pattern the deal incentive already runs against `modifier_options` (`deal_incentive/consumer.rb:30-33`,
+  #5441), applied to the metric column. Keep the two columns disjoint:
+  `Commission::IndicatorOptionsProcessor` also excludes commissioning-metric variables from the
+  `modifier_options` it builds. Rename the transactional incentive's local `metric_options`
+  (`deal_incentive/consumer.rb:31`, `deal_incentive/period_processor.rb:21` — it holds the deal-metric
+  variable values sliced out of `modifier_options`, a different concept from the new column) to
+  `deal_metric_options`, so the plain `metric_options` name belongs to the commissioning-metric column
+  and the two read cleanly side by side.
+- **Dependencies:** Task 1 (column), Task 3 (population).
+- **Acceptance criteria:**
+  - [ ] `indicator_incentive/consumer.rb:29`, `ranking_incentive/consumer.rb:44`, `limiter_incentive/consumer.rb:44`, `redemption_incentive/consumer.rb:34` inject `metric_options.slice(*consumed_keys)`.
+  - [ ] `Commission::IndicatorOptionsProcessor` (`app/services/commission/indicator_options_processor.rb:41-46`) skips commissioning-metric variables.
+  - [ ] The transactional incentive's local `metric_options` is renamed `deal_metric_options` in both sites.
+  - [ ] A metric consumed at any stage: the value the formula reads equals the materialized value, not the default.
+  - [ ] A stage whose next-stage sibling consumes a different metric does NOT receive that other metric's key.
+- **Pattern reference:** `app/workers/deal_incentive/consumer.rb:30-33` (the existing slice), `app/workers/limiter_incentive/consumer.rb:35,44`
+  ```ruby
+  # deal incentive, delivered #5441 — the slice this task mirrors onto metric_options:
+  variables_keys = plan.metrics.where.not(type: 'CommissioningMetric').joins(:variable).pluck(:key)
+  metric_options = user_commission.modifier_options.select { |key| variables_keys.include?(key) }
+  ```
 
-- **Repository**: `app`
-- **Description**: confirm a downstream rule referencing a metric-fed variable's key passes syntax
-  validation on the four reading stages and is refused on the deal stage.
-- **Acceptance criteria**:
-  - [ ] A rule in an indicator/ranking/limiter/redemption incentive whose formula references a metric-fed
-        variable's key saves; the key is in `Rule::Options`' permitted set for those stages.
-  - [ ] A deal (formula) rule referencing that key is refused.
-  - [ ] A genuinely unknown key still fails with the existing `unknown_variable` error.
-- **Open questions**:
-  - Because the metric-fed variable is an ordinary `IndicatorVariable`, its key may already be permitted by
-    the existing indicator scope — verify whether any scope change is needed at all, or whether the task is
-    purely tests.
-  - If a metric-fed variable must be distinguished from a plain indicator variable at syntax time, that
-    distinction is net-new.
+### Task 6: scope the deal-metrification flow to `DealMetric`
 
-### TASK-M — Materialization — OPEN (design + build; the critical unknown)
+- **Phase** (PLAN.md): 6, step 6.
+- **Description:** `plan.metrics` (`app/models/plan.rb:372`) returns every STI type, so the deal-metrification
+  Producer/Sower currently pluck `CommissioningMetric` rows and the Consumer calls `metric.calculate`, which
+  is undefined on `CommissioningMetric`. Scope the deal-metrification producer/sower to `DealMetric` so the
+  deal flow materializes only deal metrics and the new stage owns commissioning metrics — the same `type`
+  filter #5441 applied to deal consumption.
+- **Dependencies:** none (independent; same PR).
+- **Acceptance criteria:**
+  - [ ] A plan carrying a `CommissioningMetric` runs the deal-metrification stage without touching that metric.
+  - [ ] The deal-metrification stage still materializes every `DealMetric` exactly as before.
+- **Pattern reference:** `app/workers/metric/producer.rb:18`, `app/workers/metric/sower.rb:18`
+  ```ruby
+  metric_ids = Metric.with_uncached_connection { plan.metrics.pluck(:id) }
+  # scope to DealMetric so CommissioningMetric is not swept into deal-metrification
+  ```
 
-- **Repository**: `app`
-- **Description**: a `CommissioningMetric`, per plan per user, aggregates the commissionings of its rules
-  (sum or average) and writes the user's internal `Indicator` for the variable, signed.
-- **Acceptance criteria**:
-  - [ ] Several rules feeding one metric, across incentives of any types, produce the expected aggregate per
-        user.
-  - [ ] A rule that evaluated to zero (wrote no commissioning) contributes nothing.
-  - [ ] The engineer's worked example closes: 300 + 200 − 100 = 400, pinning the signed expression
-        (`#money`/`#points`; limiter `value * -1`) against the raw `value` column.
-  - [ ] Idempotent under retry: running the materialization twice leaves the value unchanged.
-  - [ ] A reprocess clears and recomputes the metric-produced value.
-- **Open questions (must be resolved first)**:
-  - `CommissioningMetric` has no `#calculate` and there is no commissionings-aggregating adapter — both are
-    net-new. What is the trigger (commissioning save inside the consumer, vs a stage boundary) and which
-    worker writes the indicator?
-  - Which store the metric-produced value lands in (`indicators` / `aggregated_indicators` /
-    `indicator_aggregations`), so the read path finds it.
-  - The `average` denominator: the count of feeding commissionings, confirmed.
-  - The stale-read race: the aggregate must re-read inside its own transaction at write time.
-  - Retry idempotency of the feeding commissionings is not uniform (indicator survives; limiter/ranking/
-    redemption reconstruct) — bounds how much the aggregate can rely on rewritable rows.
-  - Partial commissions: the zero-versus-absent semantics need checking against partials.
+### Task 7: tests
 
-### TASK-R — Read path — OPEN (confirm)
-
-- **Repository**: `app`
-- **Description**: a consuming rule evaluates against the metric-produced value.
-- **Acceptance criteria**:
-  - [ ] A rule in an indicator/ranking/limiter/redemption incentive reading a metric-fed variable
-        evaluates against the materialized indicator, not the default.
-  - [ ] A plan with no commissioning-metric variable produces byte-identical options hashes to today.
-- **Open questions**:
-  - Because the value is the variable's internal `Indicator`, the existing indicator options path may
-    already deliver it — confirm whether any new `Commission::<name>OptionsProcessor` / merge step is
-    required, and in which reading consumers. Depends on TASK-M's store answer.
-
-### TASK-6 — GraphQL authoring surface + clone round-trip — DELIVERED (#5442)
-
-- **Repository**: `app`
-- **Delivered (#5442)**:
-  - `commissioning_metric` (`MetricGraphqlType`) and `commissioning_metric_id` (`ID`) read fields on
-    `RuleGraphqlType`, mirroring its own `incentive` / `incentive_id` pair.
-  - A `commissioning_metric_id` argument (`required: false`) on `RuleInputGraphqlType`.
-  - That argument in the `rules:` permit of both incentive mutations — `create_incentive_graphql_mutation.rb`
-    (`rules: %i[ commissioning_metric_id description reference type value ]`) and
-    `update_incentive_graphql_mutation.rb` (`rules: %i[ _destroy commissioning_metric_id description id
-    reference type value ]`). The permit carries `reference`.
-  - The clone round-trips the binding through `CreateIncentiveGraphqlMutation` — clone is a UI action
-    through the create mutation, so no backend clone mutation exists; a request spec asserts the binding
-    persists.
-  - `MetricGraphqlType.type` — the STI discriminator, so the front can tell a `CommissioningMetric` from a
-    `DealMetric`. Covered in the metric resolver spec.
-- **Deferred to TASK-FE (picker support)**:
-  - A field on `IncentiveGraphqlType` distinguishing the metric variables an incentive feeds vs reads: the
-    shape is a frontend-contract decision the picker query has not yet fixed, a per-incentive resolver N+1s
-    a list query, and the fed/read relation is a plan-level concept (`Plan::IncentiveCommissioningMetricMapping`
-    is plan-scoped and batched). It enters at the level the frontend query defines.
-  - A `type` filter (`option(:type)` + a `Metric.for_type` scope) on `MetricGraphqlResolver`, mirroring
-    `IncentiveGraphqlResolver` — the resolver lists deal + commissioning mixed. With `type` exposed the front
-    filters client-side; a server-side filter enters with TASK-FE.
-- **Note**: creating a `CommissioningMetric` needs no new GraphQL — `CreateMetricGraphqlMutation` already
-  permits `type` + `calculation`, so it is created via the STI type.
-
-### TASK-7 — The binding permission — OPEN (build)
-
-- **Repository**: `app`
-- **Description**: the permission that makes the feature reachable by nobody until granted (the release
-  toggle).
-- **Acceptance criteria**:
-  - [ ] A migration creates the `Action` row in the established pattern
-        (`Action.create!(key: ..., level: 'module', resource: 'incentive')`), and the key is added to the
-        hardcoded `MODULE_KEYS` list in `app/workers/company/admin/processor.rb` **in the same deploy** — a
-        key in `MODULE_KEYS` with no `Action` row raises `RecordNotFound` and the processor dies.
-  - [ ] A policy method on `IncentivePolicy` following the sibling shape.
-  - [ ] The permission is granted to nobody; the non-idempotency of `Action.create!` is recorded as a code
-        comment in the migration.
-- **Open questions**: the permission key name.
-
-### TASK-8 — Variable availability by incentive type — PARTIAL (consumption exclusion delivered #5441)
-
-- **Repository**: `app`
-- **Description**: a commissioning-metric variable is excluded from the deal (transactional) incentive and
-  selectable as a rule's feeding target elsewhere.
-- **Delivered (#5441)**: the consumption exclusion — the deal workers drop commissioning-metric variables
-  from the keys a transactional incentive may read (`plan.metrics.where.not(type: 'CommissioningMetric')`
-  in `deal_incentive/consumer.rb` and `deal_incentive/period_processor.rb`).
-- **Open**: the authoring-availability filter — a commissioning-metric variable offered as a rule's feeding
-  target only where valid, and absent from the deal incentive's picker. No per-incentive-type variable-
-  availability filter exists in the models today; where it lives (a new model scope vs the GraphQL/API
-  layer) is undecided (DOMAIN.md § Remaining work). It folds into the frontend authoring surface (TASK-FE),
-  alongside the picker-support GraphQL deferred there (the `IncentiveGraphqlType` fed/read field and the
-  `MetricGraphqlResolver` `type` filter).
-
-### TASK-FE — `app-webclient` authoring surface — OPEN (build)
-
-- **Repository**: `app-webclient`
-- **Description**: bind a commissioning metric on a rule, replicate across an incentive's rules, pick
-  compatible incentives on the plan, and create a commissioning-metric variable.
-- **Acceptance criteria**:
-  - [ ] The binding can be set, edited and **cloned** on all five incentive types (the clone flows carry it,
-        per TASK-6's clone gap).
-  - [ ] A replicate action sets one rule's binding across the incentive's rule array.
-  - [ ] The plan picker offers only compatible incentives (UX; validation 1 is the guarantee).
-- **Open questions**:
-  - There is no fourth variable type to offer — creating a commissioning-metric variable is creating an
-    `IndicatorVariable` and attaching a `CommissioningMetric`. Whether this is a new screen, an extension of
-    the variable screen, or folded into the incentive/rule flow depends on TASK-6.
-
-### TASK-STMT — Statement display — OPEN (build)
-
-- **Repository**: `app` + `app-webclient`
-- **Description**: the three marks the engineer named (the metric variable in the upper listing with its
-  composed value; every feeding commissioning marked with the variable it fed; every commissioning whose
-  rule reads a metric-fed variable marked as calculated on one). The declaration is signed, so a value
-  influencing payment without appearing is signed unseen — the legal requirement.
-- **Open questions**: the GraphQL exposure of the composition and the two statement screens' changes; sized
-  after TASK-M/TASK-R settle where the value and its provenance live.
-
-### TASK-ROLL — Deploy, release, permission grant — OPEN (engineer-run)
-
-Backend deploy per environment (beta → demo → shared → atento; productive stacks gated by the Sidekiq
-queue check), then the frontend Netlify release, then the permission grant one account at a time. The
-delivered migrations are already in `develop`; the only migration still owed is TASK-7's permission
-`Action` row. Running the deploy and the grant is the engineer's — actions outside version control.
-
----
+- **Phase** (PLAN.md): 6, step 7.
+- **Description:** cover the aggregate, the stage, the boundary insertion, the read injection, and the
+  deal-metrification scoping. Read 2–3 sibling specs first; follow the project's RSpec/FactoryBot conventions.
+- **Dependencies:** Tasks 1–6.
+- **Acceptance criteria:**
+  - [ ] Aggregate: `sum` and `average`, signed `money + points`, the `300 + 200 − 100 = 400` example.
+  - [ ] Default-on-empty writes the default to `metric_options`; skip-when-none leaves the chain byte-identical.
+  - [ ] A metric consumed at a later stage (ranking/limiter/redemption) reaches its consuming rule through `metric_options`.
+  - [ ] Additive merge across two boundaries never drops a key; each stage injects only its own metric keys (the slice), never a sibling stage's.
+  - [ ] Idempotency: running the materialization twice leaves every value unchanged.
+  - [ ] The deal-metrification stage ignores commissioning metrics.
 
 ## Sequencing
 
 ```mermaid
-graph TD
-  T1[TASK-1 metric STI ✓] --> T2[TASK-2 rule link ✓]
-  T2 --> T3[TASK-3 validation 1 ✓]
-  T3 --> T3B[TASK-3B validation 2 ✓]
-  T2 --> T4[TASK-4 syntax confirm]
-  T2 --> TM[TASK-M materialization]
-  TM --> TR[TASK-R read path]
-  T4 --> TR
-  T2 --> T6[TASK-6 GraphQL + clone ✓]
-  T6 --> T7[TASK-7 permission]
-  T6 --> TFE[TASK-FE webclient]
-  T3 --> T8[TASK-8 availability]
-  TM --> TSTMT[TASK-STMT statement]
-  TR --> TROLL[TASK-ROLL deploy]
-  T6 --> TROLL
-  T7 --> TROLL
-  TFE --> TROLL
+graph LR
+  T1[1 · metric_options column] --> T3[3 · stage]
+  T2[2 · calculate] --> T3
+  T3 --> T4[4 · chain insertion]
+  T1 --> T5[5 · read injection]
+  T3 --> T5
+  T4 --> T7[7 · tests]
+  T5 --> T7
+  T6[6 · scope deal-metrification] --> T7
 ```
 
-**Delivered:** TASK-1, TASK-2, TASK-3, TASK-3B, #5441's stage-boundary rules and the consumption half of
-TASK-8, and TASK-6's GraphQL authoring binding (#5442). **Active:** the `app-webclient` authoring surface
-(TASK-FE), into which the picker-support GraphQL (the fed/read field and the resolver `type` filter) and
-the availability-filter half of TASK-8 fold; the binding permission (TASK-7); the
-rule-syntax confirm (TASK-4); and the materialization/read lane (TASK-M → TASK-R). TASK-M is the critical
-unknown — TASK-R, TASK-STMT and the productive rollout all wait on its design. The lanes converge at the
-deploy.
+## Rollout (after the build — PLAN.md Phases 10–12)
+
+- **Backend deploy (Phase 10):** one zero-downtime deploy; the queue-depth check gates a productive deploy.
+  The `metric_options` migration is additive (`null: false, default: {}`) and runs in the ephemeral migration
+  task before the new code goes live; the `Computation` key derivation and existing job argument shapes are
+  unchanged, so no phasing trigger fires.
+- **Frontend release (Phase 11):** the `app-webclient` screens (delivered) display correct values once the
+  materialization deploy lands; no code change.
+- **Release (Phase 12):** no permission gate — the feature rides existing permissions.
 
 ## Cross-cutting concerns
 
-- **Tests belong to the task that introduces the code** — the delivered tasks carry their specs
-  (`spec/models/plan_spec.rb` for validation 1); each open task carries its own.
-- **Data access** on every worker follows `~/.claude/docs/DATA-ACCESS.md` — `with_uncached_connection`,
-  IDs not loaded objects, associations navigated per record. This binds TASK-M and TASK-R specifically.
-- **The changelog entry** lands once per repository (feature-level, not per PR), naming the capability.
-- **No `## Decisions` block in any PR body** — a resolved decision goes in a code comment at the line
-  (`DECISION-AUTHORITY.md`, `PULL-REQUEST-CONVENTIONS.md`).
+- **Worker data access:** every stage worker wraps DB access in `with_uncached_connection`, passes IDs (not
+  loaded objects), and decomposes joins — per the Data Processing / Data Access rules.
+- **`metric_options` vs `modifier_options`:** two columns on `user_commissions`, disjoint by construction —
+  modifiers in one, metrics in the other, so a log reads cleanly and no key ever collides (validation 2
+  forbids a metric variable being consumed by more than one incentive type).
+- **The `Indicator` write is the durable store, `metric_options` is the calc channel:** dashboards and
+  statements read `indicators`; the consuming formula reads `metric_options`. Confirm `compiled_at` (the
+  period start) against how a metric-variable indicator is read elsewhere when the code is written.
