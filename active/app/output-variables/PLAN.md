@@ -29,13 +29,13 @@ deal → indicator → ranking → limiter → redemption.
 
 ## Status
 
-The backend model, both plan validations, the stage-boundary rules, and the GraphQL authoring binding are
-merged to `develop`; the `app-webclient` authoring surface and the declaration screens shipped in beta.
-**The one remaining feature build is the calculation — materialization: a `CommissioningMetric` computing
-its per-user value from its rules' commissionings and writing the variable's internal `Indicator` (Phase
-6), plus confirming the read path that delivers that value to a consuming rule (Phase 7).** Until it lands
-the platform does not calculate with commissioning metrics — the authoring and
-declaration screens are complete, but the values they show are not yet computed.
+The full feature build is merged to `develop` and running on `beta-001`, where the business is testing it —
+metric authoring and the metric-visualization screen are both confirmed working. The backend model, both
+plan validations, the stage-boundary rules, the GraphQL authoring binding, **and the calculation
+(materialization + read path)** are all merged; the `app-webclient` authoring surface and the declaration
+screens are live in beta. The platform now computes with commissioning metrics: a `CommissioningMetric`
+aggregates its rules' commissionings per user commission, writes the variable's internal `Indicator`, and
+delivers the value to the consuming rule through the `user_commissions.metric_options` column.
 
 **Delivered, merged to `develop`:**
 
@@ -48,20 +48,34 @@ declaration screens are complete, but the values they show are not yet computed.
 | #5436 | Validation 1 consolidated against `Plan::IncentiveCommissioningMetricMapping`; validation 2 — a single consumer incentive type per variable |
 | #5441 | Stage-boundary rules — a redemption rule cannot feed a metric; a deal incentive excludes metric variables from consumption |
 | #5442 | GraphQL authoring surface — the `commissioning_metric` binding on the rule mutations/types, the clone round-trip, `MetricGraphqlType.type` |
+| #5453 | `type` filter on the `metrics` query — the front distinguishes a `CommissioningMetric` server-side (the item Phase 8 had deferred) |
+| #5454 | Incentivation errors identified by reference (per-incentive error surface) |
+| #5455 | Incentive search exclusion filter |
+| #5456 | Materialization + read path — `CommissioningMetric#calculate`, the four boundary Producer/Consumer stages, the `user_commissions.metric_options` column, the sliced read injection, and the deal-metrification stage scoped off commissioning metrics (Phases 6–7) |
+| #5457 | Metric visualization — `MetricGraphqlType` resolves the deal-only associations (`client`/`product`/`status`) as null on a `CommissioningMetric` instead of raising, so the show page renders |
 
 Test-infra fixes #5429 / #5432 landed alongside (spec isolation; STI factory construction) — not feature work.
 
 **Frontend, delivered in beta:** the `app-webclient` authoring surface (the plan form, #6772) and the
 declaration display — declaração de regras (#6773) and declaração de resultado (#6774).
 
-**The calculation is the only remaining build.** Everything the operator authors is done, on both the
-consumption and the authoring side: the deal-incentive workers exclude commissioning-metric variables from
-what a transactional incentive consumes (#5441), and the transactional incentive's rule-formula picker is
-scoped to `DealMetric` so a commissioning-metric variable is never offered there — the deal incentive's
-only commissioning-metric control is the produce binding on a rule, which is correct. No new permission is
+**One divergence from the planned read injection (#5456, § Phase 6 step 5 / § Phase 7), recorded so the code
+is read for what it is:** the four consuming consumers slice `user_commissions.metric_options` by
+`rule.formula.referenced_identifiers` rather than by the metrics the incentive consumes
+(`consumed_metric_ids`) — a simpler key source holding the same guarantee, that a stage reads only the metric
+keys its own formula names. The plan's step-5 rename of the deal incentive's local `metric_options`
+(`deal_incentive/consumer.rb:32`, `period_processor.rb:21`) to `deal_metric_options` was dropped, correctly:
+that local holds the metric-backed variables' options sliced from `modifier_options`, so `metric_options` is
+the accurate name — deal-stage metric options travel in `modifier_options` (deal metrics are materialized up
+front), commissioning-metric options travel in the new column, and both are legitimately metric options,
+differing only in source.
+
+**Remaining: rollout only — no feature build is left.** The backend deploy has reached `beta-001`; `demo-001`
+and the two productive stacks (`shared-001`, `atento-001`) follow (Phase 10), then the frontend production
+release (Phase 11 — the screens are live in beta; production is one Netlify merge). No new permission is
 involved: the feature modifies existing screens, so whoever could already create a metric, an incentive and
-a plan can use it. Deploy to the productive stacks and the frontend production release (Phases 10–11) follow
-once the calculation is built and validated.
+a plan can use it (Phase 12). The business continues testing on beta; issues surface there and are fixed
+before the rollout progresses.
 
 ## Related and excluded documents
 
@@ -94,9 +108,9 @@ These share commissioning vocabulary but are **different features** — never fo
 - Plan-level validation 2 — a single consumer incentive type per commissioning-metric variable. **(delivered — #5436)**
 - Materialization: the `CommissioningMetric` computes its per-user-commission value from the commissionings
   of its linked rules, writes the variable's durable `Indicator`, and injects the value into the new
-  `user_commissions.metric_options` column. **(open — the only remaining build; see § Materialization)**
+  `user_commissions.metric_options` column. **(delivered — #5456)**
 - The read path that delivers the materialized value to a consuming rule — the four consuming consumers merge
-  `metric_options` into the formula options. **(open — settled design; see § Phase 7)**
+  a slice of `metric_options` into the formula options. **(delivered — #5456)**
 - Variable availability by incentive type — a commissioning-metric variable is excluded from the deal
   (transactional) incentive and selectable as a rule's feeding target elsewhere. **(delivered — the deal-incentive workers exclude commissioning-metric variables from consumption (#5441), and the transactional incentive's rule-formula picker is scoped to `DealMetric` so the variable is never offered there)**
 - GraphQL authoring surface — expose the `commissioning_metric` binding on the rule create/update
@@ -305,7 +319,16 @@ Indicator; Limiter ← Deal, Indicator, Ranking; Redemption ← Deal, Indicator,
 one type. Production is unconstrained — any number of incentive types may feed a metric, which aggregates
 them into one value.
 
-### Phase 6: Materialization — OPEN (design settled, code not started)
+### Phase 6: Materialization — DELIVERED (#5456)
+
+The design below shipped, with one divergence in the read injection (step 5): the consumers slice
+`metric_options` by `rule.formula.referenced_identifiers` rather than by `consumed_metric_ids` (same
+guarantee). The step-5 rename of the deal incentive's local `metric_options` to `deal_metric_options` was
+dropped, correctly — that local holds the metric-backed variables' options sliced from `modifier_options`
+(deal metrics), so `metric_options` is the accurate name. The stage was built as four boundary
+Producer/Consumer pairs (`app/workers/commissioning_metric/{indicator,ranking,limiter,redemption}_{producer,consumer}.rb`),
+one per consuming stage, rather than one reused stage with four insertions — the finalizer role folds into
+each boundary's consumer.
 
 **Objective:** a `CommissioningMetric`, within a plan and per user commission, computes its value from the
 commissionings of its linked rules, writes the user's internal `Indicator` for the variable (the durable
@@ -427,7 +450,7 @@ which is also an audit property (nothing is transformed at read time), the only 
   `metric_options` (additive, no key lost).
 - Idempotent under retry.
 
-### Phase 7: Read path — settled (a dedicated `metric_options` column)
+### Phase 7: Read path — DELIVERED (#5456)
 
 **Objective:** the materialized value reaches every consuming rule.
 
@@ -458,10 +481,10 @@ exposing the STI discriminator so the front tells a `CommissioningMetric` from a
 `CommissioningMetric` needs no new mutation — `CreateMetricGraphqlMutation` already permits `type` +
 `calculation`.
 
-**Deferred to the frontend surface (Phase 9):** a field on `IncentiveGraphqlType` distinguishing the metric
-variables an incentive feeds vs reads (its shape is a frontend-contract decision the picker query fixes),
-and a `type` filter on `MetricGraphqlResolver` (with `type` exposed, the front filters client-side until the
-server-side filter enters with the picker).
+**The `type` filter on `MetricGraphqlResolver` is delivered (#5453)** — the front distinguishes a
+`CommissioningMetric` server-side. The one item that stays deferred to the frontend surface (Phase 9) is a
+field on `IncentiveGraphqlType` distinguishing the metric variables an incentive feeds vs reads (its shape
+is a frontend-contract decision the picker query fixes).
 
 ### Phase 9: `app-webclient` — DELIVERED
 
@@ -553,7 +576,7 @@ authored and added.
 | Validation 1 error surface | `missing_producing_incentive` on the incentivation's `:incentive_id` | Delivered (#5434, consolidated into `Plan::IncentiveCommissioningMetricMapping` #5436). The frontend already lists per-`incentive_id` errors after submit, so the error surfaces on the incentive rather than as a generic base error |
 | Validation 2 | Single consumer incentive type per commissioning-metric variable (`multiple_consuming_incentive_types`) | Delivered (#5436). A comprehensibility/legal constraint — a variable consumed across incentive types turns the rule graph into a web the signed declaration cannot legibly present |
 | Production is unconstrained | Any number of incentive types may feed one metric | Decided (engineer, `DECISION-AUTHORITY.md` ladder, source 1). The metric aggregates (sum/average) every feeding commissioning into one value, so multiple feeder types produce a single coherent number — no single-writer-type validation |
-| Materialization trigger + store + read channel | Four identical boundary flows, one before each consuming stage, look-ahead by consumption; a Producer/Consumer stage (one Consumer per user commission) that writes the durable `Indicator` AND merges the metric's key into a new `user_commissions.metric_options` column; recompute never `+=` | **Decided (engineer, § Phase 6).** The consuming rule reads variable values from `modifier_options`, a cache built once before the deal stage and never rebuilt, so a fed-back metric cannot ride it — the value travels in a dedicated `metric_options` column, populated additively at the boundary and injected into the formula options next to `modifier_options`, **sliced to the keys the executing incentive consumes** (`metric_options.slice(*consumed_keys)`) so no stage receives another stage's metric variable. Kept a separate column for log clarity (modifiers vs metrics); the slice mirrors `deal_incentive/consumer.rb:30-33` and makes injection correct by construction, not by validation 2 alone. Default-on-empty per user makes reprocess clean |
+| Materialization trigger + store + read channel | Four identical boundary flows, one before each consuming stage, look-ahead by consumption; a Producer/Consumer stage (one Consumer per user commission) that writes the durable `Indicator` AND merges the metric's key into a new `user_commissions.metric_options` column; recompute never `+=` | **Delivered (#5456, § Phase 6).** The consuming rule reads variable values from `modifier_options`, a cache built once before the deal stage and never rebuilt, so a fed-back metric cannot ride it — the value travels in a dedicated `metric_options` column, populated additively at the boundary and injected into the formula options next to `modifier_options`, **sliced to the keys the executing rule's formula references** (`metric_options.slice(*rule.formula.referenced_identifiers)`) so no stage receives another stage's metric variable. Kept a separate column for log clarity (modifiers vs metrics). Default-on-empty per user makes reprocess clean |
 | What the aggregate sums | The signed, commission-type-aware expression (`#money` / `#points`; limiter `value * -1`), not the raw `value` column | Engineer's requirement (source 1): the 300 + 200 − 100 = 400 example closes only if the sign travels with the value; an unsigned publication would force a downstream author to know the feeder's stage |
 | Where the stage order lives | The ordered `PROCESSING_ORDER` constant on `Incentivation` | Delivered (#5436). The allowed producers for a consumer are the types strictly before it (`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`); no separate `Incentive::CALCULATION_ORDER` constant was added |
 | Variable availability by incentive type | A commissioning-metric variable is excluded from the deal incentive | **Delivered** — the deal-incentive workers exclude it from consumption (#5441), and the transactional incentive's rule-formula picker is scoped to `DealMetric` |
@@ -600,12 +623,10 @@ authored and added.
   being resolved at execution time rather than carried in the payload. Confirming it on `beta-001` — start
   a commission, deploy mid-chain, confirm completion — is available if the engineer wants the stronger
   guarantee before the first productive deploy.
-- **The materialization is designed against the code but not yet built.** The stage chain, the four
-  consuming boundaries and the writer are confirmed against the commission workers (§ Phase 6, step 4);
-  `CommissioningMetric` still has no `#calculate` and no commissionings-aggregating adapter, and no stage or
-  read-path change is in `develop`. The one piece not yet read is how the metric's rules' commissionings are
-  fetched per user for the aggregation (step 1) — settled when that query is written against the
-  `Commissioning` / `rules` linkage.
+- **The materialization is built and merged (#5456).** `CommissioningMetric#calculate(user_commission:)`,
+  the four boundary Producer/Consumer stages under `app/workers/commissioning_metric/`, the
+  `user_commissions.metric_options` column, the sliced read injection in the four consuming consumers, and
+  the deal-metrification stage scoped off commissioning metrics all live in `develop` and run on `beta-001`.
 - **The two proposal decks named in SPIKE §6 remain unreviewed** — neither file is on this machine. If
   either constrains the authoring surface, Phase 9 should be re-sized against it.
 
@@ -621,22 +642,23 @@ graph TD
   2 --> 3["3 · Registration ✓"]
   3 --> 5["5 · Plan validation ✓"]
   2 --> 4["4 · Rule syntax ✓"]
-  2 --> 6["6 · Materialization — the calculation"]
-  6 --> 7["7 · Read path"]
+  2 --> 6["6 · Materialization ✓"]
+  6 --> 7["7 · Read path ✓"]
   2 --> 8["8 · GraphQL surface ✓"]
   8 --> 9["9 · app-webclient ✓"]
-  7 --> 10["10 · Backend deploy"]
+  7 --> 10["10 · Backend deploy — beta ✓, demo/productive pending"]
   9 --> 10
   10 --> 11["11 · Frontend release"]
   11 --> 12["12 · Release"]
 ```
 
-Phases 1 through 5, 8 and 9 are delivered — the backend model, both plan validations, the stage-boundary
-rules and the GraphQL binding (#5431 / #5433 / #5434 / #5436 / #5441 / #5442), and the frontend authoring
-surface plus the two declaration screens (#6772 / #6773 / #6774). The one open lane is phase 6 into phase 7
-— the calculation — and phases 10 through 12 (deploy, frontend release, release) all wait on it. Nothing
-else is outstanding: the transactional-incentive picker already excludes commissioning-metric variables,
-and there is no permission to build.
+Every build phase is delivered — the backend model, both plan validations, the stage-boundary rules, the
+GraphQL binding (#5431 / #5433 / #5434 / #5436 / #5441 / #5442), the metric type filter (#5453), the
+calculation and read path (#5456), the visualization fix (#5457), and the frontend authoring surface plus
+the two declaration screens (#6772 / #6773 / #6774). Only the rollout remains: the backend deploy has
+reached `beta-001` (phase 10) and progresses to `demo-001` and the two productive stacks; the frontend
+production release (phase 11) and the release with no permission gate (phase 12) follow. Nothing on the
+build side is outstanding.
 
 ## Cross-cutting concerns
 

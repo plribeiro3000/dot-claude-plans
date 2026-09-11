@@ -33,6 +33,45 @@ contra a origem devolvendo `PASS@858@FAIL@0`. As contagens (`11`) corrigiram dua
 entrou nesta rodada, e o conjunto dele é o da reconciliação de 27/08
 (`20260827-132227-78941.csv`).
 
+**Onde os Executivos estão em 2026-09-10:** o Patrick pediu no #commcenter (10/09) rodar SÓ os
+Executivos — deu os demais cargos por corretos —, porque faltava a correção de dois pontos da Loandra:
+a receita de parceiro e um líder para a Flavia. A re-apuração dos Executivos (`plan_ids = [79175]`)
+rodou de ponta a ponta e está verificada. O que mudou foi só a Loandra, e a correção do Patrick era de
+STATUS: dois deals que estavam como `vendas_instaladas` (status 3084) passaram a `Venda Parceiro`
+(3968). A primeira passada do `10` reativou os dois espelhos correspondentes (`ENABLE@2`); como o ramo
+de reativação não carrega mudança de campo (§ Armadilhas confirmadas), a verificação (`12`) reprovou com
+`status_id 3084 != 3968`, e uma segunda passada do `10` — com os espelhos já ativos e divergentes —
+aplicou o `UPDATE@2` do status, fechando o `12` em `PASS@2@FAIL@0`. As contagens (`11`) vieram
+`MATCHING@10@DIVERGING@0`, nada a corrigir. Os CSVs desta rodada são `20260910-205146-79175.csv` (o
+`ENABLE`) e `20260910-210348-79175.csv` (o `UPDATE` de status). A Loandra passa a carregar R$ 269,98 em
+`faturamento_parceiro`; o `vendas_instaladas` dela segue em 21.508,09 e o `money` não muda (94,92%,
+abaixo do portão de 100% da régua de parceiro).
+
+**O próximo alvo da re-apuração dos Executivos é o plano 79338, não o 79175.** Em 2026-09-10 o Patrick
+substituiu o 79175 pelo **79338, "Remuneração Variável Executivos de Vendas Julho 2026 Errata v1"**, que
+corrige dois defeitos que este documento registra em aberto: o operador invertido da régua de receita
+(regra 265434, `>` onde cabe `<`) e um indicador cuja regra não estava amarrada ao plano. O 79338 depende
+da aprovação da Andresa e do Samuel; aprovado, a re-apuração roda contra ele — mesma mecânica dos scripts,
+trocando `plan_ids` e a compensação. O conjunto de espelhos já reconciliado na Loandra continua válido:
+vive na tabela de deals, independente do plano. Sob a régua corrigida do 79338 a receita de parceiro da
+Loandra (R$ 269,98) passa a pagar um valor pequeno — o Patrick estimou ~R$ 15 e confirma após reprocessar.
+
+**O reprocessamento da 63309 (plano 79175) fica superado por essa troca.** O `05` do 79175 só faz sentido
+se, por algum motivo, o 79175 ainda for reprocessado; a rodada boa passa a ser a do 79338, quando o Patrick
+liberar.
+
+**A Flavia: os dois líderes estão sob ela, e a contagem de 1 (não 2) é DADO, não hierarquia.** O Patrick
+confirmou que Ana Caroline Da Silva Zaniboni (`User.id` 1119722) e Gabriele Fioravanti (`User.id` 1243778)
+estão abaixo dela; o `11` conta só a Ana Caroline porque a Gabriele atinge 3.164,71 contra uma meta de
+3.975,00 (79,6%, abaixo do piso), então entra em `atingimento_lideres` como não-bateu. A subárvore da
+Flavia não teve `seats.updated_at` mexido desde 28/08, então não houve remanejamento — se a Gabriele
+deveria contar, é a meta ou o realizado dela na base que precisa mudar (dado do cliente, não do script), e
+isso provavelmente entra junto do 79338.
+
+**A "indicação" que o Patrick citou junto com a venda parceiro é a MESMA coisa** (incentivo 94277, base
+`faturamento_parceiro`); os deals de `indicacao` avulsa (status 3811) NÃO pertencem ao plano dos
+Executivos e não entram.
+
 **O que falta desta rodada são duas coisas, nesta ordem:** reprocessar as compensações 63309 e 63128,
 que é ação do engenheiro e sem a qual o número não se move, e rodar o `05-validacao.rb` em seguida.
 Como os dois planos são `override: false`, o `05` tem de imprimir `subtree@0.0` em todo alvo e um
@@ -515,6 +554,14 @@ sessão inteira gasta rodadas perseguindo a diferença entre a base e um número
 teste é barato e é obrigatório antes de tratar qualquer valor como referência: buscar o número no
 Slack. Se ele não aparece, ele não é referência — é a estrutura que sustenta a conferência, e o
 número nosso é o que se leva ao cliente para ele reagir.
+
+**O ramo de REATIVAÇÃO do `10-reconciliacao.rb` reabilita o espelho mas NÃO aplica mudança de campo.**
+Quando um espelho está desativado e a origem voltou a casar, o `10` cai no ramo de `ENABLE` e só
+reativa — as diferenças de campo (status, valor) são calculadas e registradas no CSV, mas não gravadas.
+Se a origem mudou de status enquanto o espelho estava desativado (o caso da Loandra em 2026-09-10,
+3084→3968), o espelho volta com o valor velho e a verificação (`12`) reprova. A convergência é em DUAS
+passadas: a primeira reativa, a segunda — com o espelho já ativo e divergente — cai no ramo de `UPDATE`
+e grava a mudança. Rodar o `10` de novo é seguro e é o que fecha o caso; não é preciso alterar o script.
 
 **Uma régua se LÊ, nunca se descreve de memória — e a descrição da regra não é a regra.** Duas
 afirmações erradas chegaram ao cliente por esse caminho numa única mensagem: que os Executivos

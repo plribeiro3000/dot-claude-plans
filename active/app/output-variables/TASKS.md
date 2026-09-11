@@ -1,8 +1,18 @@
 # TASKS — Commissioning metric (output variable)
 
-> Reference: PLAN.md (§ Phase 6 — Materialization, § Phase 7 — Read path). Only the open lane is decomposed
-> here: Phases 1–5, 8 and 9 are delivered, so they carry no task. Phases 10–12 (rollout) follow the build
-> and are listed last.
+> Reference: PLAN.md (§ Phase 6 — Materialization, § Phase 7 — Read path). Only the build lane is decomposed
+> here: Phases 1–5, 8 and 9 carry no task. Phases 10–12 (rollout) follow the build and are listed last.
+>
+> **Status: DELIVERED (#5456), running on `beta-001`.** All seven tasks below shipped in one PR; the
+> acceptance criteria are the build's targets. One divergence from the plan, in Task 5: the four consumers
+> slice `metric_options` by `rule.formula.referenced_identifiers` rather than by `consumed_metric_ids` (same
+> guarantee, simpler key source). Task 5's prescribed rename of the deal incentive's local `metric_options`
+> to `deal_metric_options` was dropped, correctly — that local holds the metric-backed variables' options
+> sliced from `modifier_options` (deal metrics), so `metric_options` is the accurate name; deal-stage metric
+> options travel in `modifier_options` and commissioning-metric options in the new column, both legitimately
+> metric options. Task 3 shipped as four boundary Producer/Consumer pairs under
+> `app/workers/commissioning_metric/`, one per consuming stage, rather than one reused stage with four
+> insertions.
 
 ## Decomposition
 
@@ -178,10 +188,11 @@ graph LR
 
 ## Rollout (after the build — PLAN.md Phases 10–12)
 
-- **Backend deploy (Phase 10):** one zero-downtime deploy; the queue-depth check gates a productive deploy.
-  The `metric_options` migration is additive (`null: false, default: {}`) and runs in the ephemeral migration
-  task before the new code goes live; the `Computation` key derivation and existing job argument shapes are
-  unchanged, so no phasing trigger fires.
+- **Backend deploy (Phase 10):** one zero-downtime deploy per environment; the queue-depth check gates a
+  productive deploy. `beta-001` is deployed and under business test; `demo-001` and the two productive stacks
+  (`shared-001`, `atento-001`) remain. The `metric_options` migration is additive (`null: false,
+  default: {}`) and runs in the ephemeral migration task before the new code goes live; the `Computation` key
+  derivation and existing job argument shapes are unchanged, so no phasing trigger fires.
 - **Frontend release (Phase 11):** the `app-webclient` screens (delivered) display correct values once the
   materialization deploy lands; no code change.
 - **Release (Phase 12):** no permission gate — the feature rides existing permissions.
