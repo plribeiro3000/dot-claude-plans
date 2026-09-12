@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gerenciadores de Pacotes JS — Yarn vs. o resto (Set/2026)</title>
+<style>
+  :root{
+    --bg:#f7f7f5; --card:#ffffff; --ink:#1a1a1a; --muted:#5c5c5c; --line:#e3e3df;
+    --accent:#2f5fd0; --good:#1c7c4a; --good-bg:#e7f5ec; --warn:#a9720d; --warn-bg:#fbf1de;
+    --bad:#b3341f; --bad-bg:#fbe9e6; --neutral-bg:#f0f0ee; --chip:#ecece9;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#17181a; --card:#202225; --ink:#ececec; --muted:#a2a2a2; --line:#33353a;
+      --accent:#7aa2f0; --good:#5cc389; --good-bg:#153021; --warn:#e0b263; --warn-bg:#332a16;
+      --bad:#e88a78; --bad-bg:#3a1f1a; --neutral-bg:#2a2c30; --chip:#2c2e33;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    line-height:1.55;font-size:15px}
+  .wrap{max-width:1000px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0 0 28px;font-size:14px}
+  h2{font-size:19px;margin:36px 0 12px;letter-spacing:-.01em;border-bottom:1px solid var(--line);padding-bottom:8px}
+  h3{font-size:15px;margin:20px 0 6px}
+  p{margin:8px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:14px 0}
+  .tool{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .tool .name{font-weight:700;font-size:16px;display:flex;align-items:center;gap:8px}
+  .tool .kind{font-size:12px;color:var(--muted);margin:2px 0 8px}
+  .tool p{font-size:13.5px;margin:6px 0}
+  .chip{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:20px;background:var(--chip);color:var(--muted);vertical-align:middle}
+  .chip.good{background:var(--good-bg);color:var(--good)}
+  .chip.warn{background:var(--warn-bg);color:var(--warn)}
+  .chip.bad{background:var(--bad-bg);color:var(--bad)}
+  .callout{border-left:4px solid var(--accent);background:var(--neutral-bg);border-radius:0 8px 8px 0;padding:14px 18px;margin:16px 0}
+  .callout.good{border-color:var(--good);background:var(--good-bg)}
+  .callout.warn{border-color:var(--warn);background:var(--warn-bg)}
+  .callout .t{font-weight:700;margin-bottom:4px;font-size:14px}
+  .tablewrap{overflow-x:auto;margin:14px 0;-webkit-overflow-scrolling:touch}
+  table{border-collapse:collapse;width:100%;min-width:760px;font-size:13.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-weight:700;background:var(--neutral-bg);position:sticky;top:0}
+  td.tool-col{font-weight:700;white-space:nowrap}
+  .rec{background:linear-gradient(180deg,var(--good-bg),var(--card));border:1px solid var(--good);
+    border-radius:14px;padding:22px 24px;margin:20px 0}
+  .rec .verdict{font-size:22px;font-weight:800;color:var(--good);margin:0 0 8px;letter-spacing:-.01em}
+  ul{margin:8px 0;padding-left:22px}
+  li{margin:5px 0}
+  code{background:var(--neutral-bg);padding:1px 6px;border-radius:5px;font-size:.9em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .foot{color:var(--muted);font-size:12px;margin-top:36px;border-top:1px solid var(--line);padding-top:14px}
+  .foot a{color:var(--accent)}
+  .tick{color:var(--good);font-weight:700}
+  .cross{color:var(--bad);font-weight:700}
+  .tilde{color:var(--warn);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Gerenciadores de pacotes JS — Yarn vs. o resto</h1>
+  <p class="sub">Análise para o <strong>app-webclient</strong> · 11 de setembro de 2026 · pergunta: continuar no Yarn ou migrar?</p>
+
+  <div class="rec">
+    <p class="verdict">Recomendação: ficar no Yarn.</p>
+    <p style="margin:0">Vocês estão no <strong>Yarn 4.18.0</strong> (a linha atual e mantida), e o <code>app-webclient</code> já tem <strong>todas</strong> as defesas de supply-chain que o <code>aube</code> vende como diferencial — só que num tool maduro. Trocar de gerenciador hoje não compra segurança nenhuma e adiciona risco. O <code>aube</code> é interessante, mas tem 3 meses de vida e a própria comunidade diz "ainda não para produção".</p>
+  </div>
+
+  <h2>1. "São todos a mesma coisa?" — Não. Tem uma taxonomia aqui.</h2>
+  <p>A confusão é justa, porque o marketing de todos usa as mesmas palavras. Mas eles ocupam papéis diferentes:</p>
+
+  <div class="grid">
+    <div class="tool">
+      <div class="name">npm <span class="chip good">padrão</span></div>
+      <div class="kind">Gerenciador de pacotes</div>
+      <p>Vem embutido no Node. Máxima compatibilidade. O <code>npm 11</code> (fev/2026) ganhou <code>min-release-age</code> nativo.</p>
+    </div>
+    <div class="tool">
+      <div class="name">Yarn <span class="chip good">o de vocês</span></div>
+      <div class="kind">Gerenciador de pacotes</div>
+      <p>Linha atual é a <strong>Berry (4.x)</strong>, ativa (4.18.0 em jul/2026). O Yarn 1 "Classic" está em manutenção desde 2020 — mas vocês NÃO estão nele.</p>
+    </div>
+    <div class="tool">
+      <div class="name">pnpm <span class="chip">alternativa madura</span></div>
+      <div class="kind">Gerenciador de pacotes</div>
+      <p>Store global content-addressable → ~70% menos disco. Rápido, compatível. Ganhou <code>minimumReleaseAge</code> em set/2025.</p>
+    </div>
+    <div class="tool">
+      <div class="name">bun <span class="chip warn">runtime, não só PM</span></div>
+      <div class="kind">Runtime + bundler + test + PM (em Zig)</div>
+      <p>NÃO é "um pacote de segurança". É um <strong>runtime completo</strong> que inclui um gerenciador. Adotá-lo = adotar o runtime inteiro. Muito rápido.</p>
+    </div>
+    <div class="tool">
+      <div class="name">aube <span class="chip warn">novo (2026)</span></div>
+      <div class="kind">Gerenciador de pacotes (em Rust)</div>
+      <p>O da newsletter. Do <strong>jdx</strong> (autor do mise). Modelo de disco tipo pnpm, lê/escreve o lockfile que você já tem. Foco em segurança e velocidade.</p>
+    </div>
+    <div class="tool">
+      <div class="name">Bower <span class="chip bad">morto</span></div>
+      <div class="kind">Gerenciador de pacotes (histórico)</div>
+      <p>O que o Twitter lançou (~2013), aquele "que morreu". Deprecado há anos. Não entra na conta.</p>
+    </div>
+  </div>
+
+  <div class="callout warn">
+    <div class="t">Dois erros de premissa que vale corrigir</div>
+    <p style="margin:6px 0"><strong>1. "O bun é um pacote de segurança que deu problema."</strong> Não. O bun é um runtime + gerenciador, e não teve incidente próprio. Os problemas de segurança que você ouviu falar são os <strong>ataques de supply-chain no registro do npm</strong> (o worm Shai-Hulud, 2025–2026) — que atingem pacotes publicados no npm e portanto afetam <em>todos</em> os gerenciadores igualmente, porque todos instalam do mesmo registro. Não é falha do bun.</p>
+    <p style="margin:6px 0"><strong>2. "O aube vai reescrever tudo."</strong> Não. Ele lê e escreve o lockfile existente (yarn/npm/pnpm/bun) e cai por cima do projeto sem migração. É <em>drop-in</em>, não substituição do ecossistema. (O item #1 da newsletter, o "Executor", esse sim não é gerenciador de pacotes — é um "MCP-of-MCPs" pra agentes de IA. Assunto totalmente diferente.)</p>
+  </div>
+
+  <h2>2. O que virou a chave de "seguro" em 2026: Shai-Hulud</h2>
+  <p>O tema de segurança do ano no JS não é qual gerenciador você usa — é o <strong>worm Shai-Hulud</strong> no registro do npm. Foram várias ondas:</p>
+  <ul>
+    <li><strong>Set/2025</strong> — primeira onda: phishing num maintainer → 1.300+ versões comprometidas, ~2 bilhões de downloads/mês.</li>
+    <li><strong>Nov/2025</strong> — Shai-Hulud V2 ("The Second Coming"): 700+ pacotes, 27.000 repos maliciosos, ~14.000 segredos vazados.</li>
+    <li><strong>Mai/2026</strong> — "Mini Shai-Hulud": 170+ pacotes npm.</li>
+    <li><strong>Ago/2026</strong> — nova onda: 1.280+ pacotes, 2+ bilhões de instalações/mês, roubando segredos (GitHub, npm, AWS, SSH, VPN…) durante o <code>install</code>.</li>
+  </ul>
+  <p>A indústria convergiu para <strong>duas defesas</strong>, e as duas são independentes do gerenciador:</p>
+  <ul>
+    <li><strong>Bloquear scripts de post-install</strong> (o vetor que o worm usa pra rodar durante o <code>install</code>).</li>
+    <li><strong>Quarentena por idade de release</strong> (<em>minimum release age</em>): não instalar uma versão publicada há menos de N dias, dando tempo pra comunidade pegar o pacote comprometido antes de ele cair no seu <code>node_modules</code>.</li>
+  </ul>
+
+  <div class="callout good">
+    <div class="t">O ponto que decide a resposta: vocês já fazem tudo isso — no Yarn</div>
+    <p style="margin:6px 0">O <code>.yarnrc.yml</code> do <code>app-webclient</code> já tem:</p>
+    <ul style="margin:6px 0">
+      <li><code>enableScripts: false</code> — scripts de post-install <strong>desligados</strong>. É exatamente o vetor principal do Shai-Hulud, bloqueado.</li>
+      <li><code>YARN_NPM_MINIMAL_AGE_GATE</code> via CI (age-gate nativo do Yarn Berry 4.10+), lendo da mesma variável de organização que o Renovate usa.</li>
+      <li>Renovate com <code>minimumReleaseAge</code> (7 dias) + Dependabot + o check de idade no CI, e o <code>yarn.lock</code> commitado.</li>
+    </ul>
+    <p style="margin:6px 0">Ou seja: as "features de segurança" que o <code>aube</code> anuncia como diferencial (minimum release age + jail de scripts) <strong>vocês já têm</strong>, num tool maduro. Migrar pra ganhar segurança seria trocar de ferramenta pra ter o que já está no lugar.</p>
+  </div>
+
+  <h2>3. Comparativo (setembro/2026)</h2>
+  <div class="tablewrap">
+  <table>
+    <thead>
+      <tr>
+        <th>Tool</th><th>O que é</th><th>Maturidade</th><th>Velocidade</th><th>Disco</th>
+        <th>Segurança (age-gate / scripts)</th><th>Encaixe com o stack de vocês</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="tool-col">Yarn 4</td>
+        <td>Gerenciador</td>
+        <td><span class="tick">✓</span> Maduro, mantido (4.18.0)</td>
+        <td>Boa</td>
+        <td>Média</td>
+        <td><span class="tick">✓</span> Nativo (age-gate + <code>enableScripts:false</code>)</td>
+        <td><span class="tick">✓</span> Já rodando, Angular + Netlify OK</td>
+      </tr>
+      <tr>
+        <td class="tool-col">pnpm</td>
+        <td>Gerenciador</td>
+        <td><span class="tick">✓</span> Maduro</td>
+        <td>Muito boa</td>
+        <td><span class="tick">✓</span> ~70% menos</td>
+        <td><span class="tick">✓</span> Nativo desde v10.16</td>
+        <td><span class="tilde">~</span> Migração real, ganho marginal</td>
+      </tr>
+      <tr>
+        <td class="tool-col">npm</td>
+        <td>Gerenciador</td>
+        <td><span class="tick">✓</span> Máxima compat.</td>
+        <td>Mais lenta</td>
+        <td>Alta</td>
+        <td><span class="tick">✓</span> Nativo desde npm 11</td>
+        <td><span class="tilde">~</span> Funciona, sem motivo pra sair do Yarn</td>
+      </tr>
+      <tr>
+        <td class="tool-col">bun</td>
+        <td>Runtime + PM</td>
+        <td><span class="tilde">~</span> PM ok, é um runtime</td>
+        <td><span class="tick">✓</span> A mais rápida</td>
+        <td>Média</td>
+        <td><span class="tick">✓</span> Tem age-gate</td>
+        <td><span class="cross">✗</span> Compromisso grande (adotar runtime)</td>
+      </tr>
+      <tr>
+        <td class="tool-col">aube</td>
+        <td>Gerenciador (Rust)</td>
+        <td><span class="cross">✗</span> 3 meses, "não p/ prod" (HN)</td>
+        <td><span class="tick">✓</span> Rápida (warm install)</td>
+        <td><span class="tick">✓</span> ~90% menos (multi-projeto)</td>
+        <td><span class="tick">✓</span> Padrão por default</td>
+        <td><span class="cross">✗</span> Novo demais p/ frontend de cliente</td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+
+  <h2>4. aube em detalhe — por que é interessante, e por que não agora</h2>
+  <div class="card">
+    <h3>O que tem de bom</h3>
+    <ul>
+      <li><strong>Autor confiável.</strong> jdx é o criador do <code>mise</code> (ex-rtx), ferramenta muito adotada e respeitada. Não é um projeto de fim de semana.</li>
+      <li><strong>Escrito em Rust</strong>, com pipeline de install nativo e paralelo — daí a velocidade (warm install ~8x mais rápido que pnpm nos benchmarks dele).</li>
+      <li><strong>Drop-in de verdade:</strong> lê/escreve o lockfile que você já tem, sem migração. Segue o padrão do <code>uv</code> no Python.</li>
+      <li><strong>Segurança opinada por default:</strong> minimum release age + "jails" pra scripts de post-install.</li>
+    </ul>
+    <h3>Por que não vale a troca hoje</h3>
+    <ul>
+      <li><strong>Maturidade.</strong> Lançado em 2026, v2.2.x. No Hacker News a leitura é "promissor, mas ainda não recomendado pra produção" — testadores relatam abrir bug de compatibilidade com pnpm <em>diariamente</em> (consertam rápido, mas ainda há lacunas) e ~30% mais lento que pnpm em monorepos grandes.</li>
+      <li><strong>Ganho zero de segurança pra vocês.</strong> O que ele vende, vocês já têm no Yarn.</li>
+      <li><strong>Frontend de cliente não é lugar de experimento.</strong> É whitelabel, buildado no Netlify, com Angular CLI. Um gerenciador de 3 meses aí é risco sem retorno.</li>
+    </ul>
+  </div>
+
+  <h2>5. Se um dia quiserem mexer (não agora)</h2>
+  <p>Se em algum momento a dor for <strong>disco/velocidade</strong> (não segurança), a troca de menor risco e maior maturidade é <strong>pnpm</strong> — não o aube (novo demais) nem o bun (que arrasta o runtime junto). Mas isso é "nice to have", não urgente: o Yarn 4 entrega bem e está integrado.</p>
+  <p>O que <em>de fato</em> move o ponteiro de segurança (e vocês já fazem) independe do gerenciador: <code>enableScripts: false</code>, age-gate, lockfile commitado, Renovate/Dependabot. Manter isso é o que importa — em qualquer gerenciador.</p>
+  <p><strong>Deixe o aube na lista de observação.</strong> Vale reavaliar daqui a ~6–12 meses: se ele amadurecer como o <code>uv</code> amadureceu no Python, aí sim a conversa muda.</p>
+
+  <div class="foot">
+    <p>Fontes: <a href="https://aube.sh/">aube.sh</a> · <a href="https://github.com/jdx/aube">github.com/jdx/aube</a> · <a href="https://news.ycombinator.com/item?id=47948568">HN: Aube</a> · <a href="https://reintech.io/blog/npm-vs-yarn-vs-pnpm-vs-bun-2026-comparison">Reintech: npm vs Yarn vs pnpm vs Bun 2026</a> · <a href="https://socket.dev/blog/npm-introduces-minimumreleaseage-and-bulk-oidc-configuration">Socket: npm minimumReleaseAge</a> · <a href="https://pnpm.io/supply-chain-security">pnpm: supply-chain security</a> · <a href="https://www.microsoft.com/en-us/security/blog/2025/12/09/shai-hulud-2-0-guidance-for-detecting-investigating-and-defending-against-the-supply-chain-attack/">Microsoft: Shai-Hulud 2.0</a> · <a href="https://unit42.paloaltonetworks.com/npm-supply-chain-attack/">Unit 42: Shai-Hulud</a></p>
+    <p>Estado local verificado: <code>app-webclient</code> → <code>packageManager: yarn@4.18.0</code>, <code>.yarnrc.yml</code> com <code>enableScripts: false</code> + age-gate via CI, <code>renovate.json</code> presente.</p>
+  </div>
+
+</div>
+</body>
+</html>

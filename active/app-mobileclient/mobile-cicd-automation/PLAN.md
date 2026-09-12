@@ -48,6 +48,18 @@ A signing secret has exactly two homes and one forbidden location:
 - Revoke the old App Store Connect key `CodeMagic` (`VNGXS2378P`) after the new pipeline is confirmed publishing.
 - Optional housekeeping: the stray Google Cloud default project "My First Project" got the Play API enabled on it by mistake; harmless, can be deleted anytime.
 
+## Store submission status
+
+### Google Play (`com.sharkapp.sharkreal`)
+
+- The app is published; an app update was **rejected on 2026-09-09**. Reason shown in Policy status: User Data policy → "Política de Privacidade inválida" (invalid privacy policy).
+- Root cause: no valid public privacy policy URL. Resolved — the privacy policy page is published at a public HTTPS address, `https://www.4shark.com.br/politica-de-privacidade`, and set in Play Console → Policy and programs → App content → Privacy policy.
+- Resubmission is the App content change sent for review via Publishing overview → "Enviar alterações para revisão"; the change is metadata, reviewed without a new build/versionCode. The Data safety form must stay consistent with the policy text.
+
+### Apple App Store
+
+- Reported OK by the engineer; not independently confirmed here. Confirm the exact state (approved and publishable vs. awaiting the first build via the pipeline) and record it.
+
 ## References
 
 - Codemagic — Google Play publishing with codemagic.yaml: https://docs.codemagic.io/yaml-publishing/google-play/

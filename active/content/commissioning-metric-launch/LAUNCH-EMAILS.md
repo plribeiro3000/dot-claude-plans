@@ -6,27 +6,34 @@ Documento de conteúdo (entregável client-facing). Classificação de idioma: e
 
 Lançamento da funcionalidade Métricas de Comissão (backend `CommissioningMetric` + telas de autoria/declaração), disponível por padrão apenas para usuários de nível administrador — sem feature flag, então o deploy libera para todos.
 
-- Deploy productivo: sexta-feira, 11/09 (final do dia). Começa sexta à noite.
-- E-mail Atento Colômbia (cliente que pediu): enviar sexta, 11/09.
+- Deploy productivo: feito — release 1.288.0 do `app-webclient` liberada em 11/09 (tag `v1.288.0`). Sem feature flag: já disponível por padrão para todos os usuários de nível administrador.
+- E-mail Atento Colômbia (cliente que pediu): enviado 11/09.
 - E-mails de massa (Brasil + demais países Atento, clientes que não pediram): enviar segunda, 14/09, de manhã, pelo time de operações.
 
 ## Itens a preencher antes de enviar
 
-- Confirmar/trocar o nome da funcionalidade: usado "Métricas de Comissão" / "Métricas de Comisión".
-- Nome da reunião recorrente com a Atento Colômbia (placeholder no e-mail 1).
-- Anexar os 3 prints (ver abaixo). Prints parciais, não a página inteira.
+- Nome da funcionalidade: confirmado — "Métricas de Comissão" (PT) / "Métricas de Comisión" (ES).
+- Prints 1 e 2 só existem em espanhol entre as imagens disponíveis. Para os e-mails ES (Atento CO e demais países) servem direto; para o e-mail 2 (Brasil, PT) faltam as versões PT das telas de cadastro — decidir entre gerar os prints PT ou enviar o e-mail do Brasil com os prints 1 e 2 em espanhol.
 
 ## Prints (máx. 3, parciais)
 
-1. O novo tipo de métrica de comissão — tela de cadastro da métrica, mostrando a agregação (soma/média) e a variável de destino.
-2. O cadastro do plano — uma regra/faixa associada a uma métrica de comissão.
+Arquivos em `~/Downloads/`. Prints parciais, não a página inteira.
+
+1. O novo tipo de métrica de comissão — tela de cadastro da métrica, com a agregação (soma/média) e a variável de destino.
+   - ES: `crear_metrica.png` (Tipo "Métrica de comisión", Cálculo "Suma", Variable "Pago Cuenta") — já é parcial, serve como está.
+   - PT: pendente (só há versão ES).
+2. O cadastro do plano — uma regra associada a uma métrica de comissão.
+   - ES: `exemplo_incentivo_declaracao_regras.png` (a regra e a nota "calculados por la métrica Pago Cuenta y guardados en la variable Pago Cuenta").
+   - PT: pendente (só há versão ES).
 3. A declaração de resultado — o valor calculado pela métrica aparecendo para o usuário.
+   - ES: `declaracion_resultado_metrica_ES.png` (recorte da tabela "Métrica" + "Compensaciones de indicadores", extraído da declaração ES `declaracao_resutlados2.png`).
+   - PT: `declaracao_resultado_metrica_PT.png` (mesmo recorte, extraído da declaração PT `declaracao_resutlados.png`).
 
 Descartado: print do cadastro com erro de validação — num e-mail de lançamento um estado de erro passa insegurança.
 
 ---
 
-## E-mail 1 — Atento Colômbia (ES) — enviar sexta, 11/09
+## E-mail 1 — Atento Colômbia (ES) — enviado 11/09
 
 ```
 Asunto: Entrega de la funcionalidad de Métricas de Comisión

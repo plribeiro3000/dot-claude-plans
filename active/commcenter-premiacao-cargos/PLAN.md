@@ -60,19 +60,21 @@ Loandra (R$ 269,98) passa a pagar um valor pequeno — o Patrick estimou ~R$ 15 
 se, por algum motivo, o 79175 ainda for reprocessado; a rodada boa passa a ser a do 79338, quando o Patrick
 liberar.
 
-**A Flavia: os dois líderes estão sob ela, e a contagem de 1 (não 2) é DADO, não hierarquia.** O Patrick
-confirmou que Ana Caroline Da Silva Zaniboni (`User.id` 1119722) e Gabriele Fioravanti (`User.id` 1243778)
-estão abaixo dela; o `11` conta só a Ana Caroline porque a Gabriele atinge 3.164,71 contra uma meta de
-3.975,00 (79,6%, abaixo do piso), então entra em `atingimento_lideres` como não-bateu. A subárvore da
-Flavia não teve `seats.updated_at` mexido desde 28/08, então não houve remanejamento — se a Gabriele
-deveria contar, é a meta ou o realizado dela na base que precisa mudar (dado do cliente, não do script), e
-isso provavelmente entra junto do 79338.
+**A Flavia conta 2 líderes, e cada cargo é ancorado no plano com `disabled_at` nulo — nunca num id
+fixo.** Ana Caroline Da Silva Zaniboni (`User.id` 1119722) e Gabriele Fioravanti (`User.id` 1243778)
+estão sob ela e as duas batem a meta: a contagem fecha em 2 quando os líderes são lidos do plano de
+Líderes PAP VIVO, o 79176 (compensação 63310), onde a Gabriele realiza 5.154,51 contra a meta de
+3.975,00. O plano de Líderes PAP foi recriado duas vezes — 78938 → 79153 → 79176, os dois primeiros
+desabilitados — e um `11` ancorado no 78938 lê o agregado congelado da Gabriele (3.164,71, de 25/08)
+e a conta como não-bateu. É a mesma armadilha do plano de Executivos (78939 → 79175 → 79338): o anchor
+de cada rodada é o plano não-desabilitado do cargo, resolvido na hora (§ Âncoras de julho/2026), nunca
+um número decorado.
 
 **A "indicação" que o Patrick citou junto com a venda parceiro é a MESMA coisa** (incentivo 94277, base
 `faturamento_parceiro`); os deals de `indicacao` avulsa (status 3811) NÃO pertencem ao plano dos
 Executivos e não entram.
 
-**O que falta desta rodada são duas coisas, nesta ordem:** reprocessar as compensações 63309 e 63128,
+**O que falta desta rodada são duas coisas, nesta ordem:** reprocessar as compensações 63333 (Executivos, plano vivo 79338) e 63128 (Gerentes),
 que é ação do engenheiro e sem a qual o número não se move, e rodar o `05-validacao.rb` em seguida.
 Como os dois planos são `override: false`, o `05` tem de imprimir `subtree@0.0` em todo alvo e um
 `expected` igual ao `total_after` que a reconciliação registrou.
@@ -506,7 +508,7 @@ subárvore inteira. Os alvos saem dos participantes da própria compensação em
 | Cargo | `plan_id` | Compensação | Override | Conjunto de origem resultante |
 |---|---|---|---|---|
 | Coordenador de Call Center | 78941 | 63126 | não | subárvore inteira |
-| Executivos de Vendas | 79175 | 63309 | não | subárvore inteira |
+| Executivos de Vendas | 79338 | 63333 | não | subárvore inteira |
 | Gerentes Comerciais | 78940 | 63128 | não | subárvore inteira |
 
 ### A garantia: nada apagado aqui é irrecuperável
@@ -655,14 +657,19 @@ Do usuário chega-se ao plano por dois caminhos, ambos reais: as `PlanStatement`
 Calendário 19604, período **528210** (01/07 a 31/07). Todos os planos são `SalesPlan` com
 `deal_type` `Sale`, portanto a redução da métrica é `sold_price * quantity`.
 
+**O plano de cada cargo é o que está com `disabled_at` nulo — vários foram recriados como Errata /
+Errata v1 e os antecessores estão desabilitados.** Ancorar num id fixo lê a compensação morta, cujo
+agregado ficou congelado no dia em que foi processada; resolver o plano vivo do grupo a cada rodada é
+o que evita isso. A tabela abaixo é o estado vivo desta competência.
+
 | Cargo | Plano | Grupo | Compensação | Override | Variáveis com métrica |
 |---|---|---|---|---|---|
 | Coordenador de Call Center | 78941 | 50210 | 63126 | não | `vendas_instaladas`, `movel` |
-| Executivos de Vendas | 79175 | 40315 | 63309 | não | `vendas_instaladas`, `movel`, `faturamento_parceiro` |
+| Executivos de Vendas | 79338 | 40315 | 63333 | não | `vendas_instaladas`, `movel`, `faturamento_parceiro` |
 | Gerentes Comerciais | 78940 | 40314 | 63128 | não | `vendas_instaladas`, `movel`, `indicacao` |
 | Líder de Call Center | 78943 | 50213 | 63134 | sim | `vendas_instaladas`, `movel` |
 | Call Center | 78942 | 48179 | 63120 | não | `vendas_instaladas`, `movel` |
-| Líderes PAP | 78938 | 50216 | 63125 | sim | `vendas_instaladas`, `movel`, `indicacao` |
+| Líderes PAP | 79176 | 50216 | 63310 | sim | `vendas_instaladas`, `movel`, `indicacao` |
 
 Métricas: `vendas_instaladas` → 4819; `movel` → 4907, que filtra apenas por `status_id` 3846 e
 `installment >= 1`, sem cliente nem produto; `indicacao` → 4940.

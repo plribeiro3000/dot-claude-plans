@@ -31,9 +31,12 @@ dry_run = true
 
 company_id = 2077
 
-executivos_plan_id = 79175
+# Anchor each cargo on the live plan of its group (disabled_at nil). The Executivos and Líderes PAP
+# plans were recreated as Errata/Errata v1; the antecessores are disabled and hold a frozen aggregate,
+# so reading them undercounts atingimento_lideres. See § Âncoras de julho/2026 in PLAN.md.
+executivos_plan_id = 79338
 lojas_plan_id = 78944
-lideres_plan_id = 78938
+lideres_plan_id = 79176
 competence_period_id = 528210
 
 lojas_atingimento_variable_id = 36927

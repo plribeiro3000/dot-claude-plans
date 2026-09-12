@@ -70,12 +70,16 @@ the accurate name — deal-stage metric options travel in `modifier_options` (de
 front), commissioning-metric options travel in the new column, and both are legitimately metric options,
 differing only in source.
 
-**Remaining: rollout only — no feature build is left.** The backend deploy has reached `beta-001`; `demo-001`
-and the two productive stacks (`shared-001`, `atento-001`) follow (Phase 10), then the frontend production
-release (Phase 11 — the screens are live in beta; production is one Netlify merge). No new permission is
-involved: the feature modifies existing screens, so whoever could already create a metric, an incentive and
-a plan can use it (Phase 12). The business continues testing on beta; issues surface there and are fixed
-before the rollout progresses.
+**Remaining: frontend release only — the backend release is done.** The `release/3.68.0` backend deploy is
+live in all four environments (Phase 10) — beta, demo and both productive stacks (`shared-001`, `atento-001`);
+the frontend production release (Phase 11 — the screens are live in beta; production is one Netlify merge)
+is what remains. Shipping the backend ahead of the frontend is safe:
+the release's GraphQL change is purely additive and the current production frontend references nothing it
+removed, so the backend deploy is invisible to the running front (see Phase 10). No new permission is
+involved: the feature modifies existing screens, so whoever could already create a metric, an incentive and a
+plan can use it (Phase 12). The feature stays inert until the frontend ships — there is no screen to author a
+commissioning metric, and `IncentivePolicy#update?` blocks binding one to a plan-attached incentive — so no
+existing plan's arithmetic changes.
 
 ## Related and excluded documents
 
@@ -509,9 +513,28 @@ line. The values these screens display are correct once materialization (Phase 6
   (calculation sum/average) whose rules feed it. Whether this is a new screen, an extension of the variable
   screen, or folded into the incentive/rule authoring flow is undecided and depends on the Phase 8 answer.
 
-### Phase 10: Backend deploy
+### Phase 10: Backend deploy — DONE (all four environments)
 
 **Objective:** the backend change is live in all four environments, with the feature reachable by nobody.
+
+**Status: the `release/3.68.0` backend deploy is live in all four environments** — one GitHub Actions run per
+environment (dispatched 2026-09-12 ~00:54 UTC), all concluded success:
+
+| Environment | Productive? | Run |
+|---|---|---|
+| `beta-001` (develop) | no | https://github.com/4shark/app/actions/runs/34663137948 |
+| `demo-001` (master) | no | https://github.com/4shark/app/actions/runs/34663144251 |
+| `shared-001` (master) | **yes** | https://github.com/4shark/app/actions/runs/34663163217 |
+| `atento-001` (master) | **yes** | https://github.com/4shark/app/actions/runs/34663180653 |
+
+The commissioning-metric migration `20260901190105` needed a per-environment reconciliation on the three
+`master` stacks before it settled: its automatic `ANALYZE rules` / concurrent-index steps cancelled under the
+default 250 ms migration `statement_timeout`, and the interrupted runs left `rules.commissioning_metric_id`
+present with an invalid index and an unvalidated foreign key. Landed per stack by raising the timeout to
+60000 ms (terraform PR #1159 — `MIGRATION_20260901190105` / `MIGRATION_20260901192053`), dropping the
+leftover column, deleting the `20260901190105` row from `schema_migrations`, re-running `db:migrate`, then
+`ALTER TABLE rules VALIDATE CONSTRAINT` on the recreated FK. `beta-001` migrated cleanly on the first run and
+needed none of this.
 
 - **One deploy per environment**, in progression. `beta-001` builds from `develop` and is where the full
   sequence is validated first — a real incentive feeding a metric, a real plan, a real commission run;
@@ -531,10 +554,25 @@ line. The values these screens display are correct once materialization (Phase 6
   one motion. `beta-001` and `demo-001` are never gated.
 - **The migration window.** The `prepare-and-migrate` job builds/pushes the image and runs
   `bin/rails db:migrate`, while the job that activates the new code runs later — between those two points
-  the schema is new and every serving container is old. The delivered migrations (`metrics.type`;
-  `rules.output_variable_id → commissioning_metric_id`) are already in `develop`; the materialization work
-  (Phase 6) may add a migration for wherever the metric-produced value is stored, which is settled when that
-  phase is designed. Nothing delivered so far needs splitting and there is no contract half.
+  the schema is new and every serving container is old. This release carries 10 migrations, all verified safe
+  to run in every environment: Postgres is ≥ 16 on all four stacks (beta 18, demo 17, shared/atento 16), so
+  the two `add_column`s (`metrics.type`; `user_commissions.metric_options` jsonb `null: false default: {}`)
+  are metadata-only even on the 7.5M-row `user_commissions` on `atento-001`; `metrics` is tiny everywhere
+  (≤ 429 rows) so the `type` backfill is trivial; the concurrent-index, `NOT VALID` FK, drop-column and
+  drop-unused-table migrations are online or metadata-only. The one watch-item is
+  `validate_commissioning_metric_foreign_key_on_rules`, which scans `rules` (201k on `shared-001`, 112k on
+  `atento-001`): online (`SHARE UPDATE EXCLUSIVE`, does not block traffic) and expected to pass, but if it
+  cancels under those stacks' tight `statement_timeout`, raise `MIGRATION_20260901192053` and re-run — safe
+  to re-run.
+- **Backend-first is contract-compatible with the running frontend.** The release's GraphQL change is purely
+  additive (`Rule.commissioning_metric`/`_id`, `Metric.type`, `Plan.errors` + `PlanErrorGraphqlType`, an
+  optional `reference` argument on rules/incentivations); nothing was removed or renamed, so an existing
+  client that does not ask for the new fields is unaffected. The dropped `rules.output_variable_id` column
+  was never a GraphQL field and neither the backend GraphQL surface nor `app-webclient/src` references it. The
+  plan mutations moved to `ApplicationMutationV2`, which returns errors-as-data only when the client selects
+  the new `errors` field (`lookahead.selects?(:errors)`) — the current front does not select it, so it falls
+  through to the identical V1 `raise GraphQL::ExecutionError`. The backend deploy is therefore invisible to
+  the current front, which is why it can ship ahead of the Phase 11 frontend release.
 - **Rollback is a redeploy of the previous image at every step.** Nothing drops a column, rewrites data, or
   changes an existing cross-service contract, so there is no point of no return; the closest candidate is a
   commission already calculated with metric values, and a reprocess under the old code reproduces the old
@@ -646,7 +684,7 @@ graph TD
   6 --> 7["7 · Read path ✓"]
   2 --> 8["8 · GraphQL surface ✓"]
   8 --> 9["9 · app-webclient ✓"]
-  7 --> 10["10 · Backend deploy — beta ✓, demo/productive pending"]
+  7 --> 10["10 · Backend deploy — done (beta/demo/shared/atento) ✓"]
   9 --> 10
   10 --> 11["11 · Frontend release"]
   11 --> 12["12 · Release"]
@@ -655,10 +693,9 @@ graph TD
 Every build phase is delivered — the backend model, both plan validations, the stage-boundary rules, the
 GraphQL binding (#5431 / #5433 / #5434 / #5436 / #5441 / #5442), the metric type filter (#5453), the
 calculation and read path (#5456), the visualization fix (#5457), and the frontend authoring surface plus
-the two declaration screens (#6772 / #6773 / #6774). Only the rollout remains: the backend deploy has
-reached `beta-001` (phase 10) and progresses to `demo-001` and the two productive stacks; the frontend
-production release (phase 11) and the release with no permission gate (phase 12) follow. Nothing on the
-build side is outstanding.
+the two declaration screens (#6772 / #6773 / #6774). The `release/3.68.0` backend deploy is live in all four
+environments (phase 10). What remains is the frontend production release (phase 11) and the release with no
+permission gate (phase 12). Nothing on the build side is outstanding.
 
 ## Cross-cutting concerns
 
