@@ -29,13 +29,22 @@ deal → indicator → ranking → limiter → redemption.
 
 ## Status
 
-The full feature build is merged to `develop` and running on `beta-001`, where the business is testing it —
-metric authoring and the metric-visualization screen are both confirmed working. The backend model, both
-plan validations, the stage-boundary rules, the GraphQL authoring binding, **and the calculation
-(materialization + read path)** are all merged; the `app-webclient` authoring surface and the declaration
-screens are live in beta. The platform now computes with commissioning metrics: a `CommissioningMetric`
-aggregates its rules' commissionings per user commission, writes the variable's internal `Indicator`, and
-delivers the value to the consuming rule through the `user_commissions.metric_options` column.
+The feature is **delivered and running in production across every environment** — backend and frontend both
+live. The platform computes with commissioning metrics: a `CommissioningMetric` aggregates its rules'
+commissionings per user commission, writes the variable's internal `Indicator`, and delivers the value to the
+consuming rule through the `user_commissions.metric_options` column. The backend model, both plan validations,
+the stage-boundary rules, the GraphQL authoring binding, the calculation (materialization + read path), the
+`app-webclient` authoring surface and the declaration screens are all in production.
+
+A post-launch defect in the materialization was found and fixed after the first production ship: the four
+`commissioning_metric` boundary consumers created the `Indicator` and the `AggregatedIndicator` but never the
+`IndicatorAggregation` join between them, so the aggregated indicator was disconnected from its source
+indicator (a later recalculation would reset it to the default). The fix (#5463) adds that join in all four
+consumers and shipped in backend release 3.69.0, deployed to all four environments.
+
+What still needs the engineer is not build work — it is one authoring-UX decision that was deferred and never
+resolved: **how an operator creates a commissioning-metric variable** (Phase 9 OPEN). The § Open items
+section below collects it and the smaller loose ends.
 
 **Delivered, merged to `develop`:**
 
@@ -53,6 +62,7 @@ delivers the value to the consuming rule through the `user_commissions.metric_op
 | #5455 | Incentive search exclusion filter |
 | #5456 | Materialization + read path — `CommissioningMetric#calculate`, the four boundary Producer/Consumer stages, the `user_commissions.metric_options` column, the sliced read injection, and the deal-metrification stage scoped off commissioning metrics (Phases 6–7) |
 | #5457 | Metric visualization — `MetricGraphqlType` resolves the deal-only associations (`client`/`product`/`status`) as null on a `CommissioningMetric` instead of raising, so the show page renders |
+| #5463 | Materialization fix — the four `commissioning_metric` consumers create the `IndicatorAggregation` join linking the `Indicator` to its `AggregatedIndicator`; without it the aggregated indicator was orphaned from its source (shipped in release 3.69.0) |
 
 Test-infra fixes #5429 / #5432 landed alongside (spec isolation; STI factory construction) — not feature work.
 
@@ -70,16 +80,31 @@ the accurate name — deal-stage metric options travel in `modifier_options` (de
 front), commissioning-metric options travel in the new column, and both are legitimately metric options,
 differing only in source.
 
-**Remaining: frontend release only — the backend release is done.** The `release/3.68.0` backend deploy is
-live in all four environments (Phase 10) — beta, demo and both productive stacks (`shared-001`, `atento-001`);
-the frontend production release (Phase 11 — the screens are live in beta; production is one Netlify merge)
-is what remains. Shipping the backend ahead of the frontend is safe:
-the release's GraphQL change is purely additive and the current production frontend references nothing it
-removed, so the backend deploy is invisible to the running front (see Phase 10). No new permission is
-involved: the feature modifies existing screens, so whoever could already create a metric, an incentive and a
-plan can use it (Phase 12). The feature stays inert until the frontend ships — there is no screen to author a
-commissioning metric, and `IncentivePolicy#update?` blocks binding one to a plan-attached incentive — so no
-existing plan's arithmetic changes.
+Both the backend (releases 3.68.0 then 3.69.0) and the frontend (`app-webclient` 1.288.0) are live in every
+environment; no permission gates the feature (Phase 12), so whoever can author a metric, an incentive and a
+plan can use it.
+
+## Open items
+
+Nothing on the build, deploy or release side is outstanding. Two design questions were deferred during the
+build and never resolved; both are authoring UX, not calculation, so the feature computes correctly in
+production regardless of how they land.
+
+- **The metric-creation authoring path (Phase 9).** There is no fourth variable type to offer, so creating a
+  commissioning-metric variable is creating an `IndicatorVariable` and attaching a `CommissioningMetric`
+  (calculation sum/average) whose rules feed it. Whether that is a dedicated screen, an extension of the
+  variable screen, or folded into the incentive/rule authoring flow was never decided. This is the one item
+  that decides whether an operator can author these end to end today or whether authoring still leans on a
+  developer step — it needs the engineer to confirm how the feature is being created in production.
+- **The plan-set feed-vs-consume roll-up (Phase 3).** The plan-side compatible-incentive picker (Phase 9,
+  delivered) already reads each candidate's fed vs read metric variables per incentive, so the practical need
+  looks met; the deferred question was only whether a plan-level *set* roll-up is worth computing/caching for
+  that picker. Likely closable as-is — worth one look to confirm the delivered picker covers it.
+
+Smaller loose end, no production impact: whether `app-sdk-advpl`, `app-sdk-dotnet` or `app-mobileclient` model
+`Incentive`/`Rule`/`Variable`/`Metric` is unverified (§ Assumptions); a grep across `onboarding`, `setup`,
+`integrator` and `lambda` already came back empty, so only the three unopened SDK/mobile repos remain
+unchecked.
 
 ## Related and excluded documents
 
@@ -517,8 +542,10 @@ line. The values these screens display are correct once materialization (Phase 6
 
 **Objective:** the backend change is live in all four environments, with the feature reachable by nobody.
 
-**Status: the `release/3.68.0` backend deploy is live in all four environments** — one GitHub Actions run per
-environment (dispatched 2026-09-12 ~00:54 UTC), all concluded success:
+**Status: done in all four environments, across two releases.** The `release/3.68.0` deploy carried the
+feature; `release/3.69.0` carried the materialization fix (#5463) plus the mongo CVE-2026-88030 patch, and was
+deployed to `beta-001`, `demo-001`, `shared-001` and `atento-001` (all four GitHub Actions runs concluded
+success). The 3.68.0 per-environment runs (dispatched 2026-09-12 ~00:54 UTC, all success):
 
 | Environment | Productive? | Run |
 |---|---|---|
@@ -581,14 +608,14 @@ needed none of this.
 **Dependencies:** Phases 1-8. **Running the deploy is the engineer's** — an action outside version control
 that a PR diff neither shows nor reverts. The shape above is decided; the execution and its timing are not.
 
-### Phase 11: Frontend release
+### Phase 11: Frontend release — DONE (app-webclient 1.288.0)
 
 **Objective:** the authoring surface is live.
 
-One merge, which fans out into the per-client Netlify builds. `app-webclient` ships via Netlify, one site
-per client (whitelabel), NOT GitHub Actions; every site runs the same entry point against the same
-repository, so this is one merge fanning out into ~38 builds, not 38 coordinated releases. The frontend
-ships last and therefore never faces an old backend.
+Shipped in `app-webclient` release 1.288.0. One merge fanned out into the per-client Netlify builds —
+`app-webclient` ships via Netlify, one site per client (whitelabel), NOT GitHub Actions; every site runs the
+same entry point against the same repository, so it is one merge fanning out into ~38 builds, not 38
+coordinated releases. The frontend shipped after the backend and therefore never faced an old backend.
 
 ### Phase 12: Release — no permission gate
 
@@ -686,16 +713,18 @@ graph TD
   8 --> 9["9 · app-webclient ✓"]
   7 --> 10["10 · Backend deploy — done (beta/demo/shared/atento) ✓"]
   9 --> 10
-  10 --> 11["11 · Frontend release"]
-  11 --> 12["12 · Release"]
+  10 --> 11["11 · Frontend release — done (1.288.0) ✓"]
+  11 --> 12["12 · Release — no gate ✓"]
 ```
 
-Every build phase is delivered — the backend model, both plan validations, the stage-boundary rules, the
-GraphQL binding (#5431 / #5433 / #5434 / #5436 / #5441 / #5442), the metric type filter (#5453), the
-calculation and read path (#5456), the visualization fix (#5457), and the frontend authoring surface plus
-the two declaration screens (#6772 / #6773 / #6774). The `release/3.68.0` backend deploy is live in all four
-environments (phase 10). What remains is the frontend production release (phase 11) and the release with no
-permission gate (phase 12). Nothing on the build side is outstanding.
+Every phase is delivered and live in production. The backend model, both plan validations, the stage-boundary
+rules, the GraphQL binding (#5431 / #5433 / #5434 / #5436 / #5441 / #5442), the metric type filter (#5453),
+the calculation and read path (#5456), the visualization fix (#5457) and the materialization join fix (#5463);
+the frontend authoring surface plus the two declaration screens (#6772 / #6773 / #6774). The backend is
+deployed to all four environments across releases 3.68.0 and 3.69.0 (phase 10); the frontend shipped in
+`app-webclient` 1.288.0 (phase 11); no permission gates the feature (phase 12). The only things not closed are
+the two deferred authoring-UX questions in § Open items, neither of which blocks the feature computing in
+production.
 
 ## Cross-cutting concerns
 

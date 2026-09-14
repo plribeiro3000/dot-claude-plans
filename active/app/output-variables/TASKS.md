@@ -3,7 +3,9 @@
 > Reference: PLAN.md (§ Phase 6 — Materialization, § Phase 7 — Read path). Only the build lane is decomposed
 > here: Phases 1–5, 8 and 9 carry no task. Phases 10–12 (rollout) follow the build and are listed last.
 >
-> **Status: DELIVERED (#5456), running on `beta-001`.** All seven tasks below shipped in one PR; the
+> **Status: DELIVERED (#5456) and live in production in all four environments.** A post-launch materialization
+> fix (#5463 — the four consumers now create the `IndicatorAggregation` join) shipped in backend release
+> 3.69.0. All seven tasks below shipped in one PR; the
 > acceptance criteria are the build's targets. One divergence from the plan, in Task 5: the four consumers
 > slice `metric_options` by `rule.formula.referenced_identifiers` rather than by `consumed_metric_ids` (same
 > guarantee, simpler key source). Task 5's prescribed rename of the deal incentive's local `metric_options`
@@ -188,13 +190,12 @@ graph LR
 
 ## Rollout (after the build — PLAN.md Phases 10–12)
 
-- **Backend deploy (Phase 10):** one zero-downtime deploy per environment; the queue-depth check gates a
-  productive deploy. `beta-001` is deployed and under business test; `demo-001` and the two productive stacks
-  (`shared-001`, `atento-001`) remain. The `metric_options` migration is additive (`null: false,
-  default: {}`) and runs in the ephemeral migration task before the new code goes live; the `Computation` key
-  derivation and existing job argument shapes are unchanged, so no phasing trigger fires.
-- **Frontend release (Phase 11):** the `app-webclient` screens (delivered) display correct values once the
-  materialization deploy lands; no code change.
+- **Backend deploy (Phase 10):** done in all four environments (`beta-001`, `demo-001`, `shared-001`,
+  `atento-001`) across releases 3.68.0 (feature) and 3.69.0 (the #5463 materialization fix). The
+  `metric_options` migration is additive (`null: false, default: {}`) and ran in the ephemeral migration task
+  before the new code went live; the `Computation` key derivation and existing job argument shapes are
+  unchanged, so no phasing trigger fired.
+- **Frontend release (Phase 11):** done — `app-webclient` 1.288.0.
 - **Release (Phase 12):** no permission gate — the feature rides existing permissions.
 
 ## Cross-cutting concerns
