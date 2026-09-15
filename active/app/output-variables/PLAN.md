@@ -154,13 +154,11 @@ These share commissioning vocabulary but are **different features** — never fo
   marked with which variable it fed; every commissioning whose rule reads a metric-fed variable is marked
   as having been calculated on one. **(delivered — declaração de regras #6773, declaração de resultado #6774; the value the display shows is correct once materialization lands)**
 - Test strategy, data migration, rollout sequence, execution order.
-
-### Out of scope
-
-- The incentive CSV bulk import of the binding. `IncentiveDocument::Processor` builds rules from
-  positional CSV columns (`app/workers/incentive_document/processor.rb:81-86`, `row[0]` for value and
-  `row[1]` for description); adding the binding changes a customer-facing template format. Documented as a
-  limitation instead.
+- The incentive CSV bulk import of the binding — a trailing, optional commissioning-metric column on the
+  upload template. `IncentiveDocument::Processor` resolves the external metric id to the internal
+  `CommissioningMetric` (`app/workers/incentive_document/processor.rb`); the existing positional columns keep
+  their contract and the new column is conditional, so no existing upload breaks. **(delivered — backend 3.70.0
+  #5466, frontend helper 1.289.0 #6792)**
 
 ---
 
@@ -645,7 +643,7 @@ authored and added.
 | What the aggregate sums | The signed, commission-type-aware expression (`#money` / `#points`; limiter `value * -1`), not the raw `value` column | Engineer's requirement (source 1): the 300 + 200 − 100 = 400 example closes only if the sign travels with the value; an unsigned publication would force a downstream author to know the feeder's stage |
 | Where the stage order lives | The ordered `PROCESSING_ORDER` constant on `Incentivation` | Delivered (#5436). The allowed producers for a consumer are the types strictly before it (`PROCESSING_ORDER.take(PROCESSING_ORDER.index(incentive.type))`); no separate `Incentive::CALCULATION_ORDER` constant was added |
 | Variable availability by incentive type | A commissioning-metric variable is excluded from the deal incentive | **Delivered** — the deal-incentive workers exclude it from consumption (#5441), and the transactional incentive's rule-formula picker is scoped to `DealMetric` |
-| Does the incentive CSV import support the binding | No — documented limitation | § Scope Discipline. Changes a customer-facing template |
+| Does the incentive CSV import support the binding | Yes — a trailing, optional commissioning-metric column | **Delivered** (backend 3.70.0 #5466, frontend helper 1.289.0 #6792). The client supplies its own external metric id and the processor swaps to the internal `CommissioningMetric`; the existing positional columns keep their contract, so no upload breaks |
 | Deploy shape | One backend deploy, then one frontend release | No phasing trigger fires: the `Computation` key derivation is unchanged, job argument shapes are unchanged, and recompute makes the materialization idempotent. The act of deploying remains the engineer's |
 
 ---

@@ -203,6 +203,58 @@ Cross the 3,535 distinct `NR_RE` in the sample against the Colombia normalized b
 
 Andrés asked to be contacted directly rather than waiting for the Friday sync on anything that cannot wait, so nothing here queues behind it.
 
+## Draft — the score stream queries, for execution
+
+Confirmed against the live base on 2026-09-14: the score table carries every column the integration reads (`RESULTADO`, `NR_RE`, `DT_DATA`, `DT_MODIFIED`), and its single-column primary key is `NR_CHAVE_EMPRESA_MES_RE` — `varchar(255)`, NOT NULL. That primary key is a unique index, and the column is **1:1 with the business grain**: across the whole base, `COUNT(*) = COUNT(DISTINCT NR_CHAVE_EMPRESA_MES_RE) = COUNT(DISTINCT (DT_DATA, NR_RE, NR_SERVIVIO_CODIGO, NR_ID)) = 33,079`, so the unique index on the key enforces grain-uniqueness in practice and there is no duplicate grain. The uniqueness requirement is met by this index — not by an index on the four grain columns, which is the literal shape `V1` looks for and does not find.
+
+**This is the outcome of the 2026-09-11 meeting, not a workaround to reconcile after the fact.** 4Shark recommended the composite unique index on the four grain columns; Atento (Nicolás Baracaldo, standing in for Andrés) did not adopt it. Instead they build a concatenated key column — period + person (RE) + service + indicator, hyphen-joined — which is `NR_CHAVE_EMPRESA_MES_RE`, and place the unique index on that single column. In the meeting Nicolás first described deduplicating by hand before load; 4Shark pushed for the unique index on the concatenated column so a duplicate load violates the constraint instead, and he agreed. His email states the unique index "over the business key that carries period + person + service + indicator" is already executed, and the live base confirms it (PK, unique, 1:1 with the grain). Because the concatenation is exactly the grain fields, the index is deterministic on the grain and cannot drift the way Mexico's row-hash `NK_KEY` did (that one folded a surrogate id into the hash and so was grain-vacuous). The one item that formalizes it: Nicolás owes an email documenting the dedup method, and a control-point meeting is set for Tuesday 12:00 Colombia; the data already shows the guarantee holding.
+
+There is **no** IDENTITY column. That single-column unique key is the pagination cursor: keyset pagination needs a unique, ordered column, not an auto-increment, so `NR_CHAVE_EMPRESA_MES_RE` serves. Because it is text, the cursor comparison is lexical and quoted, the only difference from the numeric `id` shape the normalized bootstrap generates (`lib/tasks/integration/normalized/sql_server/bootstrap.rake:71-82`).
+
+These are the DRAFT `Stream` templates for the score table, to be finalized at execution time (they still need the catalogue join that carries `llave` into `variable` — the `llave` column does not yet exist on `tb_dim_indicadores`, so the join half waits on Atento; the pagination half below is settled):
+
+`query_template` (first page):
+
+```sql
+SELECT NR_CHAVE_EMPRESA_MES_RE, NR_RE, DT_DATA, RESULTADO, NR_ID
+FROM dbo.tb_dim_indicadores_score
+WHERE DT_MODIFIED >= '{{ fetch_since }}'
+ORDER BY NR_CHAVE_EMPRESA_MES_RE
+OFFSET 0 ROWS FETCH NEXT {{ page_size }} ROWS ONLY
+```
+
+`paginated_query_template` (subsequent pages):
+
+```sql
+SELECT NR_CHAVE_EMPRESA_MES_RE, NR_RE, DT_DATA, RESULTADO, NR_ID
+FROM dbo.tb_dim_indicadores_score
+WHERE DT_MODIFIED >= '{{ fetch_since }}' AND NR_CHAVE_EMPRESA_MES_RE > '{{ previous_record_id }}'
+ORDER BY NR_CHAVE_EMPRESA_MES_RE
+OFFSET 0 ROWS FETCH NEXT {{ page_size }} ROWS ONLY
+```
+
+`Stream` fields: `primary_key = 'NR_CHAVE_EMPRESA_MES_RE'`; `page_size` = the integrator's `SQL_PAGE_SIZE`. The loop is the keyset walk of `Modifier::DatabaseCollectionExtractorConsumer` (`app/workers/modifier/database_collection_extractor_consumer.rb:31`): the extractor reads `primary_key` off the last row and feeds it into `{{ previous_record_id }}`, and the `> '...'` predicate advances the page.
+
+**The score→catalogue join is `score.NR_ID = catalogue.NR_ID`** — settled against the live base 2026-09-14: that join returns 0 orphans across 33,079 rows, while `score.NR_INDICADOR = catalogue.NR_ID` orphans every row because `NR_INDICADOR` is NULL throughout the score table. The `BLUEPRINT.md` names `NR_INDICADOR` as the join column, which the data contradicts. `variable` therefore maps from `catalogue.llave` reached by `score.NR_ID = catalogue.NR_ID` — once the `llave` column exists.
+
+The catalogue `tb_dim_indicadores` is a heap with no index at all (2026-09-14), so nothing guarantees `NR_ID` is unique in it; a duplicate `NR_ID` there fans out the join and duplicates the value. `V2b` in the validation set tests for a unique index on `catalogue.NR_ID`, which the `llave` load must add alongside the `llave` column.
+
+The full re-validation set — structure (INV1–3, V1–V4, VAL1), pagination cursor (P1–P2), join resolution (J1–J2), and the data checks (D1–D2) — is `vkpi-validation-queries-colombia-20260914.sql`, superseding the 09-08 file. Run it whole against `COLBOGSQL58\MSSQL58_KPI` before responding to Atento. V1 reports FAIL only because it looks for the unique index on the four grain columns; the unique index that exists (on `NR_CHAVE_EMPRESA_MES_RE`, 1:1 with the grain) satisfies the uniqueness requirement.
+
+**The catalogue key is loaded, in `NM_INDICADOR_EN_EL_PAIS`, not in a column named `llave`.** Nicolás's 2026-09-14 email confirms it and the live base agrees: `tb_dim_indicadores.NM_INDICADOR_EN_EL_PAIS` carries the 4Shark key for all 750 indicators, zero null/blank, 750 distinct values — one key per indicator, complete. Values are `<slug>_<NR_ID>` (`venta_cantada_478`, `productividad_diaria_480`). So `V2` reports FAIL only because it looks for a column literally named `llave`; the key exists under a different column, exactly as with V1's index. The `variable` mapping therefore reads `catalogue.NM_INDICADOR_EN_EL_PAIS`, reached by `score.NR_ID = catalogue.NR_ID`.
+
+Both structural asks Atento owed — the unique index and the catalogue key — are delivered as of 2026-09-14. The one item left is an alignment, not a structure gap: confirm that the key strings in `NM_INDICADOR_EN_EL_PAIS` match exactly the keys Héctor's team registered each Variable with in the platform, so every indicator resolves to its Variable. That is the subject of the Tuesday control-point session. Two lower-priority notes stay on record: `NR_NUMERADOR`/`NR_DENOMINADOR` are still present alongside `RESULTADO` (VAL1; their removal is Atento's decision, the integration reads `RESULTADO`), and the catalogue is a heap with no unique index on `NR_ID` or on the key column (V2b) — the data is unique today but nothing enforces it, so a duplicate would fan out the join.
+
+## Staging validation on atento-co-staging (execution)
+
+The source structure is delivered and verified against the live base (2026-09-14): the unique index and the catalogue key are both in place. The build-and-test now runs on the `atento-co-staging` integrator, following the playbook proven on `atento-mx-staging` (`../integrator-develop-release-validation/PLAN.md`). The develop image is already deployed to `atento-co-staging` (staging images build from `develop`). Steps, in order — each mutation is an engineer-gated action:
+
+1. **Bring the integrator up.** MongoDB running; web and worker scaled to 1 (the Terraform counts rest at 0; a manual run needs 1 of each). `bash ~/.claude/scripts/ecs-scale.sh` per service.
+2. **Base hygiene — check for junk.** Inspect the staging Mongo for stale data left by prior runs. If it carries `master`-era `Resource`/`Collection` documents, reset it: wipe every collection except the primary `Account` and `data_migrations`, and flush the deployment's Redis database (the pre-flight → mutation → verification shape of `SCRIPT-DISCIPLINE.md`, `delete_all` the justified exception).
+3. **Link the Account.** Verify `Account.primary` exists and points at the intended 4Shark backend company; if absent, create it by hand in the console with the staging API endpoint and token (the engineer supplies both; the token is typed in the console, never pasted into a chat).
+4. **Configure the VKPI source.** Create the non-normalized `DatabaseSource` (VKPI host, `normalized: false`, `resources: ['Modifier']`) plus the `Modifier` `Stream` with the query drafts above, the five `AttributeMapping`s (§ The mapping), and the availability probe.
+5. **Run and test.** `integration:start`; the `Modifier` stream extracts, transforms and builds one API request per record; validate that the indicators land in the backend for a known set of people and reconcile against the source for one period.
+
 ## Risks
 
 **The access request never being made is the risk closest to the calendar.** Network reachability from the integrator to `COLBOGSQL58` and a read-only database user are not database structure, so they are absent from both the script and the roadmap; nothing Atento holds tells them to prepare either, and without both the 17-sep start does not happen.
