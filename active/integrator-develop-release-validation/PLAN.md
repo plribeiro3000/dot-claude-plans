@@ -4,7 +4,7 @@
 
 ## Objective
 
-Prove on the Atento MX staging integrator that the `develop` code — customer database configuration read from MongoDB instead of environment variables, populated by `rake integration:normalized:bootstrap` — integrates a normalized base end to end with the same behavior `master` (8.4.25) has, then cut release 8.5.0 and roll it out to every productive integrator, so that in the week of 2026-09-14 the Atento México indicator work starts on a fleet already running the unified flow.
+Prove on the Atento MX staging integrator that the `develop` code — customer database configuration read from MongoDB instead of environment variables, populated by `rake integration:normalized:bootstrap` — integrates a normalized base end to end with the same behavior `master` (8.4.25) has, then cut release 9.0.0 and roll it out to every productive integrator, so that in the week of 2026-09-14 the Atento México indicator work starts on a fleet already running the unified flow.
 
 ## Scope
 
@@ -13,7 +13,7 @@ Prove on the Atento MX staging integrator that the `develop` code — customer d
 - The two defects that stop `develop` from running at all (F1 `Stream.none?`, F2 `warm_up?`), fixed on `develop` before anything is tested
 - The staging environment change: report recipient moved to the internal mailbox. The source time zone (F3) is settled in code, not in the environment: the bootstrap seeds every normalized source in `UTC`
 - Deploy of the develop image to `atento-mx-staging`, bootstrap, a full first run and an incremental second run, with a written parity checklist against `master`'s behavior
-- Release 8.5.0 (HubFlow), the normalized-schema version cut, and the per-integrator rollout runbook (deploy + bootstrap per environment)
+- Release 9.0.0 (HubFlow), the normalized-schema version cut, and the per-integrator rollout runbook (deploy + bootstrap per environment)
 - No Terraform change for the productive bootstraps: the time zone is seeded by the bootstrap itself, so no deployment carries a time zone variable
 
 ### Out of scope
@@ -218,7 +218,7 @@ puts "requests by status: #{Resource.collection.aggregate([{ '$unwind' => '$impo
 **Components:**
 
 - **Consistency study (executed 2026-09-10, on the server where S3 is reachable).** A read-only script picked `Resource` documents at random from the staging Mongo, fetched each one's `Collection` and `Enrichment` raw bodies from S3, and verified programmatically that `Resource == Collection data + Enrichment data`. Result: **50/50 resources consistent** (collection_ok=50, enrichment_ok=56/56, problems=0). The parent check ran alongside it: **200/200 users carrying a `parent_id` have the `parent` column populated with the full parent row** (uniform 16-key structure, `parent['id'] == parent_id`, 0 problems), and the 10k successful user registrations of the earlier integration independently prove the parent object feeds the registration payload (`user.rb:47,51` — `seat_attributes[:parent_id]`, `external_parent_subsidiary_id = import.data.dig(:parent, :subsidiary_id)`). This is what closes "the develop version is functional for the normalized base."
-- **Store defect found by the study and fixed on `develop` ([#2402](https://github.com/4shark/integrator/pull/2402), merged 2026-09-10).** `ParentUpdate` (step 14) produces `Hierarchy` resources but its six workers persisted and read their collection pages in `job.user_collections` instead of `job.hierarchy_collections` — asymmetric with the actual `Hierarchy` stream (step 2), which already uses `hierarchy_collections`. Collection stores are STI (`UserCollection store_in :user_collections`, `HierarchyCollection store_in :hierarchy_collections`), so the change-of-manager history landed in the wrong Mongo store. **The integration was never wrong** — readers scope by `stream_id`, so the misplaced pages were never cross-read — but the hierarchy-change history was unqueryable in its own store (`hierarchy_collections` held 0 rows; `user_collections` held all 40 including the 11 ParentUpdate pages). The fix swaps `user_collections` → `hierarchy_collections` on the six workers (`database_collection_extractor_consumer:19`, `api_collection_extractor_consumer:32`, `enrichment_extractor_producer:12`, `normalized_collection_consumer:9`, `custom_collection_consumer:9`, `transformer_consumer:9`), byte-identical to the Hierarchy siblings. **The same bug is present on `master`** under the `managed_*` worker names (the prod `database.connect` path), so 8.5.0 carries the fix to production. The brakeman `File Access` false positives on the two edited extractors were re-fingerprinted in `config/brakeman.ignore` (the fingerprint tracks the rendered `code` string, which the rename changed).
+- **Store defect found by the study and fixed on `develop` ([#2402](https://github.com/4shark/integrator/pull/2402), merged 2026-09-10).** `ParentUpdate` (step 14) produces `Hierarchy` resources but its six workers persisted and read their collection pages in `job.user_collections` instead of `job.hierarchy_collections` — asymmetric with the actual `Hierarchy` stream (step 2), which already uses `hierarchy_collections`. Collection stores are STI (`UserCollection store_in :user_collections`, `HierarchyCollection store_in :hierarchy_collections`), so the change-of-manager history landed in the wrong Mongo store. **The integration was never wrong** — readers scope by `stream_id`, so the misplaced pages were never cross-read — but the hierarchy-change history was unqueryable in its own store (`hierarchy_collections` held 0 rows; `user_collections` held all 40 including the 11 ParentUpdate pages). The fix swaps `user_collections` → `hierarchy_collections` on the six workers (`database_collection_extractor_consumer:19`, `api_collection_extractor_consumer:32`, `enrichment_extractor_producer:12`, `normalized_collection_consumer:9`, `custom_collection_consumer:9`, `transformer_consumer:9`), byte-identical to the Hierarchy siblings. **The same bug is present on `master`** under the `managed_*` worker names (the prod `database.connect` path), so 9.0.0 carries the fix to production. The brakeman `File Access` false positives on the two edited extractors were re-fingerprinted in `config/brakeman.ignore` (the fingerprint tracks the rendered `code` string, which the rename changed).
 - The parity checklist, executed against the Phase 3 job and, for the production reference, the last `master` job of `atento-mx` (production MongoDB, read-only console via `bin/ecs run atento-mx`):
 
 | Behavior on `master` | Where it lives on `develop` | Check |
@@ -254,37 +254,37 @@ puts "collections this job: #{Collection.where(job_id: current_job.id).count}"
 **Success criteria:**
 
 - [x] Consistency study: 50/50 resources = collection + enrichment (enrichment_ok 56/56), 0 problems; 200/200 users with `parent_id` carry the full 16-key parent row, `parent['id'] == parent_id`, 0 problems — the develop version is functional for the normalized base
-- [x] Store defect fixed on `develop` and merged (#2402, `ae38e4c2` on develop); brakeman green; the same defect confirmed present on `master` under the `managed_*` workers, so 8.5.0 carries the fix to production
+- [x] Store defect fixed on `develop` and merged (#2402, `ae38e4c2` on develop); brakeman green; the same defect confirmed present on `master` under the `managed_*` workers, so 9.0.0 carries the fix to production
 - [ ] Every row of the parity table checked and recorded in this directory (a `PARITY.md` or a section appended here)
 - [ ] Incremental run: boundary string equals master's semantics; zero duplicated, zero skipped rows at the boundary
 - [ ] Gate 6.6 of the unified-flow plan marked done with the decision recorded: `source.timezone = 'UTC'`, seeded by the bootstrap (#2365)
 
-### Phase 5 — Release 8.5.0 (target: 2026-09-10)
+### Phase 5 — Release 9.0.0 (target: 2026-09-10)
 
 **Objective:** `develop` reaches `master` as one release, with the schema artifacts versioned.
 
 **Components:**
 
-- **Pre-release analysis — two coupled storage changes ship in 8.5.0 and must be reasoned about together.** Both change *where collection data lives*, so their combined in-flight/migration effect is one analysis, not two:
+- **Pre-release analysis — two coupled storage changes ship in 9.0.0 and must be reasoned about together.** Both change *where collection data lives*, so their combined in-flight/migration effect is one analysis, not two:
   - **S3 store-prefix rename** ([#2401](https://github.com/4shark/integrator/pull/2401)) — CarrierWave `store_dir` moved off `jobs/`: collection payloads now write to `collections/<job_id>/<resource>/`, enrichment payloads to `enrichments/<job_id>/`. Existing `jobs/...` objects are relocated per productive bucket in Phase 6 (they are permanent evidence, never dropped).
   - **ParentUpdate Mongo store fix** ([#2402](https://github.com/4shark/integrator/pull/2402)) — ParentUpdate collection pages moved from `user_collections` to `hierarchy_collections`.
-  - **The combined rollout constraint (the in-flight window):** a `Job` that ran its ParentUpdate extract under `master`/old code wrote pages to `user_collections` (Mongo) and to `jobs/` (S3); the same job resuming a later stage under 8.5.0 reads `hierarchy_collections` / `collections/` and finds nothing — a **silent page skip**, not an error. Neither change is a code defect; both are safe only if **no job straddles the deploy**. So every productive deploy in Phase 6 lands with the integrator's queue drained and outside its processing window (already the rollout unit), and a run that was interrupted mid-flight is re-run from the extractor rather than resumed. This is a deploy-strategy decision (`DEPLOYMENT-STRATEGY.md`: the enqueued-job contract changed — the store a stage reads changed — so the safe shape is a drained window, which the per-integrator rollout already is), surfaced for the engineer at release time.
-- `bash ~/.claude/scripts/hubflow.sh --dir /Users/plribeiro3000/Projects/4Shark/integrator release start 8.5.0` (main working tree, `develop` synced first)
-- On the release branch, one commit `chore(release): 8.5.0`: `config/version.rb` → `8.5.0`; `CHANGELOG.md` `[Unreleased]` → `## [8.5.0] - 2026-09-10`; schema artifacts renamed from `UNRELEASED` to their next versions (F8, `README.md` §2.2 — the engineer decides `3.1` vs `3.0-p2` per SGBD) with the matching `[MSSQL] version …` / `[MSSQL Prefixed] version …` / `[PGSQL Prefixed] version …` changelog entries
-- Push with explicit refspec, PR against `master` titled `[8.5.0] - 2026-09-10` with the changelog section as body; `pr-review` runs on it
-- After the merge: `hubflow.sh --dir … release finish 8.5.0` (tag `v8.5.0`, back-merge into `develop`); `build.yaml` on the push to `master` builds the seven productive images
+  - **The combined rollout constraint (the in-flight window):** a `Job` that ran its ParentUpdate extract under `master`/old code wrote pages to `user_collections` (Mongo) and to `jobs/` (S3); the same job resuming a later stage under 9.0.0 reads `hierarchy_collections` / `collections/` and finds nothing — a **silent page skip**, not an error. Neither change is a code defect; both are safe only if **no job straddles the deploy**. So every productive deploy in Phase 6 lands with the integrator's queue drained and outside its processing window (already the rollout unit), and a run that was interrupted mid-flight is re-run from the extractor rather than resumed. This is a deploy-strategy decision (`DEPLOYMENT-STRATEGY.md`: the enqueued-job contract changed — the store a stage reads changed — so the safe shape is a drained window, which the per-integrator rollout already is), surfaced for the engineer at release time.
+- `bash ~/.claude/scripts/hubflow.sh --dir /Users/plribeiro3000/Projects/4Shark/integrator release start 9.0.0` (main working tree, `develop` synced first)
+- On the release branch, one commit `chore(release): 9.0.0`: `config/version.rb` → `9.0.0`; `CHANGELOG.md` `[Unreleased]` → `## [9.0.0] - 2026-09-10`; schema artifacts renamed from `UNRELEASED` to their next versions (F8, `README.md` §2.2 — the engineer decides `3.1` vs `3.0-p2` per SGBD) with the matching `[MSSQL] version …` / `[MSSQL Prefixed] version …` / `[PGSQL Prefixed] version …` changelog entries
+- Push with explicit refspec, PR against `master` titled `[9.0.0] - 2026-09-10` with the changelog section as body; `pr-review` runs on it
+- After the merge: `hubflow.sh --dir … release finish 9.0.0` (tag `v9.0.0`, back-merge into `develop`); `build.yaml` on the push to `master` builds the seven productive images
 
 **Dependencies:** Phase 4 signed off by the engineer.
 
 **Success criteria:**
 
-- [ ] `v8.5.0` tag on the `chore(release)` commit; `master == origin/master`, `develop == origin/develop`
-- [ ] Seven productive ECR repositories carry `:latest = 8.5.0-<master sha>`
+- [ ] `v9.0.0` tag on the `chore(release)` commit; `master == origin/master`, `develop == origin/develop`
+- [ ] Seven productive ECR repositories carry `:latest = 9.0.0-<master sha>`
 - [ ] The versioned schema migration files are ready to send to each customer's DBA
 
 ### Phase 6 — Productive rollout, one integrator at a time (target: 2026-09-10 → 2026-09-12)
 
-**Objective:** every productive integrator runs 8.5.0 with its configuration bootstrapped before its next processing window.
+**Objective:** every productive integrator runs 9.0.0 with its configuration bootstrapped before its next processing window.
 
 **Components:**
 
@@ -294,16 +294,18 @@ puts "collections this job: #{Collection.where(job_id: current_job.id).count}"
 | Step | Command | Note |
 |---|---|---|
 | 1. MongoDB up | `gh workflow run startup.yaml -R 4shark/integrator -f integrator=<slug>` | Only where the nodes sleep between windows (the deploy preflight refuses otherwise) |
-| 2. Deploy | `gh workflow run deploy.yaml -R 4shark/integrator --ref master -f integrator=<slug>` | Migrate step creates the Mongoid indexes; runner task definition re-registered with 8.5.0 |
-| 3. Encryption key shape | `aws ssm get-parameter --name /integrator-<slug>/SYMMETRIC_ENCRYPTION_KEY --with-decryption --query Parameter.Value --output text --region sa-east-1 --profile engineer-elevated > /tmp/aws_ssm_symmetric_key_<slug>.txt 2>&1` then `wc -c` (33 = correct; 65 = the hexadecimal shape that breaks the bootstrap) | Every deployment whose key measures 64 characters (IV 32) gets the two `put-parameter` rewrites of Phase 2 with its own name and its stack's KMS alias BEFORE step 4; delete the local file afterwards. Verified on `atento-mx` 2026-09-04: 64/32, so the rewrite is needed there |
-| 4. Bootstrap | `bin/ecs run <slug> "bundle exec rake integration:normalized:bootstrap"` | Reads the stack's `CLIENT_*` variables once; idempotent |
-| 5. Verify | The Phase 2 verification script on `bin/ecs run <slug>` | Source, 28 streams, `Account.primary`, `connect!` |
-| 6. MongoDB down | `gh workflow run shutdown.yaml -R 4shark/integrator -f integrator=<slug>` | Only where step 1 ran |
-| 7. Next window | Report email received; `Job` finished; services back at 0/0 | The learning step before the next integrator |
+| 2. Capture the API token | On `bin/ecs run <slug>`: read `Account.primary.api_token` and keep the value | 9.0.0 stores `api_token` encrypted (it was plain text); after the deploy the new code reads the encrypted field and the old plain value is unreachable, so capture it first. If this is skipped it is not lost — the same token lives in the 4Shark account and can be read from there; capturing beforehand is only the easier path |
+| 3. Deploy | `gh workflow run deploy.yaml -R 4shark/integrator --ref master -f integrator=<slug>` | Migrate step creates the Mongoid indexes; runner task definition re-registered with 9.0.0 |
+| 4. Encryption key shape | `aws ssm get-parameter --name /integrator-<slug>/SYMMETRIC_ENCRYPTION_KEY --with-decryption --query Parameter.Value --output text --region sa-east-1 --profile engineer-elevated > /tmp/aws_ssm_symmetric_key_<slug>.txt 2>&1` then `wc -c` (33 = correct; 65 = the hexadecimal shape that breaks the bootstrap) | Every deployment whose key measures 64 characters (IV 32) gets the two `put-parameter` rewrites of Phase 2 with its own name and its stack's KMS alias BEFORE step 5; delete the local file afterwards. Verified on `atento-mx` 2026-09-04: 64/32, so the rewrite is needed there |
+| 5. Bootstrap | `bin/ecs run <slug> "bundle exec rake integration:normalized:bootstrap"` | Reads the stack's `CLIENT_*` variables once; idempotent |
+| 6. Re-set the API token | On `bin/ecs run <slug>`: set `Account.primary.api_token` to the value captured in step 2 and save | Writes it back through the encrypted accessor so it is stored as ciphertext. The encryption key must already be the correct shape (step 4). The token is typed in the console, never pasted into a chat |
+| 7. Verify | The Phase 2 verification script on `bin/ecs run <slug>` | Source, 28 streams, `Account.primary` with a present `api_token`, `connect!` |
+| 8. MongoDB down | `gh workflow run shutdown.yaml -R 4shark/integrator -f integrator=<slug>` | Only where step 1 ran |
+| 9. Next window | Report email received; `Job` finished; services back at 0/0 | The learning step before the next integrator |
 
 - Order: the ladder is a learning progression (`ZERO-DOWNTIME-POLICY.md` § 2). Proposed: `atento-cl` (the Atento shape already validated on MX staging, smallest window impact) → `atento-co` → `atento-mx` → `atento-br` → `maqnelson` → `almaviva` → `commcenter`. The engineer settles the order by each client's volume and contract.
 - The `<slug>` values are the productive keys of the `INTEGRATORS` variable: `almaviva`, `atento-br`, `atento-cl`, `atento-co`, `atento-mx`, `commcenter`, `maqnelson`.
-- S3 store-prefix rename per productive bucket (`4shark-integrator-<slug>`), paired with the deploy. Release 8.5.0 (PR #2401) moved the CarrierWave `store_dir` off `jobs/`: collection payloads now write to `collections/<job_id>/<resource>/` and enrichment payloads to `enrichments/<job_id>/`. Existing objects stay at their old `jobs/...` paths; `Collection` and `Enrichment` raw bodies are permanent evidence (never deleted — the proof of what the source returned when an integration is disputed), so the old objects are RELOCATED to the new prefixes, never dropped. Two distinct moves, because the split is not one prefix:
+- S3 store-prefix rename per productive bucket (`4shark-integrator-<slug>`), paired with the deploy. Release 9.0.0 (PR #2401) moved the CarrierWave `store_dir` off `jobs/`: collection payloads now write to `collections/<job_id>/<resource>/` and enrichment payloads to `enrichments/<job_id>/`. Existing objects stay at their old `jobs/...` paths; `Collection` and `Enrichment` raw bodies are permanent evidence (never deleted — the proof of what the source returned when an integration is disputed), so the old objects are RELOCATED to the new prefixes, never dropped. Two distinct moves, because the split is not one prefix:
   - collections — clean recursive rename: `aws s3 mv s3://4shark-integrator-<slug>/jobs/ s3://4shark-integrator-<slug>/collections/ --recursive --profile engineer-elevated`.
   - enrichments — NOT a one-liner: `enrichment` is a mid-path segment under each `<job_id>` (`jobs/<job_id>/enrichment/...`), so the flat `jobs/`→`collections/` mv above would misfile it as `collections/<job_id>/enrichment/`. This subset needs a per-`job_id` scripted move (enumerate the `jobs/` job-id prefixes, move each one's `enrichment/` to `enrichments/<job_id>/`) run BEFORE the collections rename so the flat rename cannot swallow it.
   - Not a correctness gate for the run: raw bodies are read only within their own job, which has long finished, so this is evidence-consistency housekeeping. Staging (`atento-mx-staging`) needs nothing — its bucket was emptied 2026-09-10.
@@ -331,7 +333,7 @@ puts "collections this job: #{Collection.where(job_id: current_job.id).count}"
 | Source timezone for every bootstrapped deployment | `UTC`, seeded by the bootstrap itself (#2365); no environment variable | `master` rendered the fetch boundary as a UTC string; the harvester and the schema procedures write UTC; `UTC` is the only value with zero behavior change (`ANALYSIS.md` F3) |
 | Staging report recipient | `relatorio-integracao@4shark.com.br` | The mailbox the code already uses for internal notifications (`INTERNAL_MAILER_TO` default); one internal address for every report during the test |
 | First staging run | `SKIP_THROUGHPUT=true` | No job history → ceiling is `MINIMUM_THROUGHPUT`; a full first load exceeds it and would stop at `HighThroughputReport` (F7). The second run proves the guard |
-| Release version | `8.5.0` | `[Unreleased]` carries Added entries → minor |
+| Release version | `9.0.0` | The unified integration flow breaks every API contract; the behavior changed completely → major |
 | Rollout unit | Deploy + bootstrap per integrator, outside its window | A deploy without the bootstrap makes the next cron send `MissingStreamsReport` and skip the night |
 | Fix shape for `Stream.none?` | Local `streams_count = Stream.count` | `Style/CollectionQuerying` rewrites an inline `.count.zero?` into the `none?` that does not exist on a Mongoid model class (`../integrator/develop-image-incident/ANALYSIS.md:54`) |
 | Fix shape for the bootstrap warm-up seed | `source.warm_up = false if source.warm_up.nil?` | The flag lives on the document; a deliberate `true` is set by hand and survives re-runs |
@@ -350,7 +352,7 @@ puts "collections this job: #{Collection.where(job_id: current_job.id).count}"
 | The self-populated bases (Almaviva, Commcenter, Maqnelson) behave differently from the harvester-fed ones | Medium | Parity in the boundary string is exact for any zone the customer writes (F3); `commcenter-staging` is the optional rehearsal in Phase 4 |
 | `terraform release/3.0.0` still open when the staging change is applied | Low | The change is a feature branch off `develop`, applied on its own; the release back-merge picks it up |
 | A productive deployment's `SYMMETRIC_ENCRYPTION_KEY` / `IV` still carry the 64/32-character hexadecimal shape when its bootstrap runs | High — the bootstrap aborts at the authentication step and the next window sends `MissingStreamsReport` | Phase 6 step 3 measures the length before every bootstrap and rewrites the pair when it is wrong; nothing encrypted depends on the old values, because encryption never succeeded with them |
-| A job straddles the 8.5.0 deploy — its ParentUpdate extract ran under old code (pages in `user_collections` / `jobs/`), a later stage resumes under 8.5.0 and reads `hierarchy_collections` / `collections/` | Medium — silent page skip (no error), incomplete hierarchy-change history for that job | Deploy each integrator with its queue drained and outside its window (the rollout unit already does this); re-run an interrupted job from the extractor, never resume it across the deploy (Phase 5 pre-release analysis) |
+| A job straddles the 9.0.0 deploy — its ParentUpdate extract ran under old code (pages in `user_collections` / `jobs/`), a later stage resumes under 9.0.0 and reads `hierarchy_collections` / `collections/` | Medium — silent page skip (no error), incomplete hierarchy-change history for that job | Deploy each integrator with its queue drained and outside its window (the rollout unit already does this); re-run an interrupted job from the extractor, never resume it across the deploy (Phase 5 pre-release analysis) |
 
 ## Assumptions
 
