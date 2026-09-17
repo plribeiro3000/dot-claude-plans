@@ -1,0 +1,55 @@
+Source: https://code.claude.com/docs/en/scheduled-tasks
+Fetched: 2026-09-16 (raw HTML stripped to text; quotes below verified against the raw
+download with `grep -o` before inclusion in SPIKE.md)
+Scope: excerpt covering /loop dynamic mode, ScheduleWakeup semantics, the Monitor
+cross-reference, and "No Foreground Sleeps".
+
+=== Let Claude choose the interval ===
+
+When you omit the interval, Claude chooses one dynamically instead of running on a fixed
+cron schedule. After each iteration it picks a delay between one minute and one hour based
+on what it observed: short waits while a build is finishing or a PR is active, longer
+waits when nothing is pending. The chosen delay and the reason for it are printed at the
+end of each iteration.
+
+The example below checks CI and review comments, with Claude waiting longer between
+iterations once the PR goes quiet:
+
+  /loop check whether CI passed and address any review comments
+
+In a session where the Monitor tool is available, Claude may use it directly when you ask
+for a dynamic /loop schedule. Monitor runs a background script and streams each output
+line back, which avoids polling altogether and is often more token-efficient and
+responsive than re-running a prompt on an interval.
+
+A dynamically scheduled loop appears in your scheduled task list like any other task, so
+you can list or cancel it the same way. The jitter rules don't apply to it, but the
+seven-day expiry does.
+
+=== Stop a loop ===
+
+To stop a self-paced /loop while it is waiting for the next iteration, press Esc. This
+clears the pending wakeup so the loop does not fire again. Tasks you scheduled by asking
+Claude directly are not affected by Esc and stay in place until you delete them.
+
+In self-paced mode, Claude can also end the loop on its own once the task is complete.
+Claude calls the ScheduleWakeup tool with stop: true, which cancels the pending wakeup
+immediately. If an iteration ends without either rescheduling or stopping, Claude Code
+schedules one fallback wakeup about 20 minutes later and ends the loop when that iteration
+doesn't reschedule either.
+
+Loops on a fixed interval keep running until you cancel them like any other scheduled task
+or seven days elapse.
+
+=== Reading notes (added for this spike, not part of the source) ===
+
+- This is the ONLY place in the two official pages fetched for this spike where Monitor is
+  explicitly framed as the preferred alternative to ScheduleWakeup/`/loop` polling ("avoids
+  polling altogether ... more token-efficient and responsive than re-running a prompt on an
+  interval"). It appears as a cross-reference inside the ScheduleWakeup/`/loop` doc, not
+  inside Monitor's own doc (doc_1) — so a reader who only reads the Monitor tool's own
+  section never sees this comparison stated.
+- Nothing on this page, or on doc_1, names a single blocking-watch CLI command (`gh run
+  watch`, `aws ecs wait`, `kubectl wait`, etc.) as a worked example for Monitor's `command`
+  field. Both pages describe MECHANICS (stdout-line-is-event, ends-on-exit, delay
+  clamping) but neither supplies a CATALOG of commands that satisfy those mechanics well.

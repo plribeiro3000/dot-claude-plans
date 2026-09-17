@@ -1,0 +1,145 @@
+=== Part A: openai/codex issue #29922 ===
+Source: https://github.com/openai/codex/issues/29922
+Fetched: 2026-09-16 via `gh issue view 29922 -R openai/codex` (verbatim issue body — a
+CROSS-VENDOR community feature request, not Anthropic/Claude Code material; included for
+Section 4, community/cross-vendor sentiment)
+Title: Feature: an agent-callable `monitor` tool that wakes Codex on background events
+(logs, files, builds, CI) without polling
+
+--- Load-bearing excerpt ---
+
+Codex is turn-driven, so between turns it sits idle and cannot react to anything happening
+in the background. When I want the agent to notice that a build finished, that a log just
+printed an error, that a file changed, or that a CI run flipped state, I have two options
+today and both are bad.
+
+Polling is the expensive one. openai/codex#13733 traced where the cost comes from: each
+background status check runs a full turn that re-sends the entire conversation history, so
+a long `cargo build` watched in a poll loop costs tokens proportional to history size times
+poll count while no real work happens. Blocking the turn is worse for anything that never
+exits on its own, like a file watcher.
+
+What is missing is a way for the agent to start watching something, go fully idle, and be
+woken only when the thing it cares about actually emits an event.
+
+## The proposal
+
+Add an agent-callable `monitor` tool. The model starts a watch on an ordinary shell
+command, and each line that command prints (stdout or stderr) is delivered back as a
+notification that wakes the idle session and begins a new turn. The watch keeps running in
+the background until the command exits or the model stops it.
+
+This is the shape Claude Code ships as its `Monitor` tool. The command is the watcher, the
+lines it prints are the wake events, and the model filters to what it cares about (for
+example `tail -F app.log | grep --line-buffered ERROR`; pipe-filtering a tool that writes
+to stderr needs `2>&1` first, though the watch wakes on stderr either way). While the watch
+is quiet the session makes no API calls and spends no tokens, the property
+openai/codex#28144 asks for directly.
+
+## Use cases
+
+The ones a config-declared source cannot express, because the model decides them mid-task:
+
+* Watch this file while I work on that one: `fswatch <path>` or `inotifywait -m <path>` to
+  react to an edit or a new file during a refactor, instead of re-reading on a timer.
+* Watch the build I just started: go idle, wake when it finishes or prints an error,
+  without blocking other work.
+* Watch this log for the failure I expect: `tail -F <log> | grep --line-buffered <pattern>`
+  to wake on the first matching line.
+* Watch this CI run: a short poll loop as the watched command, so the agent is woken when
+  the run flips state.
+
+## The tool the model sees (the author's OWN proposed schema for Codex, explicitly modeled
+on / citing Claude Code's Monitor — NOT a verbatim copy of Claude Code's actual schema)
+
+  name: "monitor"
+  description: "Run a shell command as a long-lived background watcher. Each line the
+    command prints (stdout or stderr) is delivered to you as a notification, prefixed
+    with the label; lines emitted close together are batched. The watch ends when the
+    command exits. Use it to react to events without polling: `fswatch <path>` or
+    `inotifywait -m <path>` for file changes, `tail -F <log> | grep --line-buffered
+    <pattern>` for log signals, or a poll loop for remote state. action=start begins a
+    watch and returns its id; action=stop ends the watch with that id; action=list
+    shows active watches."
+
+## Real-world verification (author's own reference implementation, run against Codex)
+
+Real-world, in production Codex: I built from source and ran it in both the CLI and the
+Desktop app with a live model. The agent calls `monitor(action=start,
+command="fswatch <folder>", description="...")`, finishes its turn, and the session goes
+idle making no API calls. Touching a file in that folder wakes it on its own and it
+reports the change.
+
+--- Reading notes (added for this spike) ---
+
+- IMPORTANT ATTRIBUTION NOTE: the "tool the model sees" schema block above is the CODEX
+  issue author's OWN proposed tool description for a NEW tool they built for Codex,
+  explicitly citing Claude Code's Monitor as the design they are copying ("This is the
+  shape Claude Code ships as its `Monitor` tool"). It must NOT be cited as Claude Code's
+  actual, current Monitor tool description — this spike does not have primary-source
+  access to that exact schema text. It IS legitimate evidence of (a) cross-vendor
+  recognition that the blocking-watch-inside-Monitor shape is the right design, and (b) an
+  independent engineer's own worked example explicitly ranking "a poll loop for remote
+  state" LAST, after native commands like `fswatch`/`inotifywait`/`tail | grep` — which
+  matches this spike's recommended decision rule (Finding 5), arrived at independently.
+- Sets up a genuine engineering comparison: `openai/codex#13733` traced that each polling
+  turn "re-sends the entire conversation history", making token cost = history_size ×
+  poll_count. This is a general cost argument for blocking-watch-over-polling that applies
+  to any agent harness with this turn structure, not just Claude Code.
+
+=== Part B: claude-world.com tutorial, "Scheduled Autonomy: Loops, Wakeups & Cron" ===
+Source: https://claude-world.com/tutorials/s31-scheduled-autonomy/
+Fetched: 2026-09-16 (full page downloaded and HTML-stripped; NOT an Anthropic source — a
+third-party paid-course/tutorial site, "ClaudeWorld", published 2026-07-08, covering what
+it calls "the Fable 5 era". Treated with caution: several details in it (CronCreate/
+CronList/CronDelete tool names, jitter rules, seven-day expiry) DO match the official
+docs fetched for doc_2, which is reassuring, but the site's own framing/narrative
+("Fable 5 era", cost regimes named "WARM ZONE"/"CLIFF"/"DEAD ZONE") is the site's own
+editorial content, not verified against any Anthropic source, and is flagged as such
+wherever used in SPIKE.md.
+
+--- Verified-elsewhere-consistent excerpts (cross-checked against doc_2, which confirms
+the "between one minute and one hour" delay range and the dynamic-interval mechanism) ---
+
+"delaySeconds — clamped to the range [60, 3600]. Ask for 10 seconds, you get 60. Ask for
+two hours, you get 3600. The floor stops runaway tight-looping; the ceiling guarantees the
+loop checks in at least hourly."
+
+"Poll External State — Never Harness-Tracked Work
+
+The second discipline: know what deserves polling at all.
+
+Work the harness itself tracks — background Bash commands, spawned agents, running
+workflows — re-invokes the agent automatically when it finishes. Polling it is pure waste:
+the harness would have told you anyway. The only wakeup worth scheduling against
+harness-tracked work is a long fallback, a single distant check in case something hangs.
+
+What deserves polling is external state: CI runs, deploy rollouts, remote queues — things
+that change outside the harness's view. Match the delay to how fast that state changes: an
+eight-minute pipeline doesn't need a 60-second poll; a queue that drains hourly doesn't
+need a five-minute one."
+
+"No Foreground Sleeps
+
+Two supporting rules complete the picture:
+
+Foreground sleeps are blocked. You can't park a turn on sleep 480. To wait on a condition,
+use the Monitor tool — an until-loop over a status — instead of blocking the session."
+
+--- Reading notes (added for this spike) ---
+
+- The site's own characterization of Monitor as "an until-loop over a status" is NOT how
+  the official docs (doc_1) describe it — the official text frames Monitor around an
+  arbitrary background SCRIPT whose stdout lines become events ("Track output from any
+  long-running script you point it at"), with no requirement that the script be an
+  until-loop. This is either loose paraphrasing by the tutorial site, or it reflects the
+  site author independently converging on the same "Monitor commonly wraps an until-loop"
+  observation the two GitHub issues (doc_3, doc_4) report — worth flagging as a THIRD,
+  independent source describing the same shape, though the least authoritative of the
+  three.
+- This is the clearest available (though unofficial) statement of the "match the delay to
+  how fast that state changes" principle applied to POLLING generally, and it names the
+  correct discriminator (harness-tracked work vs. external state) that doc_4/#94178's
+  reporter also independently names. Cited in SPIKE.md as corroborating, third-party,
+  unverified-against-primary-source content — not as an authoritative claim about Claude
+  Code's actual behavior.

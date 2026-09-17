@@ -255,6 +255,18 @@ The source structure is delivered and verified against the live base (2026-09-14
 4. **Configure the VKPI source.** Create the non-normalized `DatabaseSource` (VKPI host, `normalized: false`, `resources: ['Modifier']`) plus the `Modifier` `Stream` with the query drafts above, the five `AttributeMapping`s (§ The mapping), and the availability probe.
 5. **Run and test.** `integration:start`; the `Modifier` stream extracts, transforms and builds one API request per record; validate that the indicators land in the backend for a known set of people and reconcile against the source for one period.
 
+**End-to-end integration is achieved and validated on `atento-co-staging`.** A full run — source fetch → Modifier transform → per-record API load — completes cleanly and the indicators reach the backend. The build-and-configure work of steps 1–5 is done; the engagement now moves from "does it run" to "is the data right and is it fast enough". That is the phase below.
+
+## Data validation and performance (current phase)
+
+The end-to-end path works, so the open work is three parallel workstreams on the data it produces and the speed it runs at. None of these is a source-structure gap — those are closed (§ the score-stream and catalogue-key sections above); these are about the result of the run.
+
+**Data correctness — did the values land the way they were expected to.** Reconcile the loaded indicators against the source for full periods, not just a known sample: every `RESULTADO` in the score table resolves to a backend Modifier for the right person, period, programa and indicator, with the value intact. The score→catalogue join (`score.NR_ID = catalogue.NR_ID`, key in `NM_INDICADOR_EN_EL_PAIS`) carries the Variable key, so a mismatch there surfaces as a wrong or missing Variable. The supervisor path is the one to watch — the sample carried no supervisor rows, so the first real load is where the per-operation `NR_ID` split gets confirmed rather than reasoned about.
+
+**Flow errors — surface and classify every failed request.** A run reports `successful_requests_quantity` / `failed_requests_quantity` on the Job; any non-2xx is audited through the embedded `Imports → Requests` trail (response status + body) the way `/integration-debug` does. The two failure classes seen earlier in this integration are the ones to rule out first: a subsidiary-mode mismatch (HTTP 400 "Use subsidiary scoped api" — the CO company must stay in root mode, `SUBSIDIARIES_MODULE=false`) and an `Account.api_token` decrypt failure. A clean run is zero failed requests, not "mostly 2xx".
+
+**Performance — the CPU-bound worker on a fractional vCPU.** The heavy phase is the VKPI Modifier compute, which is CPU-bound and runs on a `0.5 vCPU` worker under the Ruby GIL, so the run is bounded by CPU, not by memory or the send phase. The first performance lever is the Sidekiq thread count: reduced from 30 to 10 (terraform PR #1171, applied and merged 2026-09-16) because Sidekiq's own guidance reads a pegged-100% CPU as the signal to *lower* concurrency, not raise it. The measurement of whether 10 threads shortens the run against the 30-thread baseline, plus the oversubscription/throttling detail, lives in `../integrator-co-staging-thread-tuning/ANALYSIS.md`.
+
 ## Risks
 
 **The access request never being made is the risk closest to the calendar.** Network reachability from the integrator to `COLBOGSQL58` and a read-only database user are not database structure, so they are absent from both the script and the roadmap; nothing Atento holds tells them to prepare either, and without both the 17-sep start does not happen.

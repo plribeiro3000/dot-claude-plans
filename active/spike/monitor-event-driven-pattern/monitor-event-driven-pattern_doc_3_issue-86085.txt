@@ -1,0 +1,126 @@
+Source: https://github.com/anthropics/claude-code/issues/86085
+Fetched: 2026-09-16 via `gh issue view 86085 -R anthropics/claude-code` (verbatim issue
+body, community bug report — NOT an Anthropic-authored document; the block-message text
+quoted inside it is the REPORTER's transcription of what they observed the harness print,
+not something this spike independently reproduced)
+Title: Subagent lifecycle mishandles long external waits: sleep-block guidance prescribes
+Monitor, 'completed' fires with live Monitor children, terminal events dropped
+Environment stated in the issue: Claude Code CLI, observed 2026-08-11
+
+=== Full issue body ===
+
+## Summary
+
+Three interacting defects in how Claude Code handles a subagent ("sub-task"/background
+agent spawned by a parent session) that needs to wait on a long-running external condition
+(in our case, GitHub Actions CI checks that can run past 10 minutes). Individually each
+behavior might be defensible; together they make it structurally impossible for a subagent
+to correctly wait on anything that outlives a single tool call, while giving the agent no
+signal that this is what happened. We hit this six times in one session, at a cost of
+roughly 1.2M wasted subagent tokens, and it produced one near-miss where an agent's un-run
+final step was a message to a human teammate that would have prevented him from wasting
+his own time.
+
+**Environment:** Claude Code CLI, observed 2026-08-11. Agents are dispatched as
+subagents/sub-tasks of a parent (orchestrator) session and report status back to it via
+task notifications (`<task-notification>` events carrying a `status` field).
+
+## Defect 1 — the blocked-command error message prescribes an unsafe-for-subagents pattern
+
+When a subagent runs a command shaped like a manual wait loop — e.g. `sleep 90;
+<check-something>`, or a `for`-loop of short sleeps — the harness blocks it with a
+tool-use error resembling:
+
+```
+Blocked: sleep 90 followed by: <command> ...
+To wait for a condition, use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`)
+— you get a notification when the loop exits. Do not chain shorter sleeps to work around this
+block.
+```
+
+This is good advice **for the persistent parent/orchestrator session**, where a `Monitor`
+can run across turns and its events are delivered directly to the session that armed it.
+It is actively harmful advice **inside a subagent**, because of Defects 2 and 3 below: a
+subagent that follows this exact instruction ends up idle-armed, gets reported to its
+parent as `completed`, and can miss its own monitor's terminal event. The error message
+has no way to know it's running inside a subagent, but the prescribed remedy is only safe
+in one of the two contexts it can fire in.
+
+**Minimal repro shape:** dispatch a subagent with a task that includes a genuine
+long-running external wait (anything exceeding the ~10-minute background-command cap).
+Have it attempt an inline polling loop; observe the block; have it follow the suggested
+remedy (arm a `Monitor`, end the turn). Proceed to Defects 2–3.
+
+## Defect 2 — `status: completed` is reported to the parent while the subagent has a live
+Monitor child
+
+Observed directly in transcripts: for a single subagent, three separate task
+notifications arrived at the parent session with `<status>completed</status>` (at three
+different timestamps roughly a minute apart), each occurring immediately after the
+subagent ended a turn with plain text (e.g. "Holding for the monitor.") while its own
+armed `Monitor` was still running and had not yet fired.
+
+The parent session has no way to distinguish "this subagent is genuinely finished" from
+"this subagent is idle-armed, correctly waiting on its own live child, and will resume
+when that child's event lands." Both produce the exact same `completed` status and a calm,
+plausible-sounding text summary. In our environment this is dangerous specifically because
+the standing operating convention is "never leave a subagent open-endedly waiting" — so a
+`completed` status is trusted as "nothing more will happen here," and a parent that trusts
+it will either re-dispatch fresh work (orphaning the live monitor) or simply move on,
+silently dropping whatever the subagent still intended to do once woken.
+
+We also confirmed the converse false-positive: a subagent that is legitimately still
+working — blocked on its own delegated sub-agent rather than a Monitor — produces what
+looks like the same "went idle" signal to an outside observer polling for progress. We did
+not fully isolate whether this is the identical code path as the `completed`-with-live-
+Monitor case, but the symptom (a task that looks finished/idle while genuinely still
+working) recurred in two different shapes in the same session, which suggests a general
+lifecycle-signaling gap around "the agent is idle but not done," not one localized bug.
+
+**Impact:** a status field the parent is meant to trust ("completed") is asserted while
+the condition it implies (no more work will happen from this agent) is false. This is the
+crux of the whole report — everything else follows from it.
+
+## Defect 3 — a Monitor's terminal event can be dropped after its subagent is marked
+completed
+
+In one traced case, the subagent's own `Monitor` correctly detected the awaited condition
+(a CI check reaching a terminal conclusion state) and emitted its terminal event roughly
+two minutes AFTER the subagent's last turn (the one that produced the `completed` status
+in Defect 2). Nothing woke as a result. The event was not delivered to the parent, and the
+subagent was not resumed. The only reason this was caught at all was that a human operator
+was manually polling the underlying external system (GitHub) in parallel and noticed the
+discrepancy.
+
+[... impact/workaround sections omitted from this excerpt; not needed for this spike's
+claims. Full issue available at the URL above if needed.]
+
+## Suggested areas to investigate
+
+1. Whether `status: completed` can be deferred, or reported as a distinct state (e.g.
+   `idle-with-live-children`), whenever a subagent ends its turn with at least one
+   still-running background construct (Monitor, background command) that it itself armed.
+2. Whether the blocked-command error message can detect that it's firing inside a subagent
+   context and either omit the Monitor suggestion or add an explicit caveat that Monitor is
+   parent-session-safe only.
+3. Whether the Monitor-event-to-subagent delivery path has a race with the completion-
+   reporting path — specifically, whether an event that fires after a `completed` status
+   has already been sent can be silently lost rather than either delivered or explicitly
+   reported as dropped.
+
+Closing for now — inactive for too long. Please open a new issue if this is still relevant.
+
+=== Reading notes (added for this spike, not part of the source) ===
+
+- The load-bearing sentence for this spike's root-cause finding is the reporter's quoted
+  block message: "use Monitor with an until-loop (e.g. `until <check>; do sleep 2; done`)".
+  If the Claude Code harness's own sleep-block error text genuinely offers this as its
+  worked example (rather than pointing at a native blocking primitive), that is a strong,
+  independent, verifiable-in-principle candidate root cause for why an agent reaches for a
+  hand-rolled sleep-poll loop instead of `gh run watch` — it would be following the exact
+  shape the harness itself demonstrates when it blocks the plainer `sleep 90` form.
+- This spike did NOT reproduce the block message directly (no access to trigger a blocked
+  Bash sleep in this environment) — so this is reported, second-hand evidence about
+  internal harness text, not independently verified. It corroborates, and is corroborated
+  by, doc_4 (issue #94178) which quotes a similar shape from a different session five weeks
+  later, on a different platform (Windows vs. this issue's unstated platform) — see doc_4.

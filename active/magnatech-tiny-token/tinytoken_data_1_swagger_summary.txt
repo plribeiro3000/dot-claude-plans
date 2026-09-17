@@ -1,0 +1,46 @@
+Olist ERP API v3 — OpenAPI spec fetched from https://erp.tiny.com.br/public-api/v3/swagger/swagger.json
+Fetched: 2026-09-16
+openapi version: 3.0.0
+title: Olist ERP API v3
+total paths: 129
+
+securitySchemes: {"bearerAuth": {"type": "http", "scheme": "Bearer"}}
+
+Resource prefixes (first path segment), sorted, one per line:
+ - caixa
+ - categorias
+ - categorias-receita-despesa
+ - contas-bancarias
+ - contas-financeiras
+ - contas-pagar
+ - contas-receber
+ - contatos
+ - crm
+ - depositos
+ - estoque
+ - expedicao
+ - formas-envio
+ - formas-pagamento
+ - formas-recebimento
+ - grupos-tags
+ - info
+ - intermediadores
+ - listas-precos
+ - marcas
+ - notas
+ - orcamentos
+ - ordem-compra
+ - ordem-servico
+ - pedidos
+ - produtos
+ - separacao
+ - servicos
+ - tags
+ - usuarios
+ - vendedores
+
+Occurrences of the substring "webhook" (case-insensitive) anywhere in the spec: 0 (grep -io confirmed no matches)
+
+/produtos GET query parameters: ['nome', 'codigo', 'gtin', 'situacao', 'dataCriacao', 'dataAlteracao', 'idListaPreco', 'limit', 'offset']
+/pedidos GET query parameters: ['numero', 'nomeCliente', 'codigoCliente', 'cpfCnpj', 'dataInicial', 'dataFinal', 'dataAtualizacao', 'situacao', 'numeroPedidoEcommerce', 'idVendedor', 'marcadores', 'origemPedido', 'orderBy', 'limit', 'offset']
+/estoque/{idProduto} GET query parameters: ['idProduto']

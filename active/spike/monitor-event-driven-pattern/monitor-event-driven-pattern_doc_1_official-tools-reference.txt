@@ -1,0 +1,111 @@
+Source: https://code.claude.com/docs/en/tools-reference
+Fetched: 2026-09-16 (raw HTML stripped to text; quotes below verified against the raw
+download with `grep -o` before inclusion in SPIKE.md)
+Scope: the "Monitor tool" section in full, the "WebSocket source" section (sub-feature of
+Monitor), and the "ScheduleWakeup" row from the top-level tools table.
+
+=== Monitor tool (full section) ===
+
+Monitor tool
+
+The Monitor tool lets Claude watch something in the background and react when it changes,
+without pausing the conversation. Ask Claude to:
+
+Tail a log file and flag errors as they appear
+Poll a PR or CI job and report when its status changes
+Watch a directory for file changes
+Track output from any long-running script you point it at
+Connect to a WebSocket feed and report each message as it arrives
+
+For most watches, Claude writes a small script, runs it in the background, and receives
+each output line as it arrives. For a server that already pushes events, Claude can open a
+WebSocket instead of running a script.
+
+You keep working in the same session and Claude interjects when an event arrives.
+
+Every watch Claude starts has a deadline: 5 minutes by default, at most 30 minutes, and at
+most 10 minutes in a non-interactive run given a single prompt with -p.
+
+At the deadline the watch ends. Claude gets one notice, so it can start the watch again if
+it's still needed.
+
+Stop a monitor by asking Claude to cancel it or by ending the session. When you stop a
+subagent that started monitors, for example from /tasks, those monitors stop with it.
+
+When Monitor runs a command, it uses the same permission rules as Bash, so allow and deny
+patterns you have set for Bash apply here too. While auto mode is active, Claude Code sets
+aside allow rules that name Monitor itself, along with the other broad allow rules it
+drops, so the classifier reviews Monitor commands the same way it reviews Bash commands.
+
+The WebSocket source has its own approval prompt, which the classifier also decides in
+auto mode.
+
+The tool is not available on Amazon Bedrock, Google Cloud's Agent Platform, or Microsoft
+Foundry. It is also not available when DISABLE_TELEMETRY or
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC is set.
+
+Plugins can declare monitors that start automatically when the plugin is active, instead
+of asking Claude to start them. See plugin monitors.
+
+=== WebSocket source (sub-section, immediately follows) ===
+
+WebSocket source
+
+The WebSocket source requires Claude Code v2.1.195 or later.
+
+When a server already pushes events over a WebSocket, Claude can connect to it directly
+instead of writing a polling script. Each kind of socket activity either becomes an event
+or ends the watch:
+
+Text messages: each one becomes one event, even when the message spans multiple lines.
+Binary messages: not passed through. Claude receives a placeholder line such as
+  [binary frame, 512 bytes] instead.
+Messages larger than 1 MiB: the watch ends, so subscribe to a filtered feed where one
+  exists.
+Socket close: the watch ends and Claude receives the close code.
+
+A WebSocket watch takes a ws input in place of command, and a single Monitor call can't
+combine the two. The ws input has two fields:
+
+Field | Required | Description
+url | Yes | The endpoint to connect to. Must be a ws:// or wss:// URL with no embedded
+  credentials or whitespace, using ASCII characters only
+protocols | No | WebSocket subprotocol names to offer during the handshake. Each entry
+  must be a valid subprotocol token, and the list can't contain duplicates
+
+The timeout_ms deadline applies to a WebSocket watch too: the watch ends at the deadline,
+and TaskStop cancels it early.
+
+Opening a WebSocket prompts for approval; in auto mode the classifier decides instead. The
+prompt doesn't offer an option to skip future prompts for the same host.
+
+=== ScheduleWakeup (top-level tools table row) ===
+
+ScheduleWakeup
+
+Reschedules the next iteration of a self-paced /loop. Claude calls this at the end of each
+iteration to pick when the next one runs, between one minute and one hour out; you don't
+call it directly. To end the loop instead, Claude calls it with stop: true, which cancels
+the pending wakeup. The stop field requires Claude Code v2.1.202 or later. The pending
+wakeup appears in session_crons in Stop hook input.
+
+=== Reading notes (added for this spike, not part of the source) ===
+
+- No worked-example command (e.g. `gh run watch`, `aws ecs wait`, `kubectl wait`) appears
+  anywhere in this page for either tool. The bullet list under "Ask Claude to:" names the
+  USE CASES ("Poll a PR or CI job and report when its status changes") but never the
+  COMMAND that would satisfy them. This silence is the basis for Finding 1 in SPIKE.md.
+- The Bedrock/Google Cloud Agent Platform/Microsoft Foundry restriction and the
+  DISABLE_TELEMETRY restriction sit textually between the Monitor permission paragraph and
+  the "WebSocket source" H2 heading, sharing a paragraph with no heading of its own. Given
+  DISABLE_TELEMETRY is a networking/telemetry-scoped flag with no plausible connection to a
+  plain background-script watch, the most consistent reading is that this restriction binds
+  to the WebSocket-source capability specifically, not to Monitor's core script-watch
+  capability. Treated as inference in SPIKE.md, not as a directly stated fact — the source
+  text does not repeat "WebSocket source" in that sentence.
+- No table listing Monitor's own top-level parameters (command / description / timeout_ms /
+  persistent) appears in this page's prose the way the WebSocket sub-feature's `ws` table
+  does. Only `timeout_ms` is independently confirmed as a real parameter name, via its
+  reuse in the WebSocket section ("The timeout_ms deadline applies to a WebSocket watch
+  too"). `persistent` is NOT confirmed against this primary source — see doc_2 for the
+  third-party (unverified) claim.

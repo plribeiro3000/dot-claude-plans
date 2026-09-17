@@ -1,0 +1,88 @@
+Source: https://github.com/anthropics/claude-code/issues/65985
+Fetched: 2026-09-16 via `gh issue view 65985 -R anthropics/claude-code` (verbatim issue
+body + top comments, community bug report)
+Title: [BUG] Claude generates tight gh run view polling loops that exhaust GitHub API rate
+limits
+Claude Code Version stated in the issue: 2.1.141. Platform: Anthropic API, macOS.
+
+=== Issue body (condensed to the load-bearing paragraphs; full text fetched and grepped) ===
+
+When asked to wait for a GitHub Actions CI run to complete, Claude generates shell polling
+loops like this:
+
+  until gh run view <run-id> 2>&1 | grep -q "completed"; do true; done
+
+This pattern has two critical flaws:
+1. No delay between iterations — `do true; done` runs as fast as the shell allows, calling
+   `gh run view` hundreds of times per minute. This exhausts the GitHub REST API rate limit
+   (5,000 requests/hour) in under an hour.
+2. No awareness of terminal states — the loop has no logic to exit if the run fails, is
+   cancelled, or errors out. It can run indefinitely even when the workflow is long gone.
+
+Root cause
+This is a model training issue, not a CLI bug. Claude is reaching for a generic shell
+pattern instead of the purpose-built command that already exists:
+
+  gh run watch <run-id> --exit-status
+
+gh run watch streams live status, exits automatically when the run
+completes/fails/is cancelled, and makes efficient use of the API — no polling loop needed.
+
+Expected behavior
+Claude should always use `gh run watch <run-id>` when waiting for a CI run. It should
+never generate `until ... do true; done` or any manual polling loop against the GitHub
+API.
+
+Suggested fix
+Add this to model training or system prompt guardrails:
+- When waiting for a GitHub Actions run: use `gh run watch`, never a manual loop
+- Any shell loop that calls an external API must have a sleep — but even that is a
+  fallback, not the right answer here
+
+Additional information
+- The loops were spawned as background processes — Claude ran them with run_in_background
+  via the Bash tool and never terminated them, even after moving on to unrelated tasks in
+  the same session
+- gh run watch is already documented in the gh CLI and is the idiomatic solution — this is
+  purely a matter of Claude not choosing the right tool
+
+=== Top comment (from another engineer, condensed) ===
+
+Your diagnosis is exactly right, and `gh run watch <run-id> --exit-status` is the correct
+fix for the GitHub Actions case specifically — it opens a single streaming connection,
+returns when the run reaches a terminal state (success/failure/cancelled), and the
+`--exit-status` flag makes it exit non-zero on failure, so it composes cleanly with `&& gh
+pr merge` etc. No loop, no polling, one efficient call.
+
+One nuance on the "any shell loop that calls an external API must have a sleep" guidance:
+a `sleep` makes it survivable but `gh run watch` is still strictly better, because a
+`sleep 5` poll still wakes up to make a fresh API call every 5s for the whole run, whereas
+`watch` is one held connection. So: `gh run watch` first, `sleep`-throttled loop only as
+the fallback when no purpose-built wait exists.
+
+The root cause here extends beyond gh run view. The general pattern is: Claude generates a
+polling loop, the loop runs as a background process, and there is no external watchdog to
+detect or kill it when the session moves on.
+
+Closing for now — inactive for too long. Please open a new issue if this is still
+relevant.
+
+=== Reading notes (added for this spike, not part of the source) ===
+
+- This is the closest public match to the exact failure the engineer observed in this
+  spike's originating task: an agent generating a hand-rolled iteration loop to wait on a
+  GitHub Actions run, instead of `gh run watch <run-id> --exit-status`. The task's own
+  observed shape (`for i in $(seq 1 15); do <check>; sleep 45; done`) is the "safer"
+  bounded/sleeping cousin of this issue's `until ... do true; done` (unbounded, no sleep)
+  — both are the same underlying reflex, one just avoided the rate-limit-exhaustion
+  failure mode by accident (having a sleep and a bound), not by choosing the right command.
+- The reporter's own "Root cause" section states plainly this is "a model training issue,
+  not a CLI bug" — i.e., their own diagnosis lands on the same class of explanation this
+  spike's Finding 1/2 develop (tool-description/example framing), though this specific
+  reporter is speaking about baseline model training generally, not the Monitor/
+  ScheduleWakeup tool descriptions specifically (Monitor is not mentioned anywhere in this
+  issue).
+- One commenter's nuance — "`gh run watch` first, `sleep`-throttled loop only as the
+  fallback when no purpose-built wait exists" — is close to word-for-word the decision rule
+  this spike recommends in Finding 5, arrived at independently by a GitHub community member
+  reasoning about this exact failure mode, not the Monitor tool specifically.

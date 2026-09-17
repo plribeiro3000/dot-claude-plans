@@ -1,0 +1,81 @@
+Source: https://github.com/anthropics/claude-code/issues/94178
+Fetched: 2026-09-16 via `gh issue view 94178 -R anthropics/claude-code` (verbatim issue
+body, community bug report — NOT an Anthropic-authored document; the tool-description
+quotes inside it are the REPORTER's transcription of what they observed the harness
+present as the Bash/Monitor/Agent tool descriptions, not something this spike
+independently reproduced)
+Title: [Bug] Sub-agent orchestrators spawn redundant background polling loops instead of
+awaiting completion notifications
+Environment stated in the issue: Claude Code CLI on Windows 11 (PowerShell + Git Bash),
+model claude-fable-5-1 as orchestrator, sub-agents on opus/sonnet. Version: 2.1.270.
+
+=== Full issue body ===
+
+**Bug Description**
+Title: Sub-agent orchestrators arm redundant background `until` watchers instead of
+waiting for child-agent completion notifications
+
+Summary
+When a general-purpose sub-agent spawns its own child agents with the Agent tool, it
+frequently ends the turn by launching a background Bash `until … sleep …` loop that polls
+`git status` (or a log) for the child's output files, and re-arms a new one on every turn
+that ends without a notification. In one session a single orchestrator accumulated 15+
+concurrent shell watchers. The harness already re-invokes the parent when a child
+completes, so the watchers are pure waste (one polling shell per loop) and clutter the
+task list.
+
+Why it happens (from the built-in tool descriptions)
+- Bash: "Foreground `sleep` is blocked; use Monitor with an until-loop to wait on a
+  condition."
+- Monitor: for a single notification, "use Bash with `run_in_background` and a command
+  that exits when the condition is true, e.g. `until grep -q "Ready in" dev.log; do sleep
+  0.5; done`."
+- Agent: "Subagents run in the background; you'll be notified when one completes."
+
+The first two describe the only sanctioned way to wait. Neither says the idiom is for
+state the harness cannot observe (a dev server, CI, a remote queue) and not for the
+agent's own children. An orchestrator that has just delegated everything, has nothing else
+to do, and knows `sleep` is blocked reaches for the until-loop and applies it to its
+children's files.
+
+Repro
+1. In a fresh session, spawn a general-purpose agent (Opus or Sonnet) with a brief that
+   says "split this into N parts and delegate each to a sub-agent, then integrate their
+   results".
+2. Watch the task list: after each Agent launch the sub-agent adds a `until [ -n
+   "$(git status --porcelain <expected file>)" ]; do sleep 1; done` background shell,
+   often several per wave.
+
+Suggested fix
+Add one sentence to the Agent tool description and/or the Bash "sleep is blocked"
+sentence: "Do not poll for a sub-agent's output; you are re-invoked automatically when it
+completes. The until-loop / Monitor idiom is for external state the harness cannot
+track." Optionally, have the harness refuse (or warn on) a background Bash whose command
+polls paths a live child agent is expected to write.
+
+Workaround
+State it in the sub-agent brief: "After launching sub-agents, end your turn and wait for
+the completion notification; never arm a shell loop to watch for their files."
+
+=== Reading notes (added for this spike, not part of the source) ===
+
+- This is the second, independent (different session, different month — this one dated by
+  version 2.1.270, doc_3/#86085 dated 2026-08-11) report of the SAME shape: the reporter
+  quotes the Monitor tool description itself (not just a Bash-sleep-block error) as giving
+  a sleep-poll `until` loop as its own worked example: "use Bash with run_in_background and
+  a command that exits when the condition is true, e.g. `until grep -q "Ready in" dev.log;
+  do sleep 0.5; done`." Two independent reporters, five weeks apart, on different
+  platforms, transcribing the same shape of example independently is stronger corroboration
+  than either report alone — though neither is Anthropic's own primary documentation (see
+  doc_1/doc_2, where the currently-live official docs give NO worked-example command at
+  all for Monitor, which could mean the guidance text changed between when these two
+  issues were filed and 2026-09-16, or that the reporters paraphrased loosely, or that the
+  exact-example text lives somewhere other than the two official pages this spike fetched
+  — e.g. inside the actual system-prompt tool schema, which is not publicly documented).
+- The reporter's own analysis — "Neither says the idiom is for state the harness cannot
+  observe ... and not for the agent's own children" — names exactly the SAME missing
+  distinction (harness-tracked work vs. external state) that the third-party claude-
+  world.com tutorial (doc_6) also describes, independently, in the "Poll External State —
+  Never Harness-Tracked Work" section. Two independent sources naming the same missing
+  guidance is worth noting, though claude-world.com is a paid-course marketing site, not a
+  primary source, and could itself be drawing on these public issues.
