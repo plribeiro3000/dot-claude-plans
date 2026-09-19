@@ -109,6 +109,26 @@ diff on every resource that currently sets a conflicting or absent tag inline �
 expected, in-place, no replacement. Each stack's plan is reviewed for exactly
 this before apply; anything showing a *replace* is a real finding, not tag churn.
 
+## KMS keys — exempt via an un-tagged provider alias
+
+`default_tags` reaches every resource, and a KMS key whose key policy grants no
+`Tag` action refuses the tag: applying a cost tag to it calls `kms:TagResource`,
+which the policy denies, and the stack's apply fails on that key. The `app` and
+`vpn` modules write such least-privilege key policies (their administration
+statement carries no `Tag` action), so their keys must be excluded from
+`default_tags`.
+
+The exclusion is a second AWS provider, aliased `no_default_tags`, declared in
+the stack in the key's own region with no `default_tags` block. The module takes
+it through `configuration_aliases` and the KMS key resources set
+`provider = aws.no_default_tags`; every other resource keeps the default,
+tagged provider. A KMS key carries no meaningful cost anyway, so its absence from
+the entity rollup is immaterial.
+
+The `integrator` and `auth` key policies grant `kms:*` to the account root, so
+IAM delegation lets `default_tags` tag their keys normally — those modules need
+no alias. The outbound stacks create no KMS key of their own.
+
 ## Activation
 
 One `aws_ce_cost_allocation_tag` resource per key (`Entity`, `Project`,
@@ -122,6 +142,14 @@ resource "aws_ce_cost_allocation_tag" "entity" {
   status  = "Active"
 }
 ```
+
+The activation is a **separate PR from the tagging**, opened only once the keys
+have surfaced in AWS Billing (~24h after the first tagged stack is live). AWS
+lists a tag key for activation only after it has appeared on a billed resource,
+so the `aws_ce_cost_allocation_tag` apply fails before that window. Keeping it out
+of the tagging PR is also what lets the tagging PR merge without drift: a merged
+`aws_ce_cost_allocation_tag` that cannot yet apply would be code on `develop` with
+no live counterpart.
 
 ## Rollout order
 

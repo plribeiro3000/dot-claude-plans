@@ -15,6 +15,92 @@ redirect, and make models immutable with value equality. The six interdependent 
 one at a time, each behind its own characterization test, in the dependency order established
 below — never as a big-bang rewrite.
 
+## Progress (execution status)
+
+The data-layer track and ARCH-2 (context removal) are both landed on `develop` — no cubit under
+`model/blocs/` takes a `BuildContext`. The navigation track (NAV-1/NAV-2/NAV-4) has not started.
+Merged PR numbers are the record on `origin/develop`; open PRs are called out as such.
+
+**Done — data layer:**
+
+- **Step 0 — CI Flutter-version alignment:** PR #35. The workflow reads the version from `.fvmrc`.
+- **Phase 1.2 (ARCH-1) — `bloc.dart` split, strangler-fig, one model+cubit pair per PR:** PRs #36–#40
+  and #53–#70, plus the dead-code removals #55 (`bloc.dart` dead code) and #93 (unused calendar
+  model). Every top-level declaration is relocated to `lib/model/models/` and `lib/model/blocs/`;
+  `bloc.dart` is fully split and `hive_registrar.g.dart`'s `@HiveType(typeId:)` list is preserved.
+- **Phase 1.6 (ARCH-5) — immutable models with `equatable`:** PRs #71–#92. Every relocated model
+  carries value equality.
+- **Phase 1.3 step 2a — repository interface (`GraphQLRepository`, pass-through):** PR #94.
+- **Phase 1.3 step 2b — cubit call sites onto the GraphQL repository seam:** PRs #95–#98 explicitly
+  (clients, users filter, plans filter, comission), then folded into the LocalStore series below —
+  every migrated cubit receives `GraphQLRepository` through its constructor. Every cubit now calls
+  through the repository seam.
+- **LocalStore seam (an added seam, not in the original enumeration) — Branch by Abstraction over
+  Hive:** PRs #99, #101, #104–#108, #110–#121. Each Hive-using cubit now receives `LocalStore`,
+  `ConnectivityChecker`, and `GraphQLRepository` through its constructor; no cubit constructs
+  `Hive.box(...)` internally. This generalized the repository-seam technique to the storage and
+  connectivity dependencies, added as the data-layer decoupling proceeded.
+
+**Done — follow-up fixes that surfaced during the series (some in parallel sessions):**
+
+- PR #102 — guard the comissionings limiter cache-clear loop (Kaizen, matches the deal cubit).
+- PR #103 — scope the commissionings query to the passed user id (bug fix).
+- PRs #109 + #122 — fall back to cache when a connected fetch returns no result, extended to the
+  sibling cubits.
+- PRs #123 + #124 — extract the shared LocalStore-seam widget-test harness (the fakes and the
+  `pumpAndFetch` helper) and fold every bloc spec onto it.
+- PRs #125 + #127 — fix the Hive delete-by-value no-op so a stale cache entry is evicted on the
+  refresh path (#127 aligns the variables eviction key with the write and scopes the eviction tests).
+- PR #126 — guard the GraphQL query behind the connectivity check, so a cubit issues no network
+  round-trip when offline, and migrate the last remaining cubits onto the store seam.
+- PR #128 — parse the fetched model once before storing and emitting it (removes the double
+  `fromJson` parse the cubits carried).
+
+**Done — dependency maintenance (Renovate, parallel):** PRs #50 (secure storage), #51 (`go_router`),
+#100 (renovate action), plus the other library bumps recorded under `Changed` in `CHANGELOG.md`.
+
+**Follow-ups from the series — all landed.** The four cross-cutting items the migration surfaced —
+cache fallback on an empty connected response (#109/#122), the shared test harness (#123/#124), the
+Hive delete-by-value no-op (#125/#127), and the offline query guard (#126) — are merged, together
+with the double-`fromJson`-parse dedupe (#128). No follow-up from this series is still open.
+
+**Done — Phase 1.4 (ARCH-2), context and navigation out of the cubits:** PR **#129** made
+`BlocConnected` context-free — `verifyConnection()` emits connection state and the reconnect
+navigation moved to a root `BlocListener` in `main.dart`. With the connectivity trigger behind the
+`ConnectivityChecker` seam, the `BuildContext` each fetch cubit still carried was dead; PRs **#132**
+and **#133** dropped it — and the `flutter/material` import kept only for it — from every fetch cubit,
+with the caller sites and the `_FakeBuildContext` test scaffolding, and **#134** removed the stale
+commented-out lookup the ripple left beside the calendar fetch calls. PR **#135** moved the last
+navigation out of business logic: `BlocDashInit.fetchUser` and `BlocPeriods.fetchPerdiods` emit a
+transient `sessionExpired` flag when a connected query returns no data instead of navigating, and the
+dashboard widgets react through a `BlocListener` / `BlocConsumer` and navigate to `StartAppCheck` (the
+`#129` shape). No cubit under `model/blocs/` takes a `BuildContext`.
+
+**Not started — the rest of Phase 1:**
+
+- **Phase 1.3 step 2c — singleton long-lived `GraphQLClient`:** the interface and every conversion
+  are in place, but the client is still built per call, so `GraphQLCache` is discarded each time —
+  NET-1's actual payoff is still pending.
+- **Phase 1.1 (NAV-1/NAV-3) — collapse to a single `MaterialApp.router`.**
+- **Phase 1.5 (NAV-2/NAV-4) — go_router-only navigation + the auth redirect.** PR **#137** started NAV-4
+  by extracting the app-entry decision (setup / dashboard / login, chosen from the stored configuration,
+  token, and connectivity) out of `StartAppCheck.initState` into a pure `AppEntryResolver` in
+  `lib/model/services/`, unit-tested across every branch; `StartAppCheck` keeps its device provisioning
+  and navigation but now asks the resolver for the destination. The remaining work wires the go_router
+  redirect to that same resolver and routes the imperative destinations through go_router. The
+  `configuration.contains('name')` substring check the resolver preserves is a known follow-up candidate
+  (a `jsonDecode(...)['name']` hardening), deferred because it changes behavior.
+- **Widget-test characterization net for the three named user-facing flows** (auth entry / dashboard
+  load / QR entry): the series built and now shares a per-cubit bloc/widget-test harness (#123/#124).
+  PR **#136** started the auth-entry flow, characterizing the unconfigured-device branch (launch at
+  `/` with empty secure storage routes through `StartAppCheck` to the setup entry) by extending the
+  `app_router_test.dart` technique — the device HTTP call neutralizes itself under the test binding and
+  the lazy providers keep Hive boxes closed, so it needs no extra doubles. The two richer branches of
+  the same flow resist a widget test today: the authenticated-device gate (with/without a token) lands
+  on the login screen, which builds a web view in `initState`, and the token deep-link lands on the
+  dashboard, which reads Hive boxes — both need web-view and storage test doubles this net does not yet
+  build. The dashboard-load and QR-entry flows are not started.
+
 ## Scope
 
 ### In scope
@@ -243,16 +329,18 @@ phase builds.
 
 - [ ] Every Phase 1 PR ships independently green (`flutter analyze --no-fatal-infos` +
       `flutter test`) and the app stays manually navigable (iOS 27 simulator + Android emulator).
-- [ ] `bloc.dart` is fully split into `models/`, `repositories/`, `blocs/`, with
-      `hive_registrar.g.dart`'s adapter/typeId list unchanged from before the split.
+- [x] `bloc.dart` is fully split into `models/`, `repositories/`, `blocs/`, with
+      `hive_registrar.g.dart`'s adapter/typeId list unchanged from before the split. (PRs #36–#70.)
 - [ ] Every cubit query/mutation call goes through the repository seam, backed by one long-lived
-      `GraphQLClient` (token via `AuthLink`, reading secure storage lazily).
-- [ ] No cubit under `model/`/`blocs/` takes a `BuildContext` parameter or calls
-      `Navigator`/`context.read` directly.
+      `GraphQLClient` (token via `AuthLink`, reading secure storage lazily). (Seam landed for every
+      cubit; the single long-lived client — step 2c — is still pending.)
+- [x] No cubit under `model/`/`blocs/` takes a `BuildContext` parameter or calls
+      `Navigator`/`context.read` directly. (PRs #129, #132–#135.)
 - [ ] Exactly one `MaterialApp.router`; every navigation call site routes through go_router; a
       single `redirect` callback replaces `start.dart`'s imperative auth-gating.
-- [ ] Models are immutable with `equatable` value equality; loading/error are modelled as states,
-      not a bool field on the data model.
+- [x] Models are immutable with `equatable` value equality. (PRs #71–#92.) Loading/error as distinct
+      states rather than a bool field is still carried per-model as a `loading` flag, not yet split
+      into states.
 - [ ] The three widget-test flows (step 3) and the `bloc_test` specs added per converted cubit
       (step 4) are part of the permanent test suite, feeding TEST-1.
 

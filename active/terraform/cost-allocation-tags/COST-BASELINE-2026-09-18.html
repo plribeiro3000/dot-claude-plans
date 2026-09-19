@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Custo por Projeto</title>
+<style>
+  :root{
+    --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2a323c;
+    --tx:#e6edf3; --tx2:#9fb0c0; --tx3:#6f8296;
+    --app:#4c9be8; --integrator:#e8a24c; --vpn:#9b7ede; --auth:#4cd0b0;
+    --plat:#7b8a99; --other:#556170;
+    --fact:#3fb27f; --warn:#e8c04c;
+    --bar-bg:#232b34;
+  }
+  :root:not([data-theme="light"]) body{background:var(--bg);}
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg:#f4f6f8;--panel:#fff;--panel2:#eef1f4;--line:#dde3ea;
+      --tx:#111820;--tx2:#44566a;--tx3:#6f8296;--bar-bg:#e6ebf0;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 16px 80px;}
+  h1{font-size:24px;margin:0 0 4px;letter-spacing:-.02em}
+  h2{font-size:17px;margin:36px 0 14px;letter-spacing:-.01em}
+  .sub{color:var(--tx2);font-size:14px;margin:0 0 20px}
+  .banner{background:var(--panel2);border:1px solid var(--line);border-left:3px solid var(--warn);
+    border-radius:8px;padding:14px 16px;margin:20px 0 8px;color:var(--tx2);font-size:13.5px}
+  .banner b{color:var(--tx)}
+  .kpis{display:flex;gap:12px;flex-wrap:wrap;margin:18px 0 8px}
+  .kpi{flex:1;min-width:150px;background:var(--panel);border:1px solid var(--line);
+    border-radius:10px;padding:14px 16px}
+  .kpi .n{font-size:26px;font-weight:600;letter-spacing:-.02em}
+  .kpi .l{color:var(--tx3);font-size:12px;text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+  table{width:100%;border-collapse:collapse;font-size:14px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+  th{color:var(--tx3);font-weight:600;font-size:11.5px;text-transform:uppercase;letter-spacing:.04em;background:var(--panel2)}
+  tr:last-child td{border-bottom:none}
+  td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+  .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:8px;vertical-align:middle}
+  .bar{height:8px;border-radius:5px;background:var(--bar-bg);overflow:hidden;min-width:60px}
+  .bar > span{display:block;height:100%;border-radius:5px}
+  .pct{color:var(--tx2);font-variant-numeric:tabular-nums;font-size:13px}
+  .tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:20px;border:1px solid var(--line);color:var(--tx2)}
+  .tag.fact{color:var(--fact);border-color:color-mix(in srgb,var(--fact) 45%,transparent)}
+  .tag.est{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 45%,transparent)}
+  .muted{color:var(--tx3);font-size:13px}
+  .note{color:var(--tx2);font-size:13.5px;margin:10px 0}
+  .note code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px}
+  ul{margin:8px 0 0;padding-left:18px;color:var(--tx2);font-size:13.5px}
+  li{margin:3px 0}
+  .foot{color:var(--tx3);font-size:12px;margin-top:40px;border-top:1px solid var(--line);padding-top:14px}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  @media(max-width:680px){.split{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Custo AWS por projeto</h1>
+  <p class="sub">Conta 405749097490 · janela 04–17/set/2026 (14 dias) · valores diários em USD</p>
+
+  <div class="banner">
+    <b>Isto é uma estimativa.</b> As cost allocation tags (Entity/Project/Client) só são ativadas segunda-feira e levam ~2 dias para popular, então o Cost Explorer ainda não filtra por projeto — todo custo cai num bucket sem tag. Os totais por <span class="tag fact">serviço</span> e <span class="tag fact">região</span> abaixo são reais (vêm do Cost Explorer); o rateio por <span class="tag est">projeto/stack</span> é montado cruzando esse gasto real com o inventário de recursos (EC2, RDS, ElastiCache, ECS, NAT, OpenSearch) e reconciliado com o total real. O número exato por stack chega quarta/quinta, depois da ativação.
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="n">US$ 138</div><div class="l">Mediana / dia (30d)</div></div>
+    <div class="kpi"><div class="n">US$ 154</div><div class="l">Média / dia (30d)</div></div>
+    <div class="kpi"><div class="n">≈ US$ 4.140</div><div class="l">Mediana × 30</div></div>
+  </div>
+
+  <h2>Histórico do mês <span class="tag fact">real</span></h2>
+  <table>
+    <thead><tr><th>Métrica (custo diário, 30 dias)</th><th class="n">US$/dia</th><th>Leitura</th></tr></thead>
+    <tbody>
+      <tr><td>Mediana <span class="muted">(dia típico)</span></td><td class="n">137,9</td><td class="muted">o número a usar por dia</td></tr>
+      <tr><td>Média</td><td class="n">153,7</td><td class="muted">inflada por 1 dia de pico</td></tr>
+      <tr><td>Mínimo</td><td class="n">130,9</td><td class="muted">piso estável</td></tr>
+      <tr><td>Máximo <span class="muted">(1 dia)</span></td><td class="n">464,4</td><td class="muted">EC2-Compute disparou para ~US$ 336 nesse dia</td></tr>
+    </tbody>
+  </table>
+  <p class="note">A mediana ($138) fica ~$16 abaixo da média porque um único dia bateu $464 — o EC2-Compute saiu do típico ($22) para ~$336 (scale-up forte do ASG ou processamento pesado; vale investigar qual dia). Fora esse pico, o dia real varia pouco: $131–$140. <b>Duas cobranças não-diárias foram excluídas do dia típico:</b> Amazon Registrar $16 (renovação de domínio, one-time) e um pico pontual de S3 (~$25 num dia).</p>
+
+  <h2>Por projeto <span class="tag est">estimativa</span></h2>
+  <table>
+    <thead><tr>
+      <th>Projeto</th><th class="n">US$/dia</th><th class="n">US$/mês</th><th style="width:34%">Participação</th>
+    </tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="dot" style="background:var(--app)"></span>app <span class="muted">(4 ambientes + outbound + poolers)</span></td>
+        <td class="n">~82</td><td class="n">~2.460</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:60%;background:var(--app)"></span></div><span class="pct">60%</span></div></td>
+      </tr>
+      <tr>
+        <td><span class="dot" style="background:var(--integrator)"></span>integrator <span class="muted">(4 clientes)</span></td>
+        <td class="n">~37</td><td class="n">~1.110</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:27%;background:var(--integrator)"></span></div><span class="pct">27%</span></div></td>
+      </tr>
+      <tr>
+        <td><span class="dot" style="background:var(--plat)"></span>setup + onboarding</td>
+        <td class="n">~6</td><td class="n">~180</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:4.5%;background:var(--plat)"></span></div><span class="pct">4%</span></div></td>
+      </tr>
+      <tr>
+        <td><span class="dot" style="background:var(--vpn)"></span>vpn</td>
+        <td class="n">~4</td><td class="n">~120</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:3%;background:var(--vpn)"></span></div><span class="pct">3%</span></div></td>
+      </tr>
+      <tr>
+        <td><span class="dot" style="background:var(--auth)"></span>authenticator <span class="muted">(auth-001)</span></td>
+        <td class="n">~3</td><td class="n">~90</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:2%;background:var(--auth)"></span></div><span class="pct">2%</span></div></td>
+      </tr>
+      <tr>
+        <td><span class="dot" style="background:var(--other)"></span>outros <span class="muted">(us-west-2, global, KMS/S3 residual)</span></td>
+        <td class="n">~3</td><td class="n">~90</td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="bar" style="flex:1"><span style="width:2%;background:var(--other)"></span></div><span class="pct">2%</span></div></td>
+      </tr>
+    </tbody>
+  </table>
+  <p class="note">Incerteza por projeto ~±20% (o rateio de EC2-Other/EBS, NAT e CloudWatch é aproximado). A conclusão robusta: <b>app domina (~3/5 da conta)</b>, integrator é o segundo (~1/4) e o resto é pequeno.</p>
+
+  <h2>Drill-down por stack <span class="tag est">estimativa</span></h2>
+  <div class="split">
+    <div>
+      <table>
+        <thead><tr><th>Stack app</th><th class="n">US$/dia</th></tr></thead>
+        <tbody>
+          <tr><td>atento-001</td><td class="n">~33</td></tr>
+          <tr><td>shared-001</td><td class="n">~31</td></tr>
+          <tr><td>demo-001</td><td class="n">~8</td></tr>
+          <tr><td>beta-001</td><td class="n">~6</td></tr>
+          <tr><td>connection-poolers (4)</td><td class="n">~3</td></tr>
+          <tr><td>outbound (maqnelson + atento-br)</td><td class="n">~1</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">atento-001 e shared-001 são os pesos-pesados: cada um tem 2× Aurora <code>t4g.large</code>, um domínio OpenSearch e ~8–10 instâncias do ASG. Os outbound estão zerados (desired_count 0).</p>
+    </div>
+    <div>
+      <table>
+        <thead><tr><th>Stack integrator</th><th class="n">US$/dia</th></tr></thead>
+        <tbody>
+          <tr><td>atento <span class="muted">(br/co/cl/mx)</span></td><td class="n">~24</td></tr>
+          <tr><td>commcenter</td><td class="n">~6</td></tr>
+          <tr><td>almaviva</td><td class="n">~3,5</td></tr>
+          <tr><td>maqnelson</td><td class="n">~3</td></tr>
+        </tbody>
+      </table>
+      <p class="muted">atento concentra o integrator: 3 nós Mongo + windows-machine + o maior Redis (<code>t3.medium</code>) + 4 clusters de país. almaviva e maqnelson estão com o Mongo <b>parado agora</b> (sobem em janela noturna via cron), então hoje pagam menos e nas noites de processamento pagam mais.</p>
+    </div>
+  </div>
+
+  <h2>Dado real do Cost Explorer — por serviço <span class="tag fact">real</span></h2>
+  <table>
+    <thead><tr><th>Serviço</th><th class="n">US$/dia</th><th class="n">14 dias</th><th class="n">Onde cai</th></tr></thead>
+    <tbody>
+      <tr><td>EC2 – Other <span class="muted">(EBS, NAT-data, transfer, IPv4)</span></td><td class="n">31,0</td><td class="n">433,8</td><td class="n muted">espalhado</td></tr>
+      <tr><td>RDS <span class="muted">(Aurora)</span></td><td class="n">26,9</td><td class="n">376,8</td><td class="n muted">app</td></tr>
+      <tr><td>EC2 – Compute</td><td class="n">21,8</td><td class="n">305,3</td><td class="n muted">app + integrator</td></tr>
+      <tr><td>VPC <span class="muted">(NAT/VPN/endpoints)</span></td><td class="n">13,1</td><td class="n">183,2</td><td class="n muted">espalhado</td></tr>
+      <tr><td>ECS <span class="muted">(Fargate)</span></td><td class="n">10,7</td><td class="n">149,9</td><td class="n muted">integrator/poolers/auth</td></tr>
+      <tr><td>ElastiCache</td><td class="n">7,7</td><td class="n">107,5</td><td class="n muted">integrator</td></tr>
+      <tr><td>OpenSearch</td><td class="n">7,2</td><td class="n">100,4</td><td class="n muted">app</td></tr>
+      <tr><td>Load Balancing</td><td class="n">6,8</td><td class="n">95,7</td><td class="n muted">app/integrator/auth</td></tr>
+      <tr><td>CloudWatch</td><td class="n">6,5</td><td class="n">91,5</td><td class="n muted">app-pesado</td></tr>
+      <tr><td>KMS · S3 · ECR · Secrets</td><td class="n">3,5</td><td class="n">48,8</td><td class="n muted">espalhado</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Dado real do Cost Explorer — por região <span class="tag fact">real</span></h2>
+  <table>
+    <thead><tr><th>Região</th><th class="n">US$/dia</th><th class="n">14 dias</th><th>O que vive lá</th></tr></thead>
+    <tbody>
+      <tr><td>us-east-1</td><td class="n">74,3</td><td class="n">1.040,8</td><td>apps, onboarding, setup, connection-poolers</td></tr>
+      <tr><td>sa-east-1</td><td class="n">58,8</td><td class="n">823,3</td><td>integradores, vpn, outbound, auth-001, Mongo</td></tr>
+      <tr><td>us-west-2</td><td class="n">2,0</td><td class="n">27,5</td><td>resíduo (a investigar)</td></tr>
+      <tr><td>global</td><td class="n">0,1</td><td class="n">1,4</td><td>Route 53</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Como o rateio foi feito</h2>
+  <ul>
+    <li><b>app</b> — todo o RDS Aurora (5 instâncias), os 2 domínios OpenSearch, o ASG EC2 do fleet web/worker (~20× <code>t3a.medium</code> em us-east-1), os 4 connection-poolers (Fargate) e os ALBs dos ambientes.</li>
+    <li><b>integrator</b> — todo o ElastiCache (4 Redis, sa-east-1 — apps usam Redis Cloud externo, não ElastiCache), os nós Mongo em EC2, o Fargate das janelas noturnas e as VPNs site-to-site dos clientes.</li>
+    <li><b>vpn</b> — as 2 EC2 do Pritunl/Mongo de gestão + o NAT e a VPN do VPC <code>management</code>.</li>
+    <li><b>authenticator</b> — o cluster <code>auth-001</code> (2 tasks Fargate 24/7, sa-east-1) + seu ALB.</li>
+    <li>EC2-Other, NAT/VPC, CloudWatch e KMS/S3/ECR foram rateados por proporção de footprint — é a maior fonte de incerteza.</li>
+  </ul>
+
+  <p class="foot">Fonte: AWS Cost Explorer (<code>get-cost-and-usage</code>, UnblendedCost) + inventário via describe de EC2/RDS/ElastiCache/ECS/NAT/OpenSearch, 18/set/2026. Serviço e região são reais; projeto e stack são estimativa até as cost allocation tags popularem (~quarta/quinta após a ativação de segunda).</p>
+</div>
+</body>
+</html>

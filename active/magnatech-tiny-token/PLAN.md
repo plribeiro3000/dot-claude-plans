@@ -1,118 +1,149 @@
-# PLAN — Magnatech Tiny API token re-authorization
+# PLAN — Magnatech Tiny (Olist) integration
 
-Objective: restore 4Shark's access to Magnatech's data in the Tiny (Olist) ERP by
-minting a fresh OAuth2 token pair, then keep it alive so the client does not have
-to re-authorize again.
+Objective: integrate Magnatech's data from the Tiny (Olist) v3 ERP into 4Shark. The
+prerequisite — a live OAuth2 token to Tiny — is restored and kept alive by a temporary
+bridge; the integration itself is the work that starts on Monday.
 
-Companion script: `tiny_token.sh` in this folder (`authorize-url`, `exchange`,
-`refresh`, `test`).
+Companion files in this folder: `tiny_token.sh` (the OAuth client: `authorize-url`,
+`exchange`, `refresh`, `test`), `refresh_cron.sh` (the non-interactive hourly runner),
+`SPIKE.md` (the research behind the managed-renewal design and the change-delivery model).
 
-## Background — why access was lost
+## Current state (2026-09-18)
 
-Tiny v3 uses OAuth2 **Authorization Code** (Keycloak at
-`accounts.tiny.com.br/realms/tiny`). A human who owns the Tiny account authorizes
-the app once in the browser, producing a short-lived `code`; that `code` is
-exchanged for an **access token (~4h)** and a **refresh token (~24h)**. Access is
-kept alive by refreshing within the 24h window.
+Access to Magnatech's Tiny data is **restored and self-sustaining**. A fresh OAuth2
+authorization was done with the client, the token pair is stored on a server, and an
+hourly job refreshes it well inside Tiny's 24h refresh window — so the chain no longer
+lapses and no further re-authorization with the client is needed while the bridge runs.
 
-Emerson built a token-refresh script (`/home/deploy/magnatech/refresh.sh`) on the
-Atento mongo box in April 2026. That box was reprovisioned ~14/07/2026 (verified by
-SSM on 15/09: nodes `integrator-atento-mongo004/005/006` carry nothing Magnatech).
-The refresh stopped, the 24h window lapsed months ago, so the refresh token is dead.
-The only way back is a fresh browser authorization — which needs the client.
+The renewal runs as a **temporary bridge on `atento-mongo004`** (see below). Its proper
+home is a job inside a future `integrator-magnatech` Terraform stack, which does not exist
+yet — building that is part of the integration work.
 
-There is no `client_credentials`/service-account path on Tiny, so re-consent by the
-account owner is unavoidable when the chain lapses.
+## Background — why access was lost (still load-bearing)
 
-## Prerequisites
+Tiny v3 uses OAuth2 **Authorization Code** (Keycloak at `accounts.tiny.com.br/realms/tiny`).
+A human who owns the Tiny account authorizes the app once in the browser, producing a
+short-lived `code`; that `code` is exchanged for an **access token (~4h)** and a **refresh
+token (~24h)**. Access is kept alive by refreshing within the 24h window. There is no
+`client_credentials`/service-account path confirmed on Tiny, so once the chain lapses,
+re-consent by the account owner is the only way back.
 
-The `CLIENT_SECRET` of the "4Shark Integrator" app and the browser authorization both live
-inside Magnatech's Tiny account, so both come from Bruna during the call — there is nobody on
-4Shark's side to recover the secret from. Emerson, who registered the app in April, is no
-longer with the company, and the value died with his `refresh.sh`. So there is no separate
-"recover the secret beforehand" step: the call itself produces both the secret and the token.
+An earlier refresh script lived as a loose file on an EC2 host that was later reprovisioned,
+which wiped it; the 24h window then lapsed and the refresh token died. That is the failure
+this plan's renewal design exists to avoid — the renewal must be a reliable, versioned job,
+never a loose file on a host that a reprovision erases.
 
-Have ready before the call:
-- The `tiny_token.sh` script in this folder and an open terminal, so the code can be exchanged
-  the instant Bruna produces it (it expires in seconds).
-- The known `CLIENT_ID` and `REDIRECT_URI` — script defaults `tiny-api-3e15fb0a…-1776193439`
-  and `http://localhost:8080/oauth/tiny/callback`. Treat them as tentative: confirm against
-  what Bruna reads off the app's access-keys screen, and override with `TINY_CLIENT_ID` /
-  `TINY_REDIRECT_URI` if they differ (a regenerated or recreated app changes them). The
-  `redirect_uri` must match the app's registered value exactly, or Keycloak rejects it.
+## Handoff — what was done on 2026-09-18 (for Monday)
 
-## Procedure — the call with Bruna
+- **Re-authorization with the client.** In a call with Bruna (Magnatech), the "4Shark
+  Integrator" app's Client Secret was recovered and a fresh browser authorization produced a
+  new `code`, which was exchanged for a valid token pair. `tiny_token.sh test` returned
+  `HTTP 200` — reads against the Tiny v3 API work.
+- **A bug in `tiny_token.sh` was fixed.** `save_tokens` read the response JSON from stdin,
+  which the heredoc program already consumed, so it crashed on save. It now passes the JSON
+  through an env var (`TINY_RESPONSE_JSON`) to `json.loads`. The exchange itself was always
+  fine — only the save step was broken.
+- **The token pair was placed on `atento-mongo004`** and an hourly refresh was installed and
+  proven — a test refresh renewed the token (`OK: token renovado`), so the box now owns the
+  live chain.
+- **A separate, permanent IAM fix landed** (terraform PR #1179, merged and applied): the
+  engineer `EngineerWriteAccess` policy granted `ssm:StartSession` only on the account-less
+  session-document ARN, so no engineer could open an SSM session to any host. It now also
+  lists the account-scoped document ARN, fixing interactive host access for every engineer
+  and every host. The credential was moved to the box through that SSM session, so it never
+  passed through the chat or CloudTrail.
 
-Everything happens inside Magnatech's Tiny account, on Bruna's screen. The menu labels below
-are from the layout the docs describe and MAY have moved — guide her by the GOAL of each step,
-not a fixed click path. She produces two things: the app's Client Secret, then a fresh `code`.
+## The renewal bridge on `atento-mongo004` (temporary)
 
-1. **Find where API applications are managed.** Ask her to look, in the account settings, for
-   the screen that lists API applications / integrations. Known path: Configurações > aba
-   geral > Aplicativos — but the target is "wherever API apps are configured now", not that
-   exact path. It depends on the "Construa" plan + the "Gestão de Aplicativos" extension; if
-   she cannot find it at all, that dependency may be why.
-2. **Open the "4Shark Integrator" app and get the secret.** In the app's access-keys area
-   (labelled "Chaves de acesso" on the known layout), the Client ID and Client Secret are
-   shown, with an action to generate new keys (which invalidates the old — fine, the old
-   tokens are dead). Ask her to send you the Client Secret and confirm the Client ID. If the
-   app is gone, ask her to create one ("+ novo aplicativo") — that yields a fresh
-   client_id + secret; update the script env with both.
-3. **Generate a fresh token (`code`).** With the Client ID confirmed, produce the
-   authorization URL on your side — `bash tiny_token.sh authorize-url` — and send it for her
-   to open while logged in. She authorizes and copies the value after `code=` from the page it
-   redirects to. (If the app screen exposes its own authorize/connect action that returns a
-   code, that works too — the goal is a fresh `code`.) What to say:
-   > "Abre esse link logada na conta de vocês e autoriza o app. Vai cair numa página que
-   > provavelmente não abre — tudo bem. Copia da barra do navegador o valor depois de
-   > `code=` e me manda."
-4. **Exchange immediately** — the `code` expires in seconds (the `Code not valid` error seen
-   in April): `bash tiny_token.sh exchange`. It prompts for the code and the Client Secret;
-   nothing is echoed. Tokens are written to `~/.magnatech_tiny_tokens` (mode 600) — the
-   exchange script writes it, `refresh`/`test`/the catalog validation read it. Stopgap for the
-   meeting; the managed renewal is the follow-up below.
-5. **Verify:** `bash tiny_token.sh test`. `HTTP 200` on `GET /produtos?limit=1` = token valid
-   and reads work. `401` = token not applied; `403` = valid but missing permission.
+Instance `i-0d1fb7cde4b56697b` (`integrator-atento-mongo004`, `sa-east-1`), reached via SSM
+Session Manager. The renewal reads the stored secret, calls Tiny to refresh, and rewrites the
+token file; a cron fires it hourly. Its log records one line per run.
 
-If the authorize page errors about scope, append `&scope=openid` to the URL.
+Check it is alive (in an SSM session on the box):
 
-## After access is restored
+```bash
+sudo cat /var/log/magnatech-tiny-refresh.log
+```
 
-- Re-establish the daily refresh (`bash tiny_token.sh refresh`) as a **reliable,
-  versioned** job — not a loose file on an EC2 that a reprovision wipes. Any outage
-  longer than 24h kills the chain and forces another re-authorization with Bruna, so
-  the renewal must not silently stop.
-- Validate the product×category list Bruna sent (categories 0,7% and 2%) before
-  building the integration script that consumes the token.
-- Bring the integrator infra back up (it was aborted to avoid idle cost).
+Each hour should add an `OK: token renovado` line. A `FALHOU` line means the refresh token
+lapsed (the box was down > 24h, or the box was reprovisioned and the files are gone) — the
+recovery is a fresh re-authorization with Bruna, same as the initial one.
 
-## Follow-up — the right shape for a daily integration on Tiny's delegated auth
+**This bridge is temporary and carries a known risk:** `atento-mongo004` belongs to the
+Atento integration, not Magnatech, and its `/opt/magnatech-tiny` files are NOT
+Terraform-managed. If the box is reprovisioned, everything below vanishes silently and the
+chain dies. Move the renewal into the `integrator-magnatech` stack as soon as it exists.
 
-The full study is in `SPIKE.md` in this folder (sources + trade-off table). Load-bearing
-conclusions:
+## Teardown — remove Magnatech from `atento-mongo004`
 
-- **Auth:** authorize once, then refresh with a wide margin — a real integrator refreshes
-  every ~3–3h50 against the 4h access / 24h refresh window, so one missed run never hits the
-  24h cliff. Recovery when the chain lapses is a browser re-auth with the client, confirmed by
-  two independent integrations, so it is inherent to Tiny's design, not our script. BEFORE
-  building around this, test `client_credentials` with the recovered `CLIENT_SECRET`: the
-  realm advertises the grant type, and if the "4Shark Integrator" app has service accounts
-  enabled it removes the whole 24h-cliff/re-auth problem (machine-to-machine, no human). One
-  side-effect-free curl settles it.
-- **Change delivery:** the v3 OpenAPI spec exposes NO webhooks (129 paths, zero webhook
-  resources; every webhook doc found is API 2.0). Poll incrementally by `dataAlteracao`
-  (`/produtos`) and `dataAtualizacao` (`/pedidos`). `/estoque` has only a per-product GET —
-  no bulk date-filtered listing — so stock needs a separate design. Revisit webhooks only if a
-  v3 capability is confirmed directly with Tiny (`integracao@tiny.com.br`).
-- **Where to host:** NOT EC2 (that caused this incident). 4Shark's `ecs_scheduled_task` module
-  (Fargate + EventBridge, the harvester pattern) is the proven shape — Option A. AWS's own
-  purpose-built alternative is Secrets Manager + a rotation Lambda with atomic
-  AWSCURRENT/AWSPENDING versioning — Option B, which adds two net-new patterns. Either way two
-  things are new here: an ECS task writing its OWN rotated secret back (`ssm:PutParameter` — no
-  precedent in this codebase), and the cron/scheduler alarms (proven for `app`, not wired for
-  integrator/harvester) that provide the alert-before-the-24h-cliff the process requires.
+When the renewal moves to its own infrastructure (or the integration is dropped), everything
+Magnatech must be wiped from this box so nothing of one client lingers on another client's
+host. These are all the files created here:
+
+| Path on the box | What it is |
+|---|---|
+| `/opt/magnatech-tiny/tiny_token.sh` | the OAuth client script |
+| `/opt/magnatech-tiny/refresh_cron.sh` | the hourly runner |
+| `/opt/magnatech-tiny/secret` | the Tiny Client Secret (mode 600) |
+| `/opt/magnatech-tiny/tokens` | the access/refresh token pair (mode 600) |
+| `/etc/cron.d/magnatech-tiny-refresh` | the hourly cron entry |
+| `/var/log/magnatech-tiny-refresh.log` | the renewal log |
+
+Removal (in an SSM session on `i-0d1fb7cde4b56697b`, as root) — delete the cron first so it
+cannot fire mid-teardown:
+
+```bash
+sudo rm -f /etc/cron.d/magnatech-tiny-refresh
+```
+
+```bash
+sudo rm -rf /opt/magnatech-tiny
+```
+
+```bash
+sudo rm -f /var/log/magnatech-tiny-refresh.log
+```
+
+Confirm nothing remains:
+
+```bash
+sudo ls -la /opt/magnatech-tiny /etc/cron.d/magnatech-tiny-refresh /var/log/magnatech-tiny-refresh.log
+```
+
+It should report "No such file or directory" for all three. The token in Tiny is not revoked
+by this — it simply stops being refreshed and lapses on its own within 24h.
+
+## The integration itself — the work that starts Monday
+
+The full research is in `SPIKE.md`. The load-bearing decisions to build on:
+
+- **Renewal, done right.** Authorize once, then refresh with a wide margin (a real integrator
+  refreshes every ~3–3h50 against the 4h/24h window, so one missed run never hits the cliff).
+  Host it on the proven 4Shark shape — an `ecs_scheduled_task` (Fargate + EventBridge, the
+  harvester pattern) inside a future `integrator-magnatech` stack — with the cron/scheduler
+  alarms that alert before the 24h cliff. The one new piece versus a plain harvester is a task
+  that writes its OWN rotated token back (`ssm:PutParameter`), which no ECS task in the
+  codebase does today.
+- **Test `client_credentials` first.** The realm advertises the grant type; if the "4Shark
+  Integrator" app has service accounts enabled, machine-to-machine auth removes the whole
+  24h-cliff / human-re-auth problem class. It is one side-effect-free curl with the recovered
+  secret — settle it before designing the renewal around Authorization Code.
+- **Change delivery is polling, not webhooks.** The v3 OpenAPI spec exposes no webhooks. Poll
+  incrementally by `dataAlteracao` (`/produtos`) and `dataAtualizacao` (`/pedidos`). Stock
+  (`/estoque`) has only a per-product GET — no bulk date-filtered listing — so it needs a
+  separate design.
+- **Validate the customer data.** Confirm the product×category list Bruna sent (categories
+  0,7% and 2%) against Tiny before building the script that consumes the token.
+
+## Local artifacts (this machine)
+
+The source of truth for the two scripts is this folder (`tiny_token.sh`, `refresh_cron.sh`);
+the box holds copies. `com.4shark.magnatech-tiny-refresh.plist` here is a launchd unit for a
+Mac-local variant that is **not** used — the bridge runs on the box, not the workstation.
+The Mac token/secret files (`~/.magnatech_tiny_tokens`, `~/.magnatech_tiny_secret`) are stale
+now that the box owns the chain and can be deleted.
 
 ## Language note
 
-Internal engineering doc → English per § Language Policy. The lines to be spoken to
-the client (Bruna) are kept as pt-BR embedded quotes on purpose.
+Internal engineering doc → English per § Language Policy. Command values and the box paths
+are literal.

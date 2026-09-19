@@ -6,11 +6,11 @@
 # access_token (~4h) + refresh_token (~24h). Enquanto renovarmos dentro das 24h,
 # a corrente vive; se lapsar, tem que reautorizar com a Bruna de novo.
 #
-# Uso:
-#   bash tiny_token.sh authorize-url    # imprime a URL para mandar pra Bruna
-#   bash tiny_token.sh exchange         # troca o code pelos tokens e salva (pergunta o code e o secret)
-#   bash tiny_token.sh refresh          # renova usando o refresh_token salvo
-#   bash tiny_token.sh test             # bate na API v3 (leitura) com o access_token salvo
+# Uso (CLIENT_ID e REDIRECT_URI são args opcionais; ao criar app novo no Tiny, passe os dois — o REDIRECT_URI tem que bater com o registrado):
+#   bash tiny_token.sh authorize-url [CLIENT_ID] [REDIRECT_URI]   # imprime a URL para mandar pra Bruna
+#   bash tiny_token.sh exchange [CLIENT_ID] [REDIRECT_URI]        # troca o code pelos tokens e salva (pergunta o code e o secret)
+#   bash tiny_token.sh refresh [CLIENT_ID]                        # renova usando o refresh_token salvo
+#   bash tiny_token.sh test                                       # bate na API v3 (leitura) com o access_token salvo
 #
 # Segredos: o CLIENT_SECRET nunca fica no script. É lido do ambiente
 # (TINY_CLIENT_SECRET) ou perguntado com `read -rs`. Os tokens são salvos com
@@ -18,8 +18,9 @@
 #
 # CONFIRMAR antes de usar: CLIENT_ID e REDIRECT_URI têm que ser IDÊNTICOS aos
 # registrados no app "4Shark Integrator" dentro do Tiny. Os valores abaixo são
-# os do registro de ab/2026 (do histórico); se o app foi recriado, sobrescreva
-# via env TINY_CLIENT_ID / TINY_REDIRECT_URI.
+# os do registro de ab/2026 (do histórico); se a Bruna confirmar um CLIENT_ID
+# diferente, passe-o como argumento (ex.: bash tiny_token.sh authorize-url tiny-api-xxxx).
+# O REDIRECT_URI continua sobrescrito via env TINY_REDIRECT_URI, se precisar.
 
 set -euo pipefail
 
@@ -47,10 +48,10 @@ save_tokens() {
   response_json="$1"
   mkdir -p "$(dirname "$TOKEN_FILE")"
   umask 077
-  python3 - "$TOKEN_FILE" <<'PY'
-import json, sys, time
+  TINY_RESPONSE_JSON="$response_json" python3 - "$TOKEN_FILE" <<'PY'
+import json, os, sys, time
 token_file = sys.argv[1]
-data = json.load(sys.stdin)
+data = json.loads(os.environ["TINY_RESPONSE_JSON"])
 now = int(time.time())
 lines = [
     f'TINY_ACCESS_TOKEN={data["access_token"]}',
@@ -66,26 +67,27 @@ PY
 }
 
 cmd_authorize_url() {
-  encoded_redirect="$(urlencode "$REDIRECT_URI")"
+  client_id="${1:-$CLIENT_ID}"
+  redirect_uri="${2:-$REDIRECT_URI}"
+  encoded_redirect="$(urlencode "$redirect_uri")"
   printf 'Mande esta URL para a Bruna abrir logada na conta Tiny da Magnatech:\n\n'
-  printf '%s/auth?response_type=code&client_id=%s&redirect_uri=%s\n\n' "$AUTH_BASE" "$CLIENT_ID" "$encoded_redirect"
+  printf '%s/auth?response_type=code&client_id=%s&redirect_uri=%s\n\n' "$AUTH_BASE" "$client_id" "$encoded_redirect"
   printf 'Depois de autorizar, ela é redirecionada para o redirect_uri com ?code=... na barra.\n'
   printf 'Peça para ela copiar SÓ o valor do code e te mandar. Ele expira em segundos — troque rápido.\n'
 }
 
 cmd_exchange() {
-  code="${1:-}"
-  if [ -z "$code" ]; then
-    printf 'Cole o code que a Bruna te passou: ' >&2
-    read -r code
-  fi
+  client_id="${1:-$CLIENT_ID}"
+  redirect_uri="${2:-$REDIRECT_URI}"
+  printf 'Cole o code que a Bruna te passou: ' >&2
+  read -r code
   read_secret
   response_json="$(curl -sS -X POST "$AUTH_BASE/token" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode 'grant_type=authorization_code' \
-    --data-urlencode "client_id=$CLIENT_ID" \
+    --data-urlencode "client_id=$client_id" \
     --data-urlencode "client_secret=$client_secret" \
-    --data-urlencode "redirect_uri=$REDIRECT_URI" \
+    --data-urlencode "redirect_uri=$redirect_uri" \
     --data-urlencode "code=$code")"
   if printf '%s' "$response_json" | grep -q '"access_token"'; then
     save_tokens "$response_json"
@@ -97,13 +99,14 @@ cmd_exchange() {
 }
 
 cmd_refresh() {
+  client_id="${1:-$CLIENT_ID}"
   # shellcheck disable=SC1090
   . "$TOKEN_FILE"
   read_secret
   response_json="$(curl -sS -X POST "$AUTH_BASE/token" \
     -H 'Content-Type: application/x-www-form-urlencoded' \
     --data-urlencode 'grant_type=refresh_token' \
-    --data-urlencode "client_id=$CLIENT_ID" \
+    --data-urlencode "client_id=$client_id" \
     --data-urlencode "client_secret=$client_secret" \
     --data-urlencode "refresh_token=$TINY_REFRESH_TOKEN")"
   if printf '%s' "$response_json" | grep -q '"access_token"'; then
@@ -126,9 +129,9 @@ cmd_test() {
 }
 
 case "${1:-}" in
-  authorize-url) cmd_authorize_url ;;
-  exchange) shift; cmd_exchange "${1:-}" ;;
-  refresh) cmd_refresh ;;
+  authorize-url) shift; cmd_authorize_url "${1:-}" "${2:-}" ;;
+  exchange) shift; cmd_exchange "${1:-}" "${2:-}" ;;
+  refresh) shift; cmd_refresh "${1:-}" ;;
   test) cmd_test ;;
-  *) printf 'uso: bash tiny_token.sh {authorize-url|exchange|refresh|test}\n' >&2; exit 2 ;;
+  *) printf 'uso: bash tiny_token.sh {authorize-url|exchange [CLIENT_ID] [REDIRECT_URI] | refresh [CLIENT_ID] | test}\n' >&2; exit 2 ;;
 esac
